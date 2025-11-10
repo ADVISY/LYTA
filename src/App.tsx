@@ -16,6 +16,7 @@ import PrevoyanceLPP from "./pages/entreprises/PrevoyanceLPP";
 import APropos from "./pages/APropos";
 import Carriere from "./pages/Carriere";
 import Connexion from "./pages/Connexion";
+import Simulateurs from "./pages/Simulateurs";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
           {/* Other Pages */}
           <Route path="/a-propos" element={<APropos />} />
           <Route path="/carriere" element={<Carriere />} />
+          <Route path="/simulateurs" element={<Simulateurs />} />
           <Route path="/connexion" element={<Connexion />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

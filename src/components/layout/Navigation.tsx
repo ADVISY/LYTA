@@ -6,6 +6,7 @@ import advisyLogo from "@/assets/advisy-logo.svg";
 
 const navLinks = [
   { label: "Accueil", href: "/", type: "link" },
+  { label: "Simulateurs", href: "/simulateurs", type: "link" },
   { 
     label: "Assurances", 
     type: "dropdown",
