@@ -6,8 +6,57 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import officeImage from "@/assets/office-consultation.jpg";
 import teamImage from "@/assets/team-meeting.jpg";
+import familyConsultation from "@/assets/family-consultation.jpg";
+import advisorWoman from "@/assets/advisor-woman.jpg";
+import advisorMan from "@/assets/advisor-man.jpg";
+import advisyTextLogo from "@/assets/advisy-text-logo.svg";
+import { useState, useEffect, useCallback } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import Autoplay from "embla-carousel-autoplay";
 
 const APropos = () => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
+    Autoplay({ delay: 4000, stopOnInteraction: false }),
+  ]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const scrollTo = useCallback(
+    (index: number) => emblaApi && emblaApi.scrollTo(index),
+    [emblaApi]
+  );
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
+  const slides = [
+    {
+      image: familyConsultation,
+      title: "Proximité humaine",
+      description: "Nos conseillers vous accompagnent avec empathie et professionnalisme",
+    },
+    {
+      image: advisorWoman,
+      title: "Expertise reconnue",
+      description: "Une équipe formée pour vous offrir les meilleures solutions",
+    },
+    {
+      image: advisorMan,
+      title: "Engagement qualité",
+      description: "Votre satisfaction est notre priorité absolue",
+    },
+  ];
+
   const values = [
     {
       icon: Eye,
@@ -52,19 +101,110 @@ const APropos = () => {
     <div className="min-h-screen">
       <Navigation />
       <main>
-        {/* Hero Section */}
-        <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden bg-gradient-subtle">
-          <div className="absolute inset-0 bg-[url('/src/assets/bg-pattern.png')] opacity-5" />
-          
-          <div className="container mx-auto px-4 lg:px-8 relative z-10">
-            <div className="max-w-4xl mx-auto text-center space-y-6">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground">
-                Notre mission & nos valeurs
-              </h1>
-              <p className="text-lg md:text-xl text-foreground/80 leading-relaxed">
-                Advisy a pour mission d'apporter de la clarté, de la transparence et de la stratégie dans le monde de l'assurance et de la prévoyance.
-                Notre approche repose sur la pédagogie, l'indépendance et la proximité.
-              </p>
+        {/* Hero Section with Slider */}
+        <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
+          <div className="container relative z-10 mx-auto px-4 lg:px-8 py-20 lg:py-32">
+            <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+              {/* Left Column - Text */}
+              <div className="space-y-10 animate-fade-in">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                    <Heart className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-primary uppercase tracking-wide">
+                      À propos
+                    </span>
+                  </div>
+                  
+                  <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight flex flex-wrap items-center gap-4">
+                    <span>Découvrez</span>
+                    <img src={advisyTextLogo} alt="Advisy" className="h-14 md:h-16 lg:h-20 object-contain inline-block" />
+                  </h1>
+                  
+                  <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed font-light flex flex-wrap items-center gap-2">
+                    <img src={advisyTextLogo} alt="Advisy" className="h-6 inline-block" />
+                    <span>a pour mission d'apporter de la clarté, de la transparence et de la stratégie dans le monde de l'assurance et de la prévoyance.</span>
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Eye className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-foreground">Transparence</h3>
+                      <p className="text-sm text-muted-foreground">Clarté totale dans nos conseils</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Users className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-foreground">Indépendance</h3>
+                      <p className="text-sm text-muted-foreground">Votre intérêt avant tout</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <MapPin className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-foreground">Proximité</h3>
+                      <p className="text-sm text-muted-foreground">Présents en Suisse romande</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Carousel */}
+              <div className="relative animate-scale-in">
+                <div className="relative overflow-hidden rounded-[32px]" ref={emblaRef}>
+                  <div className="flex">
+                    {slides.map((slide, index) => (
+                      <div key={index} className="flex-[0_0_100%] min-w-0 px-2">
+                        <div className="relative">
+                          <div className="group relative z-20 rounded-[32px] overflow-hidden border-4 border-white/20 shadow-strong hover:shadow-glow transition-all duration-700 hover:-translate-y-3">
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-700 z-10" />
+                            <img 
+                              src={slide.image} 
+                              alt={slide.title}
+                              className="w-full h-full object-cover aspect-[4/3] group-hover:scale-105 transition-transform duration-700"
+                            />
+                            
+                            <div className="absolute bottom-6 left-6 right-6 z-20 bg-white/95 backdrop-blur-xl rounded-2xl p-6 border border-primary/20 shadow-strong">
+                              <h3 className="text-2xl font-bold text-foreground mb-2">
+                                {slide.title}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                {slide.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="absolute -top-16 -right-16 w-80 h-80 bg-gradient-to-br from-primary/15 to-primary-glow/10 rounded-full blur-[120px] -z-10 animate-float" />
+                          <div className="absolute -bottom-16 -left-16 w-96 h-96 bg-gradient-to-tl from-accent/20 to-primary/10 rounded-full blur-[140px] -z-10 animate-pulse" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-center gap-2 mt-6">
+                  {slides.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => scrollTo(index)}
+                      className={`transition-all duration-300 rounded-full ${
+                        index === selectedIndex
+                          ? "w-8 h-3 bg-primary shadow-glow"
+                          : "w-3 h-3 bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                      }`}
+                      aria-label={`Aller à la slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -80,9 +220,10 @@ const APropos = () => {
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">
                   Rendre l'assurance simple et accessible
                 </h2>
-                <p className="text-lg text-foreground/70 leading-relaxed">
-                  Trop souvent, l'assurance et la prévoyance sont perçues comme complexes et opaques. 
-                  Chez Advisy, nous croyons qu'il est possible de faire autrement.
+                <p className="text-lg text-foreground/70 leading-relaxed flex flex-wrap items-center gap-2">
+                  <span>Trop souvent, l'assurance et la prévoyance sont perçues comme complexes et opaques. Chez</span>
+                  <img src={advisyTextLogo} alt="Advisy" className="h-5 inline-block" />
+                  <span>, nous croyons qu'il est possible de faire autrement.</span>
                 </p>
                 <p className="text-lg text-foreground/70 leading-relaxed">
                   Notre mission est de démystifier le secteur, d'offrir des conseils personnalisés et indépendants, 
@@ -212,9 +353,9 @@ const APropos = () => {
               <h2 className="text-3xl md:text-4xl font-bold text-foreground">
                 Un réseau de confiance
               </h2>
-              <p className="text-lg text-foreground/70 leading-relaxed">
-                Advisy collabore avec les principaux acteurs suisses de l'assurance et de la finance, 
-                garantissant des solutions neutres, performantes et sur mesure pour chaque client.
+              <p className="text-lg text-foreground/70 leading-relaxed flex flex-wrap items-center gap-2">
+                <img src={advisyTextLogo} alt="Advisy" className="h-5 inline-block" />
+                <span>collabore avec les principaux acteurs suisses de l'assurance et de la finance, garantissant des solutions neutres, performantes et sur mesure pour chaque client.</span>
               </p>
               <div className="pt-8">
                 <Link to="/#contact">
