@@ -21,7 +21,7 @@ export const EnhancedHeroSection = () => {
       }}
     >
       {/* Overlay subtil pour améliorer la lisibilité */}
-      <div className="absolute inset-0 bg-background/80" />
+      <div className="absolute inset-0 bg-background/30" />
       
       {/* Advanced Background effects */}
       <div className="absolute inset-0 opacity-20">
