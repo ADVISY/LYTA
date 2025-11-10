@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Shield, TrendingUp, Calendar, CheckCircle, Sparkles, Award, Users } from "lucide-react";
 import heroBg from "@/assets/hero-bg.png";
+import familyConsultation from "@/assets/family-consultation.jpg";
 
 export const EnhancedHeroSection = () => {
   const scrollToSection = (href: string) => {
@@ -126,29 +127,31 @@ export const EnhancedHeroSection = () => {
             </div>
           </div>
 
-          {/* Right Column - Premium 3D Card Layout avec glassmorphism */}
+          {/* Right Column - Image de consultation familiale */}
           <div className="relative animate-scale-in">
             <div className="relative">
-              {/* Main premium feature card */}
-              <div className="group relative z-20 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl rounded-[32px] p-10 border-2 border-primary/30 shadow-strong hover:shadow-[0_0_80px_rgba(100,50,255,0.5)] transition-all duration-700 hover:-translate-y-3 hover:border-primary/60">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-[32px] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                <div className="relative flex items-start gap-6">
-                  <div className="w-20 h-20 rounded-3xl bg-gradient-primary flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform duration-500">
-                    <Shield className="w-10 h-10 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-3xl font-bold text-foreground mb-4 group-hover:text-primary-glow transition-colors duration-500">
-                      Protection complète
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed mb-6 text-base">
-                      Analyse approfondie de toutes vos couvertures d'assurance
-                      et recommandations personnalisées.
-                    </p>
-                    <div className="flex items-center gap-3 text-primary-glow font-bold group-hover:gap-5 transition-all duration-500">
-                      <span>En savoir plus</span>
-                      <span className="text-xl group-hover:translate-x-2 transition-transform duration-500">
-                        →
-                      </span>
+              {/* Image principale de consultation */}
+              <div className="group relative z-20 rounded-[32px] overflow-hidden border-4 border-white/20 shadow-strong hover:shadow-[0_0_80px_rgba(100,50,255,0.5)] transition-all duration-700 hover:-translate-y-3 hover:border-primary/40">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-700 z-10" />
+                <img 
+                  src={familyConsultation} 
+                  alt="Famille en consultation avec un conseiller Advisy"
+                  className="w-full h-full object-cover aspect-[4/3] group-hover:scale-105 transition-transform duration-700"
+                />
+                
+                {/* Badge flottant sur l'image */}
+                <div className="absolute bottom-6 left-6 right-6 z-20 bg-white/95 backdrop-blur-xl rounded-2xl p-6 border border-primary/20 shadow-strong">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-glow flex-shrink-0">
+                      <Shield className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-foreground mb-1">
+                        Conseil personnalisé
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Votre famille mérite la meilleure protection
+                      </p>
                     </div>
                   </div>
                 </div>
