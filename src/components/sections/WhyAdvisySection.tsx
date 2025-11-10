@@ -1,4 +1,4 @@
-import { CheckCircle, Users, Lightbulb, BarChart3, MapPin } from "lucide-react";
+import { CheckCircle, Users, Lightbulb, BarChart3, MapPin, Award } from "lucide-react";
 
 const advantages = [
   {
@@ -30,34 +30,62 @@ const advantages = [
 
 export const WhyAdvisySection = () => {
   return (
-    <section className="py-20 lg:py-32 bg-background">
-      <div className="container mx-auto px-4 lg:px-8">
-        <div className="text-center mb-16">
+    <section className="relative py-20 lg:py-32 bg-background overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-40 right-20 w-96 h-96 bg-primary rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-accent rounded-full blur-3xl" />
+      </div>
+
+      <div className="container relative z-10 mx-auto px-4 lg:px-8">
+        {/* Section Header */}
+        <div className="text-center mb-16 animate-fade-in max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+            <Award className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-primary uppercase tracking-wide">
+              Nos avantages
+            </span>
+          </div>
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-            Pourquoi choisir Advisy ?
+            Pourquoi choisir{" "}
+            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
+              Advisy ?
+            </span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-xl text-muted-foreground">
             Chez Advisy, nous rendons les assurances et la prévoyance simples et compréhensibles.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8">
+        {/* Advantages Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8">
           {advantages.map((advantage, index) => {
             const Icon = advantage.icon;
             return (
               <div
                 key={index}
-                className="text-center space-y-4 p-6 rounded-2xl bg-gradient-subtle hover:shadow-medium transition-all duration-300"
+                className="group text-center space-y-4 p-8 rounded-3xl bg-gradient-card backdrop-blur-sm border border-border hover:shadow-glow transition-all duration-500 hover:-translate-y-3 animate-slide-up"
+                style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-primary flex items-center justify-center shadow-medium">
-                  <Icon className="w-8 h-8 text-white" />
+                {/* Icon with animation */}
+                <div className="relative mx-auto w-20 h-20 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-medium group-hover:scale-110 group-hover:shadow-glow transition-all duration-500">
+                  <Icon className="w-10 h-10 text-white" />
+                  {/* Decorative glow */}
+                  <div className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl -z-10 group-hover:bg-primary/40 transition-colors duration-500" />
                 </div>
-                <h3 className="text-xl font-bold text-foreground">
+
+                {/* Title */}
+                <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
                   {advantage.title}
                 </h3>
-                <p className="text-muted-foreground">
+
+                {/* Description */}
+                <p className="text-muted-foreground leading-relaxed">
                   {advantage.description}
                 </p>
+
+                {/* Hover indicator */}
+                <div className="h-1 w-0 mx-auto bg-gradient-primary rounded-full group-hover:w-12 transition-all duration-300" />
               </div>
             );
           })}

@@ -1,6 +1,8 @@
-import { Shield, LineChart, Briefcase, Calculator } from "lucide-react";
+import { Shield, LineChart, Briefcase, Calculator, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import bgPattern from "@/assets/bg-pattern.png";
+import advisorMan from "@/assets/advisor-man.jpg";
 
 const services = [
   {
@@ -41,6 +43,13 @@ const services = [
 ];
 
 export const ServicesSection = () => {
+  const scrollToContact = () => {
+    const element = document.querySelector("#contact");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <section 
       id="services" 
@@ -56,8 +65,8 @@ export const ServicesSection = () => {
       
       {/* Background decoration */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl opacity-10">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent blur-3xl" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl" />
       </div>
       
       <div className="container relative z-10 mx-auto px-4 lg:px-8">
@@ -81,7 +90,7 @@ export const ServicesSection = () => {
         </div>
 
         {/* Services Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto mb-16">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
@@ -119,11 +128,53 @@ export const ServicesSection = () => {
                 {/* Arrow link */}
                 <div className="relative flex items-center gap-2 text-primary font-semibold group/link">
                   <span className="text-sm">Découvrir</span>
-                  <span className="group-hover/link:translate-x-1 transition-transform">→</span>
+                  <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
                 </div>
               </div>
             );
           })}
+        </div>
+
+        {/* Expert CTA Section */}
+        <div className="max-w-5xl mx-auto">
+          <div className="relative bg-gradient-card backdrop-blur-sm rounded-3xl overflow-hidden border border-border shadow-strong">
+            <div className="grid lg:grid-cols-2 gap-8 items-center">
+              {/* Image */}
+              <div className="relative h-full min-h-[300px] lg:min-h-[400px] order-2 lg:order-1">
+                <img
+                  src={advisorMan}
+                  alt="Expert conseil Advisy"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/60 lg:hidden" />
+              </div>
+              
+              {/* Content */}
+              <div className="p-8 lg:p-12 space-y-6 order-1 lg:order-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                  <Shield className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-primary">
+                    Conseil personnalisé
+                  </span>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-bold text-foreground">
+                  Parlons de votre situation
+                </h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  Chaque situation est unique. Nos experts analysent vos besoins 
+                  et vous proposent les solutions les plus adaptées, sans engagement.
+                </p>
+                <Button
+                  size="lg"
+                  onClick={scrollToContact}
+                  className="text-lg px-12 shadow-glow group"
+                >
+                  <span className="relative z-10">Consultation gratuite</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary-light to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
