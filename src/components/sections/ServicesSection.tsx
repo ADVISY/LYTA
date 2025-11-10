@@ -89,46 +89,46 @@ export const ServicesSection = () => {
           </p>
         </div>
 
-        {/* Services Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto mb-16">
+        {/* Services Grid - 5 colonnes */}
+        <div className="grid grid-cols-5 gap-4 mx-auto mb-16">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
               <div
                 key={index}
-                className="relative bg-gradient-card backdrop-blur-sm rounded-3xl p-10 border border-border shadow-medium hover:shadow-glow transition-all duration-500 hover:-translate-y-3 group animate-slide-up overflow-hidden"
+                className="relative bg-gradient-card backdrop-blur-sm rounded-2xl p-5 border border-border shadow-medium hover:shadow-glow transition-all duration-500 hover:-translate-y-2 group animate-slide-up overflow-hidden"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Hover gradient effect */}
                 <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 transition-opacity duration-500" />
                 
                 {/* Icon */}
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-8 shadow-medium group-hover:scale-110 group-hover:shadow-glow transition-all duration-500">
-                  <Icon className="w-8 h-8 text-white" />
+                <div className="relative w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 shadow-medium group-hover:scale-110 group-hover:shadow-glow transition-all duration-500 mx-auto">
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
 
                 {/* Badge */}
                 <Badge
                   variant="secondary"
-                  className="relative mb-6 bg-accent text-accent-foreground font-semibold px-4 py-1.5"
+                  className="relative mb-3 bg-accent text-accent-foreground font-semibold px-3 py-1 text-xs w-full justify-center"
                 >
                   {service.badge}
                 </Badge>
 
                 {/* Title */}
-                <h3 className="relative text-2xl font-bold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">
+                <h3 className="relative text-sm font-bold text-foreground mb-3 group-hover:text-primary transition-colors duration-300 text-center leading-tight">
                   {service.title}
                 </h3>
 
                 {/* Description */}
-                <p className="relative text-base text-muted-foreground leading-relaxed mb-6">
+                <p className="relative text-xs text-muted-foreground leading-relaxed mb-3 text-center">
                   {service.description}
                 </p>
                 
                 {/* Arrow link */}
-                <div className="relative flex items-center gap-2 text-primary font-semibold group/link">
-                  <span className="text-sm">Découvrir</span>
-                  <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
+                <div className="relative flex items-center gap-1 text-primary font-semibold group/link justify-center">
+                  <span className="text-xs">Découvrir</span>
+                  <ArrowRight className="w-3 h-3 group-hover/link:translate-x-1 transition-transform" />
                 </div>
               </div>
             );
