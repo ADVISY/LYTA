@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Shield, TrendingUp, Calendar, CheckCircle, Sparkles, Award, Users } from "lucide-react";
-import bgPatternGray from "@/assets/bg-pattern-gray.png";
+
 import familyConsultation from "@/assets/family-consultation.jpg";
 
 export const EnhancedHeroSection = () => {
@@ -17,17 +17,9 @@ export const EnhancedHeroSection = () => {
       className="relative min-h-screen flex items-center pt-20 overflow-hidden"
     >
       {/* Premium Light Overlay avec glassmorphism */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/30 to-primary/5 backdrop-blur-sm" />
       
-      {/* Advanced Premium Background effects */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-[600px] h-[600px] bg-primary/15 rounded-full blur-[120px] animate-float" />
-        <div className="absolute bottom-20 right-10 w-[700px] h-[700px] bg-gradient-to-br from-primary-glow/15 to-accent/15 rounded-full blur-[140px] animate-pulse" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/8 rounded-full blur-[160px]" />
-      </div>
       
-      {/* Mesh gradient overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(100,50,255,0.03),transparent_50%)]" />
+      
 
       <div className="container relative z-10 mx-auto px-4 lg:px-8 py-20 lg:py-32">
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
