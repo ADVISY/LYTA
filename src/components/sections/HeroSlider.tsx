@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield, TrendingUp, Award, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, TrendingUp, Award, ChevronLeft, ChevronRight, Heart, Home, Car } from "lucide-react";
 import familyConsultation from "@/assets/family-consultation.jpg";
 import calculatorSavings from "@/assets/calculator-savings.jpg";
 import teamExpertise from "@/assets/team-expertise.jpg";
+import santéModerne from "@/assets/sante-moderne.jpg";
+import menageModerne from "@/assets/menage-moderne.jpg";
+import autoModerne from "@/assets/auto-moderne.jpg";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 
@@ -16,11 +19,32 @@ const slides = [
     description: "Des experts à votre écoute pour des solutions sur mesure",
   },
   {
+    image: santéModerne,
+    icon: Heart,
+    title: "Assurance santé",
+    subtitle: "Protégez votre santé et celle de vos proches",
+    description: "Trouvez la meilleure couverture santé adaptée à vos besoins",
+  },
+  {
     image: calculatorSavings,
     icon: TrendingUp,
     title: "Optimisez vos coûts",
     subtitle: "Économisez jusqu'à 40% sur vos primes",
     description: "Calculateurs gratuits et comparaisons personnalisées",
+  },
+  {
+    image: menageModerne,
+    icon: Home,
+    title: "RC & Ménage",
+    subtitle: "Protégez votre foyer et vos biens",
+    description: "Une couverture complète pour votre habitation",
+  },
+  {
+    image: autoModerne,
+    icon: Car,
+    title: "Assurance auto",
+    subtitle: "Roulez l'esprit tranquille",
+    description: "Les meilleures offres pour votre véhicule",
   },
   {
     image: teamExpertise,
@@ -85,22 +109,22 @@ export const HeroSlider = ({ onContactClick, onServicesClick }: HeroSliderProps)
                 <div className="container mx-auto px-4 lg:px-8">
                   <div className="max-w-3xl animate-fade-in">
                     {/* Badge flottant */}
-                    <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white/95 backdrop-blur-xl border border-primary/20 shadow-strong mb-8 animate-bounce-in">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                        <Icon className="w-5 h-5 text-white" />
+                    <div className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/95 backdrop-blur-xl border-2 border-primary/30 shadow-strong mb-8 animate-bounce-in hover:scale-105 transition-all duration-300">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+                        <Icon className="w-7 h-7 text-white" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-lg font-bold text-foreground">
+                        <h3 className="text-xl font-bold text-foreground">
                           {slide.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-base text-muted-foreground">
                           {slide.subtitle}
                         </p>
                       </div>
                     </div>
 
                     {/* Description */}
-                    <p className="text-2xl md:text-3xl font-light text-foreground mb-10 leading-relaxed animate-slide-in-left">
+                    <p className="text-2xl md:text-3xl lg:text-4xl font-light text-foreground mb-10 leading-relaxed animate-slide-in-left drop-shadow-lg">
                       {slide.description}
                     </p>
 
@@ -137,29 +161,29 @@ export const HeroSlider = ({ onContactClick, onServicesClick }: HeroSliderProps)
       {/* Navigation Arrows */}
       <button
         onClick={scrollPrev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 backdrop-blur-sm border border-primary/20 shadow-strong hover:shadow-glow hover:bg-white transition-all duration-300 flex items-center justify-center group"
+        className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-20 w-14 h-14 rounded-full bg-white/95 backdrop-blur-sm border-2 border-primary/30 shadow-strong hover:shadow-glow hover:bg-white hover:scale-110 transition-all duration-300 flex items-center justify-center group"
         aria-label="Previous slide"
       >
-        <ChevronLeft className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+        <ChevronLeft className="w-7 h-7 text-primary group-hover:scale-110 transition-transform" />
       </button>
       <button
         onClick={scrollNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 backdrop-blur-sm border border-primary/20 shadow-strong hover:shadow-glow hover:bg-white transition-all duration-300 flex items-center justify-center group"
+        className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-20 w-14 h-14 rounded-full bg-white/95 backdrop-blur-sm border-2 border-primary/30 shadow-strong hover:shadow-glow hover:bg-white hover:scale-110 transition-all duration-300 flex items-center justify-center group"
         aria-label="Next slide"
       >
-        <ChevronRight className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+        <ChevronRight className="w-7 h-7 text-primary group-hover:scale-110 transition-transform" />
       </button>
 
       {/* Dots Indicators */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3 bg-black/30 backdrop-blur-md px-4 py-3 rounded-full">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => emblaApi && emblaApi.scrollTo(index)}
             className={`transition-all duration-300 rounded-full ${
               index === selectedIndex
-                ? "w-8 h-3 bg-primary shadow-glow"
-                : "w-3 h-3 bg-white/60 hover:bg-white/80"
+                ? "w-10 h-3 bg-primary shadow-glow"
+                : "w-3 h-3 bg-white/60 hover:bg-white/90 hover:scale-110"
             }`}
             aria-label={`Go to slide ${index + 1}`}
           />

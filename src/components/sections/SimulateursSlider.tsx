@@ -5,6 +5,7 @@ import simulateurSalaireHero from "@/assets/simulateur-salaire-hero.jpg";
 import simulateurSubsidesHero from "@/assets/simulateur-subsides-hero.jpg";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
+import advisyTextLogo from "@/assets/advisy-text-logo.svg";
 
 export const SimulateursSlider = () => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
@@ -69,8 +70,10 @@ export const SimulateursSlider = () => {
                 </span>
               </div>
               
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
-                Simulateurs Advisy : calculez, comprenez et{" "}
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight flex flex-wrap items-center gap-3">
+                <span>Simulateurs</span>
+                <img src={advisyTextLogo} alt="Advisy" className="h-12 md:h-14 lg:h-16 object-contain inline-block" />
+                <span>: calculez, comprenez et{" "}</span>
                 <span className="relative inline-block">
                   <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
                     optimisez votre situation
@@ -158,13 +161,14 @@ export const SimulateursSlider = () => {
         
         {/* Info Box - Full Width Below */}
         <div className="max-w-6xl mx-auto mt-16 bg-card border border-border rounded-2xl p-6 shadow-soft">
-          <p className="text-foreground mb-4">
-            Chez Advisy, nous pensons que la clarté commence par la compréhension.
-            Ces trois simulateurs vous permettent d'obtenir en quelques secondes une estimation personnalisée, 
-            afin de prendre des décisions éclairées sur votre avenir financier et votre couverture d'assurance.
+          <p className="text-foreground mb-4 flex flex-wrap items-center gap-2">
+            <span>Chez</span>
+            <img src={advisyTextLogo} alt="Advisy" className="h-5 inline-block" />
+            <span>, nous pensons que la clarté commence par la compréhension. Ces trois simulateurs vous permettent d'obtenir en quelques secondes une estimation personnalisée, afin de prendre des décisions éclairées sur votre avenir financier et votre couverture d'assurance.</span>
           </p>
-          <p className="text-sm text-muted-foreground">
-            ⚠️ Ces outils sont fournis à titre indicatif. Pour une analyse complète et certifiée, contactez un conseiller Advisy.
+          <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2">
+            <span>⚠️ Ces outils sont fournis à titre indicatif. Pour une analyse complète et certifiée, contactez un conseiller</span>
+            <img src={advisyTextLogo} alt="Advisy" className="h-4 inline-block" />
           </p>
         </div>
       </div>

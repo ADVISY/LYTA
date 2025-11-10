@@ -6,6 +6,7 @@ import calculatorSavings from "@/assets/calculator-savings.jpg";
 import teamExpertise from "@/assets/team-expertise.jpg";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
+import advisyTextLogo from "@/assets/advisy-text-logo.svg";
 
 export const EnhancedHeroSection = () => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
@@ -75,22 +76,27 @@ export const EnhancedHeroSection = () => {
           {/* Left Column - Enhanced Text */}
           <div className="space-y-10 animate-fade-in">
             <div className="space-y-6">
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
-                La clarté dans vos décisions{" "}
-                <span className="relative inline-block">
-                  <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
-                    d'assurance
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <img src={advisyTextLogo} alt="Advisy" className="h-16 md:h-20 lg:h-24 object-contain" />
+                </div>
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
+                  La clarté dans vos décisions{" "}
+                  <span className="relative inline-block">
+                    <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
+                      d'assurance
+                    </span>
+                    <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
+                  </span>{" "}
+                  et de{" "}
+                  <span className="relative inline-block">
+                    <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
+                      prévoyance
+                    </span>
+                    <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
                   </span>
-                  <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
-                </span>{" "}
-                et de{" "}
-                <span className="relative inline-block">
-                  <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
-                    prévoyance
-                  </span>
-                  <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
-                </span>
-              </h1>
+                </h1>
+              </div>
               
               <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed font-light">
                 Trouvez la solution la plus avantageuse pour votre santé, votre retraite et vos finances.{" "}
