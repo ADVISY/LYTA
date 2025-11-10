@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Shield, TrendingUp, Calendar, CheckCircle, Sparkles, Award, Users } from "lucide-react";
-import heroBg from "@/assets/hero-bg.png";
+import bgPatternGray from "@/assets/bg-pattern-gray.png";
 import familyConsultation from "@/assets/family-consultation.jpg";
 
 export const EnhancedHeroSection = () => {
@@ -16,7 +16,7 @@ export const EnhancedHeroSection = () => {
       id="accueil"
       className="relative min-h-screen flex items-center pt-20 overflow-hidden"
       style={{
-        backgroundImage: `url(${heroBg})`,
+        backgroundImage: `url(${bgPatternGray})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
