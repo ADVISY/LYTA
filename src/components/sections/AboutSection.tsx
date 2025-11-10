@@ -1,5 +1,6 @@
 import { Eye, Users, MapPin, Target } from "lucide-react";
 import officeConsultation from "@/assets/office-consultation.jpg";
+import advisyTextLogo from "@/assets/advisy-text-logo.svg";
 
 const values = [
   {
@@ -39,14 +40,15 @@ export const AboutSection = () => {
               Qui sommes-nous
             </span>
           </div>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6">
-            Advisy en{" "}
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 flex items-center justify-center gap-4 flex-wrap">
+            <img src={advisyTextLogo} alt="Advisy" className="h-12 md:h-14 object-contain" />
+            <span>en</span>{" "}
             <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
               quelques mots
             </span>
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-            Advisy est un cabinet de conseil indépendant basé en Suisse romande.
+            <img src={advisyTextLogo} alt="Advisy" className="inline-block h-6 mx-1 align-baseline" /> est un cabinet de conseil indépendant basé en Suisse romande.
             Notre mission : vous aider à prendre des décisions éclairées pour vos
             assurances et vos finances, sans jargon ni mauvaises surprises.
           </p>

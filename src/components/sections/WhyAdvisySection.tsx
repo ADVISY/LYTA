@@ -1,4 +1,5 @@
 import { CheckCircle, Users, Lightbulb, BarChart3, MapPin, Award } from "lucide-react";
+import advisyTextLogo from "@/assets/advisy-text-logo.svg";
 
 const advantages = [
   {
@@ -46,14 +47,17 @@ export const WhyAdvisySection = () => {
               Nos avantages
             </span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-            Pourquoi choisir{" "}
+          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6 flex items-center justify-center gap-3 flex-wrap">
+            <span>Pourquoi choisir</span>{" "}
+            <img src={advisyTextLogo} alt="Advisy" className="h-12 md:h-14 object-contain" />
             <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              Advisy ?
+              ?
             </span>
           </h2>
-          <p className="text-xl text-muted-foreground">
-            Chez Advisy, nous rendons les assurances et la prévoyance simples et compréhensibles.
+          <p className="text-xl text-muted-foreground flex items-center justify-center gap-2 flex-wrap">
+            <span>Chez</span>
+            <img src={advisyTextLogo} alt="Advisy" className="inline-block h-6 align-baseline" />
+            <span>, nous rendons les assurances et la prévoyance simples et compréhensibles.</span>
           </p>
         </div>
 
