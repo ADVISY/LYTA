@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import bgPattern from "@/assets/bg-pattern.png";
+import bgPatternGray from "@/assets/bg-pattern-gray.png";
 import advisyLogo from "@/assets/advisy-logo.svg";
-import heroBg from "@/assets/hero-bg.png";
 
 interface SplashSectionProps {
   onEnter: () => void;
@@ -13,13 +12,13 @@ export const SplashSection = ({ onEnter }: SplashSectionProps) => {
       id="splash"
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{
-        backgroundImage: `url(${heroBg})`,
+        backgroundImage: `url(${bgPatternGray})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-background/30" />
+      <div className="absolute inset-0 bg-background/10" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-8 px-4 animate-scale-in">
