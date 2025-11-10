@@ -11,6 +11,9 @@ const navLinks = [
     label: "Assurances", 
     type: "dropdown",
     subLinks: [
+      { label: "Vue d'ensemble", subItems: [
+        { label: "Toutes nos assurances", href: "/assurances" },
+      ]},
       { label: "Particuliers", subItems: [
         { label: "Assurance santé", href: "/assurances/sante" },
         { label: "Assurance vie & 3ᵉ pilier", href: "/assurances/3e-pilier" },
