@@ -64,7 +64,7 @@ export const Navigation = () => {
   const handleMouseLeave = () => {
     const timeout = setTimeout(() => {
       setActiveDropdown(null);
-    }, 200);
+    }, 450);
     setCloseTimeout(timeout);
   };
 
@@ -115,9 +115,17 @@ export const Navigation = () => {
 
                 {link.type === "dropdown" && (
                   <>
-                    <button className="text-sm font-semibold text-muted-foreground hover:text-primary transition-all duration-300 relative flex items-center gap-1">
+                    <button 
+                      className="text-sm font-semibold text-muted-foreground hover:text-primary transition-all duration-300 relative flex items-center gap-1"
+                      onClick={() => {
+                        if (closeTimeout) { clearTimeout(closeTimeout); setCloseTimeout(null); }
+                        setActiveDropdown(activeDropdown === link.label ? null : link.label);
+                      }}
+                      aria-expanded={activeDropdown === link.label}
+                      aria-haspopup="menu"
+                    >
                       {link.label}
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className={`w-4 h-4 transition-transform ${activeDropdown === link.label ? 'rotate-180' : ''}`} />
                       <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-primary group-hover:w-full transition-all duration-300" />
                     </button>
                     
