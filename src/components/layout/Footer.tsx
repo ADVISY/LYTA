@@ -1,4 +1,4 @@
-import advisyLogo from "@/assets/advisy-logo.png";
+import advisyLogo from "@/assets/advisy-logo.svg";
 
 export const Footer = () => {
   const scrollToSection = (href: string) => {
@@ -26,8 +26,7 @@ export const Footer = () => {
             <img 
               src={advisyLogo} 
               alt="Advisy - Le bon choix, à chaque fois" 
-              className="h-12 w-auto object-contain brightness-0 invert opacity-90"
-              style={{ imageRendering: 'crisp-edges' }}
+              className="h-16 w-auto object-contain brightness-0 invert opacity-90"
             />
           </div>
 

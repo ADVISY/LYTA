@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import advisyLogo from "@/assets/advisy-logo.png";
+import advisyLogo from "@/assets/advisy-logo.svg";
 
 const navLinks = [
   { label: "Accueil", href: "#accueil" },
@@ -36,8 +36,7 @@ export const Navigation = () => {
             <img 
               src={advisyLogo} 
               alt="Advisy - Le bon choix, à chaque fois" 
-              className="h-10 md:h-11 w-auto object-contain"
-              style={{ imageRendering: 'crisp-edges' }}
+              className="h-12 md:h-14 w-auto object-contain"
             />
           </button>
 
