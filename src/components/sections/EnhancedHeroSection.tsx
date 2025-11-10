@@ -33,14 +33,6 @@ export const EnhancedHeroSection = () => {
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
           {/* Left Column - Enhanced Text */}
           <div className="space-y-10 animate-fade-in">
-            {/* Premium Badge avec glow effect */}
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-primary/15 via-primary/10 to-primary/15 border border-primary/40 backdrop-blur-md shadow-glow hover:shadow-[0_0_60px_rgba(100,50,255,0.4)] transition-all duration-500 hover:scale-105">
-              <Sparkles className="w-5 h-5 text-primary-glow animate-pulse" />
-              <span className="text-sm font-bold text-primary-glow tracking-wide">
-                Conseil indépendant en Suisse
-              </span>
-            </div>
-
             <div className="space-y-6">
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
                 La clarté dans vos décisions{" "}
