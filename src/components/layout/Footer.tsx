@@ -26,7 +26,7 @@ export const Footer = () => {
             <img 
               src={advisyLogo} 
               alt="Advisy - Le bon choix, à chaque fois" 
-              className="h-16 w-auto object-contain brightness-0 invert opacity-90"
+              className="h-20 md:h-24 w-auto object-contain brightness-0 invert opacity-90"
             />
           </div>
 

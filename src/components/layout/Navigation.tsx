@@ -36,7 +36,7 @@ export const Navigation = () => {
             <img 
               src={advisyLogo} 
               alt="Advisy - Le bon choix, à chaque fois" 
-              className="h-12 md:h-14 w-auto object-contain"
+              className="h-14 md:h-16 w-auto object-contain"
             />
           </button>
 
