@@ -32,8 +32,10 @@ const navLinks = [
     label: "À propos", 
     type: "dropdown",
     subLinks: [
-      { label: "Notre mission", href: "/a-propos" },
-      { label: "Carrière", href: "/carriere" },
+      { label: "À propos", subItems: [
+        { label: "Notre mission", href: "/a-propos" },
+        { label: "Carrière", href: "/carriere" },
+      ]},
     ]
   },
   { label: "Contact", href: "#contact", type: "scroll" },

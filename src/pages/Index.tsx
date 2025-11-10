@@ -29,11 +29,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
+      <Navigation />
       {showSplash ? (
         <SplashSection onEnter={handleEnter} />
       ) : (
         <>
-          <Navigation />
           <main>
             <EnhancedHeroSection />
             <ServicesSection />
