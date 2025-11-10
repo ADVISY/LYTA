@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Shield, TrendingUp, Calendar, CheckCircle, Sparkles, Award, Users } from "lucide-react";
+import heroBg from "@/assets/hero-bg.png";
 
 export const EnhancedHeroSection = () => {
   const scrollToSection = (href: string) => {
@@ -13,11 +14,18 @@ export const EnhancedHeroSection = () => {
     <section
       id="accueil"
       className="relative min-h-screen flex items-center pt-20 overflow-hidden"
+      style={{
+        backgroundImage: `url(${heroBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
-      {/* Advanced Background */}
-      <div className="absolute inset-0 bg-gradient-subtle" />
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-20 left-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+      {/* Overlay subtil pour améliorer la lisibilité */}
+      <div className="absolute inset-0 bg-background/80" />
+      
+      {/* Advanced Background effects */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-20 left-10 w-96 h-96 bg-primary/15 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-accent blur-3xl" />
       </div>
 
