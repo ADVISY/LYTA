@@ -25,8 +25,9 @@ export const PartnersSection = () => {
       loop: true,
       align: "center",
       skipSnaps: false,
+      dragFree: false,
     },
-    [Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })]
+    [Autoplay({ delay: 1500, stopOnInteraction: false, stopOnMouseEnter: false })]
   );
 
   return (
