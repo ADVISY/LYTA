@@ -11,6 +11,7 @@ import { AboutSection } from "@/components/sections/AboutSection";
 import { TestimonialsSection } from "@/components/sections/TestimonialsSection";
 import { FAQSection } from "@/components/sections/FAQSection";
 import { ContactSection } from "@/components/sections/ContactSection";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true); // Réactivé
@@ -45,6 +46,7 @@ const Index = () => {
             <ContactSection />
           </main>
           <Footer />
+          <WhatsAppButton />
         </>
       )}
     </div>

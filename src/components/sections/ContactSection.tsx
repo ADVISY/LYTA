@@ -212,10 +212,10 @@ export const ContactSection = () => {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Email</p>
                     <a
-                      href="mailto:contact@e-advisy.ch"
+                      href="mailto:hello@e-advisy.ch"
                       className="text-foreground hover:text-primary transition-colors font-medium"
                     >
-                      contact@e-advisy.ch
+                      hello@e-advisy.ch
                     </a>
                   </div>
                 </div>
@@ -228,10 +228,10 @@ export const ContactSection = () => {
                       Téléphone
                     </p>
                     <a
-                      href="tel:+41xxxxxxxxx"
+                      href="tel:+41782122360"
                       className="text-foreground hover:text-primary transition-colors font-medium"
                     >
-                      +41 xx xxx xx xx
+                      +41 78 212 23 60
                     </a>
                   </div>
                 </div>
