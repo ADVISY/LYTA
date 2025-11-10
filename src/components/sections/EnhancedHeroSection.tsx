@@ -48,7 +48,7 @@ export const EnhancedHeroSection = () => {
 
             <div className="space-y-6">
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
-                Advisy : la clarté dans vos décisions{" "}
+                La clarté dans vos décisions{" "}
                 <span className="relative inline-block">
                   <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
                     d'assurance
