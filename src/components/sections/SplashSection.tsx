@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import bgPattern from "@/assets/bg-pattern.png";
-import logoInfo from "@/assets/logo-info.png";
+import advisyLogo from "@/assets/advisy-logo.png";
 
 interface SplashSectionProps {
   onEnter: () => void;
@@ -25,9 +25,9 @@ export const SplashSection = ({ onEnter }: SplashSectionProps) => {
         {/* Logo and branding */}
         <div className="flex flex-col items-center gap-6">
           <img 
-            src={logoInfo} 
-            alt="Advisy Logo" 
-            className="w-auto h-32 md:h-40 object-contain drop-shadow-2xl"
+            src={advisyLogo} 
+            alt="Advisy - Le bon choix, à chaque fois" 
+            className="w-auto h-40 md:h-48 object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-300"
           />
         </div>
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logoInfo from "@/assets/logo-info.png";
+import advisyLogo from "@/assets/advisy-logo.png";
 
 const navLinks = [
   { label: "Accueil", href: "#accueil" },
@@ -34,9 +34,9 @@ export const Navigation = () => {
             className="flex items-center hover:scale-105 transition-all duration-300"
           >
             <img 
-              src={logoInfo} 
-              alt="Advisy" 
-              className="h-10 md:h-12 w-auto object-contain"
+              src={advisyLogo} 
+              alt="Advisy - Le bon choix, à chaque fois" 
+              className="h-12 md:h-14 w-auto object-contain"
             />
           </button>
 

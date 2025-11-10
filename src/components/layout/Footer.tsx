@@ -1,4 +1,4 @@
-import logoInfo from "@/assets/logo-info.png";
+import advisyLogo from "@/assets/advisy-logo.png";
 
 export const Footer = () => {
   const scrollToSection = (href: string) => {
@@ -21,16 +21,13 @@ export const Footer = () => {
     <footer className="bg-foreground text-background py-12 lg:py-16">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="grid md:grid-cols-3 gap-8 lg:gap-12 items-center">
-          {/* Left - Logo and Tagline */}
+          {/* Left - Logo */}
           <div>
             <img 
-              src={logoInfo} 
-              alt="Advisy" 
-              className="h-16 w-auto object-contain brightness-0 invert mb-2"
+              src={advisyLogo} 
+              alt="Advisy - Le bon choix, à chaque fois" 
+              className="h-20 w-auto object-contain brightness-0 invert opacity-90"
             />
-            <p className="text-sm text-background/70">
-              Le bon choix, à chaque fois.
-            </p>
           </div>
 
           {/* Center - Navigation */}
