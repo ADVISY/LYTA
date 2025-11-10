@@ -1,12 +1,20 @@
 import { Award } from "lucide-react";
+import liechtensteinLogo from "@/assets/partners/liechtenstein-life.webp";
+import cssLogo from "@/assets/partners/css-logo.png";
+import groupeMutuelLogo from "@/assets/partners/groupe-mutuel-logo.png";
+import sanitasLogo from "@/assets/partners/sanitas-logo.png";
+import paxLogo from "@/assets/partners/pax-logo.png";
+import helsanaLogo from "@/assets/partners/helsana-logo.svg";
+import swissLifeLogo from "@/assets/partners/swiss-life-logo.jpg";
 
 const partners = [
-  { name: "Swica", logo: "https://www.swica.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/swica-logo.svg" },
-  { name: "CSS", logo: "https://www.css.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/css-logo.svg" },
-  { name: "Helsana", logo: "https://www.helsana.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/helsana-logo.svg" },
-  { name: "Groupe Mutuel", logo: "https://www.groupemutuel.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/gm-logo.svg" },
-  { name: "Assura", logo: "https://www.assura.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/assura-logo.svg" },
-  { name: "Visana", logo: "https://www.visana.ch/dam/jcr:2d8e0e9c-8e8a-4e8a-8e8a-8e8a8e8a8e8a/visana-logo.svg" },
+  { name: "Liechtenstein Life", logo: liechtensteinLogo },
+  { name: "CSS", logo: cssLogo },
+  { name: "Helsana", logo: helsanaLogo },
+  { name: "Groupe Mutuel", logo: groupeMutuelLogo },
+  { name: "Sanitas", logo: sanitasLogo },
+  { name: "Pax", logo: paxLogo },
+  { name: "Swiss Life", logo: swissLifeLogo },
 ];
 
 export const PartnersSection = () => {
@@ -44,16 +52,12 @@ export const PartnersSection = () => {
               className="group relative bg-card rounded-2xl p-6 border border-border hover:border-primary/50 shadow-soft hover:shadow-glow transition-all duration-500 hover:-translate-y-2 animate-fade-in flex items-center justify-center"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              {/* Placeholder pour les logos - à remplacer par de vrais logos */}
               <div className="w-full h-16 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary mb-1 group-hover:scale-110 transition-transform">
-                    {partner.name.charAt(0)}
-                  </div>
-                  <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {partner.name}
-                  </p>
-                </div>
+                <img 
+                  src={partner.logo} 
+                  alt={`Logo ${partner.name}`}
+                  className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
               
               {/* Hover effect */}
