@@ -4,32 +4,39 @@ import bgPattern from "@/assets/bg-pattern.png";
 
 const services = [
   {
-    title: "Assurances maladie & LCA",
-    badge: "Particuliers",
+    title: "Assurance santé (LAMal, LCA, complémentaires)",
+    badge: "Santé",
     description:
-      "Analyse de vos couvertures LAMal et complémentaires, comparaison des primes et recommandations adaptées à votre profil et à votre budget.",
+      "Trouvez la meilleure assurance maladie selon votre profil. Comparaison des modèles et franchises pour optimiser vos coûts et prestations.",
     icon: Shield,
   },
   {
-    title: "Prévoyance & 3e pilier",
-    badge: "Préparer l'avenir",
+    title: "Prévoyance et 3ᵉ pilier",
+    badge: "Prévoyance",
     description:
-      "Mise en place de solutions de prévoyance pour protéger votre famille, optimiser vos impôts et préparer votre retraite.",
+      "Préparez votre avenir avec le 3ᵉ pilier : sécurité, fiscalité et liberté. Pilier 3a ou 3b selon vos objectifs.",
     icon: LineChart,
   },
   {
-    title: "Solutions pour indépendants",
-    badge: "Indépendants & PME",
+    title: "Assurance ménage & RC privée",
+    badge: "Protection",
     description:
-      "Accompagnement complet pour vos assurances, votre prévoyance professionnelle et la protection de votre activité.",
-    icon: Briefcase,
+      "Protégez vos biens et votre responsabilité à petit prix. RC privée et assurance ménage pour éviter les mauvaises surprises.",
+    icon: Shield,
   },
   {
-    title: "Budget & optimisation financière",
-    badge: "Accompagnement",
+    title: "Assurance automobile & 2 roues",
+    badge: "Mobilité",
     description:
-      "Vision globale de vos charges, optimisation de vos primes et mise en place d'un plan d'action concret.",
+      "RC, casco partielle, casco complète : trouvez la solution adaptée à votre véhicule et votre budget.",
     icon: Calculator,
+  },
+  {
+    title: "Protection juridique",
+    badge: "Défense",
+    description:
+      "Ne soyez plus seul face aux litiges. Droit du travail, circulation, logement : défendez vos droits sans frais d'avocat.",
+    icon: Shield,
   },
 ];
 
@@ -74,7 +81,7 @@ export const ServicesSection = () => {
         </div>
 
         {/* Services Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (

@@ -43,27 +43,26 @@ export const EnhancedHeroSection = () => {
 
             <div className="space-y-6">
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
-                Votre copilote pour vos{" "}
+                Advisy : la clarté dans vos décisions{" "}
                 <span className="relative inline-block">
                   <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
-                    assurances
+                    d'assurance
                   </span>
                   <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
                 </span>{" "}
-                et{" "}
+                et de{" "}
                 <span className="relative inline-block">
                   <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
-                    finances
+                    prévoyance
                   </span>
                   <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
                 </span>
               </h1>
               
               <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed font-light">
-                Analyse complète de votre situation, optimisation de vos
-                assurances et de votre prévoyance.{" "}
+                Trouvez la solution la plus avantageuse pour votre santé, votre retraite et vos finances.{" "}
                 <span className="text-foreground font-medium">
-                  En toute indépendance.
+                  Nos conseillers indépendants vous accompagnent gratuitement dans toute la Suisse.
                 </span>
               </p>
             </div>
