@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -24,6 +27,7 @@ export default {
           foreground: "hsl(var(--primary-foreground))",
           light: "hsl(var(--primary-light))",
           dark: "hsl(var(--primary-dark))",
+          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -32,6 +36,7 @@ export default {
         neutral: {
           light: "hsl(var(--neutral-light))",
           mid: "hsl(var(--neutral-mid))",
+          dark: "hsl(var(--neutral-dark))",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -55,16 +60,24 @@ export default {
         },
       },
       boxShadow: {
+        xs: "var(--shadow-xs)",
         soft: "var(--shadow-soft)",
         medium: "var(--shadow-medium)",
         strong: "var(--shadow-strong)",
+        glow: "var(--shadow-glow)",
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
+        "gradient-hero": "var(--gradient-hero)",
         "gradient-subtle": "var(--gradient-subtle)",
+        "gradient-card": "var(--gradient-card)",
+      },
+      backdropBlur: {
+        glass: "var(--blur-glass)",
       },
       transitionTimingFunction: {
         smooth: "var(--transition-smooth)",
+        bounce: "var(--transition-bounce)",
       },
       borderRadius: {
         lg: "var(--radius)",

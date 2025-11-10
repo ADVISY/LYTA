@@ -24,26 +24,27 @@ export const Navigation = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border shadow-soft">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-glass border-b border-border/50 shadow-xs">
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-24">
           {/* Logo */}
           <button
             onClick={() => scrollToSection("#accueil")}
-            className="text-2xl font-bold text-primary hover:text-primary-light transition-colors"
+            className="text-3xl font-bold text-primary hover:text-primary-light transition-all duration-300 hover:scale-105"
           >
             advisy<span className="text-primary">.</span>
           </button>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-10">
             {navLinks.map((link) => (
               <button
                 key={link.href}
                 onClick={() => scrollToSection(link.href)}
-                className="text-sm font-medium text-foreground hover:text-primary transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
+                className="text-sm font-semibold text-muted-foreground hover:text-primary transition-all duration-300 relative group"
               >
                 {link.label}
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-primary group-hover:w-full transition-all duration-300" />
               </button>
             ))}
           </div>

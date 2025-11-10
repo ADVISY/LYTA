@@ -34,15 +34,30 @@ const services = [
 
 export const ServicesSection = () => {
   return (
-    <section id="services" className="py-20 lg:py-32 bg-background">
-      <div className="container mx-auto px-4 lg:px-8">
+    <section id="services" className="relative py-24 lg:py-40 bg-background overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl opacity-20">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent blur-3xl" />
+      </div>
+      
+      <div className="container relative z-10 mx-auto px-4 lg:px-8">
         {/* Section Header */}
-        <div className="text-center mb-16 animate-fade-in">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Nos services
+        <div className="text-center mb-20 animate-fade-in max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+            <span className="text-sm font-semibold text-primary uppercase tracking-wide">
+              Notre expertise
+            </span>
+          </div>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            Solutions sur mesure pour{" "}
+            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
+              vos besoins
+            </span>
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Une vision claire de vos assurances et de vos finances.
+          <p className="text-xl text-muted-foreground leading-relaxed">
+            Une vision claire et des recommandations concrètes pour optimiser
+            votre protection et vos finances.
           </p>
         </div>
 
@@ -53,31 +68,40 @@ export const ServicesSection = () => {
             return (
               <div
                 key={index}
-                className="bg-card rounded-2xl p-8 border border-border shadow-soft hover:shadow-strong transition-all duration-300 hover:-translate-y-2 group animate-slide-up"
+                className="relative bg-gradient-card backdrop-blur-sm rounded-3xl p-10 border border-border shadow-medium hover:shadow-glow transition-all duration-500 hover:-translate-y-3 group animate-slide-up overflow-hidden"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
+                {/* Hover gradient effect */}
+                <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 transition-opacity duration-500" />
+                
                 {/* Icon */}
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
-                  <Icon className="w-7 h-7 text-primary group-hover:text-white transition-colors duration-300" />
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-8 shadow-medium group-hover:scale-110 group-hover:shadow-glow transition-all duration-500">
+                  <Icon className="w-8 h-8 text-white" />
                 </div>
 
                 {/* Badge */}
                 <Badge
                   variant="secondary"
-                  className="mb-4 bg-accent text-accent-foreground"
+                  className="relative mb-6 bg-accent text-accent-foreground font-semibold px-4 py-1.5"
                 >
                   {service.badge}
                 </Badge>
 
                 {/* Title */}
-                <h3 className="text-xl font-bold text-foreground mb-3 group-hover:text-primary transition-colors">
+                <h3 className="relative text-2xl font-bold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">
                   {service.title}
                 </h3>
 
                 {/* Description */}
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="relative text-base text-muted-foreground leading-relaxed mb-6">
                   {service.description}
                 </p>
+                
+                {/* Arrow link */}
+                <div className="relative flex items-center gap-2 text-primary font-semibold group/link">
+                  <span className="text-sm">Découvrir</span>
+                  <span className="group-hover/link:translate-x-1 transition-transform">→</span>
+                </div>
               </div>
             );
           })}

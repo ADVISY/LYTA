@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigation } from "@/components/layout/Navigation";
 import { Footer } from "@/components/layout/Footer";
 import { SplashSection } from "@/components/sections/SplashSection";
-import { HeroSection } from "@/components/sections/HeroSection";
+import { EnhancedHeroSection } from "@/components/sections/EnhancedHeroSection";
 import { ServicesSection } from "@/components/sections/ServicesSection";
 import { MethodSection } from "@/components/sections/MethodSection";
 import { AboutSection } from "@/components/sections/AboutSection";
@@ -32,7 +32,7 @@ const Index = () => {
         <>
           <Navigation />
           <main>
-            <HeroSection />
+            <EnhancedHeroSection />
             <ServicesSection />
             <MethodSection />
             <AboutSection />
