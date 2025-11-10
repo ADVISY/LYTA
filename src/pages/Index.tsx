@@ -1,12 +1,48 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { Navigation } from "@/components/layout/Navigation";
+import { Footer } from "@/components/layout/Footer";
+import { SplashSection } from "@/components/sections/SplashSection";
+import { HeroSection } from "@/components/sections/HeroSection";
+import { ServicesSection } from "@/components/sections/ServicesSection";
+import { MethodSection } from "@/components/sections/MethodSection";
+import { AboutSection } from "@/components/sections/AboutSection";
+import { TestimonialsSection } from "@/components/sections/TestimonialsSection";
+import { FAQSection } from "@/components/sections/FAQSection";
+import { ContactSection } from "@/components/sections/ContactSection";
 
 const Index = () => {
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleEnter = () => {
+    setShowSplash(false);
+    // Scroll to main content after a brief delay
+    setTimeout(() => {
+      const accueil = document.querySelector("#accueil");
+      if (accueil) {
+        accueil.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 100);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen">
+      {showSplash ? (
+        <SplashSection onEnter={handleEnter} />
+      ) : (
+        <>
+          <Navigation />
+          <main>
+            <HeroSection />
+            <ServicesSection />
+            <MethodSection />
+            <AboutSection />
+            <TestimonialsSection />
+            <FAQSection />
+            <ContactSection />
+          </main>
+          <Footer />
+        </>
+      )}
     </div>
   );
 };
