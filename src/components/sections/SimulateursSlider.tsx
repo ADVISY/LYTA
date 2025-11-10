@@ -58,30 +58,36 @@ export const SimulateursSlider = () => {
   return (
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
       <div className="container relative z-10 mx-auto px-4 lg:px-8 py-20 lg:py-32">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-              <Calculator className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-primary uppercase tracking-wide">
-                Outils de simulation
-              </span>
+        <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+          {/* Left Column - Text */}
+          <div className="space-y-10 animate-fade-in">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-2">
+                <Calculator className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-primary uppercase tracking-wide">
+                  Outils de simulation
+                </span>
+              </div>
+              
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight">
+                Simulateurs Advisy : calculez, comprenez et{" "}
+                <span className="relative inline-block">
+                  <span className="relative z-10 bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent">
+                    optimisez votre situation
+                  </span>
+                  <span className="absolute -bottom-2 left-0 w-full h-3 bg-primary/20 blur-sm" />
+                </span>
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed font-light">
+                Des outils simples et intuitifs pour estimer vos impôts, votre salaire et vos droits à des aides sur vos primes santé.
+              </p>
             </div>
-            
-            <h1 className="text-3xl md:text-5xl font-bold text-foreground mb-6">
-              Simulateurs Advisy : calculez, comprenez et{" "}
-              <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-                optimisez votre situation
-              </span>
-            </h1>
-            
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Des outils simples et intuitifs pour estimer vos impôts, votre salaire et vos droits à des aides sur vos primes santé.
-            </p>
+
           </div>
 
-          {/* Slider */}
-          <div className="relative">
+          {/* Right Column - Slider */}
+          <div className="relative animate-scale-in">
             <div className="relative overflow-hidden rounded-[32px]" ref={emblaRef}>
               <div className="flex">
                 {slides.map((slide, index) => {
@@ -133,7 +139,7 @@ export const SimulateursSlider = () => {
             </div>
 
             {/* Dots Indicators */}
-            <div className="flex justify-center gap-2 mt-8">
+            <div className="flex justify-center gap-2 mt-6">
               {slides.map((_, index) => (
                 <button
                   key={index}
@@ -148,18 +154,18 @@ export const SimulateursSlider = () => {
               ))}
             </div>
           </div>
-
-          {/* Info Box */}
-          <div className="mt-12 bg-card border border-border rounded-2xl p-6 shadow-soft">
-            <p className="text-foreground mb-4">
-              Chez Advisy, nous pensons que la clarté commence par la compréhension.
-              Ces trois simulateurs vous permettent d'obtenir en quelques secondes une estimation personnalisée, 
-              afin de prendre des décisions éclairées sur votre avenir financier et votre couverture d'assurance.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              ⚠️ Ces outils sont fournis à titre indicatif. Pour une analyse complète et certifiée, contactez un conseiller Advisy.
-            </p>
-          </div>
+        </div>
+        
+        {/* Info Box - Full Width Below */}
+        <div className="max-w-6xl mx-auto mt-16 bg-card border border-border rounded-2xl p-6 shadow-soft">
+          <p className="text-foreground mb-4">
+            Chez Advisy, nous pensons que la clarté commence par la compréhension.
+            Ces trois simulateurs vous permettent d'obtenir en quelques secondes une estimation personnalisée, 
+            afin de prendre des décisions éclairées sur votre avenir financier et votre couverture d'assurance.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            ⚠️ Ces outils sont fournis à titre indicatif. Pour une analyse complète et certifiée, contactez un conseiller Advisy.
+          </p>
         </div>
       </div>
       
