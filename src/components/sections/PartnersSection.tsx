@@ -1,4 +1,6 @@
 import { Award } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
+import Autoplay from "embla-carousel-autoplay";
 import liechtensteinLogo from "@/assets/partners/liechtenstein-life.webp";
 import cssLogo from "@/assets/partners/css-logo.png";
 import groupeMutuelLogo from "@/assets/partners/groupe-mutuel-logo.png";
@@ -18,6 +20,15 @@ const partners = [
 ];
 
 export const PartnersSection = () => {
+  const [emblaRef] = useEmblaCarousel(
+    { 
+      loop: true,
+      align: "start",
+      dragFree: true,
+    },
+    [Autoplay({ delay: 2000, stopOnInteraction: false })]
+  );
+
   return (
     <section className="relative py-16 bg-background overflow-hidden">
       {/* Background decoration */}
@@ -44,26 +55,27 @@ export const PartnersSection = () => {
           </p>
         </div>
 
-        {/* Partners Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 items-center">
-          {partners.map((partner, index) => (
-            <div
-              key={index}
-              className="group relative bg-card rounded-2xl p-6 border border-border hover:border-primary/50 shadow-soft hover:shadow-glow transition-all duration-500 hover:-translate-y-2 animate-fade-in flex items-center justify-center"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="w-full h-16 flex items-center justify-center">
-                <img 
-                  src={partner.logo} 
-                  alt={`Logo ${partner.name}`}
-                  className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert group-hover:scale-110 transition-transform duration-300"
-                />
+        {/* Partners Slider */}
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex gap-8">
+            {partners.concat(partners).map((partner, index) => (
+              <div
+                key={index}
+                className="group relative bg-card rounded-2xl p-6 border border-border hover:border-primary/50 shadow-soft hover:shadow-glow transition-all duration-500 hover:-translate-y-2 flex items-center justify-center flex-[0_0_200px] min-w-0"
+              >
+                <div className="w-full h-16 flex items-center justify-center">
+                  <img 
+                    src={partner.logo} 
+                    alt={`Logo ${partner.name}`}
+                    className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert group-hover:scale-110 transition-transform duration-300"
+                  />
+                </div>
+                
+                {/* Hover effect */}
+                <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-500" />
               </div>
-              
-              {/* Hover effect */}
-              <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-500" />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Bottom text */}
