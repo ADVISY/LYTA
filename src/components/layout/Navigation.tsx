@@ -122,8 +122,8 @@ export const Navigation = () => {
                     </button>
                     
                     {activeDropdown === link.label && link.subLinks && (
-                      <div className="absolute top-full left-0 pt-2">
-                        <div className="bg-background border border-border rounded-xl shadow-medium p-4 min-w-[280px] animate-fade-in">
+                      <div className="absolute top-full left-0 pt-2 z-50">
+                        <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl shadow-medium p-4 min-w-[280px] animate-fade-in">
                         {link.subLinks.map((subLink) => (
                           <div key={subLink.label} className="mb-4 last:mb-0">
                             <p className="text-xs font-semibold text-primary uppercase mb-2">{subLink.label}</p>
@@ -163,7 +163,7 @@ export const Navigation = () => {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="lg:hidden absolute top-20 left-0 right-0 bg-background border-b border-border shadow-medium animate-fade-in max-h-[80vh] overflow-y-auto">
+        <div className="lg:hidden absolute top-20 left-0 right-0 bg-background/95 backdrop-blur-md border-b border-border shadow-medium animate-fade-in max-h-[80vh] overflow-y-auto z-50">
           <div className="container mx-auto px-4 py-6 flex flex-col gap-4">
             {navLinks.map((link) => (
               <div key={link.label}>
