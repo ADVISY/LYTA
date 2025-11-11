@@ -14,7 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          updated_at: string
+          user_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          updated_at?: string
+          user_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          updated_at?: string
+          user_type?: string | null
+        }
+        Relationships: []
+      }
+      ai_leads: {
+        Row: {
+          canton: string | null
+          conversation_id: string
+          created_at: string
+          email: string | null
+          id: string
+          nom: string | null
+          notes: string | null
+          prenom: string | null
+          situation_familiale: string | null
+          status: string | null
+          telephone: string | null
+          updated_at: string
+        }
+        Insert: {
+          canton?: string | null
+          conversation_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nom?: string | null
+          notes?: string | null
+          prenom?: string | null
+          situation_familiale?: string | null
+          status?: string | null
+          telephone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canton?: string | null
+          conversation_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nom?: string | null
+          notes?: string | null
+          prenom?: string | null
+          situation_familiale?: string | null
+          status?: string | null
+          telephone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_leads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
