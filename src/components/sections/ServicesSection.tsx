@@ -76,36 +76,36 @@ export const ServicesSection = () => {
           </p>
         </div>
 
-        {/* Services Grid - 5 colonnes */}
-        <div className="grid grid-cols-5 gap-4 mx-auto mb-16">
+        {/* Services Grid - Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-4 mx-auto mb-16">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
               <div
                 key={index}
-                className="relative bg-gradient-card backdrop-blur-sm rounded-2xl p-5 border border-border shadow-medium transition-all duration-300 animate-slide-up overflow-hidden"
+                className="relative bg-gradient-card backdrop-blur-sm rounded-2xl p-6 sm:p-5 lg:p-6 xl:p-5 border border-border shadow-medium transition-all duration-300 animate-slide-up overflow-hidden hover:shadow-strong hover:border-primary/30"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Icon */}
-                <div className="relative w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 shadow-medium transition-all duration-300 mx-auto">
-                  <Icon className="w-6 h-6 text-white" />
+                <div className="relative w-14 h-14 sm:w-12 sm:h-12 lg:w-14 lg:h-14 xl:w-12 xl:h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 shadow-medium transition-all duration-300 mx-auto">
+                  <Icon className="w-7 h-7 sm:w-6 sm:h-6 lg:w-7 lg:h-7 xl:w-6 xl:h-6 text-white" />
                 </div>
 
                 {/* Badge */}
                 <Badge
                   variant="secondary"
-                  className="relative mb-3 bg-accent text-accent-foreground font-semibold px-3 py-1 text-xs w-full justify-center"
+                  className="relative mb-3 bg-accent text-accent-foreground font-semibold px-3 py-1 text-xs sm:text-[10px] lg:text-xs w-full justify-center"
                 >
                   {service.badge}
                 </Badge>
 
                 {/* Title */}
-                <h3 className="relative text-sm font-bold text-foreground mb-3 text-center leading-tight">
+                <h3 className="relative text-base sm:text-sm lg:text-base xl:text-sm font-bold text-foreground mb-3 text-center leading-tight">
                   {service.title}
                 </h3>
 
                 {/* Description */}
-                <p className="relative text-xs text-muted-foreground leading-relaxed text-center">
+                <p className="relative text-sm sm:text-xs lg:text-sm xl:text-xs text-muted-foreground leading-relaxed text-center">
                   {service.description}
                 </p>
               </div>
@@ -118,34 +118,34 @@ export const ServicesSection = () => {
           <div className="relative bg-gradient-card backdrop-blur-sm rounded-3xl overflow-hidden border border-border shadow-strong">
             <div className="grid lg:grid-cols-2 gap-8 items-center">
               {/* Image */}
-              <div className="relative h-full min-h-[300px] lg:min-h-[400px] order-2 lg:order-1">
+              <div className="relative h-full min-h-[250px] sm:min-h-[300px] lg:min-h-[400px] order-2 lg:order-1 rounded-t-3xl lg:rounded-t-none lg:rounded-l-3xl overflow-hidden">
                 <img
                   src={advisorMan}
                   alt="Expert conseil Advisy"
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/60 lg:hidden" />
+                <div className="absolute inset-0 bg-gradient-to-b lg:bg-gradient-to-r from-transparent via-transparent to-background/60" />
               </div>
               
               {/* Content */}
-              <div className="p-8 lg:p-12 space-y-6 order-1 lg:order-2">
+              <div className="p-6 sm:p-8 lg:p-12 space-y-4 sm:space-y-6 order-1 lg:order-2">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
                   <Shield className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-semibold text-primary">
+                  <span className="text-xs sm:text-sm font-semibold text-primary">
                     Conseil personnalisé
                   </span>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
                   Parlons de votre situation
                 </h3>
-                <p className="text-lg text-muted-foreground leading-relaxed">
+                <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
                   Chaque situation est unique. Nos experts analysent vos besoins 
                   et vous proposent les solutions les plus adaptées, sans engagement.
                 </p>
                 <Button
                   size="lg"
                   onClick={scrollToContact}
-                  className="text-lg px-12 shadow-glow group"
+                  className="w-full sm:w-auto text-base sm:text-lg px-8 sm:px-12 shadow-glow group"
                 >
                   <span className="relative z-10">Consultation gratuite</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-primary-light to-primary opacity-0 group-hover:opacity-100 transition-opacity" />

@@ -130,33 +130,33 @@ export const EnhancedHeroSection = () => {
             </div>
 
             {/* Premium Trust Indicators avec glassmorphism */}
-            <div className="grid grid-cols-3 gap-6 pt-10 mt-6 border-t border-primary/20">
-              <div className="space-y-2 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <Award className="w-5 h-5 text-primary-glow" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 pt-10 mt-6 border-t border-primary/20">
+              <div className="space-y-2 p-3 sm:p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Award className="w-4 h-4 sm:w-5 sm:h-5 text-primary-glow" />
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">100%</p>
+                  <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">100%</p>
                 </div>
-                <p className="text-sm text-muted-foreground font-medium">Indépendant</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium text-center sm:text-left">Indépendant</p>
               </div>
-              <div className="space-y-2 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-primary-glow" />
+              <div className="space-y-2 p-3 sm:p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-glow" />
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">500+</p>
+                  <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">500+</p>
                 </div>
-                <p className="text-sm text-muted-foreground font-medium">Clients</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium text-center sm:text-left">Clients</p>
               </div>
-              <div className="space-y-2 p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-primary-glow" />
+              <div className="space-y-2 p-3 sm:p-4 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border/50 hover:border-primary/50 hover:shadow-glow transition-all duration-500 hover:scale-105">
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary-glow" />
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">15+</p>
+                  <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary-light to-primary-glow bg-clip-text text-transparent">15+</p>
                 </div>
-                <p className="text-sm text-muted-foreground font-medium">Ans d'expertise</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium text-center sm:text-left">Ans d'expertise</p>
               </div>
             </div>
           </div>
@@ -200,8 +200,8 @@ export const EnhancedHeroSection = () => {
                           </div>
                         </div>
 
-                        {/* Premium floating cards */}
-                        <div className="absolute -top-6 -right-6 z-10 w-56 bg-gradient-to-br from-card/90 to-card/60 backdrop-blur-xl rounded-3xl p-7 border-2 border-primary/20 shadow-strong hover:shadow-glow transition-all duration-500 hover:-translate-y-2 hover:border-primary/50 hover:scale-105">
+                        {/* Premium floating cards - hidden on mobile */}
+                        <div className="hidden lg:block absolute -top-6 -right-6 z-10 w-56 bg-gradient-to-br from-card/90 to-card/60 backdrop-blur-xl rounded-3xl p-7 border-2 border-primary/20 shadow-strong hover:shadow-glow transition-all duration-500 hover:-translate-y-2 hover:border-primary/50 hover:scale-105">
                           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-5 shadow-soft">
                             <TrendingUp className="w-7 h-7 text-primary-glow" />
                           </div>
@@ -211,7 +211,7 @@ export const EnhancedHeroSection = () => {
                           </p>
                         </div>
 
-                        <div className="absolute -bottom-6 -left-6 z-10 w-56 bg-gradient-to-br from-card/90 to-card/60 backdrop-blur-xl rounded-3xl p-7 border-2 border-primary/20 shadow-strong hover:shadow-glow transition-all duration-500 hover:-translate-y-2 hover:border-primary/50 hover:scale-105">
+                        <div className="hidden lg:block absolute -bottom-6 -left-6 z-10 w-56 bg-gradient-to-br from-card/90 to-card/60 backdrop-blur-xl rounded-3xl p-7 border-2 border-primary/20 shadow-strong hover:shadow-glow transition-all duration-500 hover:-translate-y-2 hover:border-primary/50 hover:scale-105">
                           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-5 shadow-soft">
                             <Calendar className="w-7 h-7 text-primary-glow" />
                           </div>

@@ -109,22 +109,22 @@ export const HeroSlider = ({ onContactClick, onServicesClick }: HeroSliderProps)
                 <div className="container mx-auto px-4 lg:px-8">
                   <div className="max-w-3xl animate-fade-in">
                     {/* Badge flottant */}
-                    <div className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/95 backdrop-blur-xl border-2 border-primary/30 shadow-strong mb-8 animate-bounce-in hover:scale-105 transition-all duration-300">
-                      <div className="w-14 h-14 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                        <Icon className="w-7 h-7 text-white" />
+                    <div className="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-white/95 backdrop-blur-xl border-2 border-primary/30 shadow-strong mb-6 sm:mb-8 animate-bounce-in hover:scale-105 transition-all duration-300">
+                      <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow flex-shrink-0">
+                        <Icon className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-xl font-bold text-foreground">
+                        <h3 className="text-base sm:text-xl font-bold text-foreground">
                           {slide.title}
                         </h3>
-                        <p className="text-base text-muted-foreground">
+                        <p className="text-sm sm:text-base text-muted-foreground">
                           {slide.subtitle}
                         </p>
                       </div>
                     </div>
 
                     {/* Description */}
-                    <p className="text-2xl md:text-3xl lg:text-4xl font-light text-foreground mb-10 leading-relaxed animate-slide-in-left drop-shadow-lg">
+                    <p className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-light text-foreground mb-8 sm:mb-10 leading-relaxed animate-slide-in-left drop-shadow-lg">
                       {slide.description}
                     </p>
 
