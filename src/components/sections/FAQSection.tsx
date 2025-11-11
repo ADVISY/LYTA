@@ -39,17 +39,9 @@ export const FAQSection = () => {
       <div className="container mx-auto px-4 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16 animate-fade-in">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-            <span className="text-sm font-semibold text-primary uppercase tracking-wide">
-              FAQ
-            </span>
-          </div>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
             Questions fréquentes
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Nous répondons à vos questions les plus courantes
-          </p>
         </div>
 
         {/* FAQ Accordion */}
