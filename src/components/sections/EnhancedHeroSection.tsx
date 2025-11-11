@@ -55,8 +55,8 @@ export const EnhancedHeroSection = () => {
     },
     {
       icon: Award,
-      title: "15 ans d'expertise",
-      description: "Plus de 500 clients nous font confiance. Accompagnement complet de A à Z.",
+      title: "4 ans d'expérience",
+      description: "Plus de 2500 clients nous font confiance. Accompagnement complet de A à Z.",
       image: teamExpertise,
     },
   ];

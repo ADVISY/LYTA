@@ -49,8 +49,8 @@ const slides = [
   {
     image: teamExpertise,
     icon: Award,
-    title: "15 ans d'expertise",
-    subtitle: "Plus de 500 clients nous font confiance",
+    title: "4 ans d'expérience",
+    subtitle: "Plus de 2500 clients nous font confiance",
     description: "Accompagnement complet de A à Z",
   },
 ];
