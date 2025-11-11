@@ -76,10 +76,47 @@ const APropos = () => {
   ];
 
   const stats = [
-    { icon: Award, value: "2500+", label: "Clients satisfaits", color: "text-red-500" },
-    { icon: TrendingUp, value: "4", label: "Années d'expérience", color: "text-blue-500" },
-    { icon: Shield, value: "93%", label: "Taux de satisfaction", color: "text-green-500", animated: true },
-    { icon: Clock, value: "24h", label: "Délai de réponse", color: "text-purple-500" },
+    { 
+      icon: Award, 
+      value: "2500+", 
+      label: "Clients satisfaits", 
+      color: "text-red-500",
+      bgColor: "bg-red-500/10",
+      glowColor: "shadow-[0_0_30px_rgba(239,68,68,0.4)]",
+      hoverGlow: "group-hover:shadow-[0_0_60px_rgba(239,68,68,0.6)]",
+      iconColor: "text-red-500"
+    },
+    { 
+      icon: TrendingUp, 
+      value: "4", 
+      label: "Années d'expérience", 
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
+      glowColor: "shadow-[0_0_30px_rgba(59,130,246,0.4)]",
+      hoverGlow: "group-hover:shadow-[0_0_60px_rgba(59,130,246,0.6)]",
+      iconColor: "text-blue-500"
+    },
+    { 
+      icon: Shield, 
+      value: "93%", 
+      label: "Taux de satisfaction", 
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+      glowColor: "shadow-[0_0_30px_rgba(34,197,94,0.4)]",
+      hoverGlow: "group-hover:shadow-[0_0_60px_rgba(34,197,94,0.6)]",
+      iconColor: "text-green-500",
+      animated: true
+    },
+    { 
+      icon: Clock, 
+      value: "24h", 
+      label: "Délai de réponse", 
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+      glowColor: "shadow-[0_0_30px_rgba(168,85,247,0.4)]",
+      hoverGlow: "group-hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]",
+      iconColor: "text-purple-500"
+    },
   ];
 
   const expertise = [
@@ -300,14 +337,35 @@ const APropos = () => {
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={index} className="text-center space-y-4">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                      <Icon className="w-8 h-8 text-primary" />
+                  <div 
+                    key={index} 
+                    className="group relative text-center space-y-4 p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border hover:scale-110 transition-all duration-500 cursor-pointer"
+                    style={{ animationDelay: `${index * 150}ms` }}
+                  >
+                    {/* Glow effect background */}
+                    <div className={`absolute inset-0 rounded-2xl ${stat.glowColor} ${stat.hoverGlow} transition-all duration-500 opacity-0 group-hover:opacity-100`} />
+                    
+                    {/* Shine animation overlay */}
+                    <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                      <div 
+                        className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                        style={{ width: '50%' }}
+                      />
                     </div>
-                    <div className={`text-4xl font-bold ${stat.color} ${stat.animated ? 'animate-pulse' : ''}`}>
-                      {stat.value}
+                    
+                    {/* Content */}
+                    <div className="relative z-10">
+                      <div className={`w-20 h-20 mx-auto rounded-2xl ${stat.bgColor} flex items-center justify-center ${stat.glowColor} group-hover:scale-110 transition-all duration-500 mb-4`}>
+                        <Icon className={`w-10 h-10 ${stat.iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                      </div>
+                      <div className={`text-5xl font-bold ${stat.color} ${stat.animated ? 'animate-pulse' : ''} group-hover:scale-110 transition-all duration-500 drop-shadow-lg`}>
+                        {stat.value}
+                      </div>
+                      <div className="text-foreground/70 font-medium mt-2">{stat.label}</div>
                     </div>
-                    <div className="text-foreground/70">{stat.label}</div>
+
+                    {/* Pulsing ring effect */}
+                    <div className={`absolute inset-0 rounded-2xl ${stat.bgColor} animate-ping opacity-0 group-hover:opacity-20`} style={{ animationDuration: '2s' }} />
                   </div>
                 );
               })}
