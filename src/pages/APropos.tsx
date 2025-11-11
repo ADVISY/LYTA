@@ -76,10 +76,10 @@ const APropos = () => {
   ];
 
   const stats = [
-    { icon: Award, value: "500+", label: "Clients satisfaits" },
-    { icon: TrendingUp, value: "15+", label: "Années d'expérience" },
-    { icon: Shield, value: "100%", label: "Taux de satisfaction" },
-    { icon: Clock, value: "24h", label: "Délai de réponse" },
+    { icon: Award, value: "2500+", label: "Clients satisfaits", color: "text-red-500" },
+    { icon: TrendingUp, value: "4", label: "Années d'expérience", color: "text-blue-500" },
+    { icon: Shield, value: "93%", label: "Taux de satisfaction", color: "text-green-500", animated: true },
+    { icon: Clock, value: "24h", label: "Délai de réponse", color: "text-purple-500" },
   ];
 
   const expertise = [
@@ -287,6 +287,15 @@ const APropos = () => {
         {/* Stats Section */}
         <section className="py-20 lg:py-32">
           <div className="container mx-auto px-4 lg:px-8">
+            <div className="max-w-3xl mx-auto text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+                <img src={advisyTextLogo} alt="Advisy" className="h-10 inline-block mx-2" />
+                en chiffres
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                Notre mission en quelques statistiques clés
+              </p>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
@@ -295,7 +304,9 @@ const APropos = () => {
                     <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                       <Icon className="w-8 h-8 text-primary" />
                     </div>
-                    <div className="text-4xl font-bold text-foreground">{stat.value}</div>
+                    <div className={`text-4xl font-bold ${stat.color} ${stat.animated ? 'animate-pulse' : ''}`}>
+                      {stat.value}
+                    </div>
                     <div className="text-foreground/70">{stat.label}</div>
                   </div>
                 );
