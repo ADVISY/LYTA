@@ -13,6 +13,7 @@ import { TestimonialsSection } from "@/components/sections/TestimonialsSection";
 import { FAQSection } from "@/components/sections/FAQSection";
 import { ContactSection } from "@/components/sections/ContactSection";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
+import { AIAssistant } from "@/components/AIAssistant";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -48,6 +49,7 @@ const Index = () => {
           </main>
           <Footer />
           <WhatsAppButton />
+          <AIAssistant />
         </>
       )}
     </div>
