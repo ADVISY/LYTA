@@ -24,12 +24,10 @@ export const AIAssistant = () => {
   const [userType, setUserType] = useState<UserType>(null);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSelectUserType = (type: UserType) => {
@@ -190,7 +188,7 @@ export const AIAssistant = () => {
             {/* Messages */}
             {userType && (
               <>
-                <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+                <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
                     {messages.map((message) => (
                       <div
@@ -230,6 +228,7 @@ export const AIAssistant = () => {
                         </div>
                       </div>
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
                 </ScrollArea>
 
