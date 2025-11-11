@@ -52,14 +52,16 @@ export const PartnersSection = () => {
         const maxDistance = containerRect.width / 2;
         const normalizedDistance = Math.max(-1, Math.min(1, distanceFromCenter / maxDistance));
 
-        // Apply 3D transforms based on distance from center
-        const rotateY = normalizedDistance * -25; // Rotate up to 25deg
-        const translateZ = (1 - Math.abs(normalizedDistance)) * 50; // Move forward when centered
-        const opacity = 0.4 + (1 - Math.abs(normalizedDistance)) * 0.6; // Fade edges
+        // Apply 3D transforms based on distance from center - INTENSIFIED
+        const rotateY = normalizedDistance * -45; // Rotate up to 45deg (was 25deg)
+        const translateZ = (1 - Math.abs(normalizedDistance)) * 120; // Move forward when centered (was 50px)
+        const scale = 0.75 + (1 - Math.abs(normalizedDistance)) * 0.25; // Scale down at edges
+        const opacity = 0.3 + (1 - Math.abs(normalizedDistance)) * 0.7; // More dramatic fade
 
         (slide as HTMLElement).style.transform = `
           rotateY(${rotateY}deg) 
           translateZ(${translateZ}px)
+          scale(${scale})
         `;
         (slide as HTMLElement).style.opacity = `${opacity}`;
       });
