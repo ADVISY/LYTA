@@ -141,99 +141,204 @@ const Connexion = () => {
         </div>
 
         <div className="max-w-xl w-full bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 animate-scale-in">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-1">
-              {isSignUp ? "Créer un compte" : "Connexion"}
-            </h2>
-            <p className="text-sm text-slate-600">
-              {isSignUp ? "Remplissez les informations ci-dessous" : "Entrez vos identifiants"}
-            </p>
-          </div>
+          <Tabs defaultValue="client" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="client">Client</TabsTrigger>
+              <TabsTrigger value="partner">Partner</TabsTrigger>
+            </TabsList>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
-                    <Input
-                      id="firstName"
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Jean"
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
-                    <Input
-                      id="lastName"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Dupont"
-                      className="h-11"
-                    />
-                  </div>
+            <TabsContent value="client" className="space-y-0">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-1">
+                  {isSignUp ? "Créer un compte" : "Espace Client"}
+                </h2>
+                <p className="text-sm text-slate-600">
+                  {isSignUp ? "Remplissez les informations ci-dessous" : "Connectez-vous à votre espace"}
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {isSignUp && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">Prénom</Label>
+                        <Input
+                          id="firstName"
+                          type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Jean"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Nom</Label>
+                        <Input
+                          id="lastName"
+                          type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Dupont"
+                          className="h-11"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.ch"
+                    className="h-11"
+                  />
                 </div>
-              </>
-            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="votre@email.ch"
-                className="h-11"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Mot de passe</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-11"
+                  />
+                  {!isSignUp && (
+                    <button
+                      type="button"
+                      className="text-xs text-[#1800AD] hover:underline"
+                      onClick={() => toast({
+                        title: "Mot de passe oublié",
+                        description: "Contactez votre conseiller pour réinitialiser votre mot de passe.",
+                      })}
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-11"
-              />
-              {!isSignUp && (
-                <button
-                  type="button"
-                  className="text-xs text-[#1800AD] hover:underline"
-                  onClick={() => toast({
-                    title: "Mot de passe oublié",
-                    description: "Contactez votre conseiller pour réinitialiser votre mot de passe.",
-                  })}
+                <Button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-[#1800AD] hover:bg-[#1800AD]/90 text-white font-semibold rounded-full h-11 mt-6 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-[1px]"
                 >
-                  Mot de passe oublié ?
-                </button>
-              )}
-            </div>
+                  {loading ? "Chargement..." : (isSignUp ? "Créer mon compte" : "Se connecter")}
+                </Button>
 
-            <Button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-[#1800AD] hover:bg-[#1800AD]/90 text-white font-semibold rounded-full h-11 mt-6 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-[1px]"
-            >
-              {loading ? "Chargement..." : (isSignUp ? "Créer mon compte" : "Se connecter")}
-            </Button>
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-sm text-slate-600 hover:text-[#1800AD]"
+                  >
+                    {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
+                  </button>
+                </div>
+              </form>
+            </TabsContent>
 
-            <div className="text-center mt-4">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-slate-600 hover:text-[#1800AD]"
-              >
-                {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
-              </button>
-            </div>
-          </form>
+            <TabsContent value="partner" className="space-y-0">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-1">
+                  {isSignUp ? "Créer un compte Partner" : "Espace Partner"}
+                </h2>
+                <p className="text-sm text-slate-600">
+                  {isSignUp ? "Inscription réservée aux partenaires Advisy" : "Connectez-vous à votre espace partenaire"}
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {isSignUp && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName-partner">Prénom</Label>
+                        <Input
+                          id="firstName-partner"
+                          type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Jean"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName-partner">Nom</Label>
+                        <Input
+                          id="lastName-partner"
+                          type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Dupont"
+                          className="h-11"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email-partner">Email professionnel</Label>
+                  <Input
+                    id="email-partner"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@advisy.ch"
+                    className="h-11"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password-partner">Mot de passe</Label>
+                  <Input
+                    id="password-partner"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-11"
+                  />
+                  {!isSignUp && (
+                    <button
+                      type="button"
+                      className="text-xs text-[#1800AD] hover:underline"
+                      onClick={() => toast({
+                        title: "Mot de passe oublié",
+                        description: "Contactez l'administrateur pour réinitialiser votre mot de passe.",
+                      })}
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  )}
+                </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-[#1800AD] hover:bg-[#1800AD]/90 text-white font-semibold rounded-full h-11 mt-6 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-[1px]"
+                >
+                  {loading ? "Chargement..." : (isSignUp ? "Créer mon compte" : "Se connecter")}
+                </Button>
+
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-sm text-slate-600 hover:text-[#1800AD]"
+                  >
+                    {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
+                  </button>
+                </div>
+              </form>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
