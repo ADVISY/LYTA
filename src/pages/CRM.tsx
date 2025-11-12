@@ -4,7 +4,7 @@ import {
   ShieldCheck, Users, LayoutDashboard, LineChart, Activity,
   Building2, MessageSquare, Bell, CreditCard, FileSignature,
   Mail, Smartphone, BarChart4, Settings, Cloud, Globe2,
-  Wallet, ChevronRight, Sun, Moon, Sparkles, Cpu, LogOut
+  Wallet, ChevronRight, Sun, Moon, Sparkles, Cpu, LogOut, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AdminUserManagement } from "@/components/crm/AdminUserManagement";
 import { useToast } from "@/hooks/use-toast";
 import { ContractsSection } from "@/components/crm/ContractsSection";
+import { useNavigate } from "react-router-dom";
 
 // Helpers d'animation
 const fadeIn = {
@@ -147,9 +148,13 @@ function TickerStrip() {
 
 function SidebarNav() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const links = [
     { label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" />, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-    { label: "Contrats", icon: <ShieldCheck className="h-4 w-4" />, action: () => document.getElementById('contracts-section')?.scrollIntoView({ behavior: 'smooth' }) },
+    { label: "Gestion Contrats", icon: <FileSignature className="h-4 w-4" />, action: () => navigate('/partner/contracts') },
+    { label: "Documents", icon: <FileText className="h-4 w-4" />, action: () => navigate('/partner/documents') },
+    { label: "Commissions", icon: <CreditCard className="h-4 w-4" />, action: () => navigate('/partner/commissions') },
+    { label: "Vue Contrats", icon: <ShieldCheck className="h-4 w-4" />, action: () => document.getElementById('contracts-section')?.scrollIntoView({ behavior: 'smooth' }) },
     { label: "Espace Client", icon: <ShieldCheck className="h-4 w-4" />, action: () => document.getElementById('client-section')?.scrollIntoView({ behavior: 'smooth' }) },
     { label: "Espace Partner", icon: <Users className="h-4 w-4" />, action: () => document.getElementById('partner-section')?.scrollIntoView({ behavior: 'smooth' }) },
     { label: "CRM Admin", icon: <Settings className="h-4 w-4" />, action: () => document.getElementById('admin-section')?.scrollIntoView({ behavior: 'smooth' }) },

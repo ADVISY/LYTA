@@ -20,9 +20,12 @@ import Carriere from "./pages/Carriere";
 import Connexion from "./pages/Connexion";
 import Simulateurs from "./pages/Simulateurs";
 import Assurances from "./pages/Assurances";
+import CRM from "./pages/CRM";
+import PartnerContracts from "./pages/partner/PartnerContracts";
+import PartnerDocuments from "./pages/partner/PartnerDocuments";
+import PartnerCommissions from "./pages/partner/PartnerCommissions";
 import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
-import CRM from "./pages/CRM";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -64,11 +67,10 @@ const App = () => (
           <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
           
           {/* CRM */}
-          <Route path="/crm" element={
-            <ProtectedRoute>
-              <CRM />
-            </ProtectedRoute>
-          } />
+          <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
+          <Route path="/partner/contracts" element={<ProtectedRoute><PartnerContracts /></ProtectedRoute>} />
+          <Route path="/partner/documents" element={<ProtectedRoute><PartnerDocuments /></ProtectedRoute>} />
+          <Route path="/partner/commissions" element={<ProtectedRoute><PartnerCommissions /></ProtectedRoute>} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
