@@ -56,6 +56,8 @@ export default function PartnerContracts() {
   const [selectedContract, setSelectedContract] = useState<MockContract | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingContract, setEditingContract] = useState<MockContract | null>(null);
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -104,10 +106,18 @@ export default function PartnerContracts() {
   const handleNewContract = (e: React.FormEvent) => {
     e.preventDefault();
     toast({ 
-      title: "Contrat créé", 
-      description: "Le nouveau contrat a été ajouté (mock)" 
+      title: isEditMode ? "Contrat modifié" : "Contrat créé", 
+      description: isEditMode ? "Les modifications ont été enregistrées (mock)" : "Le nouveau contrat a été ajouté (mock)" 
     });
     setIsNewModalOpen(false);
+    setIsEditMode(false);
+    setEditingContract(null);
+  };
+
+  const handleEditClick = (contract: MockContract) => {
+    setEditingContract(contract);
+    setIsEditMode(true);
+    setIsNewModalOpen(true);
   };
 
   const uniqueCompanies = Array.from(new Set(mockContracts.map(c => c.company)));
@@ -149,19 +159,23 @@ export default function PartnerContracts() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>Nouveau contrat</DialogTitle>
+                  <DialogTitle>{isEditMode ? "Modifier le contrat" : "Nouveau contrat"}</DialogTitle>
                   <DialogDescription>
-                    Créer un nouveau contrat d'assurance (mock)
+                    {isEditMode ? "Modifier les informations du contrat" : "Créer un nouveau contrat d'assurance (mock)"}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleNewContract} className="space-y-4">
                   <div className="space-y-2">
                     <Label>Client</Label>
-                    <Input placeholder="Nom du client" required />
+                    <Input 
+                      placeholder="Nom du client" 
+                      defaultValue={isEditMode ? editingContract?.client : ""} 
+                      required 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Type de produit</Label>
-                    <Select required>
+                    <Select required defaultValue={isEditMode ? editingContract?.type.toLowerCase() : ""}>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
@@ -176,7 +190,7 @@ export default function PartnerContracts() {
                   </div>
                   <div className="space-y-2">
                     <Label>Compagnie</Label>
-                    <Select required>
+                    <Select required defaultValue={isEditMode ? editingContract?.company : ""}>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner" />
                       </SelectTrigger>
@@ -192,16 +206,29 @@ export default function PartnerContracts() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Prime mensuelle (CHF)</Label>
-                      <Input type="number" placeholder="0" />
+                      <Input 
+                        type="number" 
+                        placeholder="0" 
+                        defaultValue={isEditMode && editingContract?.premiumMonthly ? editingContract.premiumMonthly : ""} 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Prime annuelle (CHF)</Label>
-                      <Input type="number" placeholder="0" required />
+                      <Input 
+                        type="number" 
+                        placeholder="0" 
+                        required 
+                        defaultValue={isEditMode && editingContract?.premiumYearly ? editingContract.premiumYearly : ""} 
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Date de renouvellement</Label>
-                    <Input type="date" required />
+                    <Input 
+                      type="date" 
+                      required 
+                      defaultValue={isEditMode && editingContract?.renewal ? new Date(editingContract.renewal).toISOString().split('T')[0] : ""} 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Document PDF</Label>
@@ -211,11 +238,17 @@ export default function PartnerContracts() {
                     <Button 
                       type="button" 
                       variant="outline" 
-                      onClick={() => setIsNewModalOpen(false)}
+                      onClick={() => {
+                        setIsNewModalOpen(false);
+                        setIsEditMode(false);
+                        setEditingContract(null);
+                      }}
                     >
                       Annuler
                     </Button>
-                    <Button type="submit">Créer le contrat</Button>
+                    <Button type="submit">
+                      {isEditMode ? "Enregistrer les modifications" : "Créer le contrat"}
+                    </Button>
                   </div>
                 </form>
               </DialogContent>
@@ -350,7 +383,7 @@ export default function PartnerContracts() {
                               className="h-8 w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toast({ title: "Édition", description: "Fonctionnalité en développement" });
+                                handleEditClick(contract);
                               }}
                             >
                               <Edit className="h-4 w-4" />
