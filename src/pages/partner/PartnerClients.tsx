@@ -530,8 +530,9 @@ export default function PartnerClients() {
     setIsModalOpen(true);
   };
 
-  // Detail View
-  if (viewMode === 'detail' && selectedClient) {
+  const renderDetailView = () => {
+    if (!selectedClient) return null;
+    
     const clientContracts = getClientContracts(selectedClient.id);
     const clientDocuments = getClientDocuments(selectedClient.id);
     const clientCommissions = getClientCommissions(selectedClient.id);
@@ -1055,11 +1056,10 @@ export default function PartnerClients() {
       </div>
     </motion.div>
   </div>
-);
-}
+    );
+  };
 
-  // List View
-  return (
+  const renderListView = () => (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 p-6">
       <motion.div 
         variants={fadeIn} 
@@ -1087,178 +1087,18 @@ export default function PartnerClients() {
               <Download className="h-4 w-4 mr-2" />
               Export CSV
             </Button>
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="rounded-xl" onClick={() => {
-                  setIsEditMode(false);
-                  setEditingClient(null);
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nouveau client
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    {addingFamilyMember 
-                      ? `Ajouter ${familyMemberType === 'conjoint' ? 'un conjoint' : 'un enfant'} pour ${selectedClient?.firstName} ${selectedClient?.lastName}`
-                      : isEditMode ? "Modifier le client" : "Nouveau client principal"
-                    }
-                  </DialogTitle>
-                  <DialogDescription>
-                    {addingFamilyMember 
-                      ? `Complétez les informations du membre de la famille (${familyMemberType})`
-                      : isEditMode ? "Modifier les informations du client" : "Ajouter un nouveau client principal"
-                    }
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Informations Personnelles */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Informations Personnelles
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Prénom *</Label>
-                        <Input 
-                          placeholder="Prénom" 
-                          defaultValue={isEditMode ? editingClient?.firstName : ""} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Nom *</Label>
-                        <Input 
-                          placeholder="Nom de famille" 
-                          defaultValue={isEditMode ? editingClient?.lastName : ""} 
-                          required 
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date de naissance</Label>
-                      <Input 
-                        type="date" 
-                        defaultValue={isEditMode ? editingClient?.birthdate : ""} 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Contact */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Contact
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Email *</Label>
-                        <Input 
-                          type="email"
-                          placeholder="client@example.com" 
-                          defaultValue={isEditMode ? editingClient?.email : ""} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Téléphone *</Label>
-                        <Input 
-                          type="tel"
-                          placeholder="+41 XX XXX XX XX" 
-                          defaultValue={isEditMode ? editingClient?.phone : ""} 
-                          required 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Adresse */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Adresse
-                    </h3>
-                    <div className="space-y-2">
-                      <Label>Adresse *</Label>
-                      <Input 
-                        placeholder="Rue et numéro" 
-                        defaultValue={isEditMode ? editingClient?.address : ""} 
-                        required 
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Code Postal *</Label>
-                        <Input 
-                          placeholder="1000" 
-                          defaultValue={isEditMode ? editingClient?.postalCode : ""} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label>Ville *</Label>
-                        <Input 
-                          placeholder="Lausanne" 
-                          defaultValue={isEditMode ? editingClient?.city : ""} 
-                          required 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Informations Bancaires */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Informations Bancaires
-                    </h3>
-                    <div className="space-y-2">
-                      <Label>IBAN</Label>
-                      <Input 
-                        placeholder="CH93 0000 0000 0000 0000 0" 
-                        defaultValue={isEditMode ? editingClient?.iban : ""} 
-                        pattern="[A-Z]{2}[0-9]{2}[A-Z0-9]+"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Statut */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <div className="space-y-2">
-                      <Label>Statut</Label>
-                      <Select defaultValue={isEditMode ? editingClient?.status.toLowerCase() : "prospect"}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="actif">Actif</SelectItem>
-                          <SelectItem value="prospect">Prospect</SelectItem>
-                          <SelectItem value="inactif">Inactif</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => {
-                        setIsModalOpen(false);
-                        setIsEditMode(false);
-                        setEditingClient(null);
-                      }}
-                    >
-                      Annuler
-                    </Button>
-                    <Button type="submit">
-                      {isEditMode ? "Enregistrer" : "Créer le client"}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              className="rounded-xl" 
+              onClick={() => {
+                setIsEditMode(false);
+                setEditingClient(null);
+                setAddingFamilyMember(false);
+                setIsModalOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nouveau client
+            </Button>
           </div>
         </div>
 
@@ -1385,5 +1225,177 @@ export default function PartnerClients() {
 
       </motion.div>
     </div>
+  );
+
+  return (
+    <>
+      {viewMode === 'detail' ? renderDetailView() : renderListView()}
+      
+      {/* Dialog accessible from both views */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {addingFamilyMember 
+                ? `Ajouter ${familyMemberType === 'conjoint' ? 'un conjoint' : 'un enfant'} pour ${selectedClient?.firstName} ${selectedClient?.lastName}`
+                : isEditMode ? "Modifier le client" : "Nouveau client principal"
+              }
+            </DialogTitle>
+            <DialogDescription>
+              {addingFamilyMember 
+                ? `Complétez les informations du membre de la famille (${familyMemberType})`
+                : isEditMode ? "Modifier les informations du client" : "Ajouter un nouveau client principal"
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Informations Personnelles */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Informations Personnelles
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Prénom *</Label>
+                  <Input 
+                    placeholder="Prénom" 
+                    defaultValue={isEditMode ? editingClient?.firstName : ""} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom *</Label>
+                  <Input 
+                    placeholder="Nom de famille" 
+                    defaultValue={isEditMode ? editingClient?.lastName : ""} 
+                    required 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Date de naissance</Label>
+                <Input 
+                  type="date" 
+                  defaultValue={isEditMode ? editingClient?.birthdate : ""} 
+                />
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Contact
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input 
+                    type="email"
+                    placeholder="client@example.com" 
+                    defaultValue={isEditMode ? editingClient?.email : ""} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone *</Label>
+                  <Input 
+                    type="tel"
+                    placeholder="+41 XX XXX XX XX" 
+                    defaultValue={isEditMode ? editingClient?.phone : ""} 
+                    required 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Adresse */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Adresse
+              </h3>
+              <div className="space-y-2">
+                <Label>Adresse *</Label>
+                <Input 
+                  placeholder="Rue et numéro" 
+                  defaultValue={isEditMode ? editingClient?.address : ""} 
+                  required 
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Code Postal *</Label>
+                  <Input 
+                    placeholder="1000" 
+                    defaultValue={isEditMode ? editingClient?.postalCode : ""} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Ville *</Label>
+                  <Input 
+                    placeholder="Lausanne" 
+                    defaultValue={isEditMode ? editingClient?.city : ""} 
+                    required 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Informations Bancaires */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Informations Bancaires
+              </h3>
+              <div className="space-y-2">
+                <Label>IBAN</Label>
+                <Input 
+                  placeholder="CH93 0000 0000 0000 0000 0" 
+                  defaultValue={isEditMode ? editingClient?.iban : ""} 
+                  pattern="[A-Z]{2}[0-9]{2}[A-Z0-9]+"
+                />
+              </div>
+            </div>
+
+            {/* Statut */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label>Statut</Label>
+                <Select defaultValue={isEditMode ? editingClient?.status.toLowerCase() : "prospect"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="actif">Actif</SelectItem>
+                    <SelectItem value="prospect">Prospect</SelectItem>
+                    <SelectItem value="inactif">Inactif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setIsEditMode(false);
+                  setEditingClient(null);
+                  setAddingFamilyMember(false);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button type="submit">
+                {isEditMode ? "Enregistrer" : "Créer le client"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
