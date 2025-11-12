@@ -321,8 +321,8 @@ const APropos = () => {
           </div>
         </section>
 
-        {/* Stats Section */}
-        <section className="py-20 lg:py-32">
+        {/* Stats Section with 3D Animations */}
+        <section className="py-20 lg:py-32" style={{ perspective: '2000px' }}>
           <div className="container mx-auto px-4 lg:px-8">
             <div className="max-w-3xl mx-auto text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -333,39 +333,78 @@ const APropos = () => {
                 Notre mission en quelques statistiques clés
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto" style={{ transformStyle: 'preserve-3d' }}>
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
                   <div 
                     key={index} 
-                    className="group relative text-center space-y-4 p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border hover:scale-110 transition-all duration-500 cursor-pointer"
-                    style={{ animationDelay: `${index * 150}ms` }}
+                    className="group relative text-center space-y-4 p-6 rounded-2xl bg-gradient-card backdrop-blur-sm border border-border hover:scale-110 transition-all duration-700 cursor-pointer animate-fade-in"
+                    style={{ 
+                      animationDelay: `${index * 150}ms`,
+                      transformStyle: 'preserve-3d',
+                      transform: 'rotateX(0deg) rotateY(0deg) translateZ(0px)',
+                      transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}
+                    onMouseMove={(e) => {
+                      const card = e.currentTarget;
+                      const rect = card.getBoundingClientRect();
+                      const x = e.clientX - rect.left;
+                      const y = e.clientY - rect.top;
+                      const centerX = rect.width / 2;
+                      const centerY = rect.height / 2;
+                      const rotateX = ((y - centerY) / centerY) * -15;
+                      const rotateY = ((x - centerX) / centerX) * 15;
+                      card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(30px) scale(1.05)`;
+                    }}
+                    onMouseLeave={(e) => {
+                      const card = e.currentTarget;
+                      card.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(0px) scale(1)';
+                    }}
                   >
-                    {/* Glow effect background */}
-                    <div className={`absolute inset-0 rounded-2xl ${stat.glowColor} ${stat.hoverGlow} transition-all duration-500 opacity-0 group-hover:opacity-100`} />
+                    {/* Multi-layered 3D Glow effect */}
+                    <div className={`absolute inset-0 rounded-2xl ${stat.glowColor} ${stat.hoverGlow} transition-all duration-700 opacity-0 group-hover:opacity-100`} style={{ transform: 'translateZ(-10px)' }} />
+                    <div className={`absolute inset-0 rounded-2xl ${stat.glowColor} blur-xl transition-all duration-700 opacity-0 group-hover:opacity-60`} style={{ transform: 'translateZ(-20px)' }} />
                     
-                    {/* Shine animation overlay */}
-                    <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                    {/* Enhanced Shine animation with 3D depth */}
+                    <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ transform: 'translateZ(5px)' }}>
                       <div 
-                        className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                        style={{ width: '50%' }}
+                        className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                        style={{ width: '50%', transform: 'translateZ(10px)' }}
                       />
                     </div>
                     
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className={`w-20 h-20 mx-auto rounded-2xl ${stat.bgColor} flex items-center justify-center ${stat.glowColor} group-hover:scale-110 transition-all duration-500 mb-4`}>
-                        <Icon className={`w-10 h-10 ${stat.iconColor} group-hover:scale-110 transition-transform duration-300`} />
+                    {/* Rotating gradient background on hover */}
+                    <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-30 transition-all duration-700 bg-gradient-to-br ${stat.bgColor}`} style={{ transform: 'translateZ(-5px) rotateZ(45deg) scale(1.2)' }} />
+                    
+                    {/* Content with 3D layering */}
+                    <div className="relative z-10" style={{ transform: 'translateZ(40px)' }}>
+                      <div 
+                        className={`w-20 h-20 mx-auto rounded-2xl ${stat.bgColor} flex items-center justify-center ${stat.glowColor} group-hover:scale-125 group-hover:rotate-12 transition-all duration-700 mb-4`}
+                        style={{ transformStyle: 'preserve-3d', transform: 'translateZ(20px)' }}
+                      >
+                        <Icon 
+                          className={`w-10 h-10 ${stat.iconColor} group-hover:scale-110 group-hover:rotate-[360deg] transition-all duration-700`} 
+                          style={{ transform: 'translateZ(10px)' }}
+                        />
                       </div>
-                      <div className={`text-5xl font-bold ${stat.color} ${stat.animated ? 'animate-pulse' : ''} group-hover:scale-110 transition-all duration-500 drop-shadow-lg`}>
+                      <div 
+                        className={`text-5xl font-bold ${stat.color} ${stat.animated ? 'animate-pulse' : ''} group-hover:scale-125 transition-all duration-700 drop-shadow-2xl`}
+                        style={{ transform: 'translateZ(30px)' }}
+                      >
                         {stat.value}
                       </div>
-                      <div className="text-foreground/70 font-medium mt-2">{stat.label}</div>
+                      <div 
+                        className="text-foreground/70 font-medium mt-2 group-hover:text-foreground transition-colors duration-500"
+                        style={{ transform: 'translateZ(20px)' }}
+                      >
+                        {stat.label}
+                      </div>
                     </div>
 
-                    {/* Pulsing ring effect */}
-                    <div className={`absolute inset-0 rounded-2xl ${stat.bgColor} animate-ping opacity-0 group-hover:opacity-20`} style={{ animationDuration: '2s' }} />
+                    {/* 3D Pulsing ring effect with depth */}
+                    <div className={`absolute inset-0 rounded-2xl ${stat.bgColor} animate-ping opacity-0 group-hover:opacity-30`} style={{ animationDuration: '2s', transform: 'translateZ(-30px) scale(1.1)' }} />
+                    <div className={`absolute inset-0 rounded-2xl ${stat.bgColor} animate-ping opacity-0 group-hover:opacity-20`} style={{ animationDuration: '2.5s', transform: 'translateZ(-40px) scale(1.2)' }} />
                   </div>
                 );
               })}
