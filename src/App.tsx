@@ -24,6 +24,7 @@ import CRM from "./pages/CRM";
 import PartnerContracts from "./pages/partner/PartnerContracts";
 import PartnerDocuments from "./pages/partner/PartnerDocuments";
 import PartnerCommissions from "./pages/partner/PartnerCommissions";
+import AdminUsers from "./pages/AdminUsers";
 import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -73,6 +74,11 @@ const App = () => (
             <Route path="contracts" element={<PartnerContracts />} />
             <Route path="documents" element={<PartnerDocuments />} />
             <Route path="commissions" element={<PartnerCommissions />} />
+          </Route>
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
+            <Route path="users" element={<AdminUsers />} />
           </Route>
           
           {/* Legacy Partner Routes (redirect to CRM) */}
