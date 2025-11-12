@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AdminUserManagement } from "@/components/crm/AdminUserManagement";
+import { useToast } from "@/hooks/use-toast";
 
 // Helpers d'animation
 const fadeIn = {
@@ -144,13 +145,14 @@ function TickerStrip() {
 }
 
 function SidebarNav() {
+  const { toast } = useToast();
   const links = [
-    { label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { label: "Espace Client", icon: <ShieldCheck className="h-4 w-4" /> },
-    { label: "Espace Partner", icon: <Users className="h-4 w-4" /> },
-    { label: "CRM Admin", icon: <Settings className="h-4 w-4" /> },
-    { label: "Analytics", icon: <BarChart4 className="h-4 w-4" /> },
-    { label: "Chat", icon: <MessageSquare className="h-4 w-4" /> },
+    { label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" />, action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { label: "Espace Client", icon: <ShieldCheck className="h-4 w-4" />, action: () => document.getElementById('client-section')?.scrollIntoView({ behavior: 'smooth' }) },
+    { label: "Espace Partner", icon: <Users className="h-4 w-4" />, action: () => document.getElementById('partner-section')?.scrollIntoView({ behavior: 'smooth' }) },
+    { label: "CRM Admin", icon: <Settings className="h-4 w-4" />, action: () => document.getElementById('admin-section')?.scrollIntoView({ behavior: 'smooth' }) },
+    { label: "Analytics", icon: <BarChart4 className="h-4 w-4" />, action: () => toast({ title: "Analytics", description: "Tableaux de bord avancés en développement" }) },
+    { label: "Chat", icon: <MessageSquare className="h-4 w-4" />, action: () => toast({ title: "Chat", description: "Messagerie temps réel en développement" }) },
   ];
   return (
     <aside className="sticky top-20 h-[calc(100vh-5rem)] w-64 hidden lg:flex flex-col gap-2 p-3">
@@ -161,7 +163,8 @@ function SidebarNav() {
           initial="hidden"
           animate="show"
           whileHover={{ scale: 1.02, boxShadow: "0 8px 24px rgba(59,130,246,0.15)" }}
-          className="group rounded-2xl px-3 py-2 bg-white/70 dark:bg-slate-900/50 backdrop-blur border border-white/30 dark:border-slate-700/40 text-left flex items-center gap-3"
+          onClick={l.action}
+          className="group rounded-2xl px-3 py-2 bg-white/70 dark:bg-slate-900/50 backdrop-blur border border-white/30 dark:border-slate-700/40 text-left flex items-center gap-3 cursor-pointer"
         >
           <div className="text-slate-700 dark:text-slate-200">{l.icon}</div>
           <span className="text-sm text-slate-700 dark:text-slate-200">{l.label}</span>
@@ -261,6 +264,7 @@ function ClientPanelDemo() {
   const { user } = useAuth();
   const [contracts, setContracts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -363,9 +367,26 @@ function ClientPanelDemo() {
               </div>
             )}
             <div className="mt-4 flex gap-2">
-              <Button className="rounded-xl">Nouveau contrat</Button>
-              <Button variant="outline" className="rounded-xl">Résiliation (e-sign)</Button>
-              <Button variant="ghost" className="rounded-xl">Voir dépenses globales</Button>
+              <Button 
+                className="rounded-xl"
+                onClick={() => toast({ title: "Nouveau contrat", description: "Fonctionnalité en développement" })}
+              >
+                Nouveau contrat
+              </Button>
+              <Button 
+                variant="outline" 
+                className="rounded-xl"
+                onClick={() => toast({ title: "Résiliation", description: "Signature électronique en développement" })}
+              >
+                Résiliation (e-sign)
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="rounded-xl"
+                onClick={() => toast({ title: "Dépenses", description: "Analyse globale en développement" })}
+              >
+                Voir dépenses globales
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -385,7 +406,12 @@ function ClientPanelDemo() {
             </div>
             <div className="mt-3 flex gap-2">
               <Input placeholder="Écrire un message..." />
-              <Button className="rounded-xl">Envoyer</Button>
+              <Button 
+                className="rounded-xl"
+                onClick={() => toast({ title: "Chat", description: "Chat temps réel en développement" })}
+              >
+                Envoyer
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -586,7 +612,7 @@ export default function CRM() {
 
           {/* Espace Client - visible pour clients et admins */}
           {(userRole === "client" || userRole === "admin") && (
-            <section className="space-y-4">
+            <section className="space-y-4" id="client-section">
               <motion.h2 variants={fadeIn} initial="hidden" animate="show" className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5" /> Mes Contrats
               </motion.h2>
@@ -596,7 +622,7 @@ export default function CRM() {
 
           {/* Espace Partner - visible pour partners et admins */}
           {(userRole === "partner" || userRole === "admin") && (
-            <section className="space-y-4">
+            <section className="space-y-4" id="partner-section">
               <motion.h2 variants={fadeIn} initial="hidden" animate="show" className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <Users className="h-5 w-5" /> Espace Partner
               </motion.h2>
@@ -607,7 +633,7 @@ export default function CRM() {
           {/* CRM Admin - visible uniquement pour admins */}
           {userRole === "admin" && (
             <>
-              <section className="space-y-4">
+              <section className="space-y-4" id="admin-section">
                 <motion.h2 variants={fadeIn} initial="hidden" animate="show" className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
                   <Users className="h-5 w-5" /> Gestion Utilisateurs
                 </motion.h2>
