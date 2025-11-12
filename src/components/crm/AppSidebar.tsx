@@ -6,7 +6,8 @@ import {
   Users, 
   Settings,
   LogOut,
-  Shield
+  Shield,
+  UserCircle
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -29,13 +30,14 @@ import { Separator } from "@/components/ui/separator";
 
 const partnerItems = [
   { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
+  { title: "Clients", url: "/crm/clients", icon: Users },
   { title: "Contrats", url: "/crm/contracts", icon: FileText },
   { title: "Documents", url: "/crm/documents", icon: FolderOpen },
   { title: "Commissions", url: "/crm/commissions", icon: DollarSign },
 ];
 
 const adminItems = [
-  { title: "Utilisateurs", url: "/admin/users", icon: Users },
+  { title: "Utilisateurs", url: "/admin/users", icon: UserCircle },
   { title: "Configuration", url: "/admin/settings", icon: Settings },
 ];
 
