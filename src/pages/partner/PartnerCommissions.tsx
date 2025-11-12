@@ -327,12 +327,28 @@ export default function PartnerCommissions() {
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
                       >
                         <TableCell className="font-mono text-sm">{commission.contractId}</TableCell>
-                        <TableCell className="font-medium">{commission.product}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{commission.product}</span>
+                            {commission.calculationDetails && (
+                              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                {commission.calculationDetails}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{commission.company}</TableCell>
                         <TableCell className="text-right">
-                          <span className="font-semibold text-slate-900 dark:text-slate-50">
-                            CHF {commission.amount.toFixed(2)}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-slate-900 dark:text-slate-50">
+                              CHF {commission.amount.toFixed(2)}
+                            </span>
+                            {commission.premiumAmount && commission.multiplier && (
+                              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                {commission.premiumAmount} × {commission.multiplier > 1 ? commission.multiplier : `${(commission.multiplier * 100).toFixed(1)}%`}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>{getStatusBadge(commission.status)}</TableCell>
                         <TableCell>

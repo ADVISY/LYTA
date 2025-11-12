@@ -18,6 +18,8 @@ export interface MockContract {
   sourceAcquisition?: string;
   dateSignature?: string;
   modeEncaissement?: string;
+  commissionMultiplier?: number;
+  commissionFormula?: string;
 }
 
 export interface MockDocument {
@@ -38,6 +40,9 @@ export interface MockCommission {
   status: 'À verser' | 'Versée' | 'En validation';
   date: string;
   company: string;
+  calculationDetails?: string;
+  premiumAmount?: number;
+  multiplier?: number;
 }
 
 // Mock Contracts Data
@@ -59,7 +64,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Jean-Pierre Durand",
     sourceAcquisition: "Référence client",
     dateSignature: "2025-01-15",
-    modeEncaissement: "Annuel"
+    modeEncaissement: "Annuel",
+    commissionMultiplier: 0.30,
+    commissionFormula: "Prime annuelle × 30%"
   },
   { 
     id: "C-2025-0041", 
@@ -78,7 +85,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Jean-Pierre Durand",
     sourceAcquisition: "Site web",
     dateSignature: null,
-    modeEncaissement: "Mensuel"
+    modeEncaissement: "Mensuel",
+    commissionMultiplier: 0.10,
+    commissionFormula: "Prime annuelle × 10%"
   },
   { 
     id: "C-2025-0048", 
@@ -97,12 +106,14 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Claire Bertrand",
     sourceAcquisition: "Prospection téléphonique",
     dateSignature: null,
-    modeEncaissement: null
+    modeEncaissement: null,
+    commissionMultiplier: 0.25,
+    commissionFormula: "Prime annuelle × 25%"
   },
   { 
     id: "C-2025-0055", 
     client: "Rochat Famille", 
-    type: "Santé", 
+    type: "Santé Complémentaire", 
     company: "Helsana", 
     status: "Signé", 
     premiumMonthly: 450, 
@@ -116,7 +127,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Jean-Pierre Durand",
     sourceAcquisition: "Parrainage",
     dateSignature: "2025-05-20",
-    modeEncaissement: "Mensuel"
+    modeEncaissement: "Mensuel",
+    commissionMultiplier: 16,
+    commissionFormula: "Prime mensuelle × 16"
   },
   { 
     id: "C-2025-0062", 
@@ -135,7 +148,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Claire Bertrand",
     sourceAcquisition: "LinkedIn",
     dateSignature: "2025-06-15",
-    modeEncaissement: "Annuel"
+    modeEncaissement: "Annuel",
+    commissionMultiplier: 0.30,
+    commissionFormula: "Prime annuelle × 30%"
   },
   { 
     id: "C-2025-0078", 
@@ -154,7 +169,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Jean-Pierre Durand",
     sourceAcquisition: "Salon professionnel",
     dateSignature: "2025-07-22",
-    modeEncaissement: "Mensuel"
+    modeEncaissement: "Mensuel",
+    commissionMultiplier: 0.075,
+    commissionFormula: "Prime annuelle × 7.5%"
   },
   { 
     id: "C-2025-0089", 
@@ -173,7 +190,9 @@ export const mockContracts: MockContract[] = [
     managerAdvisy: "Claire Bertrand",
     sourceAcquisition: "Agence physique",
     dateSignature: "2024-08-10",
-    modeEncaissement: "Annuel"
+    modeEncaissement: "Annuel",
+    commissionMultiplier: 0.20,
+    commissionFormula: "Prime annuelle × 20%"
   }
 ];
 
@@ -249,28 +268,37 @@ export const mockCommissions: MockCommission[] = [
     id: "COM-001",
     contractId: "C-2025-0012", 
     product: "RC Pro", 
-    amount: 820, 
+    amount: 735, 
     status: "À verser", 
     date: "2025-11-05",
-    company: "Allianz"
+    company: "Allianz",
+    calculationDetails: "Prime annuelle × 30%",
+    premiumAmount: 2450,
+    multiplier: 0.30
   },
   { 
     id: "COM-002",
     contractId: "C-2025-0041", 
     product: "Auto", 
-    amount: 140, 
+    amount: 144, 
     status: "Versée", 
     date: "2025-10-28",
-    company: "AXA"
+    company: "AXA",
+    calculationDetails: "Prime annuelle × 10%",
+    premiumAmount: 1440,
+    multiplier: 0.10
   },
   { 
     id: "COM-003",
     contractId: "C-2025-0055", 
-    product: "Santé", 
-    amount: 220, 
+    product: "Santé Complémentaire", 
+    amount: 7200, 
     status: "En validation", 
     date: "2025-11-03",
-    company: "Helsana"
+    company: "Helsana",
+    calculationDetails: "Prime mensuelle × 16",
+    premiumAmount: 450,
+    multiplier: 16
   },
   { 
     id: "COM-004",
@@ -279,7 +307,10 @@ export const mockCommissions: MockCommission[] = [
     amount: 960, 
     status: "Versée", 
     date: "2025-10-15",
-    company: "Mobilière"
+    company: "Mobilière",
+    calculationDetails: "Prime annuelle × 30%",
+    premiumAmount: 3200,
+    multiplier: 0.30
   },
   { 
     id: "COM-005",
@@ -288,25 +319,34 @@ export const mockCommissions: MockCommission[] = [
     amount: 450, 
     status: "À verser", 
     date: "2025-11-10",
-    company: "Swiss Life"
+    company: "Swiss Life",
+    calculationDetails: "Prime annuelle × 7.5%",
+    premiumAmount: 6000,
+    multiplier: 0.075
   },
   { 
     id: "COM-006",
     contractId: "C-2025-0012", 
     product: "RC Pro", 
-    amount: 820, 
+    amount: 735, 
     status: "Versée", 
     date: "2025-10-05",
-    company: "Allianz"
+    company: "Allianz",
+    calculationDetails: "Prime annuelle × 30%",
+    premiumAmount: 2450,
+    multiplier: 0.30
   },
   { 
     id: "COM-007",
     contractId: "C-2025-0055", 
-    product: "Santé", 
-    amount: 220, 
+    product: "Santé Complémentaire", 
+    amount: 7200, 
     status: "Versée", 
     date: "2025-10-03",
-    company: "Helsana"
+    company: "Helsana",
+    calculationDetails: "Prime mensuelle × 16",
+    premiumAmount: 450,
+    multiplier: 16
   }
 ];
 
