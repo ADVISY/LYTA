@@ -21,6 +21,7 @@ import Simulateurs from "./pages/Simulateurs";
 import Assurances from "./pages/Assurances";
 import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
+import CRM from "./pages/CRM";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,9 @@ const App = () => (
           {/* Legal Pages */}
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
+          
+          {/* CRM */}
+          <Route path="/crm" element={<CRM />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
