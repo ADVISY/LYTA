@@ -19,16 +19,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface Contract {
+// Use the new policies structure instead of the old contracts
+interface Policy {
   id: string;
-  contract_type: string;
-  company: string;
   policy_number: string | null;
-  monthly_premium: number;
+  status: string;
+  premium_monthly: number | null;
+  premium_yearly: number | null;
   start_date: string;
   end_date: string | null;
-  status: string;
   created_at: string;
+  product?: {
+    name: string;
+    company?: {
+      name: string;
+    };
+  };
+  client?: {
+    company_name: string | null;
+    is_company: boolean;
+    profiles?: {
+      full_name: string | null;
+    };
+  };
 }
 
 const fadeIn = {
@@ -37,25 +50,46 @@ const fadeIn = {
 };
 
 export function ContractsSection({ userId }: { userId: string }) {
-  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchContracts();
+    fetchPolicies();
   }, [userId]);
 
-  const fetchContracts = async () => {
+  const fetchPolicies = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("contracts")
-      .select("*")
+    
+    // Get partner profile first
+    const { data: partner } = await supabase
+      .from("partners")
+      .select("id")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .single();
 
-    if (!error && data) {
-      setContracts(data);
+    if (partner) {
+      const { data, error } = await supabase
+        .from("policies")
+        .select(`
+          *,
+          product:insurance_products (
+            name,
+            company:insurance_companies (name)
+          ),
+          client:clients (
+            company_name,
+            is_company,
+            profiles:user_id (full_name)
+          )
+        `)
+        .eq("partner_id", partner.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setPolicies(data as any);
+      }
     }
     setLoading(false);
   };
@@ -87,223 +121,194 @@ export function ContractsSection({ userId }: { userId: string }) {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
-      'active': 'default',
-      'pending': 'secondary',
-      'cancelled': 'destructive',
-      'expired': 'outline'
+    const variants: Record<string, string> = {
+      active: "bg-green-500",
+      pending: "bg-yellow-500",
+      suspended: "bg-orange-500",
+      cancelled: "bg-red-500",
+      expired: "bg-gray-500",
     };
     return (
-      <Badge variant={variants[status] || 'outline'} className="capitalize">
+      <Badge className={`${variants[status] || "bg-gray-500"} text-white`}>
         {status}
       </Badge>
     );
   };
 
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('fr-CH');
+  const filteredPolicies = policies.filter((policy) => {
+    const clientName = policy.client?.is_company 
+      ? policy.client.company_name 
+      : policy.client?.profiles?.full_name;
+    const searchString = `${clientName} ${policy.product?.name} ${policy.policy_number || ""}`.toLowerCase();
+    return searchString.includes(searchTerm.toLowerCase());
+  });
+
+  const stats = {
+    total: policies.length,
+    active: policies.filter((p) => p.status === "active").length,
+    pending: policies.filter((p) => p.status === "pending").length,
+    totalPremiums: policies
+      .filter((p) => p.status === "active")
+      .reduce((sum, p) => sum + (p.premium_monthly || 0), 0),
   };
 
-  const filteredContracts = contracts.filter(contract =>
-    contract.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getContractLabel(contract.contract_type).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contract.policy_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <motion.div 
-      variants={fadeIn} 
-      initial="hidden" 
-      animate="show"
-      className="space-y-4"
-    >
-      <Card className="rounded-2xl bg-white/70 dark:bg-slate-900/50 border-white/30 dark:border-slate-700/40 backdrop-blur">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
-              <ShieldCheck className="h-5 w-5" /> 
-              Gestion des Contrats
-            </CardTitle>
-            <div className="flex flex-wrap gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                  placeholder="Rechercher..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 rounded-xl w-[200px]"
-                />
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <motion.div variants={fadeIn} initial="hidden" animate="show">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Polices
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={fadeIn} initial="hidden" animate="show" transition={{ delay: 0.1 }}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Actives
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={fadeIn} initial="hidden" animate="show" transition={{ delay: 0.2 }}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                En attente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <motion.div variants={fadeIn} initial="hidden" animate="show" transition={{ delay: 0.3 }}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Primes Mensuelles
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.totalPremiums.toLocaleString("fr-CH")} CHF
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-xl"
-                onClick={() => toast({ title: "Filtres", description: "Filtres avancés en développement" })}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtrer
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-xl"
-                onClick={() => toast({ title: "Export", description: "Export PDF/Excel en développement" })}
-              >
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Filters and Actions */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <CardTitle>Polices d'assurance</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Exporter
               </Button>
-              <Button 
-                size="sm" 
-                className="rounded-xl"
-                onClick={() => toast({ title: "Nouveau contrat", description: "Formulaire en développement" })}
-              >
+              <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Nouveau
+                Nouvelle Police
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par client, type, numéro..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button variant="outline" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
             </div>
-          ) : filteredContracts.length === 0 ? (
-            <div className="text-center py-12">
-              <ShieldCheck className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 mb-2">Aucun contrat trouvé</p>
-              <p className="text-sm text-slate-400">
-                {searchTerm ? "Essayez avec d'autres termes de recherche" : "Créez votre premier contrat"}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 dark:bg-slate-800/50">
-                    <TableHead className="font-semibold">Type</TableHead>
-                    <TableHead className="font-semibold">Compagnie</TableHead>
-                    <TableHead className="font-semibold">N° Police</TableHead>
-                    <TableHead className="font-semibold text-right">Prime/mois</TableHead>
-                    <TableHead className="font-semibold">Début</TableHead>
-                    <TableHead className="font-semibold">Fin</TableHead>
-                    <TableHead className="font-semibold">Statut</TableHead>
-                    <TableHead className="font-semibold text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredContracts.map((contract) => (
-                    <TableRow 
-                      key={contract.id}
-                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{getContractIcon(contract.contract_type)}</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-200">
-                            {getContractLabel(contract.contract_type)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-slate-400" />
-                          <span className="text-slate-600 dark:text-slate-300">{contract.company}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-slate-400" />
-                          <span className="font-mono text-sm text-slate-600 dark:text-slate-300">
-                            {contract.policy_number || 'N/A'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-semibold text-slate-900 dark:text-slate-50">
-                          CHF {Number(contract.monthly_premium).toFixed(2)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                          <Calendar className="h-3 w-3" />
-                          <span className="text-sm">{formatDate(contract.start_date)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-                          <Calendar className="h-3 w-3" />
-                          <span className="text-sm">{formatDate(contract.end_date)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(contract.status)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => toast({ title: "Détails", description: "Vue détaillée en développement" })}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => toast({ title: "Modifier", description: "Édition en développement" })}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            onClick={() => toast({ title: "Supprimer", description: "Confirmation requise" })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+
+            {loading ? (
+              <div className="text-center py-8">Chargement...</div>
+            ) : filteredPolicies.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Aucune police trouvée
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Compagnie</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead className="text-right">Prime/mois</TableHead>
+                      <TableHead>Début</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          
-          {/* Summary Stats */}
-          {filteredContracts.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="rounded-xl bg-blue-50/50 dark:bg-blue-900/20 p-4 border border-blue-200/30 dark:border-blue-700/30">
-                <div className="text-sm text-blue-600 dark:text-blue-400">Total Contrats</div>
-                <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{filteredContracts.length}</div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPolicies.map((policy) => {
+                      const clientName = policy.client?.is_company
+                        ? policy.client.company_name
+                        : policy.client?.profiles?.full_name;
+                      
+                      return (
+                        <TableRow key={policy.id}>
+                          <TableCell className="font-medium">
+                            {clientName || "N/A"}
+                          </TableCell>
+                          <TableCell>{policy.product?.name || "N/A"}</TableCell>
+                          <TableCell>{policy.product?.company?.name || "N/A"}</TableCell>
+                          <TableCell>{getStatusBadge(policy.status)}</TableCell>
+                          <TableCell className="text-right">
+                            {policy.premium_monthly 
+                              ? `${policy.premium_monthly.toLocaleString("fr-CH")} CHF`
+                              : policy.premium_yearly
+                              ? `${(policy.premium_yearly / 12).toFixed(2)} CHF`
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(policy.start_date).toLocaleDateString("fr-CH")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
-              <div className="rounded-xl bg-green-50/50 dark:bg-green-900/20 p-4 border border-green-200/30 dark:border-green-700/30">
-                <div className="text-sm text-green-600 dark:text-green-400">Contrats Actifs</div>
-                <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                  {filteredContracts.filter(c => c.status === 'active').length}
-                </div>
-              </div>
-              <div className="rounded-xl bg-purple-50/50 dark:bg-purple-900/20 p-4 border border-purple-200/30 dark:border-purple-700/30">
-                <div className="text-sm text-purple-600 dark:text-purple-400">Prime Mensuelle</div>
-                <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  CHF {filteredContracts.reduce((sum, c) => sum + Number(c.monthly_premium), 0).toFixed(2)}
-                </div>
-              </div>
-              <div className="rounded-xl bg-orange-50/50 dark:bg-orange-900/20 p-4 border border-orange-200/30 dark:border-orange-700/30">
-                <div className="text-sm text-orange-600 dark:text-orange-400">Coût Annuel</div>
-                <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                  CHF {(filteredContracts.reduce((sum, c) => sum + Number(c.monthly_premium), 0) * 12).toFixed(2)}
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }

@@ -193,25 +193,15 @@ function StatCards() {
 
   useEffect(() => {
     if (user) {
-      // Fetch contracts count and total premiums
-      supabase
-        .from("contracts")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .then(({ data }) => {
-          if (data) {
-            const activeCount = data.length;
-            const monthlyTotal = data.reduce((sum, contract) => 
-              sum + Number(contract.monthly_premium), 0
-            );
-            setStats(prev => ({
-              ...prev,
-              activeContracts: activeCount,
-              monthlyPremiums: monthlyTotal
-            }));
-          }
-        });
+      // TODO: Update to use new policies structure
+      // The old contracts table has been replaced with policies
+      // For now, we'll use mock stats
+      setStats({
+        activeContracts: 0,
+        monthlyPremiums: 0,
+        totalCommissions: 0,
+        cancelRate: 0
+      });
     }
   }, [user]);
 
@@ -274,18 +264,9 @@ function ClientPanelDemo() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      supabase
-        .from("contracts")
-        .select("*")
-        .eq("user_id", user.id)
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setContracts(data);
-          }
-          setLoading(false);
-        });
-    }
+    // TODO: Update to use policies table
+    setContracts([]);
+    setLoading(false);
   }, [user]);
 
   const getContractIcon = (type: string) => {
