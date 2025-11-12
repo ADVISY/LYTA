@@ -13,6 +13,11 @@ export interface MockContract {
   contactEmail?: string;
   contactPhone?: string;
   policyNumber?: string;
+  agentAdvisy?: string;
+  managerAdvisy?: string;
+  sourceAcquisition?: string;
+  dateSignature?: string;
+  modeEncaissement?: string;
 }
 
 export interface MockDocument {
@@ -49,7 +54,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-01-15",
     contactEmail: "contact@dupont.ch",
     contactPhone: "+41 22 123 45 67",
-    policyNumber: "AL-2025-RC-0012"
+    policyNumber: "AL-2025-RC-0012",
+    agentAdvisy: "Sophie Martin",
+    managerAdvisy: "Jean-Pierre Durand",
+    sourceAcquisition: "Référence client",
+    dateSignature: "2025-01-15",
+    modeEncaissement: "Annuel"
   },
   { 
     id: "C-2025-0041", 
@@ -63,7 +73,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-03-10",
     contactEmail: "p.martin@email.ch",
     contactPhone: "+41 79 234 56 78",
-    policyNumber: "AXA-2025-AU-0041"
+    policyNumber: "AXA-2025-AU-0041",
+    agentAdvisy: "Marie Leclerc",
+    managerAdvisy: "Jean-Pierre Durand",
+    sourceAcquisition: "Site web",
+    dateSignature: null,
+    modeEncaissement: "Mensuel"
   },
   { 
     id: "C-2025-0048", 
@@ -77,7 +92,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-04-05",
     contactEmail: "info@edelweiss.ch",
     contactPhone: "+41 21 345 67 89",
-    policyNumber: null
+    policyNumber: null,
+    agentAdvisy: "Thomas Rochat",
+    managerAdvisy: "Claire Bertrand",
+    sourceAcquisition: "Prospection téléphonique",
+    dateSignature: null,
+    modeEncaissement: null
   },
   { 
     id: "C-2025-0055", 
@@ -91,7 +111,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-05-20",
     contactEmail: "rochat@email.ch",
     contactPhone: "+41 78 456 78 90",
-    policyNumber: "HEL-2025-SA-0055"
+    policyNumber: "HEL-2025-SA-0055",
+    agentAdvisy: "Sophie Martin",
+    managerAdvisy: "Jean-Pierre Durand",
+    sourceAcquisition: "Parrainage",
+    dateSignature: "2025-05-20",
+    modeEncaissement: "Mensuel"
   },
   { 
     id: "C-2025-0062", 
@@ -105,7 +130,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-06-15",
     contactEmail: "admin@techsolutions.ch",
     contactPhone: "+41 22 567 89 01",
-    policyNumber: "MOB-2025-RC-0062"
+    policyNumber: "MOB-2025-RC-0062",
+    agentAdvisy: "Marie Leclerc",
+    managerAdvisy: "Claire Bertrand",
+    sourceAcquisition: "LinkedIn",
+    dateSignature: "2025-06-15",
+    modeEncaissement: "Annuel"
   },
   { 
     id: "C-2025-0078", 
@@ -119,7 +149,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-07-22",
     contactEmail: "m.fontaine@email.ch",
     contactPhone: "+41 79 678 90 12",
-    policyNumber: "SWL-2025-3P-0078"
+    policyNumber: "SWL-2025-3P-0078",
+    agentAdvisy: "Thomas Rochat",
+    managerAdvisy: "Jean-Pierre Durand",
+    sourceAcquisition: "Salon professionnel",
+    dateSignature: "2025-07-22",
+    modeEncaissement: "Mensuel"
   },
   { 
     id: "C-2025-0089", 
@@ -133,7 +168,12 @@ export const mockContracts: MockContract[] = [
     createdAt: "2025-08-10",
     contactEmail: "contact@boulangerie-centrale.ch",
     contactPhone: "+41 21 789 01 23",
-    policyNumber: "VAU-2025-IN-0089"
+    policyNumber: "VAU-2025-IN-0089",
+    agentAdvisy: "Sophie Martin",
+    managerAdvisy: "Claire Bertrand",
+    sourceAcquisition: "Agence physique",
+    dateSignature: "2024-08-10",
+    modeEncaissement: "Annuel"
   }
 ];
 

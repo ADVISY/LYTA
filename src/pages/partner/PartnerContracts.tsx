@@ -53,6 +53,8 @@ export default function PartnerContracts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [managerFilter, setManagerFilter] = useState<string>("all");
   const [selectedContract, setSelectedContract] = useState<MockContract | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -82,8 +84,10 @@ export default function PartnerContracts() {
     
     const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
     const matchesCompany = companyFilter === "all" || contract.company === companyFilter;
+    const matchesAgent = agentFilter === "all" || contract.agentAdvisy === agentFilter;
+    const matchesManager = managerFilter === "all" || contract.managerAdvisy === managerFilter;
     
-    return matchesSearch && matchesStatus && matchesCompany;
+    return matchesSearch && matchesStatus && matchesCompany && matchesAgent && matchesManager;
   });
 
   const handleExportCSV = () => {
@@ -121,6 +125,8 @@ export default function PartnerContracts() {
   };
 
   const uniqueCompanies = Array.from(new Set(mockContracts.map(c => c.company)));
+  const uniqueAgents = Array.from(new Set(mockContracts.map(c => c.agentAdvisy).filter(Boolean)));
+  const uniqueManagers = Array.from(new Set(mockContracts.map(c => c.managerAdvisy).filter(Boolean)));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 p-6">
@@ -253,6 +259,79 @@ export default function PartnerContracts() {
                     </div>
                   </div>
 
+                  {/* Informations Advisy */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Informations Advisy
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Agent Advisy *</Label>
+                        <Select required defaultValue={isEditMode ? editingContract?.agentAdvisy : ""}>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectValue placeholder="Sélectionner un agent" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                            {uniqueAgents.map(agent => (
+                              <SelectItem key={agent} value={agent || ''}>
+                                {agent}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Manager Advisy *</Label>
+                        <Select required defaultValue={isEditMode ? editingContract?.managerAdvisy : ""}>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectValue placeholder="Sélectionner un manager" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                            {uniqueManagers.map(manager => (
+                              <SelectItem key={manager} value={manager || ''}>
+                                {manager}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Source d'acquisition</Label>
+                        <Select defaultValue={isEditMode ? editingContract?.sourceAcquisition : ""}>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                            <SelectItem value="site-web">Site web</SelectItem>
+                            <SelectItem value="reference">Référence client</SelectItem>
+                            <SelectItem value="parrainage">Parrainage</SelectItem>
+                            <SelectItem value="linkedin">LinkedIn</SelectItem>
+                            <SelectItem value="salon">Salon professionnel</SelectItem>
+                            <SelectItem value="prospection">Prospection téléphonique</SelectItem>
+                            <SelectItem value="agence">Agence physique</SelectItem>
+                            <SelectItem value="autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Mode d'encaissement</Label>
+                        <Select defaultValue={isEditMode ? editingContract?.modeEncaissement : ""}>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                            <SelectItem value="Mensuel">Mensuel</SelectItem>
+                            <SelectItem value="Trimestriel">Trimestriel</SelectItem>
+                            <SelectItem value="Semestriel">Semestriel</SelectItem>
+                            <SelectItem value="Annuel">Annuel</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Informations Contrat */}
                   <div className="space-y-4 pt-4 border-t">
                     <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -287,15 +366,32 @@ export default function PartnerContracts() {
                       <div className="space-y-2">
                         <Label>Compagnie *</Label>
                         <Select required defaultValue={isEditMode ? editingContract?.company : ""}>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
                             <SelectValue placeholder="Sélectionner" />
                           </SelectTrigger>
-                          <SelectContent>
-                            {uniqueCompanies.map(company => (
-                              <SelectItem key={company} value={company.toLowerCase()}>
-                                {company}
-                              </SelectItem>
-                            ))}
+                          <SelectContent className="bg-white dark:bg-slate-800 z-50 max-h-[300px] overflow-y-auto">
+                            <SelectItem value="Allianz">Allianz Suisse</SelectItem>
+                            <SelectItem value="AXA">AXA Assurances</SelectItem>
+                            <SelectItem value="Zurich">Zurich Insurance</SelectItem>
+                            <SelectItem value="Swiss Life">Swiss Life</SelectItem>
+                            <SelectItem value="CSS">CSS Assurance</SelectItem>
+                            <SelectItem value="Helsana">Helsana</SelectItem>
+                            <SelectItem value="Sanitas">Sanitas</SelectItem>
+                            <SelectItem value="Groupe Mutuel">Groupe Mutuel</SelectItem>
+                            <SelectItem value="Vaudoise">Vaudoise Assurances</SelectItem>
+                            <SelectItem value="Helvetia">Helvetia</SelectItem>
+                            <SelectItem value="Mobilière">La Mobilière</SelectItem>
+                            <SelectItem value="Baloise">Baloise Assurance</SelectItem>
+                            <SelectItem value="Generali">Generali Suisse</SelectItem>
+                            <SelectItem value="PAX">PAX</SelectItem>
+                            <SelectItem value="ÖKK">ÖKK</SelectItem>
+                            <SelectItem value="Sympany">Sympany</SelectItem>
+                            <SelectItem value="Visana">Visana</SelectItem>
+                            <SelectItem value="Assura">Assura</SelectItem>
+                            <SelectItem value="SWICA">SWICA</SelectItem>
+                            <SelectItem value="Concordia">Concordia</SelectItem>
+                            <SelectItem value="Atupri">Atupri</SelectItem>
+                            <SelectItem value="EGK">EGK</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -399,8 +495,8 @@ export default function PartnerContracts() {
         {/* Filters */}
         <Card className="rounded-2xl bg-white/70 dark:bg-slate-900/50 border-white/30 dark:border-slate-700/40 backdrop-blur">
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="relative lg:col-span-2">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input 
                   placeholder="Rechercher client, ID, type..." 
@@ -410,10 +506,10 @@ export default function PartnerContracts() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="rounded-xl bg-white dark:bg-slate-800 z-50">
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-800 z-50">
                   <SelectItem value="all">Tous les statuts</SelectItem>
                   <SelectItem value="Signé">Signé</SelectItem>
                   <SelectItem value="En attente">En attente</SelectItem>
@@ -422,10 +518,10 @@ export default function PartnerContracts() {
                 </SelectContent>
               </Select>
               <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Toutes les compagnies" />
+                <SelectTrigger className="rounded-xl bg-white dark:bg-slate-800 z-50">
+                  <SelectValue placeholder="Compagnies" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-800 z-50">
                   <SelectItem value="all">Toutes les compagnies</SelectItem>
                   {uniqueCompanies.map(company => (
                     <SelectItem key={company} value={company}>
@@ -434,17 +530,47 @@ export default function PartnerContracts() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="rounded-xl bg-white dark:bg-slate-800 z-50">
+                  <SelectValue placeholder="Agents" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                  <SelectItem value="all">Tous les agents</SelectItem>
+                  {uniqueAgents.map(agent => (
+                    <SelectItem key={agent} value={agent || ''}>
+                      {agent}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={managerFilter} onValueChange={setManagerFilter}>
+                <SelectTrigger className="rounded-xl bg-white dark:bg-slate-800 z-50">
+                  <SelectValue placeholder="Managers" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-800 z-50">
+                  <SelectItem value="all">Tous les managers</SelectItem>
+                  {uniqueManagers.map(manager => (
+                    <SelectItem key={manager} value={manager || ''}>
+                      {manager}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mt-4">
               <Button 
                 variant="outline" 
-                className="rounded-xl"
+                className="rounded-xl w-full md:w-auto"
                 onClick={() => {
                   setSearchTerm("");
                   setStatusFilter("all");
                   setCompanyFilter("all");
+                  setAgentFilter("all");
+                  setManagerFilter("all");
                 }}
               >
                 <X className="h-4 w-4 mr-2" />
-                Réinitialiser
+                Réinitialiser les filtres
               </Button>
             </div>
           </CardContent>
@@ -607,6 +733,39 @@ export default function PartnerContracts() {
                       )}
                     </div>
                   </div>
+
+                  {/* Advisy Info */}
+                  {(selectedContract.agentAdvisy || selectedContract.managerAdvisy) && (
+                    <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/30 space-y-3">
+                      <h3 className="font-semibold text-sm">Informations Advisy</h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        {selectedContract.agentAdvisy && (
+                          <div>
+                            <Label className="text-xs text-slate-500">Agent</Label>
+                            <div className="font-medium">{selectedContract.agentAdvisy}</div>
+                          </div>
+                        )}
+                        {selectedContract.managerAdvisy && (
+                          <div>
+                            <Label className="text-xs text-slate-500">Manager</Label>
+                            <div className="font-medium">{selectedContract.managerAdvisy}</div>
+                          </div>
+                        )}
+                        {selectedContract.sourceAcquisition && (
+                          <div className="col-span-2">
+                            <Label className="text-xs text-slate-500">Source d'acquisition</Label>
+                            <div className="font-medium">{selectedContract.sourceAcquisition}</div>
+                          </div>
+                        )}
+                        {selectedContract.modeEncaissement && (
+                          <div className="col-span-2">
+                            <Label className="text-xs text-slate-500">Mode d'encaissement</Label>
+                            <div className="font-medium">{selectedContract.modeEncaissement}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Financial Info */}
                   <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 space-y-3">
