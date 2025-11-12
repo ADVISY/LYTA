@@ -123,6 +123,104 @@ export type Database = {
           },
         ]
       }
+      commissions: {
+        Row: {
+          amount: number
+          commission_date: string
+          contract_id: string
+          created_at: string
+          id: string
+          partner_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          commission_date?: string
+          contract_id: string
+          created_at?: string
+          id?: string
+          partner_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          commission_date?: string
+          contract_id?: string
+          created_at?: string
+          id?: string
+          partner_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          company: string
+          contract_type: string
+          created_at: string
+          end_date: string | null
+          id: string
+          monthly_premium: number
+          policy_number: string | null
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company: string
+          contract_type: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          monthly_premium: number
+          policy_number?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company?: string
+          contract_type?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          monthly_premium?: number
+          policy_number?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

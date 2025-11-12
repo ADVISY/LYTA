@@ -224,40 +224,110 @@ function ChartPlaceholder({ title }: { title: string }) {
 }
 
 function ClientPanelDemo() {
+  const { user } = useAuth();
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from("contracts")
+        .select("*")
+        .eq("user_id", user.id)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setContracts(data);
+          }
+          setLoading(false);
+        });
+    }
+  }, [user]);
+
+  const getContractIcon = (type: string) => {
+    switch (type) {
+      case 'auto': return '🚗';
+      case 'menage': return '🏠';
+      case 'sante': return '🏥';
+      case 'vie': return '❤️';
+      case '3e_pilier': return '💰';
+      case 'juridique': return '⚖️';
+      case 'hypotheque': return '🏦';
+      default: return '📄';
+    }
+  };
+
+  const getContractLabel = (type: string) => {
+    const labels: { [key: string]: string } = {
+      'auto': 'Auto',
+      'menage': 'Ménage',
+      'sante': 'Santé',
+      'vie': 'Vie',
+      '3e_pilier': '3e Pilier',
+      'juridique': 'Protection Juridique',
+      'hypotheque': 'Hypothèque'
+    };
+    return labels[type] || type;
+  };
+
+  if (loading) {
+    return (
+      <Card className="rounded-2xl bg-white/70 dark:bg-slate-900/50 border-white/30 dark:border-slate-700/40 backdrop-blur">
+        <CardContent className="p-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
       <motion.div variants={springy} initial="hidden" animate="show" className="xl:col-span-2">
         <Card className="rounded-2xl bg-white/70 dark:bg-slate-900/50 border-white/30 dark:border-slate-700/40 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
-              <ShieldCheck className="h-5 w-5" /> Mes polices – Vue synthétique 3D
+              <ShieldCheck className="h-5 w-5" /> Mes polices
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {[
-                { name: "Auto", amount: "CHF 120.-/mois", company: "Zurich" },
-                { name: "Ménage", amount: "CHF 45.-/mois", company: "AXA" },
-                { name: "Santé", amount: "CHF 360.-/mois", company: "CSS" },
-                { name: "Vie", amount: "CHF 90.-/mois", company: "SwissLife" },
-              ].map((c) => (
-                <motion.div
-                  key={c.name}
-                  whileHover={{ y: -2, scale: 1.01 }}
-                  className="rounded-2xl p-4 border border-white/30 dark:border-slate-700/40 bg-gradient-to-br from-white/70 to-white/40 dark:from-slate-900/60 dark:to-slate-900/40 backdrop-blur"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{c.name}</div>
-                    <div className="text-xs text-slate-500">{c.company}</div>
-                  </div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{c.amount}</div>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-                    <FileSignature className="h-4 w-4" />
-                    <span>PDF contrat • Échéance: 31.12.2025</span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {contracts.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                Aucun contrat trouvé. Créez votre premier contrat ci-dessous.
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3">
+                {contracts.map((contract) => (
+                  <motion.div
+                    key={contract.id}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    className="rounded-2xl p-4 border border-white/30 dark:border-slate-700/40 bg-gradient-to-br from-white/70 to-white/40 dark:from-slate-900/60 dark:to-slate-900/40 backdrop-blur"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{getContractIcon(contract.contract_type)}</span>
+                        <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {getContractLabel(contract.contract_type)}
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-500">{contract.company}</div>
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      CHF {contract.monthly_premium}.-/mois
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                      <FileSignature className="h-4 w-4" />
+                      <span>N° {contract.policy_number || 'N/A'}</span>
+                      <span className={`ml-auto px-2 py-0.5 rounded-full ${
+                        contract.status === 'active' ? 'bg-green-100 text-green-700' :
+                        contract.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {contract.status}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex gap-2">
               <Button className="rounded-xl">Nouveau contrat</Button>
               <Button variant="outline" className="rounded-xl">Résiliation (e-sign)</Button>
