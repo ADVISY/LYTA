@@ -40,7 +40,10 @@ import AllDocuments from "./pages/admin/AllDocuments";
 import AllCommissions from "./pages/admin/AllCommissions";
 import AdminReports from "./pages/admin/AdminReports";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { CRMLayout } from "./components/crm/CRMLayout";
+import CRMLayout from "./pages/crm/CRMLayout";
+import CRMDashboard from "./pages/crm/CRMDashboard";
+import CRMClients from "./pages/crm/CRMClients";
+import CRMContracts from "./pages/crm/CRMContracts";
 
 const queryClient = new QueryClient();
 
@@ -80,44 +83,11 @@ const App = () => (
           <Route path="/mentions-legales" element={<MentionsLegales />} />
           <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
           
-          {/* CRM - Nested Routes with Sidebar */}
+          {/* CRM Routes */}
           <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
-            <Route index element={<Dashboard />} />
-            {/* Partner Routes */}
-            <Route path="clients" element={<PartnerClients />} />
-            <Route path="contracts" element={<PartnerContracts />} />
-            <Route path="documents" element={<PartnerDocuments />} />
-            <Route path="commissions" element={<PartnerCommissions />} />
-            <Route path="reports" element={<PartnerReports />} />
-            {/* Client Routes */}
-            <Route path="my-contracts" element={<MyContracts />} />
-            <Route path="my-documents" element={<MyDocuments />} />
-            <Route path="my-profile" element={<MyProfile />} />
-            {/* Admin Routes */}
-            <Route path="all-clients" element={<AllClients />} />
-            <Route path="all-contracts" element={<AllContracts />} />
-          </Route>
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="clients" element={<AllClients />} />
-            <Route path="contracts" element={<AllContracts />} />
-            <Route path="documents" element={<AllDocuments />} />
-            <Route path="commissions" element={<AllCommissions />} />
-            <Route path="reports" element={<AdminReports />} />
-          </Route>
-          
-          {/* Legacy Partner Routes (redirect to CRM) */}
-          <Route path="/partner/contracts" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
-            <Route index element={<PartnerContracts />} />
-          </Route>
-          <Route path="/partner/documents" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
-            <Route index element={<PartnerDocuments />} />
-          </Route>
-          <Route path="/partner/commissions" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
-            <Route index element={<PartnerCommissions />} />
+            <Route index element={<CRMDashboard />} />
+            <Route path="clients" element={<CRMClients />} />
+            <Route path="contracts" element={<CRMContracts />} />
           </Route>
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
