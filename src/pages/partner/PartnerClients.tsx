@@ -1161,23 +1161,6 @@ export default function PartnerClients() {
               </div>
             </div>
 
-            {/* Statut */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="space-y-2">
-                <Label>Statut</Label>
-                <Select defaultValue={isEditMode ? editingClient?.status.toLowerCase() : "prospect"}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="actif">Actif</SelectItem>
-                    <SelectItem value="prospect">Prospect</SelectItem>
-                    <SelectItem value="inactif">Inactif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button 
                 type="button" 
