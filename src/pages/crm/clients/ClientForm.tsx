@@ -35,7 +35,7 @@ const clientSchema = z.object({
   city: z.string().max(100).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
   birthdate: z.string().optional().nullable(),
-  email: z.string().email("Email invalide").max(255).optional().nullable(),
+  email: z.string().email("Email invalide").max(255).or(z.literal("")).optional().nullable(),
   mobile: z.string().max(50).optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   status: z.enum(["prospect", "actif", "résilié", "dormant"]),
@@ -274,7 +274,7 @@ export default function ClientForm() {
                       <FormLabel>Statut *</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -360,8 +360,8 @@ export default function ClientForm() {
                     <FormItem>
                       <FormLabel>Agent assigné</FormLabel>
                       <Select
-                        onValueChange={field.onChange}
-                        value={field.value || ""}
+                        onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                        value={field.value || "none"}
                         disabled={agentsLoading}
                       >
                         <FormControl>
@@ -370,7 +370,7 @@ export default function ClientForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Aucun</SelectItem>
+                          <SelectItem value="none">Aucun</SelectItem>
                           {agents.map((agent) => (
                             <SelectItem key={agent.id} value={agent.id}>
                               {agent.first_name && agent.last_name
