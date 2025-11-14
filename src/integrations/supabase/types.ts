@@ -123,100 +123,467 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity: string | null
+          entity_id: string | null
+          id: number
+          ip_address: unknown
+          metadata: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: number
+          ip_address?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: number
+          ip_address?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          address: string | null
+          birthdate: string | null
+          city: string | null
+          company_name: string | null
+          country: string | null
+          created_at: string
+          external_ref: string | null
+          id: string
+          is_company: boolean | null
+          phone: string | null
+          postal_code: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          birthdate?: string | null
+          city?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          is_company?: boolean | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          birthdate?: string | null
+          city?: string | null
+          company_name?: string | null
+          country?: string | null
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          is_company?: boolean | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_clients_user_id"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commissions: {
         Row: {
           amount: number
-          commission_date: string
-          contract_id: string
           created_at: string
           id: string
-          partner_id: string
+          notes: string | null
+          paid_at: string | null
+          partner_id: string | null
+          period_month: number | null
+          period_year: number | null
+          policy_id: string
           status: string
           updated_at: string
         }
         Insert: {
           amount: number
-          commission_date?: string
-          contract_id: string
           created_at?: string
           id?: string
-          partner_id: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id?: string | null
+          period_month?: number | null
+          period_year?: number | null
+          policy_id: string
           status?: string
           updated_at?: string
         }
         Update: {
           amount?: number
-          commission_date?: string
-          contract_id?: string
           created_at?: string
           id?: string
-          partner_id?: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id?: string | null
+          period_month?: number | null
+          period_year?: number | null
+          policy_id?: string
           status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "commissions_contract_id_fkey"
-            columns: ["contract_id"]
-            isOneToOne: false
-            referencedRelation: "contracts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "commissions_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
             referencedColumns: ["id"]
           },
         ]
       }
       contracts: {
         Row: {
-          company: string
-          contract_type: string
+          canceled_at: string | null
           created_at: string
-          end_date: string | null
           id: string
-          monthly_premium: number
-          policy_number: string | null
-          start_date: string
-          status: string
+          policy_id: string
+          renewal_date: string | null
+          signature_provider: string | null
+          signature_status: string
+          signed_at: string | null
           updated_at: string
-          user_id: string
         }
         Insert: {
-          company: string
-          contract_type: string
+          canceled_at?: string | null
           created_at?: string
-          end_date?: string | null
           id?: string
-          monthly_premium: number
-          policy_number?: string | null
-          start_date: string
-          status?: string
+          policy_id: string
+          renewal_date?: string | null
+          signature_provider?: string | null
+          signature_status?: string
+          signed_at?: string | null
           updated_at?: string
-          user_id: string
         }
         Update: {
-          company?: string
-          contract_type?: string
+          canceled_at?: string | null
           created_at?: string
-          end_date?: string | null
           id?: string
-          monthly_premium?: number
-          policy_number?: string | null
-          start_date?: string
-          status?: string
+          policy_id?: string
+          renewal_date?: string | null
+          signature_provider?: string | null
+          signature_status?: string
+          signed_at?: string | null
           updated_at?: string
-          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "contracts_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "contracts_policy_id_fkey"
+            columns: ["policy_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          doc_kind: string | null
+          file_key: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          owner_id: string
+          owner_type: string
+          size_bytes: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          doc_kind?: string | null
+          file_key: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          owner_id: string
+          owner_type: string
+          size_bytes?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          doc_kind?: string | null
+          file_key?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          owner_id?: string
+          owner_type?: string
+          size_bytes?: number | null
+        }
+        Relationships: []
+      }
+      insurance_companies: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      insurance_products: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          category: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string | null
+          created_at: string
+          has_attachments: boolean | null
+          id: string
+          read_at: string | null
+          sender_user_id: string | null
+          thread_key: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          has_attachments?: boolean | null
+          id?: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          thread_key: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          has_attachments?: boolean | null
+          id?: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          thread_key?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message: string | null
+          payload: Json | null
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          message?: string | null
+          payload?: Json | null
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string | null
+          payload?: Json | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      partners: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          manager_partner_id: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          manager_partner_id?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          manager_partner_id?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partners_manager_partner_id_fkey"
+            columns: ["manager_partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      policies: {
+        Row: {
+          client_id: string
+          created_at: string
+          currency: string
+          deductible: number | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          partner_id: string | null
+          policy_number: string | null
+          premium_monthly: number | null
+          premium_yearly: number | null
+          product_id: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          currency?: string
+          deductible?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          partner_id?: string | null
+          policy_number?: string | null
+          premium_monthly?: number | null
+          premium_yearly?: number | null
+          product_id: string
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          currency?: string
+          deductible?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          partner_id?: string | null
+          policy_number?: string | null
+          premium_monthly?: number | null
+          premium_yearly?: number | null
+          product_id?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "policies_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_products"
             referencedColumns: ["id"]
           },
         ]
@@ -285,6 +652,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_audit_log: {
+        Args: {
+          p_action: string
+          p_entity: string
+          p_entity_id: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: number
+      }
+      get_partner_policies: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_partner_id: string
+          p_status?: string
+        }
+        Returns: {
+          client_id: string
+          client_name: string
+          company_name: string
+          created_at: string
+          end_date: string
+          id: string
+          policy_number: string
+          premium_monthly: number
+          premium_yearly: number
+          product_id: string
+          product_name: string
+          start_date: string
+          status: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
