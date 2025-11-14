@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockCommissions, MockCommission, exportToCSV } from "@/lib/mockData";
+import { exportToCSV } from "@/lib/mockData";
+import { useCommissions } from "@/hooks/useCommissions";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, BarChart, Bar
@@ -35,43 +36,39 @@ const fadeIn = {
 };
 
 export default function PartnerCommissions() {
-  const [commissions, setCommissions] = useState<MockCommission[]>(mockCommissions);
+  const { commissions, loading, markAsPaid } = useCommissions();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [productFilter, setProductFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const filteredCommissions = commissions.filter(com => {
     const matchesStatus = statusFilter === "all" || com.status === statusFilter;
-    const matchesProduct = productFilter === "all" || com.product === productFilter;
+    const productName = com.policy?.product?.name || '';
+    const matchesProduct = productFilter === "all" || productName === productFilter;
     return matchesStatus && matchesProduct;
   });
 
   const getStatusBadge = (status: string) => {
-    const variants: { [key: string]: "default" | "secondary" | "outline" } = {
-      'Versée': 'default',
-      'À verser': 'secondary',
-      'En validation': 'outline'
+    const statusMap: { [key: string]: string } = {
+      'paid': 'Versée',
+      'due': 'À verser',
+      'pending': 'En validation'
     };
+    const displayStatus = statusMap[status] || status;
     const colors: { [key: string]: string } = {
-      'Versée': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      'À verser': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-      'En validation': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      'paid': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      'due': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+      'pending': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
     };
     return (
-      <Badge className={colors[status]}>
-        {status}
+      <Badge className={colors[status] || 'bg-slate-100 text-slate-700'}>
+        {displayStatus}
       </Badge>
     );
   };
 
-  const handleMarkAsPaid = (id: string) => {
-    setCommissions(prev => prev.map(com => 
-      com.id === id ? { ...com, status: 'Versée' as const } : com
-    ));
-    toast({ 
-      title: "Commission versée", 
-      description: "Le statut a été mis à jour avec succès" 
-    });
+  const handleMarkAsPaid = async (id: string) => {
+    await markAsPaid(id);
   };
 
   const handleExportCSV = () => {
@@ -81,13 +78,13 @@ export default function PartnerCommissions() {
 
   // Calculate totals
   const totals = {
-    total: filteredCommissions.reduce((sum, com) => sum + com.amount, 0),
-    versees: filteredCommissions.filter(c => c.status === 'Versée').reduce((sum, com) => sum + com.amount, 0),
-    aVerser: filteredCommissions.filter(c => c.status === 'À verser').reduce((sum, com) => sum + com.amount, 0),
-    enValidation: filteredCommissions.filter(c => c.status === 'En validation').reduce((sum, com) => sum + com.amount, 0)
+    total: filteredCommissions.reduce((sum, com) => sum + (com.amount || 0), 0),
+    versees: filteredCommissions.filter(c => c.status === 'paid').reduce((sum, com) => sum + (com.amount || 0), 0),
+    aVerser: filteredCommissions.filter(c => c.status === 'due').reduce((sum, com) => sum + (com.amount || 0), 0),
+    enValidation: filteredCommissions.filter(c => c.status === 'pending').reduce((sum, com) => sum + (com.amount || 0), 0)
   };
 
-  const uniqueProducts = Array.from(new Set(mockCommissions.map(c => c.product)));
+  const uniqueProducts = Array.from(new Set(commissions.map(c => c.policy?.product?.name).filter(Boolean)));
 
   // Mock chart data
   const chartData = [
@@ -326,37 +323,35 @@ export default function PartnerCommissions() {
                         key={commission.id}
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
                       >
-                        <TableCell className="font-mono text-sm">{commission.contractId}</TableCell>
+                        <TableCell className="font-mono text-sm">{commission.policy?.policy_number || commission.policy_id}</TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{commission.product}</span>
-                            {commission.calculationDetails && (
+                            <span className="font-medium">{commission.policy?.product?.name || 'N/A'}</span>
+                            {commission.notes && (
                               <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                {commission.calculationDetails}
+                                {commission.notes}
                               </span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{commission.company}</TableCell>
+                        <TableCell>{commission.policy?.product?.company?.name || 'N/A'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-col items-end">
                             <span className="font-semibold text-slate-900 dark:text-slate-50">
-                              CHF {commission.amount.toFixed(2)}
+                              CHF {commission.amount?.toFixed(2) || '0.00'}
                             </span>
-                            {commission.premiumAmount && commission.multiplier && (
-                              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                {commission.premiumAmount} × {commission.multiplier > 1 ? commission.multiplier : `${(commission.multiplier * 100).toFixed(1)}%`}
-                              </span>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell>{getStatusBadge(commission.status)}</TableCell>
                         <TableCell>
-                          {new Date(commission.date).toLocaleDateString('fr-CH')}
+                          {commission.period_month && commission.period_year ? 
+                            `${commission.period_month}/${commission.period_year}` : 
+                            new Date(commission.created_at).toLocaleDateString('fr-CH')
+                          }
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
-                            {commission.status === 'À verser' && (
+                            {commission.status === 'due' && (
                               <Button 
                                 variant="outline" 
                                 size="sm"
