@@ -64,18 +64,12 @@ export function AppSidebar() {
     >
       <SidebarContent>
         {/* Logo / Brand */}
-        <div className="p-4 flex items-center gap-3">
+        <div className="p-4 flex items-center justify-center">
           <img 
             src={advisyLogo} 
             alt="Advisy" 
-            className={collapsed ? "h-10 w-10 object-contain" : "h-12 w-auto object-contain"}
+            className={collapsed ? "h-10 w-10 object-contain" : "h-16 w-auto object-contain"}
           />
-          {!collapsed && (
-            <div>
-              <h2 className="font-bold text-lg">CRM</h2>
-              <p className="text-xs text-muted-foreground">Pro 2.0</p>
-            </div>
-          )}
         </div>
 
         <Separator className="my-2" />
