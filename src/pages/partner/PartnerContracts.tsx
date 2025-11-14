@@ -33,8 +33,8 @@ export default function PartnerContracts() {
   const getClientName = (policy: Policy) => {
     if (!policy.client) return 'N/A';
     if (policy.client.company_name) return policy.client.company_name;
-    if (policy.client.profiles) {
-      const { first_name, last_name } = policy.client.profiles;
+    if (policy.client.profile) {
+      const { first_name, last_name } = policy.client.profile;
       return `${first_name || ''} ${last_name || ''}`.trim() || 'N/A';
     }
     return 'N/A';

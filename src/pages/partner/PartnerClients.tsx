@@ -307,9 +307,9 @@ export default function PartnerClients() {
   };
 
   const filteredClients = clients.filter(client => {
-    const firstName = client.profiles?.first_name || '';
-    const lastName = client.profiles?.last_name || '';
-    const email = client.profiles?.email || '';
+    const firstName = client.profile?.first_name || '';
+    const lastName = client.profile?.last_name || '';
+    const email = client.profile?.email || '';
     const companyName = client.company_name || '';
     
     const matchesSearch = 
@@ -502,10 +502,10 @@ export default function PartnerClients() {
             <div className="flex-1">
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <User className="h-7 w-7" />
-                {selectedClient.company_name || `${selectedClient.profiles?.first_name || ''} ${selectedClient.profiles?.last_name || ''}`}
+                {selectedClient.company_name || `${selectedClient.profile?.first_name || ''} ${selectedClient.profile?.last_name || ''}`}
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mt-1">
-                Client {selectedClient.id.substring(0, 8)} • {selectedClient.profiles?.email || 'N/A'}
+                Client {selectedClient.id.substring(0, 8)} • {selectedClient.profile?.email || 'N/A'}
               </p>
             </div>
             <Button 
@@ -1060,9 +1060,9 @@ export default function PartnerClients() {
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => {
-                      const firstName = client.profiles?.first_name || '';
-                      const lastName = client.profiles?.last_name || '';
-                      const email = client.profiles?.email || '';
+                      const firstName = client.profile?.first_name || '';
+                      const lastName = client.profile?.last_name || '';
+                      const email = client.profile?.email || '';
                       const displayName = client.company_name || `${firstName} ${lastName}`;
                       
                       return (

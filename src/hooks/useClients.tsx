@@ -22,6 +22,11 @@ export type Client = {
     last_name?: string;
     email: string;
   } | null;
+  profile?: {
+    first_name?: string;
+    last_name?: string;
+    email: string;
+  } | null;
 };
 
 export function useClients() {
@@ -37,7 +42,7 @@ export function useClients() {
         .from('clients' as any)
         .select(`
           *,
-          profiles:user_id (
+          profile:profiles (
             first_name,
             last_name,
             email

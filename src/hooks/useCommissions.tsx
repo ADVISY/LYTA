@@ -40,7 +40,7 @@ export function useCommissions() {
             ),
             client:clients!client_id (
               company_name,
-              profiles:user_id (
+              profile:profiles (
                 first_name,
                 last_name
               )

@@ -41,7 +41,7 @@ export function usePolicies() {
             id,
             company_name,
             phone,
-            profiles:user_id (
+            profile:profiles (
               first_name,
               last_name,
               email
@@ -59,7 +59,7 @@ export function usePolicies() {
           partner:partners!partner_id (
             id,
             code,
-            profiles:user_id (
+            profile:profiles (
               first_name,
               last_name
             )
