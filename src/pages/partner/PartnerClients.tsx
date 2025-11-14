@@ -416,10 +416,21 @@ export default function PartnerClients() {
     e.preventDefault();
     
     try {
+      // Clean up formData: transform empty strings to null for optional fields
+      const cleanedData = {
+        ...formData,
+        company_name: formData.company_name || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        city: formData.city || null,
+        postal_code: formData.postal_code || null,
+        birthdate: formData.birthdate || null,
+      };
+
       if (isEditMode && editingClient) {
-        await updateClient(editingClient.id, formData);
+        await updateClient(editingClient.id, cleanedData);
       } else {
-        await createClient(formData);
+        await createClient(cleanedData);
       }
       
       setIsModalOpen(false);
