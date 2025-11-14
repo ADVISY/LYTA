@@ -33,6 +33,7 @@ export function usePolicies() {
   const fetchPolicies = async () => {
     try {
       setLoading(true);
+      console.log('Fetching policies...');
       const { data, error } = await supabase
         .from('policies' as any)
         .select(`
@@ -64,14 +65,17 @@ export function usePolicies() {
         `)
         .order('created_at', { ascending: false });
 
+      console.log('Policies fetched:', { data, error });
       if (error) throw error;
       setPolicies((data as any) || []);
     } catch (error: any) {
+      console.error('Error fetching policies:', error);
       toast({
         title: "Erreur",
         description: error.message,
         variant: "destructive"
       });
+      setPolicies([]);
     } finally {
       setLoading(false);
     }
