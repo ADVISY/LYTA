@@ -33,43 +33,44 @@ export function usePolicies() {
   const fetchPolicies = async () => {
     try {
       setLoading(true);
-      console.log('Fetching policies...');
       const { data, error } = await supabase
         .from('policies' as any)
         .select(`
           *,
-          client:clients!client_id (
+          client:clients!policies_client_id_fkey (
             id,
-            company_name,
             phone,
-            profile:profiles!user_id (
+            company_name,
+            profile:profiles!fk_clients_user_id (
               first_name,
               last_name,
               email
             )
           ),
-          product:insurance_products!product_id (
+          product:insurance_products!policies_product_id_fkey (
             id,
             name,
             category,
-            company:insurance_companies!company_id (
+            company:insurance_companies!insurance_products_company_id_fkey (
               name,
               logo_url
             )
           ),
-          partner:partners!partner_id (
+          partner:partners!policies_partner_id_fkey (
             id,
             code,
-            phone
+            profile:profiles!partners_user_id_fkey (
+              first_name,
+              last_name,
+              email
+            )
           )
         `)
         .order('created_at', { ascending: false });
 
-      console.log('Policies fetched:', { data, error });
       if (error) throw error;
       setPolicies((data as any) || []);
     } catch (error: any) {
-      console.error('Error fetching policies:', error);
       toast({
         title: "Erreur",
         description: error.message,
