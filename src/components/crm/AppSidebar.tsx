@@ -48,8 +48,14 @@ const clientItems = [
 
 const adminItems = [
   { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
-  { title: "Tous les Clients", url: "/crm/all-clients", icon: Users },
-  { title: "Tous les Contrats", url: "/crm/all-contracts", icon: FileText },
+  { title: "Mes Clients", url: "/crm/clients", icon: Users },
+  { title: "Mes Contrats", url: "/crm/contracts", icon: FileText },
+  { title: "Documents", url: "/crm/documents", icon: FolderOpen },
+  { title: "Commissions", url: "/crm/commissions", icon: DollarSign },
+  { title: "Rapports", url: "/crm/reports", icon: BarChart3 },
+];
+
+const adminManagementItems = [
   { title: "Gestion Utilisateurs", url: "/admin/users", icon: UserCircle },
   { title: "Configuration", url: "/admin/settings", icon: Settings },
 ];
@@ -71,7 +77,7 @@ export function AppSidebar() {
 
   // Déterminer les items à afficher selon le rôle
   const menuItems = isAdmin ? adminItems : isPartner ? partnerItems : clientItems;
-  const menuLabel = isAdmin ? "Administration" : isPartner ? "Espace Partner" : "Espace Client";
+  const menuLabel = isAdmin ? "Espace Admin" : isPartner ? "Espace Partner" : "Espace Client";
 
   return (
     <Sidebar 
@@ -121,37 +127,41 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Separator className="my-2" />
+        {isAdmin && (
+          <>
+            <Separator className="my-2" />
 
-        {/* Admin Navigation */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-xs uppercase tracking-wider">
-              Administration
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    tooltip={collapsed ? item.title : undefined}
-                  >
-                    <NavLink 
-                      to={item.url}
-                      className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
-                      activeClassName="bg-primary text-primary-foreground font-medium hover:bg-primary/90"
-                    >
-                      <item.icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            {/* Admin Management Navigation */}
+            <SidebarGroup>
+              {!collapsed && (
+                <SidebarGroupLabel className="text-xs uppercase tracking-wider">
+                  Administration
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminManagementItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton 
+                        asChild
+                        tooltip={collapsed ? item.title : undefined}
+                      >
+                        <NavLink 
+                          to={item.url}
+                          className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                          activeClassName="bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+                        >
+                          <item.icon className="h-5 w-5 shrink-0" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       {/* Footer with User Info */}
@@ -159,7 +169,7 @@ export function AppSidebar() {
         {!collapsed && user && (
           <div className="mb-2 px-2">
             <p className="text-xs font-medium truncate">{user.email}</p>
-            <p className="text-xs text-muted-foreground">Partner</p>
+            <p className="text-xs text-muted-foreground capitalize">{role || 'Client'}</p>
           </div>
         )}
         <Button
