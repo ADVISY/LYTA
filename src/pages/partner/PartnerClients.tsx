@@ -292,6 +292,9 @@ export default function PartnerClients() {
   const [addingFamilyMember, setAddingFamilyMember] = useState(false);
   const [familyMemberType, setFamilyMemberType] = useState<'conjoint' | 'enfant'>('conjoint');
   const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
     company_name: '',
     phone: '',
     address: '',
@@ -429,7 +432,6 @@ export default function PartnerClients() {
     try {
       // Clean up formData: transform empty strings to null for optional fields
       const cleanedData = {
-        ...formData,
         company_name: formData.company_name || null,
         phone: formData.phone || null,
         address: formData.address || null,
@@ -437,6 +439,8 @@ export default function PartnerClients() {
         postal_code: formData.postal_code || null,
         birthdate: formData.birthdate || null,
         iban: formData.iban || null,
+        is_company: formData.is_company,
+        country: formData.country
       };
 
       if (isEditMode && editingClient) {
@@ -449,6 +453,9 @@ export default function PartnerClients() {
       setIsEditMode(false);
       setEditingClient(null);
       setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
         company_name: '',
         phone: '',
         address: '',
@@ -468,6 +475,9 @@ export default function PartnerClients() {
     setEditingClient(client);
     setIsEditMode(true);
     setFormData({
+      first_name: client.profile?.first_name || '',
+      last_name: client.profile?.last_name || '',
+      email: client.profile?.email || '',
       company_name: client.company_name || '',
       phone: client.phone || '',
       address: client.address || '',
@@ -1044,7 +1054,8 @@ export default function PartnerClients() {
                   <Label>Prénom *</Label>
                   <Input 
                     placeholder="Prénom" 
-                    defaultValue={isEditMode ? editingClient?.firstName : ""} 
+                    value={formData.first_name}
+                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                     required 
                   />
                 </div>
@@ -1052,7 +1063,8 @@ export default function PartnerClients() {
                   <Label>Nom *</Label>
                   <Input 
                     placeholder="Nom de famille" 
-                    defaultValue={isEditMode ? editingClient?.lastName : ""} 
+                    value={formData.last_name}
+                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                     required 
                   />
                 </div>
@@ -1061,7 +1073,8 @@ export default function PartnerClients() {
                 <Label>Date de naissance</Label>
                 <Input 
                   type="date" 
-                  defaultValue={isEditMode ? editingClient?.birthdate : ""} 
+                  value={formData.birthdate}
+                  onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
                 />
               </div>
             </div>
@@ -1078,7 +1091,8 @@ export default function PartnerClients() {
                   <Input 
                     type="email"
                     placeholder="client@example.com" 
-                    defaultValue={isEditMode ? editingClient?.email : ""} 
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required 
                   />
                 </div>
@@ -1087,7 +1101,8 @@ export default function PartnerClients() {
                   <Input 
                     type="tel"
                     placeholder="+41 XX XXX XX XX" 
-                    defaultValue={isEditMode ? editingClient?.phone : ""} 
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     required 
                   />
                 </div>
@@ -1104,7 +1119,8 @@ export default function PartnerClients() {
                 <Label>Adresse *</Label>
                 <Input 
                   placeholder="Rue et numéro" 
-                  defaultValue={isEditMode ? editingClient?.address : ""} 
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   required 
                 />
               </div>
@@ -1113,7 +1129,8 @@ export default function PartnerClients() {
                   <Label>Code Postal *</Label>
                   <Input 
                     placeholder="1000" 
-                    defaultValue={isEditMode ? editingClient?.postalCode : ""} 
+                    value={formData.postal_code}
+                    onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
                     required 
                   />
                 </div>
@@ -1121,7 +1138,8 @@ export default function PartnerClients() {
                   <Label>Ville *</Label>
                   <Input 
                     placeholder="Lausanne" 
-                    defaultValue={isEditMode ? editingClient?.city : ""} 
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     required 
                   />
                 </div>

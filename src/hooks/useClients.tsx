@@ -66,9 +66,46 @@ export function useClients() {
 
   const createClient = async (clientData: any) => {
     try {
+      // First, create or get a user profile if email is provided
+      let userId = null;
+      
+      if (clientData.email && clientData.first_name && clientData.last_name) {
+        // Check if profile with this email already exists
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('profiles' as any)
+          .select('id')
+          .eq('email', clientData.email)
+          .maybeSingle();
+        
+        if (!profileError && existingProfile) {
+          userId = (existingProfile as any).id;
+        } else {
+          // Create a new user via auth (this will trigger the profile creation)
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: clientData.email,
+            password: Math.random().toString(36).slice(-12), // Random password
+            options: {
+              data: {
+                first_name: clientData.first_name,
+                last_name: clientData.last_name,
+              }
+            }
+          });
+          
+          if (authError) throw authError;
+          userId = authData.user?.id || null;
+        }
+      }
+      
+      // Prepare client data (exclude profile fields)
+      const { first_name, last_name, email, ...clientOnlyData } = clientData;
+      
       const { data, error } = await supabase
         .from('clients' as any)
-        .insert([clientData])
+        .insert([{
+          ...clientOnlyData,
+          user_id: userId
+        }])
         .select()
         .single();
 
