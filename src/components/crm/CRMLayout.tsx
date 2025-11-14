@@ -15,24 +15,24 @@ export function CRMLayout() {
         
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <header className="h-16 border-b bg-white/80 backdrop-blur-sm flex items-center px-6 gap-4 shrink-0 z-10">
+          <header className="h-12 border-b bg-white/80 backdrop-blur-sm flex items-center px-4 gap-3 shrink-0 z-10">
             <SidebarTrigger />
             
             <div className="flex-1 flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-bold">ADVISY CRM</h1>
-                <p className="text-xs text-muted-foreground">
+                <h1 className="text-lg font-bold">ADVISY CRM</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">
                   {user?.email}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="relative h-8 w-8">
+                  <Bell className="h-4 w-4" />
                   <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
                 </Button>
-                <Button variant="ghost" size="icon">
-                  <Search className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Search className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -40,7 +40,7 @@ export function CRMLayout() {
 
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
-            <div className="max-w-7xl mx-auto p-6">
+            <div className="h-full p-4">
               <Outlet />
             </div>
           </main>

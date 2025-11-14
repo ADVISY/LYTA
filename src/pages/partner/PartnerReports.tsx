@@ -204,35 +204,35 @@ export default function PartnerReports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 h-full">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Rapports et Analyses</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl font-bold">Rapports et Analyses</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             Générez des rapports détaillés et analysez vos performances
           </p>
         </div>
-        <Button onClick={exportToCSV} disabled={loading || filteredData.length === 0}>
+        <Button onClick={exportToCSV} disabled={loading || filteredData.length === 0} size="sm">
           <Download className="h-4 w-4 mr-2" />
           Exporter CSV
         </Button>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
                 Contrats
               </CardTitle>
-              <FileText className="h-5 w-5 text-blue-600" />
+              <FileText className="h-4 w-4 text-blue-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalContracts}</div>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{stats.totalContracts}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -243,14 +243,14 @@ export default function PartnerReports() {
           transition={{ delay: 0.1 }}
         >
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
                 Clients uniques
               </CardTitle>
-              <Users className="h-5 w-5 text-green-600" />
+              <Users className="h-4 w-4 text-green-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.uniqueClients}</div>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{stats.uniqueClients}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -261,14 +261,14 @@ export default function PartnerReports() {
           transition={{ delay: 0.2 }}
         >
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
                 Primes mensuelles
               </CardTitle>
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">
                 CHF {stats.totalPremiums.toFixed(2)}
               </div>
             </CardContent>
@@ -281,14 +281,14 @@ export default function PartnerReports() {
           transition={{ delay: 0.3 }}
         >
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
                 Commissions totales
               </CardTitle>
-              <DollarSign className="h-5 w-5 text-orange-600" />
+              <DollarSign className="h-4 w-4 text-orange-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">
                 CHF {stats.totalCommissions.toFixed(2)}
               </div>
             </CardContent>
@@ -298,32 +298,33 @@ export default function PartnerReports() {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Filter className="h-4 w-4" />
             Filtres de recherche
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Recherche</Label>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Recherche</Label>
               <Input
                 placeholder="Client, N° police, produit..."
                 value={filters.searchTerm}
                 onChange={(e) =>
                   setFilters({ ...filters, searchTerm: e.target.value })
                 }
+                className="h-9"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Statut</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Statut</Label>
               <Select
                 value={filters.status}
                 onValueChange={(value) => setFilters({ ...filters, status: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -336,13 +337,13 @@ export default function PartnerReports() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Compagnie</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Compagnie</Label>
               <Select
                 value={filters.company}
                 onValueChange={(value) => setFilters({ ...filters, company: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,13 +357,13 @@ export default function PartnerReports() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Année</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Année</Label>
               <Select
                 value={filters.year || "all"}
                 onValueChange={(value) => setFilters({ ...filters, year: value === "all" ? "" : value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Toutes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -378,13 +379,13 @@ export default function PartnerReports() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Mois</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Mois</Label>
               <Select
                 value={filters.month || "all"}
                 onValueChange={(value) => setFilters({ ...filters, month: value === "all" ? "" : value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Tous" />
                 </SelectTrigger>
                 <SelectContent>
@@ -398,30 +399,34 @@ export default function PartnerReports() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Date début (après)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Date début (après)</Label>
               <Input
                 type="date"
                 value={filters.startDate}
                 onChange={(e) =>
                   setFilters({ ...filters, startDate: e.target.value })
                 }
+                className="h-9"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Date début (avant)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Date début (avant)</Label>
               <Input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) =>
                   setFilters({ ...filters, endDate: e.target.value })
                 }
+                className="h-9"
               />
             </div>
 
+            <div className="flex items-end">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() =>
                   setFilters({
                     status: "all",
@@ -436,25 +441,26 @@ export default function PartnerReports() {
               >
                 Réinitialiser
               </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Results Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
             Résultats ({filteredData.length} contrat{filteredData.length !== 1 ? "s" : ""})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Chargement des données...</p>
+            <div className="text-center py-6">
+              <p className="text-muted-foreground text-sm">Chargement des données...</p>
             </div>
           ) : filteredData.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
+            <div className="text-center py-6">
+              <p className="text-muted-foreground text-sm">
                 Aucun résultat ne correspond à vos critères de recherche.
               </p>
             </div>

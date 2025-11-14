@@ -104,15 +104,15 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 h-full">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">
           Vue d'ensemble de vos performances
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {kpiCards.map((kpi, index) => (
           <motion.div
             key={kpi.title}
@@ -122,16 +122,16 @@ export default function Dashboard() {
             transition={{ delay: index * 0.1 }}
           >
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
                   {kpi.title}
                 </CardTitle>
-                <div className={`${kpi.bgColor} ${kpi.color} p-2 rounded-lg`}>
+                <div className={`${kpi.bgColor} ${kpi.color} p-1.5 rounded-lg`}>
                   {kpi.icon}
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{kpi.value}</div>
+              <CardContent className="px-4 pb-3">
+                <div className="text-xl font-bold">{kpi.value}</div>
                 <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                   <TrendingUp className="h-3 w-3 text-green-600" />
                   <span>+12% vs mois dernier</span>
@@ -142,14 +142,14 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <motion.div variants={fadeIn} initial="hidden" animate="show">
           <Card>
-            <CardHeader>
-              <CardTitle>Évolution des primes</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Évolution des primes</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={premiumsData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
@@ -171,11 +171,11 @@ export default function Dashboard() {
 
         <motion.div variants={fadeIn} initial="hidden" animate="show">
           <Card>
-            <CardHeader>
-              <CardTitle>Distribution par catégorie</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Distribution par catégorie</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
                     data={categoryData}

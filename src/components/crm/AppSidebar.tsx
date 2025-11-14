@@ -61,20 +61,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar 
-      className={collapsed ? "w-16" : "w-64"}
+      className={collapsed ? "w-14" : "w-56"}
       collapsible="icon"
     >
       <SidebarContent>
         {/* Logo / Brand */}
-        <div className="p-4 flex items-center justify-center">
+        <div className="p-2 flex items-center justify-center">
           <img 
             src={advisyLogo} 
             alt="Advisy" 
-            className={collapsed ? "h-10 w-10 object-contain" : "h-16 w-auto object-contain"}
+            className={collapsed ? "h-8 w-8 object-contain" : "h-12 w-auto object-contain"}
           />
         </div>
 
-        <Separator className="my-2" />
+        <Separator className="my-1" />
 
         {/* Partner Navigation */}
         <SidebarGroup>
@@ -141,18 +141,18 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with User Info */}
-      <SidebarFooter className="p-4 border-t">
+      <SidebarFooter className="p-2 border-t">
         {!collapsed && user && (
-          <div className="mb-3 px-2">
-            <p className="text-sm font-medium truncate">{user.email}</p>
-            <p className="text-xs text-muted-foreground">Partner Account</p>
+          <div className="mb-2 px-2">
+            <p className="text-xs font-medium truncate">{user.email}</p>
+            <p className="text-xs text-muted-foreground">Partner</p>
           </div>
         )}
         <Button
           variant="ghost"
           size={collapsed ? "icon" : "sm"}
           onClick={signOut}
-          className="w-full justify-start"
+          className="w-full justify-start h-8"
         >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span className="ml-2">Déconnexion</span>}
