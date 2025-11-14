@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
 import { Button } from "@/components/ui/button";
@@ -48,11 +48,16 @@ const statusLabels: Record<string, string> = {
 
 export default function ClientsList() {
   const navigate = useNavigate();
-  const { clients, loading, deleteClient } = useClients();
+  const { clients, loading, deleteClient, fetchClients } = useClients();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("client");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchClients(typeFilter);
+  }, [typeFilter]);
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch =
@@ -94,18 +99,45 @@ export default function ClientsList() {
     );
   }
 
+  const typeLabels: Record<string, string> = {
+    client: "Clients",
+    collaborateur: "Collaborateurs",
+    partenaire: "Partenaires",
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Clients</h1>
+          <h1 className="text-3xl font-bold">Adresses</h1>
           <p className="text-muted-foreground mt-1">
-            {filteredClients.length} client(s)
+            {filteredClients.length} adresse(s) - {typeLabels[typeFilter]}
           </p>
         </div>
         <Button onClick={() => navigate("/crm/clients/nouveau")}>
           <Plus className="h-4 w-4 mr-2" />
-          Nouveau client
+          Nouvelle adresse
+        </Button>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant={typeFilter === "client" ? "default" : "outline"}
+          onClick={() => setTypeFilter("client")}
+        >
+          Clients
+        </Button>
+        <Button
+          variant={typeFilter === "collaborateur" ? "default" : "outline"}
+          onClick={() => setTypeFilter("collaborateur")}
+        >
+          Collaborateurs
+        </Button>
+        <Button
+          variant={typeFilter === "partenaire" ? "default" : "outline"}
+          onClick={() => setTypeFilter("partenaire")}
+        >
+          Partenaires
         </Button>
       </div>
 
@@ -232,10 +264,10 @@ export default function ClientsList() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer cette adresse ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. Le client et toutes ses données
-              associées seront supprimés.
+              Cette action est irréversible. L'adresse et toutes ses données
+              associées seront supprimées.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

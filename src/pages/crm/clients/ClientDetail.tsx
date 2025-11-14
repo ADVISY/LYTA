@@ -51,6 +51,16 @@ export default function ClientDetail() {
     return "Sans nom";
   };
 
+  const getTypeLabel = () => {
+    if (!client?.type_adresse) return "";
+    const labels: Record<string, string> = {
+      client: "Client",
+      collaborateur: "Collaborateur",
+      partenaire: "Partenaire",
+    };
+    return labels[client.type_adresse] || "";
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -70,7 +80,7 @@ export default function ClientDetail() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-bold">Client non trouvé</h1>
+          <h1 className="text-3xl font-bold">Adresse non trouvée</h1>
         </div>
       </div>
     );
@@ -90,6 +100,11 @@ export default function ClientDetail() {
           <div>
             <h1 className="text-3xl font-bold">{getClientName()}</h1>
             <div className="flex items-center gap-2 mt-1">
+              {client.type_adresse && (
+                <Badge variant="outline">
+                  {getTypeLabel()}
+                </Badge>
+              )}
               {client.status && (
                 <Badge
                   variant="outline"
@@ -132,6 +147,12 @@ export default function ClientDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {client.type_adresse && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Type</p>
+                    <p className="font-medium">{getTypeLabel()}</p>
+                  </div>
+                )}
                 {client.company_name && (
                   <div>
                     <p className="text-sm text-muted-foreground">Entreprise</p>
@@ -222,9 +243,9 @@ export default function ClientDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucun suivi pour ce client
-              </p>
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aucun suivi pour cette adresse
+                </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -239,9 +260,9 @@ export default function ClientDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucune proposition pour ce client
-              </p>
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aucune proposition pour cette adresse
+                </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -256,9 +277,9 @@ export default function ClientDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucun contrat pour ce client
-              </p>
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aucun contrat pour cette adresse
+                </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -273,9 +294,9 @@ export default function ClientDetail() {
               </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucun message pour ce client
-              </p>
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aucun message pour cette adresse
+                </p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -22,6 +22,7 @@ export type Client = {
   country?: string | null;
   status?: string | null;
   tags?: string[] | null;
+  type_adresse?: string | null;
   created_at: string;
   updated_at: string;
   external_ref?: string | null;
@@ -39,16 +40,21 @@ export function useClients() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const fetchClients = async () => {
+  const fetchClients = async (typeFilter?: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('clients' as any)
         .select(`
           *,
           assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+      
+      if (typeFilter) {
+        query = query.eq('type_adresse', typeFilter);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 

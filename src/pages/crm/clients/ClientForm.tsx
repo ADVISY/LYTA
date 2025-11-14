@@ -26,6 +26,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 
 const clientSchema = z.object({
+  type_adresse: z.enum(["client", "collaborateur", "partenaire"]),
   assigned_agent_id: z.string().optional().nullable(),
   first_name: z.string().min(1, "Prénom requis").max(100),
   last_name: z.string().min(1, "Nom requis").max(100),
@@ -55,6 +56,7 @@ export default function ClientForm() {
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
+      type_adresse: "client",
       assigned_agent_id: null,
       first_name: "",
       last_name: "",
@@ -84,6 +86,7 @@ export default function ClientForm() {
     const { data } = await getClientById(id);
     if (data) {
       form.reset({
+        type_adresse: (data.type_adresse as any) || "client",
         assigned_agent_id: data.assigned_agent_id,
         first_name: data.first_name || "",
         last_name: data.last_name || "",
@@ -155,18 +158,44 @@ export default function ClientForm() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">
-            {id ? "Modifier le client" : "Nouveau client"}
+            {id ? "Modifier l'adresse" : "Nouvelle adresse"}
           </h1>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Informations du client</CardTitle>
+          <CardTitle>Informations de l'adresse</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="type_adresse"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type d'adresse *</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="client">Client</SelectItem>
+                        <SelectItem value="collaborateur">Collaborateur</SelectItem>
+                        <SelectItem value="partenaire">Partenaire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}

@@ -180,6 +180,7 @@ export type Database = {
           postal_code: string | null
           status: string | null
           tags: string[] | null
+          type_adresse: string
           updated_at: string
           user_id: string | null
           zip_code: string | null
@@ -204,6 +205,7 @@ export type Database = {
           postal_code?: string | null
           status?: string | null
           tags?: string[] | null
+          type_adresse?: string
           updated_at?: string
           user_id?: string | null
           zip_code?: string | null
@@ -228,6 +230,7 @@ export type Database = {
           postal_code?: string | null
           status?: string | null
           tags?: string[] | null
+          type_adresse?: string
           updated_at?: string
           user_id?: string | null
           zip_code?: string | null

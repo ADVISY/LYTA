@@ -20,7 +20,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const menuItems = [
   { to: "/crm", icon: LayoutDashboard, label: "Dashboard", end: true },
-  { to: "/crm/clients", icon: Users, label: "Clients" },
+  { to: "/crm/clients", icon: Users, label: "Adresses" },
   { to: "/crm/suivis", icon: ClipboardList, label: "Suivis" },
   { to: "/crm/propositions", icon: FileText, label: "Propositions" },
   { to: "/crm/contrats", icon: FileCheck, label: "Contrats" },
