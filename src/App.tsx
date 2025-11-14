@@ -25,7 +25,9 @@ import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import CRMLayout from "./pages/crm/CRMLayout";
 import CRMDashboard from "./pages/crm/CRMDashboard";
-import CRMClients from "./pages/crm/CRMClients";
+import CRMClients from "./pages/crm/clients/ClientsList";
+import ClientForm from "./pages/crm/clients/ClientForm";
+import ClientDetail from "./pages/crm/clients/ClientDetail";
 import CRMSuivis from "./pages/crm/CRMSuivis";
 import CRMPropositions from "./pages/crm/CRMPropositions";
 import CRMContracts from "./pages/crm/CRMContracts";
@@ -76,6 +78,9 @@ const App = () => (
           <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
             <Route index element={<CRMDashboard />} />
             <Route path="clients" element={<CRMClients />} />
+            <Route path="clients/nouveau" element={<ClientForm />} />
+            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="clients/:id/modifier" element={<ClientForm />} />
             <Route path="suivis" element={<CRMSuivis />} />
             <Route path="propositions" element={<CRMPropositions />} />
             <Route path="contrats" element={<CRMContracts />} />

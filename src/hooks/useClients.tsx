@@ -6,14 +6,22 @@ import { useAuth } from '@/hooks/useAuth';
 export type Client = {
   id: string;
   user_id?: string | null;
+  assigned_agent_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   company_name?: string | null;
   phone?: string | null;
+  mobile?: string | null;
+  email?: string | null;
   address?: string | null;
   city?: string | null;
   postal_code?: string | null;
+  zip_code?: string | null;
   birthdate?: string | null;
   is_company?: boolean | null;
   country?: string | null;
+  status?: string | null;
+  tags?: string[] | null;
   created_at: string;
   updated_at: string;
   external_ref?: string | null;
@@ -23,8 +31,15 @@ export type Client = {
     email: string;
   } | null;
   profile?: {
+    id: string;
     first_name?: string;
     last_name?: string;
+    email: string;
+  } | null;
+  assigned_agent?: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
     email: string;
   } | null;
 };
@@ -42,11 +57,8 @@ export function useClients() {
         .from('clients' as any)
         .select(`
           *,
-          profile:profiles!user_id (
-            first_name,
-            last_name,
-            email
-          )
+          profile:profiles!fk_clients_user_id(id, first_name, last_name, email),
+          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
         `)
         .order('created_at', { ascending: false });
 
@@ -66,46 +78,12 @@ export function useClients() {
 
   const createClient = async (clientData: any) => {
     try {
-      // First, create or get a user profile if email is provided
-      let userId = null;
-      
-      if (clientData.email && clientData.first_name && clientData.last_name) {
-        // Check if profile with this email already exists
-        const { data: existingProfile, error: profileError } = await supabase
-          .from('profiles' as any)
-          .select('id')
-          .eq('email', clientData.email)
-          .maybeSingle();
-        
-        if (!profileError && existingProfile) {
-          userId = (existingProfile as any).id;
-        } else {
-          // Create a new user via auth (this will trigger the profile creation)
-          const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: clientData.email,
-            password: Math.random().toString(36).slice(-12), // Random password
-            options: {
-              data: {
-                first_name: clientData.first_name,
-                last_name: clientData.last_name,
-              }
-            }
-          });
-          
-          if (authError) throw authError;
-          userId = authData.user?.id || null;
-        }
-      }
-      
-      // Prepare client data (exclude profile fields)
+      // Prepare client data
       const { first_name, last_name, email, ...clientOnlyData } = clientData;
       
       const { data, error } = await supabase
         .from('clients' as any)
-        .insert([{
-          ...clientOnlyData,
-          user_id: userId
-        }])
+        .insert([clientData])
         .select()
         .single();
 
@@ -117,14 +95,14 @@ export function useClients() {
       });
 
       await fetchClients();
-      return data;
+      return { data, error: null };
     } catch (error: any) {
       toast({
         title: "Erreur",
         description: error.message,
         variant: "destructive"
       });
-      throw error;
+      return { data: null, error };
     }
   };
 
@@ -143,13 +121,14 @@ export function useClients() {
       });
 
       await fetchClients();
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Erreur",
         description: error.message,
         variant: "destructive"
       });
-      throw error;
+      return { error };
     }
   };
 
@@ -168,13 +147,38 @@ export function useClients() {
       });
 
       await fetchClients();
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Erreur",
         description: error.message,
         variant: "destructive"
       });
-      throw error;
+      return { error };
+    }
+  };
+
+  const getClientById = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('clients' as any)
+        .select(`
+          *,
+          profile:profiles!fk_clients_user_id(id, first_name, last_name, email),
+          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive"
+      });
+      return { data: null, error };
     }
   };
 
@@ -190,6 +194,7 @@ export function useClients() {
     fetchClients,
     createClient,
     updateClient,
-    deleteClient
+    deleteClient,
+    getClientById
   };
 }
