@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, Plus, FileText } from "lucide-react";
 import { usePolicies } from "@/hooks/usePolicies";
+import { useInsuranceCompanies } from "@/hooks/useInsuranceCompanies";
+import { useInsuranceProducts } from "@/hooks/useInsuranceProducts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,8 +27,12 @@ import {
 
 export function ContractsSection({ userId }: { userId: string }) {
   const { policies, loading, createPolicy } = usePolicies();
+  const { companies } = useInsuranceCompanies();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const { products } = useInsuranceProducts(selectedCompanyId);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
+    company_id: '',
     product_id: '',
     policy_number: '',
     start_date: '',
@@ -61,7 +67,9 @@ export function ContractsSection({ userId }: { userId: string }) {
       });
       
       setIsModalOpen(false);
+      setSelectedCompanyId('');
       setFormData({
+        company_id: '',
         product_id: '',
         policy_number: '',
         start_date: '',
@@ -169,16 +177,45 @@ export function ContractsSection({ userId }: { userId: string }) {
             </div>
 
             <div className="space-y-2">
+              <Label>Compagnie d'assurance *</Label>
+              <Select 
+                value={formData.company_id} 
+                onValueChange={(value) => {
+                  setFormData({ ...formData, company_id: value, product_id: '' });
+                  setSelectedCompanyId(value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une compagnie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Produit d'assurance *</Label>
-              <Input
-                placeholder="ID du produit"
-                value={formData.product_id}
-                onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Sélectionnez un produit d'assurance existant
-              </p>
+              <Select 
+                value={formData.product_id} 
+                onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+                disabled={!selectedCompanyId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedCompanyId ? "Sélectionner un produit" : "Sélectionner d'abord une compagnie"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} - {product.category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
