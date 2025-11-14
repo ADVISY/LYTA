@@ -12,6 +12,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import advisyLogo from "@/assets/advisy-logo.svg";
 
 import {
@@ -31,15 +32,25 @@ import { Separator } from "@/components/ui/separator";
 
 const partnerItems = [
   { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
-  { title: "Clients", url: "/crm/clients", icon: Users },
-  { title: "Contrats", url: "/crm/contracts", icon: FileText },
+  { title: "Mes Clients", url: "/crm/clients", icon: Users },
+  { title: "Mes Contrats", url: "/crm/contracts", icon: FileText },
   { title: "Documents", url: "/crm/documents", icon: FolderOpen },
   { title: "Commissions", url: "/crm/commissions", icon: DollarSign },
   { title: "Rapports", url: "/crm/reports", icon: BarChart3 },
 ];
 
+const clientItems = [
+  { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
+  { title: "Mes Contrats", url: "/crm/my-contracts", icon: FileText },
+  { title: "Mes Documents", url: "/crm/my-documents", icon: FolderOpen },
+  { title: "Mon Profil", url: "/crm/my-profile", icon: UserCircle },
+];
+
 const adminItems = [
-  { title: "Utilisateurs", url: "/admin/users", icon: UserCircle },
+  { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
+  { title: "Tous les Clients", url: "/crm/all-clients", icon: Users },
+  { title: "Tous les Contrats", url: "/crm/all-contracts", icon: FileText },
+  { title: "Gestion Utilisateurs", url: "/admin/users", icon: UserCircle },
   { title: "Configuration", url: "/admin/settings", icon: Settings },
 ];
 
@@ -48,6 +59,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, user } = useAuth();
+  const { role, isAdmin, isPartner, isClient } = useUserRole();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => {
@@ -57,7 +69,9 @@ export function AppSidebar() {
     return currentPath.startsWith(path);
   };
 
-  const isPartnerExpanded = partnerItems.some((i) => isActive(i.url));
+  // Déterminer les items à afficher selon le rôle
+  const menuItems = isAdmin ? adminItems : isPartner ? partnerItems : clientItems;
+  const menuLabel = isAdmin ? "Administration" : isPartner ? "Espace Partner" : "Espace Client";
 
   return (
     <Sidebar 
@@ -76,16 +90,16 @@ export function AppSidebar() {
 
         <Separator className="my-1" />
 
-        {/* Partner Navigation */}
+        {/* Main Navigation */}
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-xs uppercase tracking-wider">
-              Espace Partner
+              {menuLabel}
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {partnerItems.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

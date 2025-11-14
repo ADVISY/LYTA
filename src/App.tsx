@@ -31,6 +31,11 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminSettings from "./pages/AdminSettings";
 import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
+import MyContracts from "./pages/client/MyContracts";
+import MyDocuments from "./pages/client/MyDocuments";
+import MyProfile from "./pages/client/MyProfile";
+import AllClients from "./pages/admin/AllClients";
+import AllContracts from "./pages/admin/AllContracts";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CRMLayout } from "./components/crm/CRMLayout";
 
@@ -75,11 +80,19 @@ const App = () => (
           {/* CRM - Nested Routes with Sidebar */}
           <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
+            {/* Partner Routes */}
             <Route path="clients" element={<PartnerClients />} />
             <Route path="contracts" element={<PartnerContracts />} />
             <Route path="documents" element={<PartnerDocuments />} />
             <Route path="commissions" element={<PartnerCommissions />} />
             <Route path="reports" element={<PartnerReports />} />
+            {/* Client Routes */}
+            <Route path="my-contracts" element={<MyContracts />} />
+            <Route path="my-documents" element={<MyDocuments />} />
+            <Route path="my-profile" element={<MyProfile />} />
+            {/* Admin Routes */}
+            <Route path="all-clients" element={<AllClients />} />
+            <Route path="all-contracts" element={<AllContracts />} />
           </Route>
           
           {/* Admin Routes */}
