@@ -168,6 +168,7 @@ export type Database = {
           country: string | null
           created_at: string
           external_ref: string | null
+          iban: string | null
           id: string
           is_company: boolean | null
           phone: string | null
@@ -183,6 +184,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           external_ref?: string | null
+          iban?: string | null
           id?: string
           is_company?: boolean | null
           phone?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           external_ref?: string | null
+          iban?: string | null
           id?: string
           is_company?: boolean | null
           phone?: string | null

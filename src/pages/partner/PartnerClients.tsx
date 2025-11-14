@@ -288,6 +288,7 @@ export default function PartnerClients() {
     city: '',
     postal_code: '',
     birthdate: '',
+    iban: '',
     is_company: false,
     country: 'CH'
   });
@@ -425,6 +426,7 @@ export default function PartnerClients() {
         city: formData.city || null,
         postal_code: formData.postal_code || null,
         birthdate: formData.birthdate || null,
+        iban: formData.iban || null,
       };
 
       if (isEditMode && editingClient) {
@@ -443,6 +445,7 @@ export default function PartnerClients() {
         city: '',
         postal_code: '',
         birthdate: '',
+        iban: '',
         is_company: false,
         country: 'CH'
       });
@@ -461,6 +464,7 @@ export default function PartnerClients() {
       city: client.city || '',
       postal_code: client.postal_code || '',
       birthdate: client.birthdate || '',
+      iban: client.iban || '',
       is_company: client.is_company || false,
       country: client.country || 'CH'
     });
@@ -1272,8 +1276,8 @@ export default function PartnerClients() {
                 <Label>IBAN</Label>
                 <Input 
                   placeholder="CH93 0000 0000 0000 0000 0" 
-                  defaultValue={isEditMode ? editingClient?.iban : ""} 
-                  pattern="[A-Z]{2}[0-9]{2}[A-Z0-9]+"
+                  value={formData.iban}
+                  onChange={(e) => setFormData({ ...formData, iban: e.target.value.toUpperCase() })}
                 />
               </div>
             </div>
