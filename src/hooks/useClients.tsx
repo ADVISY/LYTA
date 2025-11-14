@@ -42,7 +42,7 @@ export function useClients() {
         .from('clients' as any)
         .select(`
           *,
-          profile:profiles (
+          profile:profiles!user_id (
             first_name,
             last_name,
             email
