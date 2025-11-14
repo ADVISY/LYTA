@@ -36,6 +36,9 @@ import MyDocuments from "./pages/client/MyDocuments";
 import MyProfile from "./pages/client/MyProfile";
 import AllClients from "./pages/admin/AllClients";
 import AllContracts from "./pages/admin/AllContracts";
+import AllDocuments from "./pages/admin/AllDocuments";
+import AllCommissions from "./pages/admin/AllCommissions";
+import AdminReports from "./pages/admin/AdminReports";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CRMLayout } from "./components/crm/CRMLayout";
 
@@ -99,6 +102,11 @@ const App = () => (
           <Route path="/admin" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="clients" element={<AllClients />} />
+            <Route path="contracts" element={<AllContracts />} />
+            <Route path="documents" element={<AllDocuments />} />
+            <Route path="commissions" element={<AllCommissions />} />
+            <Route path="reports" element={<AdminReports />} />
           </Route>
           
           {/* Legacy Partner Routes (redirect to CRM) */}

@@ -48,11 +48,11 @@ const clientItems = [
 
 const adminItems = [
   { title: "Dashboard", url: "/crm", icon: LayoutDashboard },
-  { title: "Mes Clients", url: "/crm/clients", icon: Users },
-  { title: "Mes Contrats", url: "/crm/contracts", icon: FileText },
-  { title: "Documents", url: "/crm/documents", icon: FolderOpen },
-  { title: "Commissions", url: "/crm/commissions", icon: DollarSign },
-  { title: "Rapports", url: "/crm/reports", icon: BarChart3 },
+  { title: "Tous les Clients", url: "/admin/clients", icon: Users },
+  { title: "Tous les Contrats", url: "/admin/contracts", icon: FileText },
+  { title: "Tous les Documents", url: "/admin/documents", icon: FolderOpen },
+  { title: "Toutes les Commissions", url: "/admin/commissions", icon: DollarSign },
+  { title: "Rapports Globaux", url: "/admin/reports", icon: BarChart3 },
 ];
 
 const adminManagementItems = [
