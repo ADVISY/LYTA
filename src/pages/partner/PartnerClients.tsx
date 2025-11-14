@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useClients } from "@/hooks/useClients";
 import {
   Table,
   TableBody,
@@ -44,25 +45,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface Client {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  postalCode: string;
-  birthdate?: string;
-  iban?: string;
-  contractsCount: number;
-  totalPremium: number;
-  status: 'Actif' | 'Inactif' | 'Prospect';
-  createdAt: string;
-  familyRole?: 'principal' | 'conjoint' | 'enfant';
-  parentClientId?: string;
-}
-
 interface Contract {
   id: string;
   clientId: string;
@@ -94,8 +76,8 @@ interface Commission {
   period: string;
 }
 
-// Mock data
-const mockClients: Client[] = [
+// Mock data conservé pour les contrats, documents et commissions
+// À connecter plus tard
   {
     id: "CLI-001",
     firstName: "Marie",
@@ -390,16 +372,26 @@ const fadeIn = {
 };
 
 export default function PartnerClients() {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const { clients, loading, createClient, updateClient, deleteClient } = useClients();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<any>(null);
   const [addingFamilyMember, setAddingFamilyMember] = useState(false);
   const [familyMemberType, setFamilyMemberType] = useState<'conjoint' | 'enfant'>('conjoint');
+  const [formData, setFormData] = useState({
+    company_name: '',
+    phone: '',
+    address: '',
+    city: '',
+    postal_code: '',
+    birthdate: '',
+    is_company: false,
+    country: 'CH'
+  });
   const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
@@ -416,13 +408,20 @@ export default function PartnerClients() {
   };
 
   const filteredClients = clients.filter(client => {
+    const firstName = client.profiles?.first_name || '';
+    const lastName = client.profiles?.last_name || '';
+    const email = client.profiles?.email || '';
+    const companyName = client.company_name || '';
+    
     const matchesSearch = 
-      client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.id.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || client.status === statusFilter;
+    // Pour l'instant tous actifs (pas de colonne status dans DB)
+    const matchesStatus = statusFilter === "all" || true;
     
     return matchesSearch && matchesStatus;
   });
@@ -513,22 +512,66 @@ export default function PartnerClients() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({ 
-      title: isEditMode ? "Client modifié" : "Client créé", 
-      description: isEditMode ? "Les modifications ont été enregistrées" : "Le nouveau client a été ajouté" 
-    });
-    setIsModalOpen(false);
-    setIsEditMode(false);
-    setEditingClient(null);
+    
+    try {
+      if (isEditMode && editingClient) {
+        await updateClient(editingClient.id, formData);
+      } else {
+        await createClient(formData);
+      }
+      
+      setIsModalOpen(false);
+      setIsEditMode(false);
+      setEditingClient(null);
+      setFormData({
+        company_name: '',
+        phone: '',
+        address: '',
+        city: '',
+        postal_code: '',
+        birthdate: '',
+        is_company: false,
+        country: 'CH'
+      });
+    } catch (error) {
+      console.error('Error saving client:', error);
+    }
   };
 
-  const handleEditClick = (client: Client) => {
+  const handleEditClick = (client: any) => {
     setEditingClient(client);
     setIsEditMode(true);
+    setFormData({
+      company_name: client.company_name || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      city: client.city || '',
+      postal_code: client.postal_code || '',
+      birthdate: client.birthdate || '',
+      is_company: client.is_company || false,
+      country: client.country || 'CH'
+    });
     setIsModalOpen(true);
   };
+
+  const handleDeleteClick = async (clientId: string) => {
+    if (confirm('Supprimer ce client ?')) {
+      await deleteClient(clientId);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Chargement des clients...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderDetailView = () => {
     if (!selectedClient) return null;
@@ -559,10 +602,10 @@ export default function PartnerClients() {
             <div className="flex-1">
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
                 <User className="h-7 w-7" />
-                {selectedClient.firstName} {selectedClient.lastName}
+                {selectedClient.company_name || `${selectedClient.profiles?.first_name || ''} ${selectedClient.profiles?.last_name || ''}`}
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mt-1">
-                Client {selectedClient.id} • {selectedClient.email}
+                Client {selectedClient.id.substring(0, 8)} • {selectedClient.profiles?.email || 'N/A'}
               </p>
             </div>
             <Button 
@@ -1158,35 +1201,41 @@ export default function PartnerClients() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredClients.map((client) => (
+                    {filteredClients.map((client) => {
+                      const firstName = client.profiles?.first_name || '';
+                      const lastName = client.profiles?.last_name || '';
+                      const email = client.profiles?.email || '';
+                      const displayName = client.company_name || `${firstName} ${lastName}`;
+                      
+                      return (
                       <TableRow 
                         key={client.id}
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
                         onClick={() => handleRowClick(client)}
                       >
-                        <TableCell className="font-mono text-sm">{client.id}</TableCell>
+                        <TableCell className="font-mono text-sm">{client.id.substring(0, 8)}</TableCell>
                         <TableCell className="font-medium">
-                          {client.firstName} {client.lastName}
+                          {displayName}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm">
                             <Mail className="h-3 w-3 text-slate-400" />
-                            {client.email}
+                            {email}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm">
                             <Phone className="h-3 w-3 text-slate-400" />
-                            {client.phone}
+                            {client.phone || 'N/A'}
                           </div>
                         </TableCell>
-                        <TableCell>{client.city}</TableCell>
-                        <TableCell>{getStatusBadge(client.status)}</TableCell>
+                        <TableCell>{client.city || 'N/A'}</TableCell>
+                        <TableCell>{getStatusBadge('Actif')}</TableCell>
                         <TableCell className="text-right font-semibold">
-                          {client.contractsCount}
+                          0
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          CHF {client.totalPremium.toLocaleString()}
+                          CHF 0
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
@@ -1215,7 +1264,8 @@ export default function PartnerClients() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
