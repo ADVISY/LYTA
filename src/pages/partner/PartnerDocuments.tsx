@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, Search, Upload, FolderPlus, 
-  Download, Share2, Edit, Eye, File
+  Download, Share2, Edit, Eye, File, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockDocuments, MockDocument } from "@/lib/mockData";
+import { useDocuments } from "@/hooks/useDocuments";
 
 const fadeIn = {
   hidden: { opacity: 0, y: 10 },
@@ -31,20 +31,20 @@ const fadeIn = {
 };
 
 export default function PartnerDocuments() {
-  const [documents] = useState<MockDocument[]>(mockDocuments);
+  const { documents, loading, deleteDocument } = useDocuments();
   const [searchTerm, setSearchTerm] = useState("");
   const [kindFilter, setKindFilter] = useState<string>("all");
-  const [selectedDoc, setSelectedDoc] = useState<MockDocument | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const { toast } = useToast();
 
   const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesKind = kindFilter === "all" || doc.kind === kindFilter;
+    const matchesSearch = doc.file_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesKind = kindFilter === "all" || doc.doc_kind === kindFilter;
     return matchesSearch && matchesKind;
   });
 
-  const uniqueKinds = Array.from(new Set(mockDocuments.map(d => d.kind)));
+  const uniqueKinds = Array.from(new Set(documents.map(d => d.doc_kind).filter(Boolean)));
 
   const getKindColor = (kind: string) => {
     const colors: { [key: string]: string } = {
@@ -58,16 +58,30 @@ export default function PartnerDocuments() {
     return colors[kind] || 'bg-slate-100 text-slate-700 dark:bg-slate-800/30 dark:text-slate-400';
   };
 
-  const handleViewDocument = (doc: MockDocument) => {
+  const handleViewDocument = (doc: any) => {
     setSelectedDoc(doc);
     setIsViewerOpen(true);
   };
 
-  const handleDownload = (doc: MockDocument) => {
+  const handleDownload = (doc: any) => {
     toast({ 
       title: "Téléchargement lancé", 
-      description: `${doc.name} est en cours de téléchargement (mock)` 
+      description: `${doc.file_name} est en cours de téléchargement` 
     });
+  };
+
+  const handleDelete = async (doc: any) => {
+    if (confirm('Supprimer ce document ?')) {
+      await deleteDocument(doc.id);
+    }
+  };
+
+  const formatBytes = (bytes: number | null) => {
+    if (!bytes) return 'N/A';
+    const k = 1024;
+    if (bytes < k) return bytes + ' B';
+    if (bytes < k * k) return (bytes / k).toFixed(1) + ' KB';
+    return (bytes / (k * k)).toFixed(1) + ' MB';
   };
 
   const handleUpload = () => {
@@ -76,6 +90,17 @@ export default function PartnerDocuments() {
       description: "Fonctionnalité d'upload en développement" 
     });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-sky-50 dark:from-slate-950 dark:to-slate-900 p-6">
@@ -183,20 +208,22 @@ export default function PartnerDocuments() {
                         <h3 
                           className="font-semibold text-sm text-slate-900 dark:text-slate-50 truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                           onClick={() => handleViewDocument(doc)}
-                          title={doc.name}
+                          title={doc.file_name}
                         >
-                          {doc.name}
+                          {doc.file_name}
                         </h3>
                         <div className="flex items-center justify-between mt-2">
-                          <Badge className={`text-xs ${getKindColor(doc.kind)}`}>
-                            {doc.kind}
-                          </Badge>
-                          <span className="text-xs text-slate-500">{doc.size}</span>
+                          {doc.doc_kind && (
+                            <Badge className={`text-xs ${getKindColor(doc.doc_kind)}`}>
+                              {doc.doc_kind}
+                            </Badge>
+                          )}
+                          <span className="text-xs text-slate-500">{formatBytes(doc.size_bytes)}</span>
                         </div>
                       </div>
                       
                       <div className="text-xs text-slate-500">
-                        {new Date(doc.date).toLocaleDateString('fr-CH')}
+                        {new Date(doc.created_at).toLocaleDateString('fr-CH')}
                       </div>
 
                       {/* Actions */}
@@ -222,10 +249,10 @@ export default function PartnerDocuments() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          className="rounded-xl p-2"
-                          onClick={() => toast({ title: "Partager", description: "Fonctionnalité en développement" })}
+                          className="rounded-xl p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          onClick={() => handleDelete(doc)}
                         >
-                          <Share2 className="h-3 w-3" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
