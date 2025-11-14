@@ -59,10 +59,7 @@ export function usePolicies() {
           partner:partners!partner_id (
             id,
             code,
-            profile:profiles!user_id (
-              first_name,
-              last_name
-            )
+            phone
           )
         `)
         .order('created_at', { ascending: false });

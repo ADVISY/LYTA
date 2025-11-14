@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useClients, type Client } from "@/hooks/useClients";
+import { usePolicies } from "@/hooks/usePolicies";
+import { useDocuments } from "@/hooks/useDocuments";
+import { useCommissions } from "@/hooks/useCommissions";
 import {
   Table,
   TableBody,
@@ -44,6 +47,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContractsSection } from "@/components/crm/ContractsSection";
+import { DocumentsSection } from "@/components/crm/DocumentsSection";
+import { CommissionsSection } from "@/components/crm/CommissionsSection";
+import { FollowUpSection } from "@/components/crm/FollowUpSection";
 
 interface Contract {
   id: string;
@@ -272,6 +279,9 @@ const fadeIn = {
 
 export default function PartnerClients() {
   const { clients, loading, createClient, updateClient, deleteClient } = useClients();
+  const { policies } = usePolicies();
+  const { documents } = useDocuments();
+  const { commissions } = useCommissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -353,15 +363,15 @@ export default function PartnerClients() {
   };
 
   const getClientContracts = (clientId: string) => {
-    return mockContracts.filter(c => c.clientId === clientId);
+    return policies.filter(p => p.client_id === clientId);
   };
 
   const getClientDocuments = (clientId: string) => {
-    return mockDocuments.filter(d => d.clientId === clientId);
+    return documents.filter(d => d.owner_id === clientId && d.owner_type === 'client');
   };
 
   const getClientCommissions = (clientId: string) => {
-    return mockCommissions.filter(c => c.clientId === clientId);
+    return commissions.filter(c => c.policy?.client?.id === clientId);
   };
 
   const getFamilyMembers = (clientId: string): Client[] => {
@@ -380,9 +390,9 @@ export default function PartnerClients() {
 
   const getTotalFamilyPremiums = (clientId: string): number => {
     const familyMembers = getFamilyMembers(clientId);
-    let total = getClientContracts(clientId).reduce((sum, c) => sum + c.premiumMonthly, 0);
+    let total = getClientContracts(clientId).reduce((sum, c) => sum + (c.premium_monthly || 0), 0);
     familyMembers.forEach(member => {
-      total += getClientContracts(member.id).reduce((sum, c) => sum + c.premiumMonthly, 0);
+      total += getClientContracts(member.id).reduce((sum, c) => sum + (c.premium_monthly || 0), 0);
     });
     return total;
   };
@@ -560,7 +570,7 @@ export default function PartnerClients() {
                       CHF {getTotalFamilyPremiums(selectedClient.id).toFixed(0)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Dont CHF {clientContracts.reduce((sum, c) => sum + c.premiumMonthly, 0)} directs
+                      Dont CHF {clientContracts.reduce((sum, c) => sum + (c.premium_monthly || 0), 0)} directs
                     </p>
                   </div>
                   <CreditCard className="h-10 w-10 text-green-500/20" />
@@ -713,170 +723,17 @@ export default function PartnerClients() {
 
                 {/* Contracts Tab */}
                 <TabsContent value="contracts" className="mt-6">
-                  {clientContracts.length === 0 ? (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">Aucun contrat pour ce client</p>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-slate-50/50 dark:bg-slate-800/50">
-                            <TableHead className="font-semibold">N° Police</TableHead>
-                            <TableHead className="font-semibold">Produit</TableHead>
-                            <TableHead className="font-semibold">Compagnie</TableHead>
-                            <TableHead className="font-semibold">Statut</TableHead>
-                            <TableHead className="font-semibold">Date début</TableHead>
-                            <TableHead className="font-semibold text-right">Prime mensuelle</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {clientContracts.map((contract) => (
-                            <TableRow key={contract.id}>
-                              <TableCell className="font-mono text-sm">{contract.policyNumber}</TableCell>
-                              <TableCell className="font-medium">{contract.productName}</TableCell>
-                              <TableCell>{contract.company}</TableCell>
-                              <TableCell>{getContractStatusBadge(contract.status)}</TableCell>
-                              <TableCell>{new Date(contract.startDate).toLocaleDateString('fr-CH')}</TableCell>
-                              <TableCell className="text-right font-semibold">
-                                CHF {contract.premiumMonthly}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
+                  <ContractsSection userId={selectedClient.id} />
                 </TabsContent>
 
                 {/* Documents Tab */}
                 <TabsContent value="documents" className="mt-6">
-                  {clientDocuments.length === 0 ? (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">Aucun document pour ce client</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {clientDocuments.map((doc) => (
-                        <Card key={doc.id} className="rounded-xl hover:shadow-lg transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{doc.name}</p>
-                                <p className="text-xs text-slate-500 mt-1">{doc.type}</p>
-                                <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                                  <span>{doc.size}</span>
-                                  <span>•</span>
-                                  <span>{new Date(doc.uploadDate).toLocaleDateString('fr-CH')}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                  <DocumentsSection userId={selectedClient.id} />
                 </TabsContent>
 
                 {/* Activity / Suivi Tab */}
                 <TabsContent value="activity" className="mt-6 space-y-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Historique et suivi</h3>
-                      <Button size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ajouter une note
-                      </Button>
-                    </div>
-                    
-                    {/* Timeline */}
-                    <div className="space-y-4">
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full bg-blue-500" />
-                          <div className="w-0.5 h-full bg-slate-200 dark:bg-slate-700" />
-                        </div>
-                        <div className="flex-1 pb-6">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">Contrat signé</span>
-                            <Badge variant="outline">Auto</Badge>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Contrat Assurance Auto signé avec Allianz
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">15 janvier 2023</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full bg-green-500" />
-                          <div className="w-0.5 h-full bg-slate-200 dark:bg-slate-700" />
-                        </div>
-                        <div className="flex-1 pb-6">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">Appel téléphonique</span>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Discussion sur les options complémentaires santé
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">8 mars 2023</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full bg-purple-500" />
-                          <div className="w-0.5 h-full bg-slate-200 dark:bg-slate-700" />
-                        </div>
-                        <div className="flex-1 pb-6">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">Email envoyé</span>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Devis pour 3ème pilier envoyé
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">25 mai 2023</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">Contrat 3ème pilier signé</span>
-                            <Badge variant="outline">Prévoyance</Badge>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Contrat 3ème Pilier A signé avec Swiss Life
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">10 juin 2023</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Comments Section */}
-                    <div className="border-t pt-4 mt-6">
-                      <h4 className="font-semibold mb-3">Commentaires internes</h4>
-                      <div className="space-y-3">
-                        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                          <p className="text-sm mb-1">Client très satisfait du service. Intéressé par une assurance RC ménage.</p>
-                          <p className="text-xs text-slate-500">Agent: Marie Laurent • 12 fév 2024</p>
-                        </div>
-                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                          <p className="text-sm mb-1">À recontacter pour renouvellement auto en janvier 2025.</p>
-                          <p className="text-xs text-slate-500">Agent: Marc Dubois • 5 jan 2024</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <FollowUpSection userId={selectedClient.id} />
                 </TabsContent>
               </Tabs>
             </CardContent>
@@ -930,20 +787,24 @@ export default function PartnerClients() {
                   </div>
                 ) : (
                   clientCommissions.map((commission) => {
-                    const contract = clientContracts.find(c => c.id === commission.contractId);
+                    const contract = clientContracts.find(c => c.id === commission.policy_id);
                     return (
                       <div key={commission.id} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
-                            <p className="text-sm font-medium">{contract?.productName || 'Contrat'}</p>
-                            <p className="text-xs text-slate-500 font-mono">{contract?.policyNumber}</p>
+                            <p className="text-sm font-medium">{contract?.product?.name || 'Contrat'}</p>
+                            <p className="text-xs text-slate-500 font-mono">{contract?.policy_number}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-bold text-green-700 dark:text-green-400">CHF {commission.amount}</p>
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-slate-600 dark:text-slate-400">{commission.period}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">
+                            {commission.period_month && commission.period_year 
+                              ? `${commission.period_month}/${commission.period_year}`
+                              : 'N/A'}
+                          </p>
                           {getCommissionStatusBadge(commission.status)}
                         </div>
                       </div>

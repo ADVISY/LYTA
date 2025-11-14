@@ -1,16 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Plus, FileText } from "lucide-react";
-import { usePolicies } from "@/hooks/usePolicies";
+import { Banknote, Plus } from "lucide-react";
+import { useCommissions } from "@/hooks/useCommissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-export function ContractsSection({ userId }: { userId: string }) {
-  const { policies, loading } = usePolicies();
+export function CommissionsSection({ userId }: { userId: string }) {
+  const { commissions, loading } = useCommissions();
   
-  // Filter policies for this specific client
-  const clientPolicies = policies.filter(p => p.client_id === userId);
+  // Filter commissions for policies of this client
+  const clientCommissions = commissions.filter(
+    c => c.policy?.client?.id === userId
+  );
 
   if (loading) {
     return (
@@ -26,53 +28,50 @@ export function ContractsSection({ userId }: { userId: string }) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              <CardTitle>Polices d'assurance</CardTitle>
+              <Banknote className="h-5 w-5 text-primary" />
+              <CardTitle>Commissions</CardTitle>
             </div>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
-              Nouveau contrat
+              Nouvelle commission
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {clientPolicies.length === 0 ? (
+          {clientCommissions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">Aucun contrat</p>
+              <Banknote className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">Aucune commission</p>
               <p className="text-sm">
-                Ce client n'a pas encore de police d'assurance.
+                Aucune commission enregistrée pour ce client.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {clientPolicies.map((policy) => (
+              {clientCommissions.map((commission) => (
                 <div
-                  key={policy.id}
+                  key={commission.id}
                   className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-semibold">{policy.product?.name || 'Produit inconnu'}</h4>
+                      <p className="font-semibold">CHF {commission.amount}</p>
                       <Badge variant={
-                        policy.status === 'active' ? 'default' :
-                        policy.status === 'pending' ? 'secondary' : 'outline'
+                        commission.status === 'paid' ? 'default' :
+                        commission.status === 'due' ? 'secondary' : 'outline'
                       }>
-                        {policy.status === 'active' ? 'Actif' : 
-                         policy.status === 'pending' ? 'En attente' : policy.status}
+                        {commission.status === 'paid' ? 'Payée' : 
+                         commission.status === 'due' ? 'En attente' : commission.status}
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <p>Compagnie: {policy.product?.company?.name || 'N/A'}</p>
-                      {policy.policy_number && (
-                        <p>N° Police: {policy.policy_number}</p>
+                      {commission.policy?.policy_number && (
+                        <p>Police: {commission.policy.policy_number}</p>
                       )}
-                      <p>Début: {format(new Date(policy.start_date), 'dd MMM yyyy', { locale: fr })}</p>
-                      {policy.premium_monthly && (
-                        <p className="font-medium text-foreground">
-                          Prime: CHF {policy.premium_monthly}/mois
-                        </p>
+                      {commission.period_month && commission.period_year && (
+                        <p>Période: {commission.period_month}/{commission.period_year}</p>
                       )}
+                      <p>Date: {format(new Date(commission.created_at), 'dd MMM yyyy', { locale: fr })}</p>
                     </div>
                   </div>
                 </div>
