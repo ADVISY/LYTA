@@ -6,12 +6,12 @@ import {
   Users, 
   Settings,
   LogOut,
-  Shield,
   UserCircle
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import advisyLogo from "@/assets/advisy-logo.svg";
 
 import {
   Sidebar,
@@ -65,13 +65,15 @@ export function AppSidebar() {
       <SidebarContent>
         {/* Logo / Brand */}
         <div className="p-4 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Shield className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img 
+            src={advisyLogo} 
+            alt="Advisy" 
+            className={collapsed ? "h-10 w-10 object-contain" : "h-12 w-auto object-contain"}
+          />
           {!collapsed && (
             <div>
-              <h2 className="font-bold text-lg">ADVISY CRM</h2>
-              <p className="text-xs text-muted-foreground">2.0</p>
+              <h2 className="font-bold text-lg">CRM</h2>
+              <p className="text-xs text-muted-foreground">Pro 2.0</p>
             </div>
           )}
         </div>
