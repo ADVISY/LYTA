@@ -48,9 +48,7 @@ export default function ClientDetail() {
     if (client.first_name || client.last_name) {
       return `${client.first_name || ""} ${client.last_name || ""}`.trim();
     }
-    return client.profile?.first_name && client.profile?.last_name
-      ? `${client.profile.first_name} ${client.profile.last_name}`
-      : "Sans nom";
+    return "Sans nom";
   };
 
   if (loading) {
@@ -140,28 +138,22 @@ export default function ClientDetail() {
                     <p className="font-medium">{client.company_name}</p>
                   </div>
                 )}
-                {(client.first_name || client.profile?.first_name) && (
+                {client.first_name && (
                   <div>
                     <p className="text-sm text-muted-foreground">Prénom</p>
-                    <p className="font-medium">
-                      {client.first_name || client.profile?.first_name}
-                    </p>
+                    <p className="font-medium">{client.first_name}</p>
                   </div>
                 )}
-                {(client.last_name || client.profile?.last_name) && (
+                {client.last_name && (
                   <div>
                     <p className="text-sm text-muted-foreground">Nom</p>
-                    <p className="font-medium">
-                      {client.last_name || client.profile?.last_name}
-                    </p>
+                    <p className="font-medium">{client.last_name}</p>
                   </div>
                 )}
-                {(client.email || client.profile?.email) && (
+                {client.email && (
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">
-                      {client.email || client.profile?.email}
-                    </p>
+                    <p className="font-medium">{client.email}</p>
                   </div>
                 )}
                 {client.mobile && (

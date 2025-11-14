@@ -59,7 +59,7 @@ export default function ClientsList() {
       !searchTerm ||
       client.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.profile?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
@@ -171,7 +171,7 @@ export default function ClientsList() {
                       {getClientName(client)}
                     </TableCell>
                     <TableCell>
-                      {client.profile?.email || client.email || "—"}
+                      {client.email || "—"}
                     </TableCell>
                     <TableCell>{client.city || "—"}</TableCell>
                     <TableCell>

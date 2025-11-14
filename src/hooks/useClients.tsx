@@ -25,17 +25,6 @@ export type Client = {
   created_at: string;
   updated_at: string;
   external_ref?: string | null;
-  profiles?: {
-    first_name?: string;
-    last_name?: string;
-    email: string;
-  } | null;
-  profile?: {
-    id: string;
-    first_name?: string;
-    last_name?: string;
-    email: string;
-  } | null;
   assigned_agent?: {
     id: string;
     first_name?: string | null;
@@ -57,7 +46,6 @@ export function useClients() {
         .from('clients' as any)
         .select(`
           *,
-          profile:profiles!fk_clients_user_id(id, first_name, last_name, email),
           assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
         `)
         .order('created_at', { ascending: false });
@@ -78,13 +66,13 @@ export function useClients() {
 
   const createClient = async (clientData: any) => {
     try {
-      // Prepare client data
-      const { first_name, last_name, email, ...clientOnlyData } = clientData;
-      
       const { data, error } = await supabase
         .from('clients' as any)
         .insert([clientData])
-        .select()
+        .select(`
+          *,
+          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
+        `)
         .single();
 
       if (error) throw error;
@@ -164,7 +152,6 @@ export function useClients() {
         .from('clients' as any)
         .select(`
           *,
-          profile:profiles!fk_clients_user_id(id, first_name, last_name, email),
           assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
         `)
         .eq('id', id)
