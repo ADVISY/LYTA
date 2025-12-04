@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Building2,
   Menu,
   Sparkles,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const menuItems = [
   { to: "/crm/propositions", icon: FileText, label: "Propositions", color: "from-cyan-500 to-blue-500" },
   { to: "/crm/contrats", icon: FileCheck, label: "Contrats", color: "from-violet-500 to-purple-500" },
   { to: "/crm/commissions", icon: DollarSign, label: "Commissions", color: "from-green-500 to-emerald-500" },
+  { to: "/crm/compagnies", icon: Building2, label: "Compagnies", color: "from-red-500 to-orange-500" },
   { to: "/crm/collaborateurs", icon: UserCog, label: "Collaborateurs", color: "from-pink-500 to-rose-500" },
   { to: "/crm/rapports", icon: BarChart3, label: "Rapports", color: "from-indigo-500 to-violet-500" },
   { to: "/crm/parametres", icon: Settings, label: "Paramètres", color: "from-slate-500 to-gray-500" },
