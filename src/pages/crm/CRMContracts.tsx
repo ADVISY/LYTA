@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { usePolicies } from "@/hooks/usePolicies";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function CRMContracts() {
+  const navigate = useNavigate();
   const { policies, loading } = usePolicies();
 
   if (loading) {
@@ -83,7 +85,11 @@ export default function CRMContracts() {
                     >
                       {statusLabels[policy.status] || policy.status}
                     </Badge>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigate(`/crm/clients/${policy.client_id}?tab=contracts`)}
+                    >
                       Voir
                     </Button>
                   </div>

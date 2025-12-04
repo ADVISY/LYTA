@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useClients, Client } from "@/hooks/useClients";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
+import { usePolicies, Policy } from "@/hooks/usePolicies";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,14 +34,34 @@ const statusLabels: Record<string, string> = {
   dormant: "Dormant",
 };
 
+const policyStatusColors: Record<string, string> = {
+  pending: "bg-yellow-500",
+  active: "bg-green-500",
+  expired: "bg-gray-500",
+  cancelled: "bg-red-500",
+};
+
+const policyStatusLabels: Record<string, string> = {
+  pending: "En attente",
+  active: "Actif",
+  expired: "Expiré",
+  cancelled: "Annulé",
+};
+
 export default function ClientDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "info";
   const navigate = useNavigate();
   const { getClientById } = useClients();
   const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
+  const { policies, loading: policiesLoading } = usePolicies();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
+
+  // Filter policies for this client
+  const clientPolicies = policies.filter(p => p.client_id === id);
 
   useEffect(() => {
     loadClient();
@@ -145,14 +166,14 @@ export default function ClientDetail() {
 
       <div className="grid gap-6">
         <div>
-          <Tabs defaultValue="info" className="w-full">
+          <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informations</TabsTrigger>
               <TabsTrigger value="family">
                 <Users className="h-4 w-4 mr-2" />
                 Famille ({familyMembers.length})
               </TabsTrigger>
-              <TabsTrigger value="contracts">Contrats</TabsTrigger>
+              <TabsTrigger value="contracts">Contrats ({clientPolicies.length})</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
             </TabsList>
 
@@ -301,10 +322,50 @@ export default function ClientDetail() {
             <TabsContent value="contracts">
               <Card>
                 <CardHeader>
-                  <CardTitle>Contrats</CardTitle>
+                  <CardTitle>Contrats ({clientPolicies.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Aucun contrat pour le moment</p>
+                  {policiesLoading ? (
+                    <p className="text-muted-foreground text-center py-8">Chargement...</p>
+                  ) : clientPolicies.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Aucun contrat pour ce client</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Produit</TableHead>
+                          <TableHead>Compagnie</TableHead>
+                          <TableHead>N° Police</TableHead>
+                          <TableHead>Prime mensuelle</TableHead>
+                          <TableHead>Date début</TableHead>
+                          <TableHead>Statut</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientPolicies.map((policy) => (
+                          <TableRow key={policy.id}>
+                            <TableCell className="font-medium">{policy.product?.name || '-'}</TableCell>
+                            <TableCell>{policy.product?.company?.name || '-'}</TableCell>
+                            <TableCell>{policy.policy_number || '-'}</TableCell>
+                            <TableCell>{policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}</TableCell>
+                            <TableCell>
+                              {policy.start_date
+                                ? format(new Date(policy.start_date), "dd.MM.yyyy")
+                                : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white`}
+                              >
+                                {policyStatusLabels[policy.status] || policy.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
