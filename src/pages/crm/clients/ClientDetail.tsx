@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
@@ -257,7 +257,7 @@ export default function ClientDetail() {
       <div className="grid gap-6">
         <div>
           <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList>
+            <TabsList className="flex-wrap h-auto gap-1">
               <TabsTrigger value="info">Informations</TabsTrigger>
               <TabsTrigger value="family">
                 <Users className="h-4 w-4 mr-2" />
@@ -265,6 +265,10 @@ export default function ClientDetail() {
               </TabsTrigger>
               <TabsTrigger value="contracts">Contrats ({clientPolicies.length})</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="suivis">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Suivis
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="info">
@@ -725,6 +729,67 @@ export default function ClientDetail() {
                       </TableBody>
                     </Table>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="suivis">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Suivis et tâches
+                  </CardTitle>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nouveau suivi
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {/* Stats mini cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-muted-foreground">Ouverts</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">0</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm text-muted-foreground">En cours</span>
+                      </div>
+                      <p className="text-2xl font-bold text-amber-600">0</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm text-muted-foreground">Terminés</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-600">0</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ClipboardList className="h-4 w-4 text-violet-600" />
+                        <span className="text-sm text-muted-foreground">Total</span>
+                      </div>
+                      <p className="text-2xl font-bold text-violet-600">0</p>
+                    </div>
+                  </div>
+
+                  {/* Empty state */}
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-muted-foreground mb-2">Aucun suivi pour ce client</p>
+                    <p className="text-sm text-muted-foreground/70 mb-4">
+                      Ajoutez des notes, rappels et tâches de suivi
+                    </p>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Créer un suivi
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
