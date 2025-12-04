@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Loader2, FileText, X, Check } from "lucide-react";
 import DocumentUpload from "./DocumentUpload";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Company = {
   id: string;
@@ -36,23 +37,18 @@ type Product = {
   company_id: string;
 };
 
-type ContractEntry = {
+type SelectedProduct = {
   id: string;
-  companyId: string;
   productId: string;
-  category: string | null;
-  policyNumber: string;
-  startDate: string;
-  status: string;
-  notes: string;
+  name: string;
+  category: string;
+  // Category-specific fields
   lamalAmount: string;
   lcaAmount: string;
   monthlyPremium: string;
   durationYears: string;
   premiumMonthly: string;
   deductible: string;
-  isOpen: boolean;
-  documents: Array<{ file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number }>;
 };
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
@@ -72,24 +68,13 @@ const categoryLabels: Record<string, string> = {
   legal: "Protection juridique",
 };
 
-const createEmptyEntry = (): ContractEntry => ({
-  id: crypto.randomUUID(),
-  companyId: "",
-  productId: "",
-  category: null,
-  policyNumber: "",
-  startDate: new Date().toISOString().split('T')[0],
-  status: "pending",
-  notes: "",
-  lamalAmount: "",
-  lcaAmount: "",
-  monthlyPremium: "",
-  durationYears: "",
-  premiumMonthly: "",
-  deductible: "",
-  isOpen: true,
-  documents: [],
-});
+const categoryColors: Record<string, string> = {
+  health: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  auto: "bg-orange-100 text-orange-800 border-orange-300",
+  home: "bg-blue-100 text-blue-800 border-blue-300",
+  life: "bg-violet-100 text-violet-800 border-violet-300",
+  legal: "bg-amber-100 text-amber-800 border-amber-300",
+};
 
 export default function ContractForm({ clientId, open, onOpenChange, onSuccess }: ContractFormProps) {
   const { createDocument } = useDocuments();
@@ -101,14 +86,33 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  const [entries, setEntries] = useState<ContractEntry[]>([createEmptyEntry()]);
+  // Common fields
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState("pending");
+  const [notes, setNotes] = useState("");
+  const [documents, setDocuments] = useState<UploadedDoc[]>([]);
+  
+  // Selected products
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
     if (open) {
       fetchCompaniesAndProducts();
-      setEntries([createEmptyEntry()]);
+      resetForm();
     }
   }, [open]);
+
+  const resetForm = () => {
+    setSelectedCompanyId("");
+    setStartDate(new Date().toISOString().split('T')[0]);
+    setStatus("pending");
+    setNotes("");
+    setDocuments([]);
+    setSelectedProducts([]);
+    setProductSearch("");
+  };
 
   const fetchCompaniesAndProducts = async () => {
     setLoading(true);
@@ -122,80 +126,59 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
     setLoading(false);
   };
 
-  const getProductsForCompany = (companyId: string) => {
-    return allProducts.filter(p => p.company_id === companyId);
+  const getProductsForCompany = () => {
+    if (!selectedCompanyId) return [];
+    let products = allProducts.filter(p => p.company_id === selectedCompanyId);
+    if (productSearch) {
+      const search = productSearch.toLowerCase();
+      products = products.filter(p => 
+        p.name.toLowerCase().includes(search) ||
+        categoryLabels[p.category]?.toLowerCase().includes(search)
+      );
+    }
+    return products;
   };
 
-  const updateEntry = (id: string, updates: Partial<ContractEntry>) => {
-    setEntries(prev => prev.map(entry => {
-      if (entry.id !== id) return entry;
-      
-      const updated = { ...entry, ...updates };
-      
-      // Reset product when company changes
-      if (updates.companyId && updates.companyId !== entry.companyId) {
-        updated.productId = "";
-        updated.category = null;
-      }
-      
-      // Update category when product changes
-      if (updates.productId) {
-        const product = allProducts.find(p => p.id === updates.productId);
-        updated.category = product?.category || null;
-      }
-      
-      return updated;
-    }));
-  };
-
-  const addDocumentToEntry = (entryId: string, doc: UploadedDoc) => {
-    setEntries(prev => prev.map(entry => 
-      entry.id === entryId 
-        ? { ...entry, documents: [...entry.documents, doc] }
-        : entry
-    ));
-  };
-
-  const removeDocumentFromEntry = (entryId: string, docIndex: number) => {
-    setEntries(prev => prev.map(entry => 
-      entry.id === entryId 
-        ? { ...entry, documents: entry.documents.filter((_, i) => i !== docIndex) }
-        : entry
-    ));
-  };
-
-  const addEntry = () => {
-    setEntries(prev => [...prev, createEmptyEntry()]);
-  };
-
-  const removeEntry = (id: string) => {
-    if (entries.length > 1) {
-      setEntries(prev => prev.filter(e => e.id !== id));
+  const toggleProductSelection = (product: Product) => {
+    const isSelected = selectedProducts.some(sp => sp.productId === product.id);
+    
+    if (isSelected) {
+      setSelectedProducts(prev => prev.filter(sp => sp.productId !== product.id));
+    } else {
+      setSelectedProducts(prev => [...prev, {
+        id: crypto.randomUUID(),
+        productId: product.id,
+        name: product.name,
+        category: product.category,
+        lamalAmount: "",
+        lcaAmount: "",
+        monthlyPremium: "",
+        durationYears: "",
+        premiumMonthly: "",
+        deductible: "",
+      }]);
     }
   };
 
-  const toggleEntry = (id: string) => {
-    setEntries(prev => prev.map(entry => 
-      entry.id === id ? { ...entry, isOpen: !entry.isOpen } : entry
+  const updateSelectedProduct = (id: string, updates: Partial<SelectedProduct>) => {
+    setSelectedProducts(prev => prev.map(sp => 
+      sp.id === id ? { ...sp, ...updates } : sp
     ));
   };
 
-  const getEntryTitle = (entry: ContractEntry, index: number) => {
-    if (!entry.productId) return `Produit ${index + 1}`;
-    const product = allProducts.find(p => p.id === entry.productId);
-    const company = companies.find(c => c.id === entry.companyId);
-    return `${product?.name || ''} - ${company?.name || ''}`;
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    setSelectedProducts([]);
+    setProductSearch("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const validEntries = entries.filter(entry => entry.productId && entry.startDate);
-    
-    if (validEntries.length === 0) {
+    if (selectedProducts.length === 0) {
       toast({
         title: "Erreur",
-        description: "Veuillez ajouter au moins un produit avec une date de début",
+        description: "Veuillez sélectionner au moins un produit",
         variant: "destructive"
       });
       return;
@@ -204,73 +187,72 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
     setSubmitting(true);
 
     try {
-      for (const entry of validEntries) {
+      for (const product of selectedProducts) {
         let calculatedPremium = 0;
         let endDate: string | null = null;
         let notesWithDetails = '';
-        const deductibleValue = parseFloat(entry.deductible) || null;
+        const deductibleValue = parseFloat(product.deductible) || null;
 
-        if (entry.category === 'health') {
-          const lamal = parseFloat(entry.lamalAmount) || 0;
-          const lca = parseFloat(entry.lcaAmount) || 0;
+        if (product.category === 'health') {
+          const lamal = parseFloat(product.lamalAmount) || 0;
+          const lca = parseFloat(product.lcaAmount) || 0;
           calculatedPremium = lamal + lca;
-          // Format structured notes for health
           const notesParts = [];
           notesParts.push(`LAMal: ${lamal.toFixed(2)} CHF`);
           notesParts.push(`LCA: ${lca.toFixed(2)} CHF`);
           if (deductibleValue) {
             notesParts.push(`Franchise: ${deductibleValue} CHF`);
           }
-          if (entry.notes) {
-            notesParts.push(entry.notes);
+          if (notes) {
+            notesParts.push(notes);
           }
           notesWithDetails = notesParts.join('\n');
-        } else if (entry.category === 'life') {
-          calculatedPremium = parseFloat(entry.monthlyPremium) || 0;
-          const years = parseInt(entry.durationYears) || 0;
+        } else if (product.category === 'life') {
+          calculatedPremium = parseFloat(product.monthlyPremium) || 0;
+          const years = parseInt(product.durationYears) || 0;
           const notesParts = [];
           notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
           if (years > 0) {
-            const start = new Date(entry.startDate);
+            const start = new Date(startDate);
             start.setFullYear(start.getFullYear() + years);
             endDate = start.toISOString().split('T')[0];
             notesParts.push(`Durée: ${years} ans`);
           }
-          if (entry.notes) {
-            notesParts.push(entry.notes);
+          if (notes) {
+            notesParts.push(notes);
           }
           notesWithDetails = notesParts.join('\n');
         } else {
-          calculatedPremium = parseFloat(entry.premiumMonthly) || 0;
+          calculatedPremium = parseFloat(product.premiumMonthly) || 0;
           const notesParts = [];
           notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
           if (deductibleValue) {
             notesParts.push(`Franchise: ${deductibleValue} CHF`);
           }
-          if (entry.notes) {
-            notesParts.push(entry.notes);
+          if (notes) {
+            notesParts.push(notes);
           }
           notesWithDetails = notesParts.join('\n');
         }
 
         const policyData = {
           client_id: clientId,
-          product_id: entry.productId,
-          policy_number: entry.policyNumber || null,
-          start_date: entry.startDate,
+          product_id: product.productId,
+          policy_number: null,
+          start_date: startDate,
           end_date: endDate,
           premium_monthly: calculatedPremium,
           premium_yearly: calculatedPremium * 12,
           deductible: deductibleValue,
-          status: entry.status,
+          status: status,
           notes: notesWithDetails || null,
         };
 
         const policy = await createPolicy(policyData);
 
-        // Save documents linked to this policy
-        if (entry.documents.length > 0 && policy?.id) {
-          for (const doc of entry.documents) {
+        // Save documents linked to the first policy (shared documents)
+        if (documents.length > 0 && policy?.id) {
+          for (const doc of documents) {
             await createDocument({
               owner_id: policy.id,
               owner_type: 'policy',
@@ -286,10 +268,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
       
       toast({
         title: "Contrats créés",
-        description: `${validEntries.length} contrat(s) ajouté(s) avec succès`
+        description: `${selectedProducts.length} contrat(s) ajouté(s) avec succès`
       });
 
-      setEntries([createEmptyEntry()]);
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
@@ -303,242 +284,123 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
     }
   };
 
-  const renderEntryFields = (entry: ContractEntry) => {
-    const products = getProductsForCompany(entry.companyId);
-    
+  const groupedProducts = () => {
+    const products = getProductsForCompany();
+    const grouped: Record<string, Product[]> = {};
+    products.forEach(p => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+    return grouped;
+  };
+
+  const renderProductSpecificFields = (product: SelectedProduct) => {
+    if (product.category === 'health') {
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <Label className="text-xs">LAMal (CHF/mois)</Label>
+            <Input
+              type="number"
+              step="0.05"
+              min="0"
+              placeholder="350"
+              value={product.lamalAmount}
+              onChange={(e) => updateSelectedProduct(product.id, { lamalAmount: e.target.value })}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">LCA (CHF/mois)</Label>
+            <Input
+              type="number"
+              step="0.05"
+              min="0"
+              placeholder="150"
+              value={product.lcaAmount}
+              onChange={(e) => updateSelectedProduct(product.id, { lcaAmount: e.target.value })}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Franchise</Label>
+            <Select 
+              value={product.deductible} 
+              onValueChange={(value) => updateSelectedProduct(product.id, { deductible: value })}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="300">300</SelectItem>
+                <SelectItem value="500">500</SelectItem>
+                <SelectItem value="1000">1'000</SelectItem>
+                <SelectItem value="1500">1'500</SelectItem>
+                <SelectItem value="2000">2'000</SelectItem>
+                <SelectItem value="2500">2'500</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+
+    if (product.category === 'life') {
+      return (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Prime (CHF/mois)</Label>
+            <Input
+              type="number"
+              step="0.05"
+              min="0"
+              placeholder="200"
+              value={product.monthlyPremium}
+              onChange={(e) => updateSelectedProduct(product.id, { monthlyPremium: e.target.value })}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Durée (années)</Label>
+            <Input
+              type="number"
+              min="1"
+              max="50"
+              placeholder="10"
+              value={product.durationYears}
+              onChange={(e) => updateSelectedProduct(product.id, { durationYears: e.target.value })}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Other categories (auto, home, legal)
     return (
-      <div className="space-y-4 pt-4">
-        {/* Company & Product Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Compagnie d'assurance *</Label>
-            <Select 
-              value={entry.companyId} 
-              onValueChange={(value) => updateEntry(entry.id, { companyId: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une compagnie" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Produit *</Label>
-            <Select 
-              value={entry.productId} 
-              onValueChange={(value) => updateEntry(entry.id, { productId: value })}
-              disabled={!entry.companyId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={entry.companyId ? "Sélectionner un produit" : "Choisir d'abord une compagnie"} />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((product) => (
-                  <SelectItem key={product.id} value={product.id}>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        [{categoryLabels[product.category] || product.category}]
-                      </span>
-                      {product.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Health Insurance Fields */}
-        {entry.category === 'health' && (
-          <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 space-y-4">
-            <h4 className="font-semibold text-emerald-800">Assurance maladie</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Prime LAMal mensuelle (CHF)</Label>
-                <Input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  placeholder="350.00"
-                  value={entry.lamalAmount}
-                  onChange={(e) => updateEntry(entry.id, { lamalAmount: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Prime LCA mensuelle (CHF)</Label>
-                <Input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  placeholder="150.00"
-                  value={entry.lcaAmount}
-                  onChange={(e) => updateEntry(entry.id, { lcaAmount: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Franchise LAMal (CHF)</Label>
-                <Select 
-                  value={entry.deductible} 
-                  onValueChange={(value) => updateEntry(entry.id, { deductible: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="300">300 CHF</SelectItem>
-                    <SelectItem value="500">500 CHF</SelectItem>
-                    <SelectItem value="1000">1'000 CHF</SelectItem>
-                    <SelectItem value="1500">1'500 CHF</SelectItem>
-                    <SelectItem value="2000">2'000 CHF</SelectItem>
-                    <SelectItem value="2500">2'500 CHF</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {(entry.lamalAmount || entry.lcaAmount) && (
-              <p className="text-sm text-emerald-700">
-                Total mensuel: <strong>{((parseFloat(entry.lamalAmount) || 0) + (parseFloat(entry.lcaAmount) || 0)).toFixed(2)} CHF</strong>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Life Insurance Fields */}
-        {entry.category === 'life' && (
-          <div className="p-4 rounded-lg bg-violet-50 border border-violet-200 space-y-4">
-            <h4 className="font-semibold text-violet-800">Assurance vie / Prévoyance</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Prime mensuelle (CHF)</Label>
-                <Input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  placeholder="200.00"
-                  value={entry.monthlyPremium}
-                  onChange={(e) => updateEntry(entry.id, { monthlyPremium: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Durée du contrat (années)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="50"
-                  placeholder="10"
-                  value={entry.durationYears}
-                  onChange={(e) => updateEntry(entry.id, { durationYears: e.target.value })}
-                />
-              </div>
-            </div>
-            {entry.monthlyPremium && entry.durationYears && (
-              <p className="text-sm text-violet-700">
-                Total sur {entry.durationYears} ans: <strong>{(parseFloat(entry.monthlyPremium) * 12 * parseInt(entry.durationYears)).toLocaleString('fr-CH')} CHF</strong>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Other Insurance Types */}
-        {entry.category && !['health', 'life'].includes(entry.category) && (
-          <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 space-y-4">
-            <h4 className="font-semibold text-blue-800">{categoryLabels[entry.category] || 'Assurance'}</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Prime mensuelle (CHF)</Label>
-                <Input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  placeholder="50.00"
-                  value={entry.premiumMonthly}
-                  onChange={(e) => updateEntry(entry.id, { premiumMonthly: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Franchise (CHF)</Label>
-                <Input
-                  type="number"
-                  step="100"
-                  min="0"
-                  placeholder="300"
-                  value={entry.deductible}
-                  onChange={(e) => updateEntry(entry.id, { deductible: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* General Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Numéro de police</Label>
-            <Input
-              placeholder="POL-2024-001"
-              value={entry.policyNumber}
-              onChange={(e) => updateEntry(entry.id, { policyNumber: e.target.value })}
-              maxLength={50}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Date de début *</Label>
-            <Input
-              type="date"
-              value={entry.startDate}
-              onChange={(e) => updateEntry(entry.id, { startDate: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Statut</Label>
-            <Select 
-              value={entry.status} 
-              onValueChange={(value) => updateEntry(entry.id, { status: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="active">Actif</SelectItem>
-                <SelectItem value="expired">Expiré</SelectItem>
-                <SelectItem value="cancelled">Annulé</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Notes</Label>
-          <Textarea
-            placeholder="Informations complémentaires..."
-            value={entry.notes}
-            onChange={(e) => updateEntry(entry.id, { notes: e.target.value })}
-            maxLength={500}
-            rows={2}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs">Prime (CHF/mois)</Label>
+          <Input
+            type="number"
+            step="0.05"
+            min="0"
+            placeholder="50"
+            value={product.premiumMonthly}
+            onChange={(e) => updateSelectedProduct(product.id, { premiumMonthly: e.target.value })}
+            className="h-8 text-sm"
           />
         </div>
-
-        {/* Documents Section */}
-        <div className="p-4 rounded-lg bg-muted/30 border space-y-3">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <Label className="font-semibold">Documents ({entry.documents.length})</Label>
-          </div>
-          <DocumentUpload
-            documents={entry.documents}
-            onUpload={(doc) => addDocumentToEntry(entry.id, doc)}
-            onRemove={(index) => removeDocumentFromEntry(entry.id, index)}
+        <div>
+          <Label className="text-xs">Franchise (CHF)</Label>
+          <Input
+            type="number"
+            step="100"
+            min="0"
+            placeholder="300"
+            value={product.deductible}
+            onChange={(e) => updateSelectedProduct(product.id, { deductible: e.target.value })}
+            className="h-8 text-sm"
           />
         </div>
       </div>
@@ -547,7 +409,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Nouveaux contrats</DialogTitle>
         </DialogHeader>
@@ -557,67 +419,177 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {entries.map((entry, index) => (
-              <Collapsible 
-                key={entry.id} 
-                open={entry.isOpen}
-                onOpenChange={() => toggleEntry(entry.id)}
-              >
-                <div className="border rounded-lg">
-                  <CollapsibleTrigger asChild>
-                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                      <div className="flex items-center gap-2">
-                        {entry.isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        <span className="font-medium">{getEntryTitle(entry, index)}</span>
-                        {entry.category && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                            {categoryLabels[entry.category]}
-                          </span>
-                        )}
-                      </div>
-                      {entries.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeEntry(entry.id);
-                          }}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            {/* Step 1: Company Selection */}
+            <div className="space-y-4 pb-4 border-b">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Compagnie d'assurance *</Label>
+                  <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une compagnie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Date de début *</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Statut</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="active">Actif</SelectItem>
+                      <SelectItem value="expired">Expiré</SelectItem>
+                      <SelectItem value="cancelled">Annulé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Product Selection */}
+            {selectedCompanyId && (
+              <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                {/* Left: Product List */}
+                <div className="space-y-3 overflow-hidden flex flex-col">
+                  <div className="space-y-2">
+                    <Label>Sélectionner les produits</Label>
+                    <Input
+                      placeholder="Rechercher un produit..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="flex-1 border rounded-lg">
+                    <div className="p-2 space-y-3">
+                      {Object.entries(groupedProducts()).map(([category, products]) => (
+                        <div key={category}>
+                          <div className={`text-xs font-semibold px-2 py-1 rounded mb-1 ${categoryColors[category] || 'bg-gray-100'}`}>
+                            {categoryLabels[category] || category} ({products.length})
+                          </div>
+                          <div className="space-y-1">
+                            {products.map((product) => {
+                              const isSelected = selectedProducts.some(sp => sp.productId === product.id);
+                              return (
+                                <div
+                                  key={product.id}
+                                  onClick={() => toggleProductSelection(product)}
+                                  className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                                    isSelected 
+                                      ? 'bg-primary/10 border border-primary' 
+                                      : 'hover:bg-muted border border-transparent'
+                                  }`}
+                                >
+                                  <Checkbox checked={isSelected} />
+                                  <span className="text-sm flex-1 truncate">{product.name}</span>
+                                  {isSelected && <Check className="h-4 w-4 text-primary" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      {Object.keys(groupedProducts()).length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Aucun produit trouvé
+                        </p>
                       )}
                     </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="px-4 pb-4">
-                      {renderEntryFields(entry)}
-                    </div>
-                  </CollapsibleContent>
+                  </ScrollArea>
                 </div>
-              </Collapsible>
-            ))}
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addEntry}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un autre produit
-            </Button>
+                {/* Right: Selected Products with specific fields */}
+                <div className="space-y-3 overflow-hidden flex flex-col">
+                  <Label>Produits sélectionnés ({selectedProducts.length})</Label>
+                  <ScrollArea className="flex-1 border rounded-lg">
+                    <div className="p-2 space-y-3">
+                      {selectedProducts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          Sélectionnez des produits dans la liste
+                        </p>
+                      ) : (
+                        selectedProducts.map((product) => (
+                          <div 
+                            key={product.id} 
+                            className={`p-3 rounded-lg border space-y-3 ${categoryColors[product.category] || 'bg-muted/30'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm">{product.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                className="h-6 w-6 p-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {renderProductSpecificFields(product)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            {/* Common fields: Notes & Documents */}
+            {selectedProducts.length > 0 && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Notes (communes à tous les contrats)</Label>
+                    <Textarea
+                      placeholder="Informations complémentaires..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      maxLength={500}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <Label>Documents ({documents.length})</Label>
+                    </div>
+                    <DocumentUpload
+                      documents={documents}
+                      onUpload={(doc) => setDocuments(prev => [...prev, doc])}
+                      onRemove={(index) => setDocuments(prev => prev.filter((_, i) => i !== index))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Annuler
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || selectedProducts.length === 0}>
                 {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Créer {entries.filter(e => e.productId).length} contrat(s)
+                Créer {selectedProducts.length} contrat(s)
               </Button>
             </div>
           </form>
