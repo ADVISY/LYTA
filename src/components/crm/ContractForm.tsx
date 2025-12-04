@@ -207,24 +207,50 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
       for (const entry of validEntries) {
         let calculatedPremium = 0;
         let endDate: string | null = null;
-        let notesWithDetails = entry.notes;
+        let notesWithDetails = '';
+        const deductibleValue = parseFloat(entry.deductible) || null;
 
         if (entry.category === 'health') {
           const lamal = parseFloat(entry.lamalAmount) || 0;
           const lca = parseFloat(entry.lcaAmount) || 0;
           calculatedPremium = lamal + lca;
-          notesWithDetails = `LAMal: ${lamal} CHF, LCA: ${lca} CHF${entry.notes ? `\n${entry.notes}` : ''}`;
+          // Format structured notes for health
+          const notesParts = [];
+          notesParts.push(`LAMal: ${lamal.toFixed(2)} CHF`);
+          notesParts.push(`LCA: ${lca.toFixed(2)} CHF`);
+          if (deductibleValue) {
+            notesParts.push(`Franchise: ${deductibleValue} CHF`);
+          }
+          if (entry.notes) {
+            notesParts.push(entry.notes);
+          }
+          notesWithDetails = notesParts.join('\n');
         } else if (entry.category === 'life') {
           calculatedPremium = parseFloat(entry.monthlyPremium) || 0;
           const years = parseInt(entry.durationYears) || 0;
+          const notesParts = [];
+          notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
           if (years > 0) {
             const start = new Date(entry.startDate);
             start.setFullYear(start.getFullYear() + years);
             endDate = start.toISOString().split('T')[0];
-            notesWithDetails = `Durée: ${years} ans${entry.notes ? `\n${entry.notes}` : ''}`;
+            notesParts.push(`Durée: ${years} ans`);
           }
+          if (entry.notes) {
+            notesParts.push(entry.notes);
+          }
+          notesWithDetails = notesParts.join('\n');
         } else {
           calculatedPremium = parseFloat(entry.premiumMonthly) || 0;
+          const notesParts = [];
+          notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
+          if (deductibleValue) {
+            notesParts.push(`Franchise: ${deductibleValue} CHF`);
+          }
+          if (entry.notes) {
+            notesParts.push(entry.notes);
+          }
+          notesWithDetails = notesParts.join('\n');
         }
 
         const policyData = {
@@ -235,7 +261,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
           end_date: endDate,
           premium_monthly: calculatedPremium,
           premium_yearly: calculatedPremium * 12,
-          deductible: parseFloat(entry.deductible) || null,
+          deductible: deductibleValue,
           status: entry.status,
           notes: notesWithDetails || null,
         };

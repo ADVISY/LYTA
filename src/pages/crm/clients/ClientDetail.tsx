@@ -436,22 +436,27 @@ export default function ClientDetail() {
                         const category = policy.product?.category;
                         const notes = policy.notes || '';
                         
-                        // Parse health details from notes
-                        const lamalMatch = notes.match(/LAMal:\s*([\d.]+)\s*CHF/);
-                        const lcaMatch = notes.match(/LCA:\s*([\d.]+)\s*CHF/);
-                        const lamalAmount = lamalMatch ? parseFloat(lamalMatch[1]) : null;
-                        const lcaAmount = lcaMatch ? parseFloat(lcaMatch[1]) : null;
+                        // Parse health details from notes (flexible regex)
+                        const lamalMatch = notes.match(/LAMal[:\s]*([\d.,]+)\s*CHF/i);
+                        const lcaMatch = notes.match(/LCA[:\s]*([\d.,]+)\s*CHF/i);
+                        const franchiseMatch = notes.match(/Franchise[:\s]*([\d.,]+)\s*CHF/i);
+                        const lamalAmount = lamalMatch ? parseFloat(lamalMatch[1].replace(',', '.')) : null;
+                        const lcaAmount = lcaMatch ? parseFloat(lcaMatch[1].replace(',', '.')) : null;
+                        const franchiseFromNotes = franchiseMatch ? parseFloat(franchiseMatch[1].replace(',', '.')) : null;
                         
                         // Parse life duration from notes
-                        const durationMatch = notes.match(/Durée:\s*(\d+)\s*ans/);
+                        const durationMatch = notes.match(/Durée[:\s]*(\d+)\s*ans/i);
                         const durationYears = durationMatch ? parseInt(durationMatch[1]) : null;
+                        
+                        // Use deductible from field or parsed from notes
+                        const displayDeductible = policy.deductible || franchiseFromNotes;
                         
                         return (
                           <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
                             <div className="flex items-start justify-between">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{policy.product?.name || '-'}</span>
+                                  <span className="font-semibold">{policy.product?.name || 'Produit inconnu'}</span>
                                   <Badge
                                     variant="outline"
                                     className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white text-xs`}
@@ -460,7 +465,7 @@ export default function ClientDetail() {
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  {policy.product?.company?.name} • {policy.policy_number || 'Sans numéro'}
+                                  {policy.product?.company?.name || 'Compagnie inconnue'} • {policy.policy_number || 'Sans numéro'}
                                 </p>
                               </div>
                               <div className="text-right text-sm">
@@ -471,8 +476,8 @@ export default function ClientDetail() {
                               </div>
                             </div>
                             
-                            {/* Category-specific details */}
-                            {category === 'health' && (lamalAmount !== null || lcaAmount !== null) && (
+                            {/* Health Insurance Details */}
+                            {category === 'health' && (
                               <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
@@ -490,32 +495,33 @@ export default function ClientDetail() {
                                   <div>
                                     <p className="text-muted-foreground">Total mensuel</p>
                                     <p className="font-semibold">
-                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
                                     </p>
                                   </div>
                                   <div>
-                                    <p className="text-muted-foreground">Franchise</p>
+                                    <p className="text-muted-foreground">Franchise LAMal</p>
                                     <p className="font-semibold">
-                                      {policy.deductible ? `${policy.deductible} CHF` : '-'}
+                                      {displayDeductible ? `${displayDeductible} CHF` : '-'}
                                     </p>
                                   </div>
                                 </div>
                               </div>
                             )}
                             
+                            {/* Life Insurance Details */}
                             {category === 'life' && (
                               <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
                                     <p className="text-muted-foreground">Prime mensuelle</p>
                                     <p className="font-semibold text-violet-700 dark:text-violet-400">
-                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
                                     </p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Prime annuelle</p>
                                     <p className="font-semibold text-violet-700 dark:text-violet-400">
-                                      {policy.premium_yearly ? `${policy.premium_yearly} CHF` : '-'}
+                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
                                     </p>
                                   </div>
                                   <div>
@@ -534,27 +540,54 @@ export default function ClientDetail() {
                               </div>
                             )}
                             
+                            {/* Other Insurance Types (auto, home, legal, etc.) */}
                             {category && !['health', 'life'].includes(category) && (
                               <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                   <div>
                                     <p className="text-muted-foreground">Prime mensuelle</p>
                                     <p className="font-semibold text-blue-700 dark:text-blue-400">
-                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
                                     </p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Prime annuelle</p>
                                     <p className="font-semibold text-blue-700 dark:text-blue-400">
-                                      {policy.premium_yearly ? `${policy.premium_yearly} CHF` : '-'}
+                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
                                     </p>
                                   </div>
                                   <div>
                                     <p className="text-muted-foreground">Franchise</p>
                                     <p className="font-semibold">
-                                      {policy.deductible ? `${policy.deductible} CHF` : '-'}
+                                      {displayDeductible ? `${displayDeductible} CHF` : '-'}
                                     </p>
                                   </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Fallback for contracts without category */}
+                            {!category && (
+                              <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Prime mensuelle</p>
+                                    <p className="font-semibold">
+                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Prime annuelle</p>
+                                    <p className="font-semibold">
+                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  {displayDeductible && (
+                                    <div>
+                                      <p className="text-muted-foreground">Franchise</p>
+                                      <p className="font-semibold">{displayDeductible} CHF</p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}
