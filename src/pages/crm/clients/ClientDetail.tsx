@@ -431,41 +431,137 @@ export default function ClientDetail() {
                       </Button>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produit</TableHead>
-                          <TableHead>Compagnie</TableHead>
-                          <TableHead>N° Police</TableHead>
-                          <TableHead>Prime mensuelle</TableHead>
-                          <TableHead>Date début</TableHead>
-                          <TableHead>Statut</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {clientPolicies.map((policy) => (
-                          <TableRow key={policy.id}>
-                            <TableCell className="font-medium">{policy.product?.name || '-'}</TableCell>
-                            <TableCell>{policy.product?.company?.name || '-'}</TableCell>
-                            <TableCell>{policy.policy_number || '-'}</TableCell>
-                            <TableCell>{policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}</TableCell>
-                            <TableCell>
-                              {policy.start_date
-                                ? format(new Date(policy.start_date), "dd.MM.yyyy")
-                                : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white`}
-                              >
-                                {policyStatusLabels[policy.status] || policy.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="space-y-4">
+                      {clientPolicies.map((policy) => {
+                        const category = policy.product?.category;
+                        const notes = policy.notes || '';
+                        
+                        // Parse health details from notes
+                        const lamalMatch = notes.match(/LAMal:\s*([\d.]+)\s*CHF/);
+                        const lcaMatch = notes.match(/LCA:\s*([\d.]+)\s*CHF/);
+                        const lamalAmount = lamalMatch ? parseFloat(lamalMatch[1]) : null;
+                        const lcaAmount = lcaMatch ? parseFloat(lcaMatch[1]) : null;
+                        
+                        // Parse life duration from notes
+                        const durationMatch = notes.match(/Durée:\s*(\d+)\s*ans/);
+                        const durationYears = durationMatch ? parseInt(durationMatch[1]) : null;
+                        
+                        return (
+                          <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">{policy.product?.name || '-'}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white text-xs`}
+                                  >
+                                    {policyStatusLabels[policy.status] || policy.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {policy.product?.company?.name} • {policy.policy_number || 'Sans numéro'}
+                                </p>
+                              </div>
+                              <div className="text-right text-sm">
+                                <p className="text-muted-foreground">Début</p>
+                                <p className="font-medium">
+                                  {policy.start_date ? format(new Date(policy.start_date), "dd.MM.yyyy") : "-"}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Category-specific details */}
+                            {category === 'health' && (lamalAmount !== null || lcaAmount !== null) && (
+                              <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Prime LAMal</p>
+                                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                      {lamalAmount !== null ? `${lamalAmount.toFixed(2)} CHF/mois` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Prime LCA</p>
+                                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                      {lcaAmount !== null ? `${lcaAmount.toFixed(2)} CHF/mois` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Total mensuel</p>
+                                    <p className="font-semibold">
+                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Franchise</p>
+                                    <p className="font-semibold">
+                                      {policy.deductible ? `${policy.deductible} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {category === 'life' && (
+                              <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-950/30 rounded-lg">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Prime mensuelle</p>
+                                    <p className="font-semibold text-violet-700 dark:text-violet-400">
+                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Prime annuelle</p>
+                                    <p className="font-semibold text-violet-700 dark:text-violet-400">
+                                      {policy.premium_yearly ? `${policy.premium_yearly} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Durée</p>
+                                    <p className="font-semibold">
+                                      {durationYears ? `${durationYears} ans` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Date de fin</p>
+                                    <p className="font-semibold">
+                                      {policy.end_date ? format(new Date(policy.end_date), "dd.MM.yyyy") : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {category && !['health', 'life'].includes(category) && (
+                              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Prime mensuelle</p>
+                                    <p className="font-semibold text-blue-700 dark:text-blue-400">
+                                      {policy.premium_monthly ? `${policy.premium_monthly} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Prime annuelle</p>
+                                    <p className="font-semibold text-blue-700 dark:text-blue-400">
+                                      {policy.premium_yearly ? `${policy.premium_yearly} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Franchise</p>
+                                    <p className="font-semibold">
+                                      {policy.deductible ? `${policy.deductible} CHF` : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </CardContent>
               </Card>
