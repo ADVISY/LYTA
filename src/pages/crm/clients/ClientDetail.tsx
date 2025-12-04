@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
+import ContractForm from "@/components/crm/ContractForm";
 import {
   Table,
   TableBody,
@@ -59,6 +60,7 @@ export default function ClientDetail() {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
+  const [contractFormOpen, setContractFormOpen] = useState(false);
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -321,14 +323,25 @@ export default function ClientDetail() {
 
             <TabsContent value="contracts">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Contrats ({clientPolicies.length})</CardTitle>
+                  <Button onClick={() => setContractFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nouveau contrat
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {policiesLoading ? (
                     <p className="text-muted-foreground text-center py-8">Chargement...</p>
                   ) : clientPolicies.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Aucun contrat pour ce client</p>
+                    <div className="text-center py-8">
+                      <FileCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">Aucun contrat pour ce client</p>
+                      <Button className="mt-4" onClick={() => setContractFormOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ajouter un contrat
+                      </Button>
+                    </div>
                   ) : (
                     <Table>
                       <TableHeader>
@@ -388,6 +401,12 @@ export default function ClientDetail() {
         clientId={id!}
         open={familyFormOpen}
         onOpenChange={setFamilyFormOpen}
+      />
+
+      <ContractForm
+        clientId={id!}
+        open={contractFormOpen}
+        onOpenChange={setContractFormOpen}
       />
     </div>
   );
