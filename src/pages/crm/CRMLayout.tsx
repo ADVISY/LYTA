@@ -20,7 +20,6 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import advisyLogo from "@/assets/advisy-logo.svg";
-import advisyTextLogo from "@/assets/advisy-text-logo.svg";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
@@ -149,10 +148,10 @@ export default function CRMLayout() {
         
         {/* Logo Section */}
         <div className="p-6 border-b border-primary/10 relative">
-          <div className="flex items-center gap-3">
-            <img src={advisyTextLogo} alt="Advisy" className="h-8" />
+          <div className="flex items-center justify-center">
+            <img src={advisyLogo} alt="Advisy" className="h-16 object-contain" />
           </div>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center justify-center gap-2 mt-3">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <p className="text-xs text-muted-foreground capitalize font-medium">
               {role} • en ligne
@@ -195,7 +194,7 @@ export default function CRMLayout() {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-b border-primary/10 shadow-lg">
         <div className="flex items-center justify-between p-4">
-          <img src={advisyTextLogo} alt="Advisy" className="h-6" />
+          <img src={advisyLogo} alt="Advisy" className="h-10 object-contain" />
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="hover:bg-primary/10 rounded-xl">
@@ -203,8 +202,8 @@ export default function CRMLayout() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-2xl">
-              <div className="p-6 border-b border-primary/10">
-                <img src={advisyTextLogo} alt="Advisy" className="h-7" />
+              <div className="p-6 border-b border-primary/10 flex flex-col items-center">
+                <img src={advisyLogo} alt="Advisy" className="h-14 object-contain" />
                 <p className="text-xs text-muted-foreground capitalize mt-2">{role}</p>
               </div>
               <nav className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
