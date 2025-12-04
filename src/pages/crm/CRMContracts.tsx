@@ -53,7 +53,11 @@ export default function CRMContracts() {
             </div>
           ) : (
             <div className="space-y-2">
-              {policies.map((policy) => (
+              {policies.map((policy) => {
+                const clientName = policy.client?.company_name || 
+                  `${policy.client?.first_name || ''} ${policy.client?.last_name || ''}`.trim() || 
+                  'Client inconnu';
+                return (
                 <div
                   key={policy.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent"
@@ -61,7 +65,7 @@ export default function CRMContracts() {
                   <div className="space-y-1">
                     <p className="font-medium">{policy.product?.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {policy.product?.company?.name}
+                      {policy.product?.company?.name} - {clientName}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -83,8 +87,9 @@ export default function CRMContracts() {
                       Voir
                     </Button>
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

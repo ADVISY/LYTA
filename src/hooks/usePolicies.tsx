@@ -39,13 +39,11 @@ export function usePolicies() {
           *,
           client:clients!policies_client_id_fkey (
             id,
+            first_name,
+            last_name,
+            email,
             phone,
-            company_name,
-            profile:profiles!fk_clients_user_id (
-              first_name,
-              last_name,
-              email
-            )
+            company_name
           ),
           product:insurance_products!policies_product_id_fkey (
             id,
@@ -58,12 +56,7 @@ export function usePolicies() {
           ),
           partner:partners!policies_partner_id_fkey (
             id,
-            code,
-            profile:profiles!partners_user_id_fkey (
-              first_name,
-              last_name,
-              email
-            )
+            code
           )
         `)
         .order('created_at', { ascending: false });
