@@ -25,7 +25,6 @@ import advisyLogo from "@/assets/advisy-logo.svg";
 const menuItems = [
   { to: "/crm", icon: LayoutDashboard, label: "Dashboard", end: true, color: "from-blue-500 to-indigo-500" },
   { to: "/crm/clients", icon: Users, label: "Adresses", color: "from-emerald-500 to-teal-500" },
-  { to: "/crm/propositions", icon: FileText, label: "Propositions", color: "from-cyan-500 to-blue-500" },
   { to: "/crm/contrats", icon: FileCheck, label: "Contrats", color: "from-violet-500 to-purple-500" },
   { to: "/crm/commissions", icon: DollarSign, label: "Commissions", color: "from-green-500 to-emerald-500" },
   { to: "/crm/compagnies", icon: Building2, label: "Compagnies", color: "from-red-500 to-orange-500" },
