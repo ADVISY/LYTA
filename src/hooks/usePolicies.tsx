@@ -94,9 +94,9 @@ export function usePolicies() {
       }
 
       const { data, error } = await supabase
-        .from('policies' as any)
+        .from('policies')
         .insert([policyData])
-        .select()
+        .select('id')
         .single();
 
       if (error) throw error;
@@ -107,7 +107,7 @@ export function usePolicies() {
       });
 
       await fetchPolicies();
-      return data;
+      return data as { id: string };
     } catch (error: any) {
       toast({
         title: "Erreur",

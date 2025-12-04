@@ -3,15 +3,18 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useClients, Client } from "@/hooks/useClients";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 import { usePolicies, Policy } from "@/hooks/usePolicies";
+import { useDocuments, Document } from "@/hooks/useDocuments";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
 import ContractForm from "@/components/crm/ContractForm";
+import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import {
   Table,
   TableBody,
@@ -20,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<string, string> = {
   prospect: "bg-blue-500",
@@ -54,19 +58,24 @@ export default function ClientDetail() {
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "info";
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { getClientById } = useClients();
   const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
   const { policies, loading: policiesLoading } = usePolicies();
+  const { createDocument, deleteDocument } = useDocuments();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
   const [contractFormOpen, setContractFormOpen] = useState(false);
+  const [clientDocuments, setClientDocuments] = useState<Document[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
 
   useEffect(() => {
     loadClient();
+    loadDocuments();
   }, [id]);
 
   const loadClient = async () => {
@@ -75,6 +84,85 @@ export default function ClientDetail() {
     const { data } = await getClientById(id);
     setClient(data);
     setLoading(false);
+  };
+
+  const loadDocuments = async () => {
+    if (!id) return;
+    setDocumentsLoading(true);
+    try {
+      // Get documents for this client and their policies
+      const policyIds = policies.filter(p => p.client_id === id).map(p => p.id);
+      
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .or(`owner_id.eq.${id},owner_id.in.(${policyIds.join(',')})`)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setClientDocuments(data as Document[]);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  // Reload documents when policies change
+  useEffect(() => {
+    if (id && policies.length > 0) {
+      loadDocuments();
+    }
+  }, [policies, id]);
+
+  const handleDocumentUpload = async (doc: { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number }) => {
+    if (!id) return;
+    try {
+      await createDocument({
+        owner_id: id,
+        owner_type: 'client',
+        file_key: doc.file_key,
+        file_name: doc.file_name,
+        doc_kind: doc.doc_kind,
+        mime_type: doc.mime_type,
+        size_bytes: doc.size_bytes,
+      });
+      await loadDocuments();
+    } catch (error) {
+      console.error('Error saving document:', error);
+    }
+  };
+
+  const handleDocumentDelete = async (docId: string, fileKey: string) => {
+    try {
+      // Delete from storage
+      await supabase.storage.from('documents').remove([fileKey]);
+      // Delete record
+      await deleteDocument(docId);
+      await loadDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+    }
+  };
+
+  const handleDocumentView = async (fileKey: string) => {
+    try {
+      const { data } = await supabase.storage.from('documents').createSignedUrl(fileKey, 3600);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ouvrir le document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getDocKindLabel = (kind: string) => {
+    return docKindOptions.find(o => o.value === kind)?.label || kind;
   };
 
   const getClientName = () => {
@@ -385,11 +473,80 @@ export default function ClientDetail() {
 
             <TabsContent value="documents">
               <Card>
-                <CardHeader>
-                  <CardTitle>Documents</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Documents ({clientDocuments.length})</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">Aucun document pour le moment</p>
+                <CardContent className="space-y-6">
+                  {/* Upload Section */}
+                  <div className="p-4 bg-muted/30 rounded-lg border">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      Ajouter un document
+                    </h4>
+                    <DocumentUpload
+                      documents={[]}
+                      onUpload={handleDocumentUpload}
+                      showList={false}
+                    />
+                  </div>
+
+                  {/* Documents List */}
+                  {documentsLoading ? (
+                    <p className="text-muted-foreground text-center py-8">Chargement...</p>
+                  ) : clientDocuments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">Aucun document pour ce client</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nom du fichier</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Date d'ajout</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientDocuments.map((doc) => (
+                          <TableRow key={doc.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-primary" />
+                                {doc.file_name}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{getDocKindLabel(doc.doc_kind || 'autre')}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(doc.created_at), "dd.MM.yyyy HH:mm")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDocumentView(doc.file_key)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handleDocumentDelete(doc.id, doc.file_key)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -407,6 +564,7 @@ export default function ClientDetail() {
         clientId={id!}
         open={contractFormOpen}
         onOpenChange={setContractFormOpen}
+        onSuccess={loadDocuments}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePolicies } from "@/hooks/usePolicies";
+import { useDocuments } from "@/hooks/useDocuments";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Trash2, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import DocumentUpload from "./DocumentUpload";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type Company = {
@@ -50,7 +52,10 @@ type ContractEntry = {
   premiumMonthly: string;
   deductible: string;
   isOpen: boolean;
+  documents: Array<{ file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number }>;
 };
+
+type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
 
 interface ContractFormProps {
   clientId: string;
@@ -83,9 +88,11 @@ const createEmptyEntry = (): ContractEntry => ({
   premiumMonthly: "",
   deductible: "",
   isOpen: true,
+  documents: [],
 });
 
 export default function ContractForm({ clientId, open, onOpenChange, onSuccess }: ContractFormProps) {
+  const { createDocument } = useDocuments();
   const { createPolicy } = usePolicies();
   const { toast } = useToast();
   
@@ -139,6 +146,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
       
       return updated;
     }));
+  };
+
+  const addDocumentToEntry = (entryId: string, doc: UploadedDoc) => {
+    setEntries(prev => prev.map(entry => 
+      entry.id === entryId 
+        ? { ...entry, documents: [...entry.documents, doc] }
+        : entry
+    ));
+  };
+
+  const removeDocumentFromEntry = (entryId: string, docIndex: number) => {
+    setEntries(prev => prev.map(entry => 
+      entry.id === entryId 
+        ? { ...entry, documents: entry.documents.filter((_, i) => i !== docIndex) }
+        : entry
+    ));
   };
 
   const addEntry = () => {
@@ -217,7 +240,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
           notes: notesWithDetails || null,
         };
 
-        await createPolicy(policyData);
+        const policy = await createPolicy(policyData);
+
+        // Save documents linked to this policy
+        if (entry.documents.length > 0 && policy?.id) {
+          for (const doc of entry.documents) {
+            await createDocument({
+              owner_id: policy.id,
+              owner_type: 'policy',
+              file_key: doc.file_key,
+              file_name: doc.file_name,
+              doc_kind: doc.doc_kind,
+              mime_type: doc.mime_type,
+              size_bytes: doc.size_bytes,
+            });
+          }
+        }
       }
       
       toast({
@@ -462,6 +500,19 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
             onChange={(e) => updateEntry(entry.id, { notes: e.target.value })}
             maxLength={500}
             rows={2}
+          />
+        </div>
+
+        {/* Documents Section */}
+        <div className="p-4 rounded-lg bg-muted/30 border space-y-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <Label className="font-semibold">Documents ({entry.documents.length})</Label>
+          </div>
+          <DocumentUpload
+            documents={entry.documents}
+            onUpload={(doc) => addDocumentToEntry(entry.id, doc)}
+            onRemove={(index) => removeDocumentFromEntry(entry.id, index)}
           />
         </div>
       </div>
