@@ -172,46 +172,63 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     
     setLoading(true);
     
-    // Fetch the policy directly if not in policies list
-    let existingPolicy = policies.find(p => p.id === policyId);
-    
-    if (!existingPolicy) {
-      // Policy might not be loaded yet, fetch it directly
-      const { data } = await supabase
-        .from('policies')
-        .select(`
-          *,
-          product:insurance_products!policies_product_id_fkey (
-            id,
+    // Fetch the policy directly
+    const { data: existingPolicy } = await supabase
+      .from('policies')
+      .select(`
+        *,
+        product:insurance_products!policies_product_id_fkey (
+          id,
+          name,
+          category,
+          company_id,
+          company:insurance_companies!insurance_products_company_id_fkey (
             name,
-            category,
-            company_id,
-            company:insurance_companies!insurance_products_company_id_fkey (
-              name,
-              logo_url
-            )
+            logo_url
           )
-        `)
-        .eq('id', policyId)
-        .maybeSingle();
-      
-      if (data) {
-        existingPolicy = data as any;
-      }
-    }
+        )
+      `)
+      .eq('id', policyId)
+      .maybeSingle();
     
     if (existingPolicy) {
       setStartDate(existingPolicy.start_date || new Date().toISOString().split('T')[0]);
       setStatus(existingPolicy.status || 'active');
       setNotes(existingPolicy.notes || '');
       
-      // Set company first
+      // Set company from product
       if (existingPolicy.product?.company_id) {
         setSelectedCompanyId(existingPolicy.product.company_id);
       }
       
-      // Set selected product
-      if (existingPolicy.product) {
+      // Check if we have products_data (multi-product contract)
+      const productsData = existingPolicy.products_data as any[] | null;
+      
+      if (productsData && productsData.length > 0) {
+        // Load products from products_data
+        const loadedProducts: SelectedProduct[] = productsData.map(prod => {
+          const isLamal = prod.category === 'health' && isLamalProduct(prod.name);
+          
+          // Set LAMal fields if applicable
+          if (isLamal && prod.premium) {
+            setLamalPremium(String(prod.premium));
+            if (prod.deductible) setLamalFranchise(String(prod.deductible));
+          }
+          
+          return {
+            id: generateId(),
+            productId: prod.productId,
+            name: prod.name || 'Produit',
+            category: prod.category || 'other',
+            premium: String(prod.premium || ''),
+            deductible: String(prod.deductible || ''),
+            durationYears: String(prod.durationYears || ''),
+          };
+        });
+        
+        setSelectedProducts(loadedProducts);
+      } else if (existingPolicy.product) {
+        // Fallback: single product from product relation
         const category = existingPolicy.product.category || 'other';
         const isLamal = category === 'health' && isLamalProduct(existingPolicy.product.name);
         
