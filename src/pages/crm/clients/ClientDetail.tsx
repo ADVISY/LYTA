@@ -61,7 +61,7 @@ export default function ClientDetail() {
   const { toast } = useToast();
   const { getClientById } = useClients();
   const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
-  const { policies, loading: policiesLoading } = usePolicies();
+  const { policies, loading: policiesLoading, fetchPolicies } = usePolicies();
   const { createDocument, deleteDocument } = useDocuments();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -807,7 +807,10 @@ export default function ClientDetail() {
         clientId={id!}
         open={contractFormOpen}
         onOpenChange={setContractFormOpen}
-        onSuccess={loadDocuments}
+        onSuccess={() => {
+          fetchPolicies();
+          loadDocuments();
+        }}
       />
     </div>
   );

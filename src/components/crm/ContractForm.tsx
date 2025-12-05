@@ -234,6 +234,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
     setSubmitting(true);
 
     try {
+      // Get the company name
+      const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+      const companyName = selectedCompany?.name || null;
+
       for (const product of selectedProducts) {
         let calculatedPremium = 0;
         let endDate: string | null = null;
@@ -246,7 +250,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
             calculatedPremium = parseFloat(lamalPremium) || 0;
             deductibleValue = parseFloat(lamalFranchise) || null;
             const notesParts = [];
-            notesParts.push(`Prime LAMal: ${calculatedPremium.toFixed(2)} CHF/mois`);
+            notesParts.push(`LAMal: ${calculatedPremium.toFixed(2)} CHF`);
             if (deductibleValue) {
               notesParts.push(`Franchise: ${deductibleValue} CHF`);
             }
@@ -256,7 +260,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
             // LCA product - use individual premium
             calculatedPremium = parseFloat(product.premium) || 0;
             const notesParts = [];
-            notesParts.push(`Prime LCA: ${calculatedPremium.toFixed(2)} CHF/mois`);
+            notesParts.push(`LCA: ${calculatedPremium.toFixed(2)} CHF`);
             if (notes) notesParts.push(notes);
             notesWithDetails = notesParts.join('\n');
           }
@@ -296,6 +300,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
           deductible: deductibleValue,
           status: status,
           notes: notesWithDetails || null,
+          company_name: companyName,
+          product_type: product.category,
         };
 
         const policy = await createPolicy(policyData);
@@ -453,7 +459,12 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                       : 'hover:bg-muted/80'
                                   }`}
                                 >
-                                  <Checkbox checked={isSelected} className={isSelected ? 'border-primary-foreground' : ''} />
+                                  <Checkbox 
+                                    checked={isSelected} 
+                                    className={isSelected ? 'border-primary-foreground' : ''} 
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={() => toggleProductSelection(product)}
+                                  />
                                   <span className="flex-1 truncate">{product.name}</span>
                                   {isLamal && (
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
