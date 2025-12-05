@@ -471,16 +471,29 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   };
 
   const groupedProducts = useMemo(() => {
-    const products = getProductsForCompany();
+    if (!selectedCompanyId || !allProducts.length) return {};
+    
+    const filtered = allProducts.filter(p => {
+      if (!p || p.company_id !== selectedCompanyId) return false;
+      if (!productSearch) return true;
+      const search = productSearch.toLowerCase();
+      const nameMatch = (p.name || '').toLowerCase().includes(search);
+      const categoryMatch = (categoryLabels[p.category] || p.category || '').toLowerCase().includes(search);
+      return nameMatch || categoryMatch;
+    });
+    
     const grouped: Record<string, Product[]> = {};
-    for (const p of products) {
-      if (!p?.id) continue;
+    for (const p of filtered) {
       const category = p.category || 'other';
       if (!grouped[category]) grouped[category] = [];
       grouped[category].push(p);
     }
     return grouped;
   }, [selectedCompanyId, allProducts, productSearch]);
+
+  const isProductSelected = (productId: string): boolean => {
+    return selectedProducts.some(sp => sp?.productId === productId);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -581,32 +594,30 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             </div>
                             <div className="space-y-1 pl-1">
                               {products.map((product) => {
-                                if (!product || !product.id) return null;
-                                const isSelected = (selectedProducts || []).some(sp => sp && sp.productId === product.id);
-                                const isLamal = product.category === 'health' && product.name && isLamalProduct(product.name);
+                                if (!product?.id) return null;
+                                const selected = isProductSelected(product.id);
+                                const lamal = product.category === 'health' && isLamalProduct(product.name);
                                 return (
-                                  <div
+                                  <button
+                                    type="button"
                                     key={product.id}
                                     onClick={() => toggleProductSelection(product)}
-                                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all text-sm ${
-                                      isSelected 
+                                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all text-sm w-full text-left ${
+                                      selected 
                                         ? 'bg-primary text-primary-foreground shadow-sm' 
                                         : 'hover:bg-muted/80'
                                     }`}
                                   >
-                                    <Checkbox 
-                                      checked={isSelected} 
-                                      className={isSelected ? 'border-primary-foreground' : ''} 
-                                      onClick={(e) => e.stopPropagation()}
-                                      onCheckedChange={() => toggleProductSelection(product)}
-                                    />
+                                    <div className={`h-4 w-4 rounded border flex items-center justify-center ${selected ? 'bg-primary-foreground border-primary-foreground' : 'border-input'}`}>
+                                      {selected && <Check className="h-3 w-3 text-primary" />}
+                                    </div>
                                     <span className="flex-1 truncate">{product.name || 'Produit'}</span>
-                                    {isLamal && (
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {lamal && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${selected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
                                         LAMal
                                       </span>
                                     )}
-                                  </div>
+                                  </button>
                                 );
                               })}
                             </div>
