@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { Check, ChevronsUpDown, Search, User, FileCheck } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Check, ChevronsUpDown, Search, User, FileCheck, Plus, Trash2, Users, Percent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClients, Client } from "@/hooks/useClients";
-import { usePolicies, Policy } from "@/hooks/usePolicies";
+import { usePolicies } from "@/hooks/usePolicies";
 import { useCommissions } from "@/hooks/useCommissions";
+import { useCommissionParts } from "@/hooks/useCommissionParts";
+import { useAgents, Agent } from "@/hooks/useAgents";
 
 const commissionSchema = z.object({
   policy_id: z.string().min(1, "Veuillez sélectionner un contrat"),
@@ -29,6 +31,13 @@ const commissionSchema = z.object({
 
 type CommissionFormValues = z.infer<typeof commissionSchema>;
 
+interface PartAgent {
+  agent_id: string;
+  agent_name: string;
+  rate: number;
+  amount: number;
+}
+
 interface CommissionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,11 +48,18 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
   const { clients, fetchClients } = useClients();
   const { policies, fetchPolicies } = usePolicies();
   const { createCommission } = useCommissions();
+  const { addMultipleParts } = useCommissionParts();
+  const { agents } = useAgents();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [clientOpen, setClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Commission parts state
+  const [commissionParts, setCommissionParts] = useState<PartAgent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [newPartRate, setNewPartRate] = useState<number>(0);
 
   const form = useForm<CommissionFormValues>({
     resolver: zodResolver(commissionSchema),
@@ -57,6 +73,10 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     },
   });
 
+  const totalAmount = form.watch("amount") || 0;
+  const totalAssignedRate = commissionParts.reduce((sum, p) => sum + p.rate, 0);
+  const remainingRate = 100 - totalAssignedRate;
+
   useEffect(() => {
     if (open) {
       fetchClients();
@@ -64,7 +84,14 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     }
   }, [open]);
 
-  // Filter clients based on search
+  // Recalculate amounts when total amount changes
+  useEffect(() => {
+    setCommissionParts(prev => prev.map(p => ({
+      ...p,
+      amount: (totalAmount * p.rate) / 100
+    })));
+  }, [totalAmount]);
+
   const filteredClients = clients.filter(client => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -74,7 +101,6 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     return fullName.includes(query) || companyName.includes(query) || email.includes(query);
   });
 
-  // Filter policies for selected client
   const clientPolicies = selectedClient 
     ? policies.filter(p => p.client_id === selectedClient.id)
     : [];
@@ -84,27 +110,88 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     return `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Sans nom';
   };
 
+  const getAgentName = (agent: Agent) => {
+    return `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email;
+  };
+
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
     setClientOpen(false);
-    form.setValue("policy_id", ""); // Reset policy selection
+    form.setValue("policy_id", "");
+  };
+
+  const handleAddPart = () => {
+    if (!selectedAgentId || newPartRate <= 0 || newPartRate > remainingRate) return;
+    
+    const agent = agents.find(a => a.id === selectedAgentId);
+    if (!agent) return;
+    
+    // Check if agent already added
+    if (commissionParts.some(p => p.agent_id === selectedAgentId)) {
+      return;
+    }
+
+    const newPart: PartAgent = {
+      agent_id: selectedAgentId,
+      agent_name: getAgentName(agent),
+      rate: newPartRate,
+      amount: (totalAmount * newPartRate) / 100
+    };
+
+    setCommissionParts(prev => [...prev, newPart]);
+    setSelectedAgentId("");
+    setNewPartRate(0);
+  };
+
+  const handleUpdatePartRate = (agentId: string, newRate: number) => {
+    const otherPartsRate = commissionParts
+      .filter(p => p.agent_id !== agentId)
+      .reduce((sum, p) => sum + p.rate, 0);
+    
+    if (newRate + otherPartsRate > 100) return;
+
+    setCommissionParts(prev => prev.map(p => 
+      p.agent_id === agentId 
+        ? { ...p, rate: newRate, amount: (totalAmount * newRate) / 100 }
+        : p
+    ));
+  };
+
+  const handleRemovePart = (agentId: string) => {
+    setCommissionParts(prev => prev.filter(p => p.agent_id !== agentId));
   };
 
   const onSubmit = async (values: CommissionFormValues) => {
     try {
       setLoading(true);
-      await createCommission({
+      
+      // Create the commission with total_amount
+      const commission = await createCommission({
         policy_id: values.policy_id,
         amount: values.amount,
+        total_amount: values.amount,
         type: values.type,
         status: values.status,
         date: values.date || null,
         notes: values.notes || null,
       });
       
+      // Add commission parts if any
+      if (commission && commissionParts.length > 0) {
+        const partsToInsert = commissionParts.map(p => ({
+          commission_id: commission.id,
+          agent_id: p.agent_id,
+          rate: p.rate,
+          amount: p.amount
+        }));
+        
+        await addMultipleParts(partsToInsert);
+      }
+      
       form.reset();
       setSelectedClient(null);
       setSearchQuery("");
+      setCommissionParts([]);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -118,12 +205,16 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     form.reset();
     setSelectedClient(null);
     setSearchQuery("");
+    setCommissionParts([]);
     onOpenChange(false);
   };
 
+  // Filter out already selected agents
+  const availableAgents = agents.filter(a => !commissionParts.some(p => p.agent_id === a.id));
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouvelle commission</DialogTitle>
         </DialogHeader>
@@ -232,88 +323,202 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
               />
             )}
 
-            {/* Amount */}
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Montant (CHF)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Type */}
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type de commission</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Amount */}
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Montant total (CHF)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00"
+                        {...field}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="acquisition">Acquisition</SelectItem>
-                      <SelectItem value="renewal">Renouvellement</SelectItem>
-                      <SelectItem value="bonus">Bonus</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Status */}
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Statut</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+              {/* Type */}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type de commission</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner le type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="acquisition">Acquisition</SelectItem>
+                        <SelectItem value="renewal">Renouvellement</SelectItem>
+                        <SelectItem value="bonus">Bonus</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Status */}
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Statut</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner le statut" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="due">À payer</SelectItem>
+                        <SelectItem value="pending">En attente</SelectItem>
+                        <SelectItem value="paid">Payée</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Date */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le statut" />
-                      </SelectTrigger>
+                      <Input type="date" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="due">À payer</SelectItem>
-                      <SelectItem value="pending">En attente</SelectItem>
-                      <SelectItem value="paid">Payée</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Date */}
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Commission Parts Section */}
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Répartition de la commission
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Summary */}
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
+                  <span>Total: <strong>{totalAmount.toFixed(2)} CHF</strong> (100%)</span>
+                  <span className={remainingRate < 0 ? "text-destructive" : "text-muted-foreground"}>
+                    Restant: <strong>{remainingRate.toFixed(1)}%</strong> ({((totalAmount * remainingRate) / 100).toFixed(2)} CHF)
+                  </span>
+                </div>
+
+                {/* Existing Parts */}
+                {commissionParts.length > 0 && (
+                  <div className="space-y-2">
+                    {commissionParts.map((part) => (
+                      <div 
+                        key={part.agent_id} 
+                        className="flex items-center gap-3 p-3 border rounded-lg bg-card"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">{part.agent_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={part.rate}
+                            onChange={(e) => handleUpdatePartRate(part.agent_id, Number(e.target.value))}
+                            className="w-20 text-right"
+                            min={0}
+                            max={100}
+                            step={0.5}
+                          />
+                          <span className="text-muted-foreground">%</span>
+                        </div>
+                        <div className="w-24 text-right font-medium">
+                          {part.amount.toFixed(2)} CHF
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleRemovePart(part.agent_id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add New Part */}
+                {remainingRate > 0 && availableAgents.length > 0 && (
+                  <div className="flex items-end gap-3 pt-2 border-t">
+                    <div className="flex-1">
+                      <Label className="text-xs mb-1.5 block">Collaborateur</Label>
+                      <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableAgents.map((agent) => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {getAgentName(agent)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs mb-1.5 block">Pourcentage</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          value={newPartRate || ""}
+                          onChange={(e) => setNewPartRate(Number(e.target.value))}
+                          placeholder="0"
+                          min={0}
+                          max={remainingRate}
+                          step={0.5}
+                        />
+                        <Percent className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleAddPart}
+                      disabled={!selectedAgentId || newPartRate <= 0}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {availableAgents.length === 0 && commissionParts.length > 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    Tous les collaborateurs ont été assignés
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Notes */}
             <FormField
@@ -326,7 +531,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                     <Textarea 
                       placeholder="Notes sur cette commission..."
                       className="resize-none"
-                      rows={3}
+                      rows={2}
                       {...field}
                     />
                   </FormControl>
