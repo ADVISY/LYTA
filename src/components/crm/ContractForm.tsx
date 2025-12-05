@@ -114,6 +114,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [clientExistingPolicies, setClientExistingPolicies] = useState<any[]>([]);
   
   // Common fields
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
@@ -130,9 +131,26 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
 
+  // Get companies that the client already has contracts with
+  const companiesWithExistingContracts = useMemo(() => {
+    return clientExistingPolicies
+      .filter(p => p.id !== policyId) // Exclude current policy in edit mode
+      .map(p => p.company_name)
+      .filter(Boolean);
+  }, [clientExistingPolicies, policyId]);
+
+  // Check if selected company already has a contract
+  const hasExistingContractWithCompany = useMemo(() => {
+    if (!selectedCompanyId || editMode) return false;
+    const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+    if (!selectedCompany) return false;
+    return companiesWithExistingContracts.includes(selectedCompany.name);
+  }, [selectedCompanyId, companies, companiesWithExistingContracts, editMode]);
+
   useEffect(() => {
     if (open) {
       fetchCompaniesAndProducts();
+      fetchClientExistingPolicies();
       if (editMode && policyId) {
         loadExistingPolicy();
       } else {
@@ -140,6 +158,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       }
     }
   }, [open, editMode, policyId]);
+
+  const fetchClientExistingPolicies = async () => {
+    const { data } = await supabase
+      .from('policies')
+      .select('id, company_name')
+      .eq('client_id', clientId);
+    setClientExistingPolicies(data || []);
+  };
 
   const loadExistingPolicy = async () => {
     if (!policyId) return;
@@ -357,6 +383,16 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       return;
     }
 
+    if (hasExistingContractWithCompany) {
+      const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+      toast({
+        title: "Erreur",
+        description: `Ce client a déjà un contrat avec ${selectedCompany?.name}. Un client ne peut avoir qu'un seul contrat par compagnie.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -539,17 +575,30 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Compagnie *</Label>
                 <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className={hasExistingContractWithCompany ? "border-destructive" : ""}>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
+                    {companies.map((company) => {
+                      const hasContract = companiesWithExistingContracts.includes(company.name);
+                      return (
+                        <SelectItem 
+                          key={company.id} 
+                          value={company.id}
+                          className={hasContract ? "text-muted-foreground" : ""}
+                        >
+                          {company.name}
+                          {hasContract && " (contrat existant)"}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
+                {hasExistingContractWithCompany && (
+                  <p className="text-xs text-destructive">
+                    Ce client a déjà un contrat avec cette compagnie
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -963,7 +1012,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Annuler
                 </Button>
-                <Button type="submit" disabled={submitting || selectedProducts.length === 0}>
+                <Button type="submit" disabled={submitting || selectedProducts.length === 0 || hasExistingContractWithCompany}>
                   {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editMode ? "Enregistrer" : `Créer le contrat (${selectedProducts.length} produit${selectedProducts.length > 1 ? 's' : ''})`}
                 </Button>
