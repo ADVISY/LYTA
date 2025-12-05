@@ -233,44 +233,62 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     setLoading(false);
   };
 
-  const getProductsForCompany = () => {
+  const getProductsForCompany = (): Product[] => {
     if (!selectedCompanyId) return [];
-    let products = allProducts.filter(p => p.company_id === selectedCompanyId);
-    if (productSearch) {
-      const search = productSearch.toLowerCase();
-      products = products.filter(p => 
-        p.name.toLowerCase().includes(search) ||
-        categoryLabels[p.category]?.toLowerCase().includes(search)
-      );
+    try {
+      let products = allProducts.filter(p => p && p.company_id === selectedCompanyId);
+      if (productSearch) {
+        const search = productSearch.toLowerCase();
+        products = products.filter(p => {
+          const nameMatch = p.name ? p.name.toLowerCase().includes(search) : false;
+          const categoryMatch = p.category ? (categoryLabels[p.category] || p.category).toLowerCase().includes(search) : false;
+          return nameMatch || categoryMatch;
+        });
+      }
+      return products;
+    } catch (error) {
+      console.error('Error filtering products:', error);
+      return [];
     }
-    return products;
   };
 
   const toggleProductSelection = (product: Product) => {
-    if (!product || !product.id) return;
+    if (!product || !product.id) {
+      console.warn('Invalid product passed to toggleProductSelection');
+      return;
+    }
     
-    const isSelected = selectedProducts.some(sp => sp.productId === product.id);
-    
-    if (isSelected) {
-      setSelectedProducts(prev => prev.filter(sp => sp.productId !== product.id));
-    } else {
-      const category = product.category || 'other';
-      setSelectedProducts(prev => [...prev, {
-        id: generateId(),
-        productId: product.id,
-        name: product.name || 'Produit sans nom',
-        category: category,
-        premium: "",
-        deductible: "",
-        durationYears: "",
-      }]);
+    try {
+      const isSelected = selectedProducts.some(sp => sp && sp.productId === product.id);
+      
+      if (isSelected) {
+        setSelectedProducts(prev => prev.filter(sp => sp && sp.productId !== product.id));
+      } else {
+        const newProduct: SelectedProduct = {
+          id: generateId(),
+          productId: product.id,
+          name: product.name || 'Produit sans nom',
+          category: product.category || 'other',
+          premium: "",
+          deductible: "",
+          durationYears: "",
+        };
+        setSelectedProducts(prev => [...prev, newProduct]);
+      }
+    } catch (error) {
+      console.error('Error toggling product selection:', error);
     }
   };
 
   const updateSelectedProduct = (id: string, updates: Partial<SelectedProduct>) => {
-    setSelectedProducts(prev => prev.map(sp => 
-      sp.id === id ? { ...sp, ...updates } : sp
-    ));
+    if (!id) return;
+    try {
+      setSelectedProducts(prev => prev.map(sp => 
+        sp && sp.id === id ? { ...sp, ...updates } : sp
+      ));
+    } catch (error) {
+      console.error('Error updating product:', error);
+    }
   };
 
   const handleCompanyChange = (companyId: string) => {
@@ -281,36 +299,46 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     setLamalFranchise("");
   };
 
-  // Categorize selected products
+  // Categorize selected products safely
   const categorizedSelection = useMemo(() => {
-    const safeProducts = selectedProducts.filter(p => p && p.id && p.category);
-    const health = safeProducts.filter(p => p.category === 'health');
-    const life = safeProducts.filter(p => p.category === 'life');
-    const other = safeProducts.filter(p => !['health', 'life'].includes(p.category || ''));
-    
-    const healthLamal = health.filter(p => p.name && isLamalProduct(p.name));
-    const healthLca = health.filter(p => !p.name || !isLamalProduct(p.name));
-    
-    return { healthLamal, healthLca, life, other, health };
+    try {
+      const safeProducts = (selectedProducts || []).filter(p => p && p.id && p.category);
+      const health = safeProducts.filter(p => p.category === 'health');
+      const life = safeProducts.filter(p => p.category === 'life');
+      const other = safeProducts.filter(p => !['health', 'life'].includes(p.category || ''));
+      
+      const healthLamal = health.filter(p => p.name && isLamalProduct(p.name));
+      const healthLca = health.filter(p => !p.name || !isLamalProduct(p.name));
+      
+      return { healthLamal, healthLca, life, other, health };
+    } catch (error) {
+      console.error('Error categorizing products:', error);
+      return { healthLamal: [], healthLca: [], life: [], other: [], health: [] };
+    }
   }, [selectedProducts]);
 
-  // Calculate totals
+  // Calculate totals safely
   const totals = useMemo(() => {
-    const lamal = parseFloat(lamalPremium) || 0;
-    const lcaTotal = categorizedSelection.healthLca.reduce((sum, p) => sum + (parseFloat(p.premium) || 0), 0);
-    const healthTotal = lamal + lcaTotal;
-    
-    const lifeTotal = categorizedSelection.life.reduce((sum, p) => sum + (parseFloat(p.premium) || 0), 0);
-    const otherTotal = categorizedSelection.other.reduce((sum, p) => sum + (parseFloat(p.premium) || 0), 0);
-    
-    return {
-      lamal,
-      lcaTotal,
-      healthTotal,
-      lifeTotal,
-      otherTotal,
-      grandTotal: healthTotal + lifeTotal + otherTotal
-    };
+    try {
+      const lamal = parseFloat(lamalPremium) || 0;
+      const lcaTotal = (categorizedSelection.healthLca || []).reduce((sum, p) => sum + (parseFloat(p?.premium || '0') || 0), 0);
+      const healthTotal = lamal + lcaTotal;
+      
+      const lifeTotal = (categorizedSelection.life || []).reduce((sum, p) => sum + (parseFloat(p?.premium || '0') || 0), 0);
+      const otherTotal = (categorizedSelection.other || []).reduce((sum, p) => sum + (parseFloat(p?.premium || '0') || 0), 0);
+      
+      return {
+        lamal,
+        lcaTotal,
+        healthTotal,
+        lifeTotal,
+        otherTotal,
+        grandTotal: healthTotal + lifeTotal + otherTotal
+      };
+    } catch (error) {
+      console.error('Error calculating totals:', error);
+      return { lamal: 0, lcaTotal: 0, healthTotal: 0, lifeTotal: 0, otherTotal: 0, grandTotal: 0 };
+    }
   }, [lamalPremium, categorizedSelection, selectedProducts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -438,14 +466,21 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     }
   };
 
-  const groupedProducts = () => {
-    const products = getProductsForCompany();
-    const grouped: Record<string, Product[]> = {};
-    products.forEach(p => {
-      if (!grouped[p.category]) grouped[p.category] = [];
-      grouped[p.category].push(p);
-    });
-    return grouped;
+  const groupedProducts = (): Record<string, Product[]> => {
+    try {
+      const products = getProductsForCompany();
+      const grouped: Record<string, Product[]> = {};
+      products.forEach(p => {
+        if (!p) return;
+        const category = p.category || 'other';
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(p);
+      });
+      return grouped;
+    } catch (error) {
+      console.error('Error grouping products:', error);
+      return {};
+    }
   };
 
   return (
@@ -537,45 +572,48 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                   </div>
                   <ScrollArea className="flex-1">
                     <div className="space-y-4 pr-2">
-                      {Object.entries(groupedProducts()).map(([category, products]) => (
-                        <div key={category}>
-                          <div className={`flex items-center gap-2 text-xs font-semibold px-2 py-1.5 rounded-md mb-2 ${categoryColors[category] || 'bg-gray-100'}`}>
-                            {categoryIcons[category]}
-                            {categoryLabels[category] || category} ({products.length})
+                      {Object.entries(groupedProducts()).map(([category, products]) => {
+                        if (!products || !Array.isArray(products)) return null;
+                        return (
+                          <div key={category}>
+                            <div className={`flex items-center gap-2 text-xs font-semibold px-2 py-1.5 rounded-md mb-2 ${categoryColors[category] || 'bg-gray-100'}`}>
+                              {categoryIcons[category] || <Shield className="h-4 w-4" />}
+                              {categoryLabels[category] || category} ({products.length})
+                            </div>
+                            <div className="space-y-1 pl-1">
+                              {products.map((product) => {
+                                if (!product || !product.id) return null;
+                                const isSelected = (selectedProducts || []).some(sp => sp && sp.productId === product.id);
+                                const isLamal = product.category === 'health' && product.name && isLamalProduct(product.name);
+                                return (
+                                  <div
+                                    key={product.id}
+                                    onClick={() => toggleProductSelection(product)}
+                                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all text-sm ${
+                                      isSelected 
+                                        ? 'bg-primary text-primary-foreground shadow-sm' 
+                                        : 'hover:bg-muted/80'
+                                    }`}
+                                  >
+                                    <Checkbox 
+                                      checked={isSelected} 
+                                      className={isSelected ? 'border-primary-foreground' : ''} 
+                                      onClick={(e) => e.stopPropagation()}
+                                      onCheckedChange={() => toggleProductSelection(product)}
+                                    />
+                                    <span className="flex-1 truncate">{product.name || 'Produit'}</span>
+                                    {isLamal && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
+                                        LAMal
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="space-y-1 pl-1">
-                            {products.map((product) => {
-                              if (!product || !product.id) return null;
-                              const isSelected = selectedProducts.some(sp => sp.productId === product.id);
-                              const isLamal = product.category === 'health' && product.name && isLamalProduct(product.name);
-                              return (
-                                <div
-                                  key={product.id}
-                                  onClick={() => toggleProductSelection(product)}
-                                  className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all text-sm ${
-                                    isSelected 
-                                      ? 'bg-primary text-primary-foreground shadow-sm' 
-                                      : 'hover:bg-muted/80'
-                                  }`}
-                                >
-                                  <Checkbox 
-                                    checked={isSelected} 
-                                    className={isSelected ? 'border-primary-foreground' : ''} 
-                                    onClick={(e) => e.stopPropagation()}
-                                    onCheckedChange={() => toggleProductSelection(product)}
-                                  />
-                                  <span className="flex-1 truncate">{product.name || 'Produit'}</span>
-                                  {isLamal && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
-                                      LAMal
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {Object.keys(groupedProducts()).length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
                           Aucun produit trouvé
@@ -677,7 +715,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                            onClick={() => setSelectedProducts(prev => prev.filter(sp => sp && sp.id !== product.id))}
                                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                                           >
                                             <X className="h-4 w-4" />
@@ -724,7 +762,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           type="button"
                                           variant="ghost"
                                           size="sm"
-                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp && sp.id !== product.id))}
                                           className="h-6 w-6 p-0 text-destructive"
                                         >
                                           <X className="h-4 w-4" />
@@ -800,7 +838,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           type="button"
                                           variant="ghost"
                                           size="sm"
-                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp && sp.id !== product.id))}
                                           className="h-6 w-6 p-0 text-destructive"
                                         >
                                           <X className="h-4 w-4" />
