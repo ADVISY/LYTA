@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useFamilyMembers, FamilyMember } from "@/hooks/useFamilyMembers";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const familyMemberSchema = z.object({
   first_name: z.string().min(1, "Prénom requis"),
@@ -53,6 +55,23 @@ export default function FamilyMemberForm({
 }: FamilyMemberFormProps) {
   const { createFamilyMember, updateFamilyMember } = useFamilyMembers(clientId);
   const [loading, setLoading] = useState(false);
+  const [parentClient, setParentClient] = useState<any>(null);
+  const { toast } = useToast();
+
+  // Fetch parent client data to copy address info
+  useEffect(() => {
+    const fetchParentClient = async () => {
+      if (clientId && open) {
+        const { data } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('id', clientId)
+          .maybeSingle();
+        setParentClient(data);
+      }
+    };
+    fetchParentClient();
+  }, [clientId, open]);
 
   const form = useForm<FamilyMemberFormData>({
     resolver: zodResolver(familyMemberSchema),
@@ -85,11 +104,46 @@ export default function FamilyMemberForm({
         form.reset();
       }
     } else {
+      // Create family member
       const { error } = await createFamilyMember({
         client_id: clientId,
         ...data,
       } as any);
+      
       if (!error) {
+        // Also create a new client entry for this family member
+        try {
+          const newClientData = {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            birthdate: data.birth_date || null,
+            permit_type: data.permit_type || null,
+            nationality: data.nationality || null,
+            type_adresse: 'client',
+            status: 'prospect',
+            // Copy address from parent client
+            address: parentClient?.address || null,
+            zip_code: parentClient?.zip_code || null,
+            city: parentClient?.city || null,
+            country: parentClient?.country || 'Suisse',
+          };
+
+          const { error: clientError } = await supabase
+            .from('clients')
+            .insert([newClientData]);
+
+          if (clientError) {
+            console.error('Error creating client for family member:', clientError);
+          } else {
+            toast({
+              title: "Adresse créée",
+              description: `${data.first_name} ${data.last_name} a été ajouté(e) à la liste des adresses`
+            });
+          }
+        } catch (err) {
+          console.error('Error creating client:', err);
+        }
+        
         onOpenChange(false);
         form.reset();
       }
