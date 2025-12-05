@@ -414,11 +414,12 @@ export default function ClientDetail() {
                           <TableHead>Relation</TableHead>
                           <TableHead>Permis</TableHead>
                           <TableHead>Nationalité</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {familyMembers.map((member) => (
-                          <TableRow key={member.id}>
+                          <TableRow key={member.id} className="cursor-pointer hover:bg-muted/50">
                             <TableCell>{member.first_name}</TableCell>
                             <TableCell>{member.last_name}</TableCell>
                             <TableCell>
@@ -426,9 +427,53 @@ export default function ClientDetail() {
                                 ? new Date(member.birth_date).toLocaleDateString("fr-CH")
                                 : "-"}
                             </TableCell>
-                            <TableCell className="capitalize">{member.relation_type}</TableCell>
+                            <TableCell className="capitalize">
+                              {member.relation_type}
+                              {member.is_reverse_relation && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  Famille
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>{member.permit_type || "-"}</TableCell>
                             <TableCell>{member.nationality || "-"}</TableCell>
+                            <TableCell>
+                              {member.linked_client_id ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => navigate(`/crm/clients/${member.linked_client_id}`)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Voir
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    // Find the client by name
+                                    const { data } = await supabase
+                                      .from('clients')
+                                      .select('id')
+                                      .ilike('first_name', member.first_name)
+                                      .ilike('last_name', member.last_name)
+                                      .maybeSingle();
+                                    if (data?.id) {
+                                      navigate(`/crm/clients/${data.id}`);
+                                    } else {
+                                      toast({
+                                        title: "Information",
+                                        description: "Aucune fiche client trouvée pour ce membre",
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Voir
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

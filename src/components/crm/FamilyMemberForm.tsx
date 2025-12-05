@@ -104,48 +104,83 @@ export default function FamilyMemberForm({
         form.reset();
       }
     } else {
-      // Create family member
-      const { error } = await createFamilyMember({
-        client_id: clientId,
-        ...data,
-      } as any);
-      
-      if (!error) {
-        // Also create a new client entry for this family member
-        try {
-          const newClientData = {
-            first_name: data.first_name,
-            last_name: data.last_name,
-            birthdate: data.birth_date || null,
-            permit_type: data.permit_type || null,
-            nationality: data.nationality || null,
-            type_adresse: 'client',
-            status: 'prospect',
-            // Copy address from parent client
-            address: parentClient?.address || null,
-            zip_code: parentClient?.zip_code || null,
-            city: parentClient?.city || null,
-            country: parentClient?.country || 'Suisse',
-          };
+      try {
+        // 1. Create a new client entry for this family member
+        const newClientData = {
+          first_name: data.first_name,
+          last_name: data.last_name,
+          birthdate: data.birth_date || null,
+          permit_type: data.permit_type || null,
+          nationality: data.nationality || null,
+          type_adresse: 'client',
+          status: 'prospect',
+          // Copy address from parent client
+          address: parentClient?.address || null,
+          zip_code: parentClient?.zip_code || null,
+          city: parentClient?.city || null,
+          country: parentClient?.country || 'Suisse',
+        };
 
-          const { error: clientError } = await supabase
-            .from('clients')
-            .insert([newClientData]);
+        const { data: newClient, error: clientError } = await supabase
+          .from('clients')
+          .insert([newClientData])
+          .select('id')
+          .single();
 
-          if (clientError) {
-            console.error('Error creating client for family member:', clientError);
-          } else {
-            toast({
-              title: "Adresse créée",
-              description: `${data.first_name} ${data.last_name} a été ajouté(e) à la liste des adresses`
-            });
-          }
-        } catch (err) {
-          console.error('Error creating client:', err);
+        if (clientError) {
+          console.error('Error creating client for family member:', clientError);
+          toast({
+            title: "Erreur",
+            description: "Impossible de créer la fiche client",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
         }
-        
+
+        // 2. Create family member entry (child linked to parent)
+        const { error: familyError } = await createFamilyMember({
+          client_id: clientId,
+          ...data,
+        } as any);
+
+        if (familyError) {
+          console.error('Error creating family member:', familyError);
+        }
+
+        // 3. Create reverse family member entry (parent linked to child)
+        // So when viewing the child's profile, they see the parent
+        const reverseRelationType = data.relation_type === 'conjoint' ? 'conjoint' : 'autre';
+        const { error: reverseError } = await supabase
+          .from('family_members' as any)
+          .insert([{
+            client_id: newClient.id,
+            first_name: parentClient?.first_name || '',
+            last_name: parentClient?.last_name || '',
+            birth_date: parentClient?.birthdate || null,
+            relation_type: reverseRelationType,
+            permit_type: parentClient?.permit_type || null,
+            nationality: parentClient?.nationality || null,
+          }]);
+
+        if (reverseError) {
+          console.error('Error creating reverse family member:', reverseError);
+        }
+
+        toast({
+          title: "Membre ajouté",
+          description: `${data.first_name} ${data.last_name} a été ajouté(e) à la famille et à la liste des adresses`
+        });
+
         onOpenChange(false);
         form.reset();
+      } catch (err) {
+        console.error('Error:', err);
+        toast({
+          title: "Erreur",
+          description: "Une erreur est survenue",
+          variant: "destructive"
+        });
       }
     }
 

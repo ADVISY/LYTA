@@ -13,6 +13,9 @@ export type FamilyMember = {
   nationality?: string | null;
   created_at: string;
   updated_at: string;
+  // For bidirectional display
+  linked_client_id?: string | null;
+  is_reverse_relation?: boolean;
 };
 
 export function useFamilyMembers(clientId?: string) {
@@ -30,16 +33,99 @@ export function useFamilyMembers(clientId?: string) {
         return;
       }
 
-      const { data, error } = await supabase
+      // Get current client info
+      const { data: currentClient } = await supabase
+        .from('clients')
+        .select('first_name, last_name')
+        .eq('id', targetId)
+        .maybeSingle();
+
+      // 1. Get direct family members (this client is the parent)
+      const { data: directMembers, error: directError } = await supabase
         .from('family_members' as any)
         .select('*')
         .eq('client_id', targetId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (directError) throw directError;
 
-      setFamilyMembers((data as any) || []);
+      // 2. Get reverse relationships (this client is a family member of someone else)
+      // Find family_members where this client's name matches
+      const { data: reverseMembers, error: reverseError } = await supabase
+        .from('family_members' as any)
+        .select('*, clients!family_members_client_id_fkey(id, first_name, last_name, birthdate, permit_type, nationality)')
+        .neq('client_id', targetId);
+
+      if (reverseError) throw reverseError;
+
+      // Filter reverse members to find entries that match this client
+      const matchingReverseMembers: FamilyMember[] = [];
+      
+      if (reverseMembers && currentClient) {
+        for (const member of reverseMembers as any[]) {
+          // Check if this family member entry matches the current client
+          if (
+            member.first_name?.toLowerCase() === currentClient.first_name?.toLowerCase() &&
+            member.last_name?.toLowerCase() === currentClient.last_name?.toLowerCase()
+          ) {
+            // Add the parent client as a family member (reverse relationship)
+            const parentClient = member.clients;
+            if (parentClient) {
+              // Determine reverse relation type
+              let reverseRelationType: 'conjoint' | 'enfant' | 'autre' = 'autre';
+              if (member.relation_type === 'enfant') {
+                reverseRelationType = 'autre'; // Child sees parent as "autre" or we could add "parent"
+              } else if (member.relation_type === 'conjoint') {
+                reverseRelationType = 'conjoint';
+              }
+
+              matchingReverseMembers.push({
+                id: `reverse-${member.id}`,
+                client_id: targetId,
+                first_name: parentClient.first_name || '',
+                last_name: parentClient.last_name || '',
+                birth_date: parentClient.birthdate,
+                relation_type: reverseRelationType,
+                permit_type: parentClient.permit_type,
+                nationality: parentClient.nationality,
+                created_at: member.created_at,
+                updated_at: member.updated_at,
+                linked_client_id: parentClient.id,
+                is_reverse_relation: true,
+              });
+
+              // Also get siblings (other family members of the same parent)
+              const { data: siblings } = await supabase
+                .from('family_members' as any)
+                .select('*')
+                .eq('client_id', parentClient.id)
+                .neq('id', member.id);
+
+              if (siblings) {
+                for (const sibling of siblings as any[]) {
+                  // Don't add ourselves again
+                  if (
+                    sibling.first_name?.toLowerCase() !== currentClient.first_name?.toLowerCase() ||
+                    sibling.last_name?.toLowerCase() !== currentClient.last_name?.toLowerCase()
+                  ) {
+                    matchingReverseMembers.push({
+                      ...sibling,
+                      id: `sibling-${sibling.id}`,
+                      is_reverse_relation: true,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Combine direct and reverse members
+      const allMembers = [...(directMembers as any[] || []), ...matchingReverseMembers];
+      setFamilyMembers(allMembers);
     } catch (error: any) {
+      console.error('Error fetching family members:', error);
       toast({
         title: "Erreur",
         description: error.message,
