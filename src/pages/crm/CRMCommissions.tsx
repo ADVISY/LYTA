@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DollarSign, TrendingUp, Wallet, PiggyBank, Search, MoreHorizontal, CheckCircle, Clock, AlertCircle, Eye, Trash2, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp, Wallet, PiggyBank, Search, MoreHorizontal, CheckCircle, Clock, AlertCircle, Eye, Trash2, Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import CommissionForm from "@/components/crm/CommissionForm";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   due: { label: "À payer", color: "bg-amber-100 text-amber-800", icon: Clock },
@@ -35,6 +36,7 @@ export default function CRMCommissions() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commissionToDelete, setCommissionToDelete] = useState<string | null>(null);
+  const [commissionFormOpen, setCommissionFormOpen] = useState(false);
 
   useEffect(() => {
     fetchCommissions();
@@ -124,12 +126,16 @@ export default function CRMCommissions() {
               <DollarSign className="h-7 w-7 text-white" />
             </div>
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Commissions
             </h1>
             <p className="text-muted-foreground">Suivez vos commissions et revenus</p>
           </div>
+          <Button onClick={() => setCommissionFormOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nouvelle commission
+          </Button>
         </div>
       </div>
 
@@ -339,6 +345,13 @@ export default function CRMCommissions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Commission Form */}
+      <CommissionForm
+        open={commissionFormOpen}
+        onOpenChange={setCommissionFormOpen}
+        onSuccess={fetchCommissions}
+      />
     </div>
   );
 }

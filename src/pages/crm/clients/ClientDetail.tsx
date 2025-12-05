@@ -5,12 +5,13 @@ import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 import { usePolicies, Policy } from "@/hooks/usePolicies";
 import { useDocuments, Document } from "@/hooks/useDocuments";
 import { useSuivis, Suivi, suiviTypeLabels, suiviStatusLabels, suiviStatusColors } from "@/hooks/useSuivis";
+import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,6 +83,7 @@ export default function ClientDetail() {
   const { policies, loading: policiesLoading, fetchPolicies, deletePolicy } = usePolicies();
   const { createDocument, deleteDocument } = useDocuments();
   const { suivis, loading: suivisLoading, stats: suiviStats, fetchSuivis, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis(id);
+  const { commissions, loading: commissionsLoading, fetchCommissions, markAsPaid, deleteCommission } = useCommissions();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
@@ -100,6 +102,11 @@ export default function ClientDetail() {
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
+  
+  // Filter commissions for this client's policies
+  const clientCommissions = commissions.filter(c => 
+    clientPolicies.some(p => p.id === c.policy_id)
+  );
 
   useEffect(() => {
     loadClient();
@@ -307,6 +314,10 @@ export default function ClientDetail() {
               <TabsTrigger value="suivis">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Suivis
+              </TabsTrigger>
+              <TabsTrigger value="commissions">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Commissions ({clientCommissions.length})
               </TabsTrigger>
             </TabsList>
 
@@ -989,6 +1000,160 @@ export default function ClientDetail() {
                             </TableCell>
                           </TableRow>
                         ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="commissions">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Commissions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Commission stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm text-muted-foreground">Total</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                          .format(clientCommissions.reduce((sum, c) => sum + Number(c.amount || 0), 0))}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm text-muted-foreground">À payer</span>
+                      </div>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                          .format(clientCommissions.filter(c => c.status === 'due').reduce((sum, c) => sum + Number(c.amount || 0), 0))}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-muted-foreground">En attente</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                          .format(clientCommissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.amount || 0), 0))}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-muted-foreground">Payées</span>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                          .format(clientCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount || 0), 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Commissions list */}
+                  {commissionsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    </div>
+                  ) : clientCommissions.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                      <DollarSign className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="text-muted-foreground mb-2">Aucune commission pour ce client</p>
+                      <p className="text-sm text-muted-foreground/70">
+                        Les commissions s'ajoutent depuis la page Commissions
+                      </p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>N° Police</TableHead>
+                          <TableHead>Produit</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Montant</TableHead>
+                          <TableHead>Statut</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientCommissions.map((commission) => {
+                          const statusConfig: Record<string, { label: string; color: string }> = {
+                            due: { label: "À payer", color: "bg-amber-500" },
+                            pending: { label: "En attente", color: "bg-blue-500" },
+                            paid: { label: "Payée", color: "bg-emerald-500" },
+                          };
+                          const typeConfig: Record<string, { label: string }> = {
+                            acquisition: { label: "Acquisition" },
+                            renewal: { label: "Renouvellement" },
+                            bonus: { label: "Bonus" },
+                          };
+                          const status = statusConfig[commission.status] || statusConfig.pending;
+                          const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
+
+                          return (
+                            <TableRow key={commission.id}>
+                              <TableCell className="font-mono text-sm">
+                                {commission.policy?.policy_number || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {commission.policy?.product?.name || '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{type.label}</Badge>
+                              </TableCell>
+                              <TableCell className="font-semibold text-emerald-600">
+                                {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                                  .format(Number(commission.amount))}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`${status.color} text-white`}>
+                                  {status.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {commission.date 
+                                  ? format(new Date(commission.date), "dd/MM/yyyy", { locale: fr })
+                                  : format(new Date(commission.created_at), "dd/MM/yyyy", { locale: fr })
+                                }
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {commission.status !== 'paid' && (
+                                      <DropdownMenuItem onClick={() => markAsPaid(commission.id)}>
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Marquer comme payée
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem 
+                                      className="text-destructive"
+                                      onClick={() => deleteCommission(commission.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Supprimer
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   )}
