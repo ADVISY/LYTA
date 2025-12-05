@@ -364,97 +364,116 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const selectedCompany = companies.find(c => c.id === selectedCompanyId);
       const companyName = selectedCompany?.name || null;
 
-      for (const product of selectedProducts) {
-        let calculatedPremium = 0;
-        let endDate: string | null = null;
-        let notesWithDetails = '';
-        let deductibleValue: number | null = null;
-
+      // Build products data array with all product details
+      const productsData = selectedProducts.map(product => {
+        let premium = 0;
+        let deductible: number | null = null;
+        
         if (product.category === 'health') {
           if (isLamalProduct(product.name)) {
-            calculatedPremium = parseFloat(lamalPremium) || 0;
-            deductibleValue = parseFloat(lamalFranchise) || null;
-            const notesParts = [];
-            notesParts.push(`LAMal: ${calculatedPremium.toFixed(2)} CHF`);
-            if (deductibleValue) {
-              notesParts.push(`Franchise: ${deductibleValue} CHF`);
-            }
-            if (notes) notesParts.push(notes);
-            notesWithDetails = notesParts.join('\n');
+            premium = parseFloat(lamalPremium) || 0;
+            deductible = parseFloat(lamalFranchise) || null;
           } else {
-            calculatedPremium = parseFloat(product.premium) || 0;
-            const notesParts = [];
-            notesParts.push(`LCA: ${calculatedPremium.toFixed(2)} CHF`);
-            if (notes) notesParts.push(notes);
-            notesWithDetails = notesParts.join('\n');
+            premium = parseFloat(product.premium) || 0;
           }
         } else if (product.category === 'life') {
-          calculatedPremium = parseFloat(product.premium) || 0;
-          const years = parseInt(product.durationYears) || 0;
-          const notesParts = [];
-          notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
-          if (years > 0) {
-            const start = new Date(startDate);
-            start.setFullYear(start.getFullYear() + years);
-            endDate = start.toISOString().split('T')[0];
-            notesParts.push(`Durée: ${years} ans`);
-          }
-          if (notes) notesParts.push(notes);
-          notesWithDetails = notesParts.join('\n');
+          premium = parseFloat(product.premium) || 0;
         } else {
-          calculatedPremium = parseFloat(product.premium) || 0;
-          deductibleValue = parseFloat(product.deductible) || null;
-          const notesParts = [];
-          notesParts.push(`Prime mensuelle: ${calculatedPremium.toFixed(2)} CHF`);
-          if (deductibleValue) {
-            notesParts.push(`Franchise: ${deductibleValue} CHF`);
-          }
-          if (notes) notesParts.push(notes);
-          notesWithDetails = notesParts.join('\n');
+          premium = parseFloat(product.premium) || 0;
+          deductible = parseFloat(product.deductible) || null;
         }
-
-        const policyData = {
-          client_id: clientId,
-          product_id: product.productId,
-          policy_number: null,
-          start_date: startDate,
-          end_date: endDate,
-          premium_monthly: calculatedPremium,
-          premium_yearly: calculatedPremium * 12,
-          deductible: deductibleValue,
-          status: status,
-          notes: notesWithDetails || null,
-          company_name: companyName,
-          product_type: product.category,
+        
+        return {
+          productId: product.productId,
+          name: product.name,
+          category: product.category,
+          premium,
+          deductible,
+          durationYears: product.durationYears ? parseInt(product.durationYears) : null,
         };
+      });
 
-        if (editMode && policyId) {
-          // Update existing policy
-          await updatePolicy(policyId, policyData);
-        } else {
-          // Create new policy
-          const policy = await createPolicy(policyData);
+      // Calculate totals
+      const totalMonthly = totals.grandTotal;
+      const totalYearly = totalMonthly * 12;
+      
+      // Calculate end date based on life insurance duration if applicable
+      let endDate: string | null = null;
+      const lifeProducts = selectedProducts.filter(p => p.category === 'life' && p.durationYears);
+      if (lifeProducts.length > 0) {
+        const maxDuration = Math.max(...lifeProducts.map(p => parseInt(p.durationYears) || 0));
+        if (maxDuration > 0) {
+          const start = new Date(startDate);
+          start.setFullYear(start.getFullYear() + maxDuration);
+          endDate = start.toISOString().split('T')[0];
+        }
+      }
 
-          // Save documents linked to each policy
-          if (documents.length > 0 && policy?.id) {
-            for (const doc of documents) {
-              await createDocument({
-                owner_id: policy.id,
-                owner_type: 'policy',
-                file_key: doc.file_key,
-                file_name: doc.file_name,
-                doc_kind: doc.doc_kind,
-                mime_type: doc.mime_type,
-                size_bytes: doc.size_bytes,
-              });
-            }
+      // Build notes with summary
+      const notesParts: string[] = [];
+      if (categorizedSelection.healthLamal.length > 0 && totals.lamal > 0) {
+        notesParts.push(`LAMal: ${totals.lamal.toFixed(2)} CHF/mois`);
+        if (lamalFranchise) notesParts.push(`Franchise LAMal: ${lamalFranchise} CHF`);
+      }
+      if (totals.lcaTotal > 0) {
+        notesParts.push(`LCA: ${totals.lcaTotal.toFixed(2)} CHF/mois`);
+      }
+      if (totals.lifeTotal > 0) {
+        notesParts.push(`Vie/Prévoyance: ${totals.lifeTotal.toFixed(2)} CHF/mois`);
+      }
+      if (totals.otherTotal > 0) {
+        notesParts.push(`Autres: ${totals.otherTotal.toFixed(2)} CHF/mois`);
+      }
+      if (notes) notesParts.push(notes);
+
+      // Use the first product's ID as the main product_id (for backward compatibility)
+      const mainProductId = selectedProducts[0].productId;
+      const mainCategory = selectedProducts.length === 1 
+        ? selectedProducts[0].category 
+        : 'multi';
+
+      const policyData = {
+        client_id: clientId,
+        product_id: mainProductId,
+        policy_number: null,
+        start_date: startDate,
+        end_date: endDate,
+        premium_monthly: totalMonthly,
+        premium_yearly: totalYearly,
+        deductible: parseFloat(lamalFranchise) || null,
+        status: status,
+        notes: notesParts.join('\n') || null,
+        company_name: companyName,
+        product_type: mainCategory,
+        products_data: productsData,
+      };
+
+      if (editMode && policyId) {
+        await updatePolicy(policyId, policyData);
+      } else {
+        const policy = await createPolicy(policyData);
+
+        // Save documents linked to the policy
+        if (documents.length > 0 && policy?.id) {
+          for (const doc of documents) {
+            await createDocument({
+              owner_id: policy.id,
+              owner_type: 'policy',
+              file_key: doc.file_key,
+              file_name: doc.file_name,
+              doc_kind: doc.doc_kind,
+              mime_type: doc.mime_type,
+              size_bytes: doc.size_bytes,
+            });
           }
         }
       }
       
       toast({
-        title: editMode ? "Contrat mis à jour" : "Contrats créés",
-        description: editMode ? "Le contrat a été modifié avec succès" : `${selectedProducts.length} contrat(s) ajouté(s) avec succès`
+        title: editMode ? "Contrat mis à jour" : "Contrat créé",
+        description: editMode 
+          ? "Le contrat a été modifié avec succès" 
+          : `Contrat avec ${selectedProducts.length} produit(s) créé avec succès`
       });
 
       onOpenChange(false);
@@ -462,7 +481,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message || (editMode ? "Impossible de modifier le contrat" : "Impossible de créer les contrats"),
+        description: error.message || (editMode ? "Impossible de modifier le contrat" : "Impossible de créer le contrat"),
         variant: "destructive"
       });
     } finally {
@@ -946,7 +965,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 </Button>
                 <Button type="submit" disabled={submitting || selectedProducts.length === 0}>
                   {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Créer {selectedProducts.length} contrat(s)
+                  {editMode ? "Enregistrer" : `Créer le contrat (${selectedProducts.length} produit${selectedProducts.length > 1 ? 's' : ''})`}
                 </Button>
               </div>
             </div>

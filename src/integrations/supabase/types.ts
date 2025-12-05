@@ -716,6 +716,7 @@ export type Database = {
           premium_yearly: number | null
           product_id: string
           product_type: string | null
+          products_data: Json | null
           start_date: string
           status: string
           updated_at: string
@@ -735,6 +736,7 @@ export type Database = {
           premium_yearly?: number | null
           product_id: string
           product_type?: string | null
+          products_data?: Json | null
           start_date: string
           status?: string
           updated_at?: string
@@ -754,6 +756,7 @@ export type Database = {
           premium_yearly?: number | null
           product_id?: string
           product_type?: string | null
+          products_data?: Json | null
           start_date?: string
           status?: string
           updated_at?: string

@@ -442,7 +442,11 @@ export default function ClientDetail() {
                         const category = policy.product?.category;
                         const notes = policy.notes || '';
                         
-                        // Parse health details from notes (flexible regex)
+                        // Get products_data from policy
+                        const productsData = policy.products_data || [];
+                        const hasMultipleProducts = productsData.length > 1;
+                        
+                        // Parse health details from notes (flexible regex) - fallback for old contracts
                         const lamalMatch = notes.match(/LAMal[:\s]*([\d.,]+)\s*CHF/i);
                         const lcaMatch = notes.match(/LCA[:\s]*([\d.,]+)\s*CHF/i);
                         const franchiseMatch = notes.match(/Franchise[:\s]*([\d.,]+)\s*CHF/i);
@@ -457,28 +461,19 @@ export default function ClientDetail() {
                         // Use deductible from field or parsed from notes
                         const displayDeductible = policy.deductible || franchiseFromNotes;
                         
-                        // Calculate commission and expected revenue
-                        let expectedCommission: number | null = null;
-                        let commissionFormula = '';
-                        
-                        if (category === 'health' && lcaAmount !== null) {
-                          // Complémentaires: LCA × 16
-                          expectedCommission = lcaAmount * 16;
-                          commissionFormula = `LCA ${lcaAmount.toFixed(2)} × 16`;
-                        } else if (category === 'life' && policy.premium_monthly && durationYears) {
-                          // Vie/3e pilier: mensuel × durée × 4%
-                          const monthlyAmount = Number(policy.premium_monthly);
-                          const totalContractValue = monthlyAmount * 12 * durationYears;
-                          expectedCommission = totalContractValue * 0.04;
-                          commissionFormula = `${monthlyAmount.toFixed(2)} × ${durationYears} ans × 4%`;
-                        }
+                        // Calculate totals from products_data
+                        const totalFromProducts = productsData.reduce((sum, p) => sum + (p.premium || 0), 0);
                         
                         return (
                             <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
                             <div className="flex items-start justify-between">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{policy.product?.name || 'Produit inconnu'}</span>
+                                  <span className="font-semibold">
+                                    {hasMultipleProducts 
+                                      ? `Contrat multi-produits (${productsData.length})`
+                                      : (policy.product?.name || 'Produit inconnu')}
+                                  </span>
                                   <Badge
                                     variant="outline"
                                     className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white text-xs`}
@@ -487,7 +482,7 @@ export default function ClientDetail() {
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  {policy.product?.company?.name || 'Compagnie inconnue'} • {policy.policy_number || 'Sans numéro'}
+                                  {policy.product?.company?.name || policy.company_name || 'Compagnie inconnue'} • {policy.policy_number || 'Sans numéro'}
                                 </p>
                               </div>
                               <div className="flex items-start gap-4">
@@ -511,8 +506,43 @@ export default function ClientDetail() {
                               </div>
                             </div>
                             
-                            {/* Health Insurance Details */}
-                            {category === 'health' && (
+                            {/* Multi-products display */}
+                            {hasMultipleProducts && (
+                              <div className="mt-3 p-3 bg-primary/5 rounded-lg">
+                                <h4 className="font-medium text-sm mb-2">Produits inclus</h4>
+                                <div className="space-y-2">
+                                  {productsData.map((prod, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-sm p-2 bg-background rounded border">
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">
+                                          {prod.category === 'health' ? 'Santé' : 
+                                           prod.category === 'life' ? 'Vie' :
+                                           prod.category === 'auto' ? 'Auto' :
+                                           prod.category === 'home' ? 'Ménage' :
+                                           prod.category === 'legal' ? 'Juridique' : 'Autre'}
+                                        </Badge>
+                                        <span>{prod.name}</span>
+                                      </div>
+                                      <div className="text-right">
+                                        <span className="font-semibold">{prod.premium?.toFixed(2) || '0.00'} CHF/mois</span>
+                                        {prod.deductible && (
+                                          <span className="text-muted-foreground ml-2">(Fr. {prod.deductible} CHF)</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-3 pt-2 border-t flex justify-between items-center">
+                                  <span className="font-semibold">Total mensuel</span>
+                                  <span className="text-lg font-bold text-primary">
+                                    {policy.premium_monthly ? Number(policy.premium_monthly).toFixed(2) : totalFromProducts.toFixed(2)} CHF
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Single product - Health Insurance Details */}
+                            {!hasMultipleProducts && category === 'health' && (
                               <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
@@ -540,25 +570,11 @@ export default function ClientDetail() {
                                     </p>
                                   </div>
                                 </div>
-                                {/* Commission for health */}
-                                {expectedCommission !== null && (
-                                  <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">Commission attendue</p>
-                                        <p className="text-xs text-muted-foreground/70">{commissionFormula}</p>
-                                      </div>
-                                      <p className="font-bold text-emerald-700 dark:text-emerald-400">
-                                        {expectedCommission.toFixed(2)} CHF
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             )}
                             
-                            {/* Life Insurance Details */}
-                            {category === 'life' && (
+                            {/* Single product - Life Insurance Details */}
+                            {!hasMultipleProducts && category === 'life' && (
                               <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                   <div>
@@ -586,30 +602,11 @@ export default function ClientDetail() {
                                     </p>
                                   </div>
                                 </div>
-                                {/* Commission and total value for life */}
-                                {expectedCommission !== null && durationYears && policy.premium_monthly && (
-                                  <div className="mt-3 pt-3 border-t border-violet-200 dark:border-violet-800">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">Valeur totale du contrat</p>
-                                        <p className="font-semibold text-violet-700 dark:text-violet-400">
-                                          {(Number(policy.premium_monthly) * 12 * durationYears).toLocaleString('fr-CH')} CHF
-                                        </p>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="text-xs text-muted-foreground">Commission attendue (4%)</p>
-                                        <p className="font-bold text-violet-700 dark:text-violet-400">
-                                          {expectedCommission.toFixed(2)} CHF
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             )}
                             
-                            {/* Other Insurance Types (auto, home, legal, etc.) */}
-                            {category && !['health', 'life'].includes(category) && (
+                            {/* Single product - Other Insurance Types */}
+                            {!hasMultipleProducts && category && !['health', 'life'].includes(category) && (
                               <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                   <div>
@@ -635,7 +632,7 @@ export default function ClientDetail() {
                             )}
                             
                             {/* Fallback for contracts without category */}
-                            {!category && (
+                            {!hasMultipleProducts && !category && (
                               <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                   <div>

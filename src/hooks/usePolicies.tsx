@@ -17,6 +17,16 @@ export type Policy = {
   deductible?: number | null;
   currency: string;
   notes?: string | null;
+  company_name?: string | null;
+  product_type?: string | null;
+  products_data?: Array<{
+    productId: string;
+    name: string;
+    category: string;
+    premium: number;
+    deductible?: number | null;
+    durationYears?: number | null;
+  }> | null;
   created_at: string;
   updated_at: string;
   client?: any;
