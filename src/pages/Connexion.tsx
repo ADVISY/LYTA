@@ -11,14 +11,56 @@ import { useAuth } from "@/hooks/useAuth";
 
 const Connexion = () => {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer votre adresse email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await resetPassword(email);
+      
+      if (error) {
+        toast({
+          title: "Erreur",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Email envoyé",
+          description: "Un email de réinitialisation a été envoyé à votre adresse.",
+        });
+        setIsResetPassword(false);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Une erreur est survenue.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Redirect if already logged in
   useEffect(() => {
@@ -133,13 +175,50 @@ const Connexion = () => {
             className="h-32 sm:h-40 mx-auto mb-8 drop-shadow-2xl hover:scale-105 transition-transform duration-300"
           />
           <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            Espace sécurisé Advisy
+            {isResetPassword ? "Réinitialiser le mot de passe" : "Espace sécurisé Advisy"}
           </h1>
           <p className="text-slate-600">
-            {isSignUp ? "Créez votre compte pour accéder à votre espace" : "Connectez-vous à votre espace client"}
+            {isResetPassword 
+              ? "Entrez votre email pour recevoir un lien de réinitialisation" 
+              : (isSignUp ? "Créez votre compte pour accéder à votre espace" : "Connectez-vous à votre espace client")}
           </p>
         </div>
 
+        {isResetPassword ? (
+          <div className="max-w-xl w-full bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 animate-scale-in">
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="votre@email.ch"
+                  className="h-11"
+                />
+              </div>
+
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-[#1800AD] hover:bg-[#1800AD]/90 text-white font-semibold rounded-full h-11 mt-6 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-[1px]"
+              >
+                {loading ? "Envoi en cours..." : "Envoyer le lien"}
+              </Button>
+
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsResetPassword(false)}
+                  className="text-sm text-slate-600 hover:text-[#1800AD]"
+                >
+                  Retour à la connexion
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
         <div className="max-w-xl w-full bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 animate-scale-in">
           <Tabs defaultValue="client" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -213,10 +292,7 @@ const Connexion = () => {
                     <button
                       type="button"
                       className="text-xs text-[#1800AD] hover:underline"
-                      onClick={() => toast({
-                        title: "Mot de passe oublié",
-                        description: "Contactez votre conseiller pour réinitialiser votre mot de passe.",
-                      })}
+                      onClick={() => setIsResetPassword(true)}
                     >
                       Mot de passe oublié ?
                     </button>
@@ -309,10 +385,7 @@ const Connexion = () => {
                     <button
                       type="button"
                       className="text-xs text-[#1800AD] hover:underline"
-                      onClick={() => toast({
-                        title: "Mot de passe oublié",
-                        description: "Contactez l'administrateur pour réinitialiser votre mot de passe.",
-                      })}
+                      onClick={() => setIsResetPassword(true)}
                     >
                       Mot de passe oublié ?
                     </button>
@@ -340,6 +413,7 @@ const Connexion = () => {
             </TabsContent>
           </Tabs>
         </div>
+        )}
       </main>
     </div>
   );
