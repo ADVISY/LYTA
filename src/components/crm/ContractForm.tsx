@@ -63,6 +63,17 @@ const categoryLabels: Record<string, string> = {
   home: "Ménage/RC",
   life: "Vie/Prévoyance",
   legal: "Protection juridique",
+  property: "Ménage/RC",
+  other: "Autre",
+};
+
+// Helper to generate unique IDs safely
+const generateId = (): string => {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
 };
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -71,6 +82,8 @@ const categoryIcons: Record<string, React.ReactNode> = {
   home: <Home className="h-4 w-4" />,
   life: <Shield className="h-4 w-4" />,
   legal: <Scale className="h-4 w-4" />,
+  property: <Home className="h-4 w-4" />,
+  other: <Shield className="h-4 w-4" />,
 };
 
 const categoryColors: Record<string, string> = {
@@ -79,10 +92,13 @@ const categoryColors: Record<string, string> = {
   home: "bg-blue-50 text-blue-800 border-blue-200",
   life: "bg-violet-50 text-violet-800 border-violet-200",
   legal: "bg-amber-50 text-amber-800 border-amber-200",
+  property: "bg-blue-50 text-blue-800 border-blue-200",
+  other: "bg-gray-50 text-gray-800 border-gray-200",
 };
 
 // Helper to detect if a health product is LAMal or LCA
-const isLamalProduct = (productName: string): boolean => {
+const isLamalProduct = (productName: string | null | undefined): boolean => {
+  if (!productName) return false;
   const name = productName.toLowerCase();
   return name.includes('lamal') || name.includes('base') || name.includes('obligatoire');
 };
@@ -157,16 +173,19 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
   };
 
   const toggleProductSelection = (product: Product) => {
+    if (!product || !product.id) return;
+    
     const isSelected = selectedProducts.some(sp => sp.productId === product.id);
     
     if (isSelected) {
       setSelectedProducts(prev => prev.filter(sp => sp.productId !== product.id));
     } else {
+      const category = product.category || 'other';
       setSelectedProducts(prev => [...prev, {
-        id: crypto.randomUUID(),
+        id: generateId(),
         productId: product.id,
-        name: product.name,
-        category: product.category,
+        name: product.name || 'Produit sans nom',
+        category: category,
         premium: "",
         deductible: "",
         durationYears: "",
@@ -190,12 +209,13 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
 
   // Categorize selected products
   const categorizedSelection = useMemo(() => {
-    const health = selectedProducts.filter(p => p.category === 'health');
-    const life = selectedProducts.filter(p => p.category === 'life');
-    const other = selectedProducts.filter(p => !['health', 'life'].includes(p.category));
+    const safeProducts = selectedProducts.filter(p => p && p.id && p.category);
+    const health = safeProducts.filter(p => p.category === 'health');
+    const life = safeProducts.filter(p => p.category === 'life');
+    const other = safeProducts.filter(p => !['health', 'life'].includes(p.category || ''));
     
-    const healthLamal = health.filter(p => isLamalProduct(p.name));
-    const healthLca = health.filter(p => !isLamalProduct(p.name));
+    const healthLamal = health.filter(p => p.name && isLamalProduct(p.name));
+    const healthLca = health.filter(p => !p.name || !isLamalProduct(p.name));
     
     return { healthLamal, healthLca, life, other, health };
   }, [selectedProducts]);
@@ -447,8 +467,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                           </div>
                           <div className="space-y-1 pl-1">
                             {products.map((product) => {
+                              if (!product || !product.id) return null;
                               const isSelected = selectedProducts.some(sp => sp.productId === product.id);
-                              const isLamal = product.category === 'health' && isLamalProduct(product.name);
+                              const isLamal = product.category === 'health' && product.name && isLamalProduct(product.name);
                               return (
                                 <div
                                   key={product.id}
@@ -465,7 +486,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                     onClick={(e) => e.stopPropagation()}
                                     onCheckedChange={() => toggleProductSelection(product)}
                                   />
-                                  <span className="flex-1 truncate">{product.name}</span>
+                                  <span className="flex-1 truncate">{product.name || 'Produit'}</span>
                                   {isLamal && (
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
                                       LAMal
@@ -543,7 +564,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                     </div>
                                   </div>
                                   <div className="mt-2 text-xs text-muted-foreground">
-                                    Produit: {categorizedSelection.healthLamal.map(p => p.name).join(', ')}
+                                    Produit: {categorizedSelection.healthLamal.map(p => p.name || 'Produit').join(', ')}
                                   </div>
                                 </div>
                               )}
@@ -556,33 +577,36 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                     Assurances complémentaires ({categorizedSelection.healthLca.length})
                                   </h4>
                                   <div className="space-y-3">
-                                    {categorizedSelection.healthLca.map((product) => (
-                                      <div key={product.id} className="flex items-center gap-3 p-2 bg-white rounded border">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium truncate">{product.name}</p>
+                                    {categorizedSelection.healthLca.map((product) => {
+                                      if (!product || !product.id) return null;
+                                      return (
+                                        <div key={product.id} className="flex items-center gap-3 p-2 bg-white rounded border">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{product.name || 'Produit'}</p>
+                                          </div>
+                                          <div className="w-32">
+                                            <Input
+                                              type="number"
+                                              step="0.05"
+                                              min="0"
+                                              placeholder="Prime/mois"
+                                              value={product.premium || ""}
+                                              onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
+                                              className="h-8 text-sm"
+                                            />
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
                                         </div>
-                                        <div className="w-32">
-                                          <Input
-                                            type="number"
-                                            step="0.05"
-                                            min="0"
-                                            placeholder="Prime/mois"
-                                            value={product.premium}
-                                            onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
-                                            className="h-8 text-sm"
-                                          />
-                                        </div>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
-                                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                   {totals.lcaTotal > 0 && (
                                     <p className="mt-2 text-sm font-medium text-right">
@@ -612,53 +636,56 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                 <h3 className="font-bold">Vie / Prévoyance / 3e Pilier</h3>
                               </div>
                               <div className="space-y-3">
-                                {categorizedSelection.life.map((product) => (
-                                  <div key={product.id} className="p-3 bg-white/60 rounded-lg">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <p className="font-medium text-sm">{product.name}</p>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
-                                        className="h-6 w-6 p-0 text-destructive"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <Label className="text-xs">Prime mensuelle (CHF)</Label>
-                                        <Input
-                                          type="number"
-                                          step="0.05"
-                                          min="0"
-                                          placeholder="200.00"
-                                          value={product.premium}
-                                          onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
-                                          className="h-8 text-sm bg-white"
-                                        />
+                                {categorizedSelection.life.map((product) => {
+                                  if (!product || !product.id) return null;
+                                  return (
+                                    <div key={product.id} className="p-3 bg-white/60 rounded-lg">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <p className="font-medium text-sm">{product.name || 'Produit'}</p>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                          className="h-6 w-6 p-0 text-destructive"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
                                       </div>
-                                      <div>
-                                        <Label className="text-xs">Durée (années)</Label>
-                                        <Input
-                                          type="number"
-                                          min="1"
-                                          max="50"
-                                          placeholder="10"
-                                          value={product.durationYears}
-                                          onChange={(e) => updateSelectedProduct(product.id, { durationYears: e.target.value })}
-                                          className="h-8 text-sm bg-white"
-                                        />
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <Label className="text-xs">Prime mensuelle (CHF)</Label>
+                                          <Input
+                                            type="number"
+                                            step="0.05"
+                                            min="0"
+                                            placeholder="200.00"
+                                            value={product.premium || ""}
+                                            onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
+                                            className="h-8 text-sm bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label className="text-xs">Durée (années)</Label>
+                                          <Input
+                                            type="number"
+                                            min="1"
+                                            max="50"
+                                            placeholder="10"
+                                            value={product.durationYears || ""}
+                                            onChange={(e) => updateSelectedProduct(product.id, { durationYears: e.target.value })}
+                                            className="h-8 text-sm bg-white"
+                                          />
+                                        </div>
                                       </div>
+                                      {product.premium && product.durationYears && (
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                          Total sur {product.durationYears} ans: {(parseFloat(product.premium) * 12 * parseInt(product.durationYears)).toLocaleString('fr-CH')} CHF
+                                        </p>
+                                      )}
                                     </div>
-                                    {product.premium && product.durationYears && (
-                                      <p className="mt-2 text-xs text-muted-foreground">
-                                        Total sur {product.durationYears} ans: {(parseFloat(product.premium) * 12 * parseInt(product.durationYears)).toLocaleString('fr-CH')} CHF
-                                      </p>
-                                    )}
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                               {totals.lifeTotal > 0 && (
                                 <div className="mt-4 pt-3 border-t border-violet-300">
@@ -679,53 +706,57 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess }
                                 <h3 className="font-bold">Autres assurances</h3>
                               </div>
                               <div className="space-y-3">
-                                {categorizedSelection.other.map((product) => (
-                                  <div key={product.id} className="p-3 bg-white rounded-lg border">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${categoryColors[product.category]}`}>
-                                          {categoryLabels[product.category]}
-                                        </span>
-                                        <p className="font-medium text-sm">{product.name}</p>
+                                {categorizedSelection.other.map((product) => {
+                                  if (!product || !product.id) return null;
+                                  const category = product.category || 'other';
+                                  return (
+                                    <div key={product.id} className="p-3 bg-white rounded-lg border">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${categoryColors[category] || 'bg-gray-100 text-gray-800'}`}>
+                                            {categoryLabels[category] || category}
+                                          </span>
+                                          <p className="font-medium text-sm">{product.name || 'Produit'}</p>
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
+                                          className="h-6 w-6 p-0 text-destructive"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
                                       </div>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== product.id))}
-                                        className="h-6 w-6 p-0 text-destructive"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <Label className="text-xs">Prime mensuelle (CHF)</Label>
+                                          <Input
+                                            type="number"
+                                            step="0.05"
+                                            min="0"
+                                            placeholder="50.00"
+                                            value={product.premium || ""}
+                                            onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
+                                            className="h-8 text-sm"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label className="text-xs">Franchise (CHF)</Label>
+                                          <Input
+                                            type="number"
+                                            step="100"
+                                            min="0"
+                                            placeholder="200"
+                                            value={product.deductible || ""}
+                                            onChange={(e) => updateSelectedProduct(product.id, { deductible: e.target.value })}
+                                            className="h-8 text-sm"
+                                          />
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <Label className="text-xs">Prime mensuelle (CHF)</Label>
-                                        <Input
-                                          type="number"
-                                          step="0.05"
-                                          min="0"
-                                          placeholder="50.00"
-                                          value={product.premium}
-                                          onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
-                                          className="h-8 text-sm"
-                                        />
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs">Franchise (CHF)</Label>
-                                        <Input
-                                          type="number"
-                                          step="100"
-                                          min="0"
-                                          placeholder="200"
-                                          value={product.deductible}
-                                          onChange={(e) => updateSelectedProduct(product.id, { deductible: e.target.value })}
-                                          className="h-8 text-sm"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                               {totals.otherTotal > 0 && (
                                 <div className="mt-4 pt-3 border-t border-slate-300">
