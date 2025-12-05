@@ -4,12 +4,13 @@ import { useClients, Client } from "@/hooks/useClients";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 import { usePolicies, Policy } from "@/hooks/usePolicies";
 import { useDocuments, Document } from "@/hooks/useDocuments";
+import { useSuivis, Suivi, suiviTypeLabels, suiviStatusLabels, suiviStatusColors } from "@/hooks/useSuivis";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +21,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
 import ContractForm from "@/components/crm/ContractForm";
+import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import {
   Table,
@@ -73,6 +81,7 @@ export default function ClientDetail() {
   const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
   const { policies, loading: policiesLoading, fetchPolicies, deletePolicy } = usePolicies();
   const { createDocument, deleteDocument } = useDocuments();
+  const { suivis, loading: suivisLoading, stats: suiviStats, fetchSuivis, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis(id);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
@@ -83,6 +92,11 @@ export default function ClientDetail() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
+  const [suiviFormOpen, setSuiviFormOpen] = useState(false);
+  const [editSuiviOpen, setEditSuiviOpen] = useState(false);
+  const [editSuivi, setEditSuivi] = useState<Suivi | null>(null);
+  const [deleteSuiviConfirmOpen, setDeleteSuiviConfirmOpen] = useState(false);
+  const [suiviToDelete, setSuiviToDelete] = useState<string | null>(null);
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -833,7 +847,7 @@ export default function ClientDetail() {
                     <ClipboardList className="h-5 w-5" />
                     Suivis et tâches
                   </CardTitle>
-                  <Button>
+                  <Button onClick={() => setSuiviFormOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Nouveau suivi
                   </Button>
@@ -846,43 +860,138 @@ export default function ClientDetail() {
                         <Clock className="h-4 w-4 text-blue-600" />
                         <span className="text-sm text-muted-foreground">Ouverts</span>
                       </div>
-                      <p className="text-2xl font-bold text-blue-600">0</p>
+                      <p className="text-2xl font-bold text-blue-600">{suiviStats.ouverts}</p>
                     </div>
                     <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
                       <div className="flex items-center gap-2 mb-1">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <span className="text-sm text-muted-foreground">En cours</span>
                       </div>
-                      <p className="text-2xl font-bold text-amber-600">0</p>
+                      <p className="text-2xl font-bold text-amber-600">{suiviStats.en_cours}</p>
                     </div>
                     <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
                       <div className="flex items-center gap-2 mb-1">
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        <span className="text-sm text-muted-foreground">Terminés</span>
+                        <span className="text-sm text-muted-foreground">Fermés</span>
                       </div>
-                      <p className="text-2xl font-bold text-emerald-600">0</p>
+                      <p className="text-2xl font-bold text-emerald-600">{suiviStats.fermes}</p>
                     </div>
                     <div className="p-4 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
                       <div className="flex items-center gap-2 mb-1">
                         <ClipboardList className="h-4 w-4 text-violet-600" />
                         <span className="text-sm text-muted-foreground">Total</span>
                       </div>
-                      <p className="text-2xl font-bold text-violet-600">0</p>
+                      <p className="text-2xl font-bold text-violet-600">{suiviStats.total}</p>
                     </div>
                   </div>
 
-                  {/* Empty state */}
-                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p className="text-muted-foreground mb-2">Aucun suivi pour ce client</p>
-                    <p className="text-sm text-muted-foreground/70 mb-4">
-                      Ajoutez des notes, rappels et tâches de suivi
-                    </p>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Créer un suivi
-                    </Button>
-                  </div>
+                  {/* Suivis list */}
+                  {suivisLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    </div>
+                  ) : suivis.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                      <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="text-muted-foreground mb-2">Aucun suivi pour ce client</p>
+                      <p className="text-sm text-muted-foreground/70 mb-4">
+                        Ajoutez des notes, rappels et tâches de suivi
+                      </p>
+                      <Button onClick={() => setSuiviFormOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Créer un suivi
+                      </Button>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Titre</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Statut</TableHead>
+                          <TableHead>Date de rappel</TableHead>
+                          <TableHead>Créé le</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {suivis.map((suivi) => (
+                          <TableRow key={suivi.id}>
+                            <TableCell className="font-medium">
+                              {suivi.title}
+                              {suivi.description && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                  {suivi.description}
+                                </p>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {suivi.type ? (
+                                <Badge variant="outline">
+                                  {suiviTypeLabels[suivi.type] || suivi.type}
+                                </Badge>
+                              ) : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${suiviStatusColors[suivi.status]} text-white`}>
+                                {suiviStatusLabels[suivi.status] || suivi.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {suivi.reminder_date ? (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(suivi.reminder_date), "dd/MM/yyyy", { locale: fr })}
+                                </span>
+                              ) : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(suivi.created_at), "dd/MM/yyyy", { locale: fr })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => {
+                                    setEditSuivi(suivi);
+                                    setEditSuiviOpen(true);
+                                  }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Modifier
+                                  </DropdownMenuItem>
+                                  {suivi.status !== "ferme" ? (
+                                    <DropdownMenuItem onClick={() => closeSuivi(suivi.id)}>
+                                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                                      Fermer le suivi
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => reopenSuivi(suivi.id)}>
+                                      <RotateCcw className="h-4 w-4 mr-2" />
+                                      Réouvrir
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={() => {
+                                      setSuiviToDelete(suivi.id);
+                                      setDeleteSuiviConfirmOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -937,6 +1046,56 @@ export default function ClientDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setPolicyToDelete(null)}>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeletePolicy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Suivi Form - Create */}
+      <SuiviForm
+        clientId={id!}
+        open={suiviFormOpen}
+        onOpenChange={setSuiviFormOpen}
+        onSuccess={fetchSuivis}
+      />
+
+      {/* Suivi Form - Edit */}
+      {editSuivi && (
+        <SuiviForm
+          clientId={id!}
+          open={editSuiviOpen}
+          onOpenChange={(open) => {
+            setEditSuiviOpen(open);
+            if (!open) setEditSuivi(null);
+          }}
+          onSuccess={fetchSuivis}
+          editMode={true}
+          suivi={editSuivi}
+        />
+      )}
+
+      {/* Delete Suivi Confirmation Dialog */}
+      <AlertDialog open={deleteSuiviConfirmOpen} onOpenChange={setDeleteSuiviConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce suivi ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le suivi sera définitivement supprimé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSuiviToDelete(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={async () => {
+                if (suiviToDelete) {
+                  await deleteSuivi(suiviToDelete);
+                  setDeleteSuiviConfirmOpen(false);
+                  setSuiviToDelete(null);
+                }
+              }} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
