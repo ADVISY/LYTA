@@ -10,6 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
@@ -61,7 +71,7 @@ export default function ClientDetail() {
   const { toast } = useToast();
   const { getClientById } = useClients();
   const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
-  const { policies, loading: policiesLoading, fetchPolicies } = usePolicies();
+  const { policies, loading: policiesLoading, fetchPolicies, deletePolicy } = usePolicies();
   const { createDocument, deleteDocument } = useDocuments();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +81,8 @@ export default function ClientDetail() {
   const [editPolicyId, setEditPolicyId] = useState<string | null>(null);
   const [clientDocuments, setClientDocuments] = useState<Document[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -160,6 +172,17 @@ export default function ClientDetail() {
         description: "Impossible d'ouvrir le document",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeletePolicy = async () => {
+    if (!policyToDelete) return;
+    try {
+      await deletePolicy(policyToDelete);
+      setDeleteConfirmOpen(false);
+      setPolicyToDelete(null);
+    } catch (error) {
+      console.error('Error deleting policy:', error);
     }
   };
 
@@ -492,17 +515,30 @@ export default function ClientDetail() {
                                     {policy.start_date ? format(new Date(policy.start_date), "dd.MM.yyyy") : "-"}
                                   </p>
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => {
-                                    setEditPolicyId(policy.id);
-                                    setEditContractOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      setEditPolicyId(policy.id);
+                                      setEditContractOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      setPolicyToDelete(policy.id);
+                                      setDeleteConfirmOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                             
@@ -843,6 +879,24 @@ export default function ClientDetail() {
           policyId={editPolicyId}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce contrat ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le contrat et toutes ses données seront définitivement supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPolicyToDelete(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePolicy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
