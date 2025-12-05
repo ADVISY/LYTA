@@ -109,12 +109,12 @@ export default function ClientDetail() {
     }
   };
 
-  // Reload documents when policies change
+  // Reload documents when policies load (only once per policy count change)
   useEffect(() => {
-    if (id && policies.length > 0) {
+    if (id && !policiesLoading && policies.length > 0) {
       loadDocuments();
     }
-  }, [policies, id]);
+  }, [policiesLoading, id]);
 
   const handleDocumentUpload = async (doc: { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number }) => {
     if (!id) return;
