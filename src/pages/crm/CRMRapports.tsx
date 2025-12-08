@@ -20,56 +20,57 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Types de rapports disponibles
-const reportTypes = [
-  { id: "adresses", label: "Liste d'adresses", icon: Users },
-  { id: "contrats", label: "Liste des contrats", icon: FileCheck },
-  { id: "suivis", label: "Liste des suivis", icon: MessageSquare },
+// Sources de données disponibles
+const dataSources = [
+  { id: "adresses", label: "Adresses", icon: Users, required: true },
+  { id: "contrats", label: "Contrats", icon: FileCheck, required: false },
+  { id: "suivis", label: "Suivis", icon: MessageSquare, required: false },
 ];
 
-// Champs disponibles par type
-const fieldsByType: Record<string, { id: string; label: string; type: string }[]> = {
+// Champs disponibles par source
+const fieldsBySource: Record<string, { id: string; label: string; type: string; dbField: string }[]> = {
   adresses: [
-    { id: "type_adresse", label: "Type d'adresse", type: "select" },
-    { id: "first_name", label: "Prénom", type: "text" },
-    { id: "last_name", label: "Nom", type: "text" },
-    { id: "email", label: "Email", type: "text" },
-    { id: "phone", label: "Téléphone", type: "text" },
-    { id: "mobile", label: "Mobile", type: "text" },
-    { id: "address", label: "Adresse", type: "text" },
-    { id: "zip_code", label: "Code postal", type: "text" },
-    { id: "city", label: "Ville", type: "text" },
-    { id: "canton", label: "Canton", type: "text" },
-    { id: "country", label: "Pays", type: "text" },
-    { id: "birthdate", label: "Date de naissance", type: "date" },
-    { id: "nationality", label: "Nationalité", type: "text" },
-    { id: "civil_status", label: "État civil", type: "select" },
-    { id: "permit_type", label: "Permis", type: "select" },
-    { id: "profession", label: "Profession", type: "text" },
-    { id: "employer", label: "Employeur", type: "text" },
-    { id: "status", label: "Statut", type: "select" },
-    { id: "created_at", label: "Date de création", type: "date" },
+    { id: "adr_type_adresse", label: "Type d'adresse", type: "select", dbField: "type_adresse" },
+    { id: "adr_first_name", label: "Prénom", type: "text", dbField: "first_name" },
+    { id: "adr_last_name", label: "Nom", type: "text", dbField: "last_name" },
+    { id: "adr_email", label: "Email", type: "text", dbField: "email" },
+    { id: "adr_phone", label: "Téléphone", type: "text", dbField: "phone" },
+    { id: "adr_mobile", label: "Mobile", type: "text", dbField: "mobile" },
+    { id: "adr_address", label: "Adresse", type: "text", dbField: "address" },
+    { id: "adr_zip_code", label: "Code postal", type: "text", dbField: "zip_code" },
+    { id: "adr_city", label: "Ville", type: "text", dbField: "city" },
+    { id: "adr_canton", label: "Canton", type: "text", dbField: "canton" },
+    { id: "adr_country", label: "Pays", type: "text", dbField: "country" },
+    { id: "adr_birthdate", label: "Date de naissance", type: "date", dbField: "birthdate" },
+    { id: "adr_nationality", label: "Nationalité", type: "text", dbField: "nationality" },
+    { id: "adr_civil_status", label: "État civil", type: "select", dbField: "civil_status" },
+    { id: "adr_permit_type", label: "Permis", type: "select", dbField: "permit_type" },
+    { id: "adr_profession", label: "Profession", type: "text", dbField: "profession" },
+    { id: "adr_employer", label: "Employeur", type: "text", dbField: "employer" },
+    { id: "adr_status", label: "Statut client", type: "select", dbField: "status" },
+    { id: "adr_created_at", label: "Date création adresse", type: "date", dbField: "created_at" },
   ],
   contrats: [
-    { id: "policy_number", label: "Numéro de police", type: "text" },
-    { id: "company_name", label: "Compagnie", type: "text" },
-    { id: "product_type", label: "Type de produit", type: "select" },
-    { id: "status", label: "Statut", type: "select" },
-    { id: "start_date", label: "Date de début", type: "date" },
-    { id: "end_date", label: "Date de fin", type: "date" },
-    { id: "premium_monthly", label: "Prime mensuelle", type: "number" },
-    { id: "premium_yearly", label: "Prime annuelle", type: "number" },
-    { id: "deductible", label: "Franchise", type: "number" },
-    { id: "created_at", label: "Date de création", type: "date" },
+    { id: "ctr_policy_number", label: "N° Police", type: "text", dbField: "policy_number" },
+    { id: "ctr_company_name", label: "Compagnie", type: "text", dbField: "company_name" },
+    { id: "ctr_product_type", label: "Type produit", type: "select", dbField: "product_type" },
+    { id: "ctr_status", label: "Statut contrat", type: "select", dbField: "status" },
+    { id: "ctr_start_date", label: "Date début", type: "date", dbField: "start_date" },
+    { id: "ctr_end_date", label: "Date fin", type: "date", dbField: "end_date" },
+    { id: "ctr_premium_monthly", label: "Prime mensuelle", type: "number", dbField: "premium_monthly" },
+    { id: "ctr_premium_yearly", label: "Prime annuelle", type: "number", dbField: "premium_yearly" },
+    { id: "ctr_deductible", label: "Franchise", type: "number", dbField: "deductible" },
+    { id: "ctr_notes", label: "Notes contrat", type: "text", dbField: "notes" },
+    { id: "ctr_created_at", label: "Date création contrat", type: "date", dbField: "created_at" },
   ],
   suivis: [
-    { id: "title", label: "Titre", type: "text" },
-    { id: "type", label: "Type", type: "select" },
-    { id: "status", label: "Statut", type: "select" },
-    { id: "description", label: "Description", type: "text" },
-    { id: "reminder_date", label: "Date de rappel", type: "date" },
-    { id: "created_at", label: "Date de création", type: "date" },
-    { id: "updated_at", label: "Dernière mise à jour", type: "date" },
+    { id: "suv_title", label: "Titre suivi", type: "text", dbField: "title" },
+    { id: "suv_type", label: "Type suivi", type: "select", dbField: "type" },
+    { id: "suv_status", label: "Statut suivi", type: "select", dbField: "status" },
+    { id: "suv_description", label: "Description", type: "text", dbField: "description" },
+    { id: "suv_reminder_date", label: "Date rappel", type: "date", dbField: "reminder_date" },
+    { id: "suv_created_at", label: "Date création suivi", type: "date", dbField: "created_at" },
+    { id: "suv_updated_at", label: "Mise à jour suivi", type: "date", dbField: "updated_at" },
   ],
 };
 
@@ -103,21 +104,21 @@ const operatorsByFieldType: Record<string, { id: string; label: string }[]> = {
   ],
 };
 
-// Conditions additionnelles
-const additionalConditions = [
-  { id: "has_contract", label: "Doit avoir un contrat" },
-  { id: "no_contract", label: "Ne doit pas avoir de contrat" },
-  { id: "has_suivi", label: "Doit avoir un suivi" },
-  { id: "no_suivi", label: "Ne doit pas avoir de suivi" },
+// Conditions de jointure
+const joinConditions = [
+  { id: "has_contract", label: "Doit avoir un contrat", source: "contrats" },
+  { id: "no_contract", label: "Ne doit pas avoir de contrat", source: "contrats" },
+  { id: "has_suivi", label: "Doit avoir un suivi", source: "suivis" },
+  { id: "no_suivi", label: "Ne doit pas avoir de suivi", source: "suivis" },
 ];
 
 interface SavedReport {
   id: string;
   name: string;
-  type: string;
+  sources: string[];
   selectedFields: string[];
   filters: ReportFilter[];
-  conditions: string[];
+  joinConditions: string[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +126,7 @@ interface SavedReport {
 
 interface ReportFilter {
   id: string;
+  source: string;
   field: string;
   operator: string;
   value: string;
@@ -139,17 +141,18 @@ export default function CRMRapports() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [reportResults, setReportResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [activeTab, setActiveTab] = useState("adresses");
 
   // État du nouveau rapport
   const [reportName, setReportName] = useState("");
-  const [reportType, setReportType] = useState("adresses");
+  const [selectedSources, setSelectedSources] = useState<string[]>(["adresses"]);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [filters, setFilters] = useState<ReportFilter[]>([]);
   const [conditions, setConditions] = useState<string[]>([]);
 
   // Charger les rapports sauvegardés depuis localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("crm_reports");
+    const saved = localStorage.getItem("crm_reports_v2");
     if (saved) {
       setSavedReports(JSON.parse(saved));
     }
@@ -157,7 +160,7 @@ export default function CRMRapports() {
 
   // Sauvegarder dans localStorage
   const saveReportsToStorage = (reports: SavedReport[]) => {
-    localStorage.setItem("crm_reports", JSON.stringify(reports));
+    localStorage.setItem("crm_reports_v2", JSON.stringify(reports));
     setSavedReports(reports);
   };
 
@@ -174,10 +177,10 @@ export default function CRMRapports() {
     const newReport: SavedReport = {
       id: crypto.randomUUID(),
       name: reportName,
-      type: reportType,
+      sources: selectedSources,
       selectedFields,
       filters,
-      conditions,
+      joinConditions: conditions,
       createdBy: user?.email || "Utilisateur",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -194,12 +197,13 @@ export default function CRMRapports() {
 
     const updated = savedReports.map(r => 
       r.id === selectedReport.id 
-        ? { ...r, name: reportName, selectedFields, filters, conditions, updatedAt: new Date().toISOString() }
+        ? { ...r, name: reportName, sources: selectedSources, selectedFields, filters, joinConditions: conditions, updatedAt: new Date().toISOString() }
         : r
     );
     saveReportsToStorage(updated);
     setSelectedReport(null);
     resetForm();
+    setIsNewReportOpen(false);
     toast.success("Rapport mis à jour");
   };
 
@@ -211,10 +215,30 @@ export default function CRMRapports() {
 
   const resetForm = () => {
     setReportName("");
-    setReportType("adresses");
+    setSelectedSources(["adresses"]);
     setSelectedFields([]);
     setFilters([]);
     setConditions([]);
+    setActiveTab("adresses");
+  };
+
+  const toggleSource = (sourceId: string) => {
+    if (sourceId === "adresses") return; // Adresses is always required
+    
+    setSelectedSources(prev => {
+      const newSources = prev.includes(sourceId)
+        ? prev.filter(s => s !== sourceId)
+        : [...prev, sourceId];
+      
+      // Remove fields and filters from removed sources
+      if (!newSources.includes(sourceId)) {
+        const prefix = sourceId === "contrats" ? "ctr_" : "suv_";
+        setSelectedFields(f => f.filter(field => !field.startsWith(prefix)));
+        setFilters(f => f.filter(filter => filter.source !== sourceId));
+      }
+      
+      return newSources;
+    });
   };
 
   const toggleField = (fieldId: string) => {
@@ -225,11 +249,12 @@ export default function CRMRapports() {
     );
   };
 
-  const addFilter = () => {
-    const availableFields = fieldsByType[reportType];
-    if (availableFields.length > 0) {
+  const addFilter = (source: string) => {
+    const availableFields = fieldsBySource[source];
+    if (availableFields && availableFields.length > 0) {
       setFilters([...filters, {
         id: crypto.randomUUID(),
+        source,
         field: availableFields[0].id,
         operator: "equals",
         value: "",
@@ -253,78 +278,154 @@ export default function CRMRapports() {
     );
   };
 
+  const getFieldLabel = (fieldId: string): string => {
+    for (const source of Object.keys(fieldsBySource)) {
+      const field = fieldsBySource[source].find(f => f.id === fieldId);
+      if (field) return field.label;
+    }
+    return fieldId;
+  };
+
   const executeReport = async (report: SavedReport) => {
     setIsExecuting(true);
     setShowResults(true);
     
     try {
-      let query;
+      // Fetch clients with optional joins
+      const { data: clientsData, error: clientsError } = await supabase
+        .from("clients")
+        .select("*");
       
-      if (report.type === "adresses") {
-        query = supabase.from("clients").select("*");
-      } else if (report.type === "contrats") {
-        query = supabase.from("policies").select(`
-          *,
-          client:clients(first_name, last_name, email)
-        `);
-      } else if (report.type === "suivis") {
-        query = supabase.from("suivis").select(`
-          *,
-          client:clients(first_name, last_name, email)
-        `);
+      if (clientsError) throw clientsError;
+
+      // Fetch policies if needed
+      let policiesData: any[] = [];
+      if (report.sources.includes("contrats")) {
+        const { data, error } = await supabase.from("policies").select("*");
+        if (!error && data) policiesData = data;
       }
 
-      if (!query) {
-        throw new Error("Type de rapport non supporté");
+      // Fetch suivis if needed
+      let suivisData: any[] = [];
+      if (report.sources.includes("suivis")) {
+        const { data, error } = await supabase.from("suivis").select("*");
+        if (!error && data) suivisData = data;
       }
 
-      // Appliquer les filtres
-      for (const filter of report.filters) {
+      // Apply address filters on clients
+      let filteredClients = clientsData || [];
+      const addressFilters = report.filters.filter(f => f.source === "adresses");
+      
+      for (const filter of addressFilters) {
+        const fieldDef = fieldsBySource.adresses.find(f => f.id === filter.field);
+        if (!fieldDef) continue;
+        const dbField = fieldDef.dbField;
+        
         if (!filter.value && filter.operator !== "is_empty" && filter.operator !== "is_not_empty") continue;
         
-        switch (filter.operator) {
-          case "equals":
-            query = query.eq(filter.field, filter.value);
-            break;
-          case "not_equals":
-            query = query.neq(filter.field, filter.value);
-            break;
-          case "contains":
-            query = query.ilike(filter.field, `%${filter.value}%`);
-            break;
-          case "starts_with":
-            query = query.ilike(filter.field, `${filter.value}%`);
-            break;
-          case "ends_with":
-            query = query.ilike(filter.field, `%${filter.value}`);
-            break;
-          case "greater_than":
-            query = query.gt(filter.field, filter.value);
-            break;
-          case "less_than":
-            query = query.lt(filter.field, filter.value);
-            break;
-          case "before":
-            query = query.lt(filter.field, filter.value);
-            break;
-          case "after":
-            query = query.gt(filter.field, filter.value);
-            break;
-          case "is_empty":
-            query = query.is(filter.field, null);
-            break;
-          case "is_not_empty":
-            query = query.not(filter.field, "is", null);
-            break;
-        }
+        filteredClients = filteredClients.filter(client => {
+          const value = client[dbField];
+          switch (filter.operator) {
+            case "equals":
+              return String(value || "") === filter.value;
+            case "not_equals":
+              return String(value || "") !== filter.value;
+            case "contains":
+              return String(value || "").toLowerCase().includes(filter.value.toLowerCase());
+            case "starts_with":
+              return String(value || "").toLowerCase().startsWith(filter.value.toLowerCase());
+            case "ends_with":
+              return String(value || "").toLowerCase().endsWith(filter.value.toLowerCase());
+            case "is_empty":
+              return !value;
+            case "is_not_empty":
+              return !!value;
+            default:
+              return true;
+          }
+        });
       }
 
-      const { data, error } = await query;
+      let results: any[] = [];
+
+      // Process results
+      for (const client of filteredClients) {
+        const baseRow: any = {};
+        
+        // Add address fields
+        for (const field of fieldsBySource.adresses) {
+          if (report.selectedFields.includes(field.id)) {
+            baseRow[field.label] = client[field.dbField] ?? "-";
+          }
+        }
+
+        // Get related policies and suivis
+        const clientPolicies = policiesData.filter(p => p.client_id === client.id);
+        const clientSuivis = suivisData.filter(s => s.client_id === client.id);
+
+        // Apply join conditions
+        if (report.joinConditions.includes("has_contract") && clientPolicies.length === 0) continue;
+        if (report.joinConditions.includes("no_contract") && clientPolicies.length > 0) continue;
+        if (report.joinConditions.includes("has_suivi") && clientSuivis.length === 0) continue;
+        if (report.joinConditions.includes("no_suivi") && clientSuivis.length > 0) continue;
+
+        // If we include contracts
+        if (report.sources.includes("contrats")) {
+          if (clientPolicies.length > 0) {
+            for (const policy of clientPolicies) {
+              const row = { ...baseRow };
+
+              // Add contract fields
+              for (const field of fieldsBySource.contrats) {
+                if (report.selectedFields.includes(field.id)) {
+                  row[field.label] = policy[field.dbField] ?? "-";
+                }
+              }
+
+              // If we also include suivis
+              if (report.sources.includes("suivis") && clientSuivis.length > 0) {
+                for (const suivi of clientSuivis) {
+                  const fullRow = { ...row };
+                  for (const field of fieldsBySource.suivis) {
+                    if (report.selectedFields.includes(field.id)) {
+                      fullRow[field.label] = suivi[field.dbField] ?? "-";
+                    }
+                  }
+                  results.push(fullRow);
+                }
+              } else {
+                results.push(row);
+              }
+            }
+          } else if (!report.joinConditions.includes("has_contract")) {
+            for (const field of fieldsBySource.contrats) {
+              if (report.selectedFields.includes(field.id)) {
+                baseRow[field.label] = "-";
+              }
+            }
+            results.push(baseRow);
+          }
+        } else if (report.sources.includes("suivis")) {
+          if (clientSuivis.length > 0) {
+            for (const suivi of clientSuivis) {
+              const row = { ...baseRow };
+              for (const field of fieldsBySource.suivis) {
+                if (report.selectedFields.includes(field.id)) {
+                  row[field.label] = suivi[field.dbField] ?? "-";
+                }
+              }
+              results.push(row);
+            }
+          } else if (!report.joinConditions.includes("has_suivi")) {
+            results.push(baseRow);
+          }
+        } else {
+          results.push(baseRow);
+        }
+      }
       
-      if (error) throw error;
-      
-      setReportResults(data || []);
-      toast.success(`${data?.length || 0} résultats trouvés`);
+      setReportResults(results);
+      toast.success(`${results.length} résultats trouvés`);
     } catch (error: any) {
       console.error("Erreur lors de l'exécution du rapport:", error);
       toast.error("Erreur lors de l'exécution du rapport");
@@ -356,13 +457,13 @@ export default function CRMRapports() {
   const exportToExcel = () => {
     if (reportResults.length === 0) return;
 
-    const headers = Object.keys(reportResults[0]).join(",");
+    const headers = Object.keys(reportResults[0]).join(";");
     const rows = reportResults.map(row => 
       Object.values(row).map(v => 
         typeof v === "object" ? JSON.stringify(v) : `"${v}"`
-      ).join(",")
+      ).join(";")
     );
-    const csv = [headers, ...rows].join("\n");
+    const csv = "\uFEFF" + [headers, ...rows].join("\n"); // BOM for Excel UTF-8
     
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -376,11 +477,34 @@ export default function CRMRapports() {
   const openEditReport = (report: SavedReport) => {
     setSelectedReport(report);
     setReportName(report.name);
-    setReportType(report.type);
+    setSelectedSources(report.sources);
     setSelectedFields(report.selectedFields);
     setFilters(report.filters);
-    setConditions(report.conditions);
+    setConditions(report.joinConditions);
     setIsNewReportOpen(true);
+  };
+
+  const getSourceIcon = (sources: string[]) => {
+    if (sources.includes("contrats") && sources.includes("suivis")) {
+      return <div className="flex -space-x-1">
+        <Users className="h-4 w-4" />
+        <FileCheck className="h-4 w-4" />
+        <MessageSquare className="h-4 w-4" />
+      </div>;
+    }
+    if (sources.includes("contrats")) {
+      return <div className="flex -space-x-1">
+        <Users className="h-4 w-4" />
+        <FileCheck className="h-4 w-4" />
+      </div>;
+    }
+    if (sources.includes("suivis")) {
+      return <div className="flex -space-x-1">
+        <Users className="h-4 w-4" />
+        <MessageSquare className="h-4 w-4" />
+      </div>;
+    }
+    return <Users className="h-4 w-4" />;
   };
 
   return (
@@ -410,7 +534,7 @@ export default function CRMRapports() {
               Nouveau rapport
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {selectedReport ? "Modifier le rapport" : "Nouveau rapport"}
@@ -418,171 +542,183 @@ export default function CRMRapports() {
             </DialogHeader>
             
             <div className="space-y-6 py-4">
-              {/* Nom et type */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nom du rapport</Label>
-                  <Input 
-                    value={reportName} 
-                    onChange={(e) => setReportName(e.target.value)}
-                    placeholder="Ex: Clients actifs 2025"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type de rapport</Label>
-                  <Select value={reportType} onValueChange={(v) => {
-                    setReportType(v);
-                    setSelectedFields([]);
-                    setFilters([]);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {reportTypes.map(type => (
-                        <SelectItem key={type.id} value={type.id}>
-                          <div className="flex items-center gap-2">
-                            <type.icon className="h-4 w-4" />
-                            {type.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Nom du rapport */}
+              <div className="space-y-2">
+                <Label>Nom du rapport</Label>
+                <Input 
+                  value={reportName} 
+                  onChange={(e) => setReportName(e.target.value)}
+                  placeholder="Ex: Clients avec contrats santé 2025"
+                />
               </div>
 
-              {/* Sélection des champs */}
+              {/* Sélection des sources */}
               <div className="space-y-2">
-                <Label>Champs à afficher</Label>
-                <div className="grid grid-cols-3 gap-2 p-4 border rounded-lg bg-muted/30 max-h-48 overflow-y-auto">
-                  {fieldsByType[reportType]?.map(field => (
-                    <div key={field.id} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={field.id}
-                        checked={selectedFields.includes(field.id)}
-                        onCheckedChange={() => toggleField(field.id)}
-                      />
-                      <label 
-                        htmlFor={field.id} 
-                        className="text-sm cursor-pointer"
-                      >
-                        {field.label}
-                      </label>
-                    </div>
+                <Label>Sources de données</Label>
+                <div className="flex gap-2">
+                  {dataSources.map(source => (
+                    <Badge 
+                      key={source.id}
+                      variant={selectedSources.includes(source.id) ? "default" : "outline"}
+                      className={cn(
+                        "cursor-pointer gap-2 py-2 px-3",
+                        source.required && "cursor-default"
+                      )}
+                      onClick={() => !source.required && toggleSource(source.id)}
+                    >
+                      <source.icon className="h-4 w-4" />
+                      {source.label}
+                      {source.required && <span className="text-xs opacity-70">(requis)</span>}
+                    </Badge>
                   ))}
                 </div>
               </div>
 
-              {/* Conditions additionnelles */}
-              {reportType === "adresses" && (
-                <div className="space-y-2">
-                  <Label>Conditions</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {additionalConditions.map(cond => (
-                      <Badge 
-                        key={cond.id}
-                        variant={conditions.includes(cond.id) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => toggleCondition(cond.id)}
-                      >
-                        {cond.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Filtres */}
+              {/* Conditions de jointure */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Filtres</Label>
-                  <Button variant="outline" size="sm" onClick={addFilter}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Ajouter un filtre
-                  </Button>
+                <Label>Conditions</Label>
+                <div className="flex flex-wrap gap-2">
+                  {joinConditions.map(cond => (
+                    <Badge 
+                      key={cond.id}
+                      variant={conditions.includes(cond.id) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleCondition(cond.id)}
+                    >
+                      {cond.label}
+                    </Badge>
+                  ))}
                 </div>
-                
-                {filters.length > 0 ? (
-                  <div className="space-y-2">
-                    {filters.map(filter => {
-                      const fieldDef = fieldsByType[reportType]?.find(f => f.id === filter.field);
-                      const operators = operatorsByFieldType[fieldDef?.type || "text"] || [];
-                      
-                      return (
-                        <div key={filter.id} className="flex items-center gap-2 p-2 border rounded-lg bg-background">
-                          <Select 
-                            value={filter.field} 
-                            onValueChange={(v) => updateFilter(filter.id, { field: v })}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {fieldsByType[reportType]?.map(f => (
-                                <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          <Select 
-                            value={filter.operator}
-                            onValueChange={(v) => updateFilter(filter.id, { operator: v })}
-                          >
-                            <SelectTrigger className="w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {operators.map(op => (
-                                <SelectItem key={op.id} value={op.id}>{op.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          {!["is_empty", "is_not_empty"].includes(filter.operator) && (
-                            <Input 
-                              value={filter.value}
-                              onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                              placeholder="Valeur..."
-                              className="flex-1"
-                            />
-                          )}
-                          
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => removeFilter(filter.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground p-4 border rounded-lg bg-muted/30 text-center">
-                    Aucun filtre défini. Le rapport affichera tous les enregistrements.
-                  </p>
-                )}
               </div>
+
+              {/* Onglets pour champs et filtres par source */}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  {selectedSources.map(sourceId => {
+                    const source = dataSources.find(s => s.id === sourceId);
+                    return (
+                      <TabsTrigger key={sourceId} value={sourceId} className="gap-2">
+                        {source && <source.icon className="h-4 w-4" />}
+                        {source?.label}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+
+                {selectedSources.map(sourceId => (
+                  <TabsContent key={sourceId} value={sourceId} className="space-y-4 mt-4">
+                    {/* Champs disponibles */}
+                    <div className="space-y-2">
+                      <Label>Champs à afficher</Label>
+                      <div className="grid grid-cols-3 gap-2 p-4 border rounded-lg bg-muted/30 max-h-40 overflow-y-auto">
+                        {fieldsBySource[sourceId]?.map(field => (
+                          <div key={field.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={field.id}
+                              checked={selectedFields.includes(field.id)}
+                              onCheckedChange={() => toggleField(field.id)}
+                            />
+                            <label 
+                              htmlFor={field.id} 
+                              className="text-sm cursor-pointer"
+                            >
+                              {field.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Filtres pour cette source */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Filtres</Label>
+                        <Button variant="outline" size="sm" onClick={() => addFilter(sourceId)}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Ajouter un filtre
+                        </Button>
+                      </div>
+                      
+                      {filters.filter(f => f.source === sourceId).length > 0 ? (
+                        <div className="space-y-2">
+                          {filters.filter(f => f.source === sourceId).map(filter => {
+                            const fieldDef = fieldsBySource[sourceId]?.find(f => f.id === filter.field);
+                            const operators = operatorsByFieldType[fieldDef?.type || "text"] || [];
+                            
+                            return (
+                              <div key={filter.id} className="flex items-center gap-2 p-2 border rounded-lg bg-background">
+                                <Select 
+                                  value={filter.field} 
+                                  onValueChange={(v) => updateFilter(filter.id, { field: v })}
+                                >
+                                  <SelectTrigger className="w-40">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {fieldsBySource[sourceId]?.map(f => (
+                                      <SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                
+                                <Select 
+                                  value={filter.operator}
+                                  onValueChange={(v) => updateFilter(filter.id, { operator: v })}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {operators.map(op => (
+                                      <SelectItem key={op.id} value={op.id}>{op.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                
+                                {!["is_empty", "is_not_empty"].includes(filter.operator) && (
+                                  <Input 
+                                    value={filter.value}
+                                    onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
+                                    placeholder="Valeur..."
+                                    className="flex-1"
+                                  />
+                                )}
+                                
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => removeFilter(filter.id)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground p-3 border rounded-lg bg-muted/30 text-center">
+                          Aucun filtre pour cette source
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
 
               {/* Aperçu des champs sélectionnés */}
               {selectedFields.length > 0 && (
                 <div className="space-y-2">
                   <Label>Champs sélectionnés ({selectedFields.length})</Label>
                   <div className="flex flex-wrap gap-1">
-                    {selectedFields.map(fieldId => {
-                      const field = fieldsByType[reportType]?.find(f => f.id === fieldId);
-                      return (
-                        <Badge key={fieldId} variant="secondary" className="gap-1">
-                          {field?.label}
-                          <X 
-                            className="h-3 w-3 cursor-pointer" 
-                            onClick={() => toggleField(fieldId)}
-                          />
-                        </Badge>
-                      );
-                    })}
+                    {selectedFields.map(fieldId => (
+                      <Badge key={fieldId} variant="secondary" className="gap-1">
+                        {getFieldLabel(fieldId)}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => toggleField(fieldId)}
+                        />
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               )}
@@ -614,61 +750,67 @@ export default function CRMRapports() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nom</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>Sources</TableHead>
                     <TableHead>Créé par</TableHead>
                     <TableHead>Mise à jour</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {savedReports.map(report => {
-                    const typeInfo = reportTypes.find(t => t.id === report.type);
-                    return (
-                      <TableRow key={report.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {typeInfo && <typeInfo.icon className="h-4 w-4 text-muted-foreground" />}
-                            {report.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{typeInfo?.label}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {report.createdBy}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(report.updatedAt), "dd.MM.yyyy HH:mm", { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => executeReport(report)}
-                              disabled={isExecuting}
-                            >
-                              <Play className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => openEditReport(report)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleDeleteReport(report.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {savedReports.map(report => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {getSourceIcon(report.sources)}
+                          {report.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {report.sources.map(s => (
+                            <Badge key={s} variant="outline" className="text-xs">
+                              {dataSources.find(ds => ds.id === s)?.label}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {report.createdBy}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(report.updatedAt), "dd.MM.yyyy HH:mm", { locale: fr })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => executeReport(report)}
+                            disabled={isExecuting}
+                            title="Exécuter"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => openEditReport(report)}
+                            title="Modifier"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDeleteReport(report.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             ) : (
@@ -683,27 +825,74 @@ export default function CRMRapports() {
           </CardContent>
         </Card>
 
-        {/* Types de rapports rapides */}
+        {/* Rapports rapides */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Rapports rapides</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {reportTypes.map(type => (
-              <Button 
-                key={type.id}
-                variant="outline" 
-                className="w-full justify-start gap-3"
-                onClick={() => {
-                  setReportType(type.id);
-                  setSelectedFields(fieldsByType[type.id]?.slice(0, 5).map(f => f.id) || []);
-                  setIsNewReportOpen(true);
-                }}
-              >
-                <type.icon className="h-4 w-4" />
-                {type.label}
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3"
+              onClick={() => {
+                setSelectedSources(["adresses"]);
+                setSelectedFields(fieldsBySource.adresses.slice(0, 6).map(f => f.id));
+                setActiveTab("adresses");
+                setIsNewReportOpen(true);
+              }}
+            >
+              <Users className="h-4 w-4" />
+              Liste d'adresses
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3"
+              onClick={() => {
+                setSelectedSources(["adresses", "contrats"]);
+                setSelectedFields([
+                  ...fieldsBySource.adresses.slice(0, 4).map(f => f.id),
+                  ...fieldsBySource.contrats.slice(0, 4).map(f => f.id)
+                ]);
+                setActiveTab("adresses");
+                setIsNewReportOpen(true);
+              }}
+            >
+              <FileCheck className="h-4 w-4" />
+              Adresses + Contrats
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3"
+              onClick={() => {
+                setSelectedSources(["adresses", "suivis"]);
+                setSelectedFields([
+                  ...fieldsBySource.adresses.slice(0, 4).map(f => f.id),
+                  ...fieldsBySource.suivis.slice(0, 4).map(f => f.id)
+                ]);
+                setActiveTab("adresses");
+                setIsNewReportOpen(true);
+              }}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Adresses + Suivis
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3"
+              onClick={() => {
+                setSelectedSources(["adresses", "contrats", "suivis"]);
+                setSelectedFields([
+                  ...fieldsBySource.adresses.slice(0, 3).map(f => f.id),
+                  ...fieldsBySource.contrats.slice(0, 3).map(f => f.id),
+                  ...fieldsBySource.suivis.slice(0, 3).map(f => f.id)
+                ]);
+                setActiveTab("adresses");
+                setIsNewReportOpen(true);
+              }}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Rapport complet
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -742,24 +931,21 @@ export default function CRMRapports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {Object.keys(reportResults[0]).filter(k => k !== "client" && !k.includes("_id")).slice(0, 8).map(key => (
+                      {Object.keys(reportResults[0]).map(key => (
                         <TableHead key={key} className="whitespace-nowrap">
-                          {fieldsByType.adresses?.find(f => f.id === key)?.label || 
-                           fieldsByType.contrats?.find(f => f.id === key)?.label ||
-                           fieldsByType.suivis?.find(f => f.id === key)?.label ||
-                           key}
+                          {key}
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportResults.slice(0, 50).map((row, idx) => (
+                    {reportResults.slice(0, 100).map((row, idx) => (
                       <TableRow key={idx}>
-                        {Object.entries(row).filter(([k]) => k !== "client" && !k.includes("_id")).slice(0, 8).map(([key, value]) => (
-                          <TableCell key={key} className="whitespace-nowrap">
-                            {value === null ? "-" : 
+                        {Object.values(row).map((value: any, cellIdx) => (
+                          <TableCell key={cellIdx} className="whitespace-nowrap">
+                            {value === null || value === undefined ? "-" : 
                              typeof value === "object" ? JSON.stringify(value) :
-                             String(value).length > 30 ? String(value).slice(0, 30) + "..." :
+                             String(value).length > 40 ? String(value).slice(0, 40) + "..." :
                              String(value)}
                           </TableCell>
                         ))}
@@ -767,9 +953,9 @@ export default function CRMRapports() {
                     ))}
                   </TableBody>
                 </Table>
-                {reportResults.length > 50 && (
+                {reportResults.length > 100 && (
                   <p className="text-sm text-muted-foreground text-center mt-4">
-                    Affichage des 50 premiers résultats sur {reportResults.length}
+                    Affichage des 100 premiers résultats sur {reportResults.length}
                   </p>
                 )}
               </div>
