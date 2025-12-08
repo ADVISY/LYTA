@@ -506,8 +506,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '15px', borderBottom: '3px solid #1800AD' }}>
                     <div>
                       <img src={advisyLogo} alt="Advisy" style={{ height: '50px', width: 'auto', marginBottom: '8px' }} />
-                      <div style={{ fontSize: '10px', color: '#666' }}>Sàrl • Courtier en assurances</div>
-                      <div style={{ fontSize: '9px', color: '#999', marginTop: '3px' }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
                         Route de Chêne 5, 1207 Genève<br/>info@e-advisy.ch • www.e-advisy.ch
                       </div>
                     </div>
@@ -610,29 +609,46 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
                   </div>
 
                 {/* Conditions du mandat */}
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '12px', paddingBottom: '5px', borderBottom: '2px solid #1800AD', letterSpacing: '1px' }}>
+                <div style={{ marginBottom: '25px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1800AD', marginBottom: '15px', paddingBottom: '8px', borderBottom: '3px solid #1800AD', letterSpacing: '2px' }}>
                     CONDITIONS DU MANDAT
                   </div>
 
-                  <div style={{ fontSize: '10px', lineHeight: 1.6, textAlign: 'justify' }}>
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>1. Objet du contrat :</strong> Le présent contrat est un mandat de gestion dans le domaine des assurances de tous types.</p>
+                  <div style={{ display: 'grid', gap: '12px' }}>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>1. Objet du contrat</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Le présent contrat est un mandat de gestion dans le domaine des assurances de tous types.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>2. Prestations :</strong> e-Advisy négocie les meilleurs contrats d'assurance en fonction des besoins du Mandant. Celui-ci donne procuration au courtier pour entreprendre toutes les démarches nécessaires à la modification, annulation ou conclusion de polices d'assurance.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>2. Prestations</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>e-Advisy négocie les meilleurs contrats d'assurance en fonction des besoins du Mandant. Celui-ci donne procuration au courtier pour entreprendre toutes les démarches nécessaires.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>3. Statut :</strong> e-Advisy, inscrite auprès de la FINMA en tant que courtier indépendant, collabore de manière neutre avec les principaux assureurs autorisés en Suisse.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>3. Statut FINMA</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>e-Advisy, inscrite auprès de la FINMA en tant que courtier indépendant, collabore de manière neutre avec les principaux assureurs autorisés en Suisse.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>4. Responsabilité :</strong> e-Advisy répond des négligences ou fautes en relation avec l'activité de conseil. Ces risques sont couverts par une assurance RC professionnelle.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>4. Responsabilité</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>e-Advisy répond des négligences ou fautes en relation avec l'activité de conseil. Ces risques sont couverts par une assurance RC professionnelle.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>5. Obligations du Mandant :</strong> Le Mandant s'engage à fournir toutes les informations nécessaires et garde toute liberté dans le choix des assureurs.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>5. Rémunération</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>e-Advisy est uniquement rémunérée par les commissions versées par les assureurs. Aucun frais n'est facturé au Mandant.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>6. Rémunération :</strong> e-Advisy est uniquement rémunérée par les commissions versées par les assureurs. Aucun frais n'est facturé au Mandant.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>6. Procuration</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Le Mandant autorise e-Advisy à obtenir tous renseignements auprès des assureurs, modifier les données personnelles et couvertures, et résilier les contrats.</div>
+                    </div>
                     
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>7. Procuration :</strong> Le Mandant autorise e-Advisy à obtenir tous types de renseignements auprès des assureurs, modifier les données personnelles et couvertures, et résilier les contrats d'assurance.</p>
-                    
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>8. Durée :</strong> Le mandat est valable dès signature jusqu'à révocation écrite. Il remplace tout mandat antérieur.</p>
-                    
-                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>9. For juridique :</strong> Droit suisse applicable. For juridique à Genève.</p>
+                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>7. Durée et for juridique</div>
+                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Valable dès signature jusqu'à révocation écrite. Droit suisse applicable, for juridique à Genève.</div>
+                    </div>
                   </div>
                 </div>
 
