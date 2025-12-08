@@ -52,10 +52,7 @@ export function useClients() {
       setLoading(true);
       let query = supabase
         .from('clients' as any)
-        .select(`
-          *,
-          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
-        `);
+        .select('*');
       
       if (typeFilter) {
         query = query.eq('type_adresse', typeFilter);
@@ -82,10 +79,7 @@ export function useClients() {
       const { data, error } = await supabase
         .from('clients' as any)
         .insert([clientData])
-        .select(`
-          *,
-          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
-        `)
+        .select('*')
         .single();
 
       if (error) throw error;
@@ -163,10 +157,7 @@ export function useClients() {
     try {
       const { data, error } = await supabase
         .from('clients' as any)
-        .select(`
-          *,
-          assigned_agent:profiles!clients_assigned_agent_id_fkey(id, first_name, last_name, email)
-        `)
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
