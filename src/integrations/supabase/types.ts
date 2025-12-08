@@ -328,6 +328,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clients_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_clients_user_id"
             columns: ["user_id"]
             isOneToOne: true
@@ -378,6 +385,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "collaborator_permissions_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       commission_part_agent: {
@@ -411,6 +425,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_part_agent_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
             referencedColumns: ["id"]
           },
           {
@@ -616,6 +637,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "family_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       insurance_companies: {
@@ -735,6 +763,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -880,6 +915,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "policies_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
@@ -986,6 +1028,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "propositions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       suivis: {
@@ -1040,6 +1089,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "suivis_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -1073,7 +1129,163 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      clients_secure: {
+        Row: {
+          address: string | null
+          assigned_agent_id: string | null
+          bank_name: string | null
+          birthdate: string | null
+          bonus_rate: number | null
+          canton: string | null
+          city: string | null
+          civil_status: string | null
+          commission_rate: number | null
+          commission_rate_lca: number | null
+          commission_rate_vie: number | null
+          company_name: string | null
+          contract_type: string | null
+          country: string | null
+          created_at: string | null
+          email: string | null
+          employer: string | null
+          external_ref: string | null
+          first_name: string | null
+          fixed_salary: number | null
+          hire_date: string | null
+          iban: string | null
+          id: string | null
+          is_company: boolean | null
+          last_name: string | null
+          manager_commission_rate_lca: number | null
+          manager_commission_rate_vie: number | null
+          manager_id: string | null
+          mobile: string | null
+          nationality: string | null
+          permit_type: string | null
+          phone: string | null
+          postal_code: string | null
+          profession: string | null
+          reserve_rate: number | null
+          status: string | null
+          tags: string[] | null
+          type_adresse: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_percentage: number | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          assigned_agent_id?: string | null
+          bank_name?: never
+          birthdate?: string | null
+          bonus_rate?: never
+          canton?: string | null
+          city?: string | null
+          civil_status?: string | null
+          commission_rate?: never
+          commission_rate_lca?: never
+          commission_rate_vie?: never
+          company_name?: string | null
+          contract_type?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          employer?: string | null
+          external_ref?: string | null
+          first_name?: string | null
+          fixed_salary?: never
+          hire_date?: string | null
+          iban?: never
+          id?: string | null
+          is_company?: boolean | null
+          last_name?: string | null
+          manager_commission_rate_lca?: never
+          manager_commission_rate_vie?: never
+          manager_id?: string | null
+          mobile?: string | null
+          nationality?: string | null
+          permit_type?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          profession?: string | null
+          reserve_rate?: never
+          status?: string | null
+          tags?: string[] | null
+          type_adresse?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_percentage?: number | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          assigned_agent_id?: string | null
+          bank_name?: never
+          birthdate?: string | null
+          bonus_rate?: never
+          canton?: string | null
+          city?: string | null
+          civil_status?: string | null
+          commission_rate?: never
+          commission_rate_lca?: never
+          commission_rate_vie?: never
+          company_name?: string | null
+          contract_type?: string | null
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          employer?: string | null
+          external_ref?: string | null
+          first_name?: string | null
+          fixed_salary?: never
+          hire_date?: string | null
+          iban?: never
+          id?: string | null
+          is_company?: boolean | null
+          last_name?: string | null
+          manager_commission_rate_lca?: never
+          manager_commission_rate_vie?: never
+          manager_id?: string | null
+          mobile?: string | null
+          nationality?: string | null
+          permit_type?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          profession?: string | null
+          reserve_rate?: never
+          status?: string | null
+          tags?: string[] | null
+          type_adresse?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_percentage?: number | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "clients_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_clients_user_id"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_view_financial_data: { Args: never; Returns: boolean }
