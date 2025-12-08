@@ -603,13 +603,24 @@ export default function CRMCompta() {
               const clientName = commission.policy?.client?.company_name || 
                 `${commission.policy?.client?.first_name || ''} ${commission.policy?.client?.last_name || ''}`.trim();
               const agentPart = parts.find(p => p.agent_id === collaborateur.id);
+              const isDecommission = commission.type === 'decommission' || Number(agentPart?.amount) < 0;
               return (
-                <TableRow key={commission.id}>
+                <TableRow key={commission.id} className={cn(isDecommission && "bg-red-50")}>
                   <TableCell className="text-xs py-2">{format(new Date(commission.created_at), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="font-medium text-xs py-2">{clientName || '-'}</TableCell>
+                  <TableCell className="font-medium text-xs py-2">
+                    {clientName || '-'}
+                    {isDecommission && (
+                      <Badge variant="destructive" className="ml-2 text-[10px] px-1 py-0">
+                        Décommission
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs py-2">{commission.policy?.product?.name || '-'}</TableCell>
                   <TableCell className="font-mono text-xs py-2">{commission.policy?.policy_number || '-'}</TableCell>
-                  <TableCell className="text-right font-semibold text-emerald-600 text-xs py-2">
+                  <TableCell className={cn(
+                    "text-right font-semibold text-xs py-2",
+                    isDecommission ? "text-red-600" : "text-emerald-600"
+                  )}>
                     {agentPart ? formatCurrency(Number(agentPart.amount)) : '-'}
                   </TableCell>
                 </TableRow>

@@ -498,10 +498,14 @@ export default function CRMCommissions() {
                           const StatusIcon = status.icon;
                           const isCommissionExpanded = expandedCommission === commission.id;
                           const parts = commissionParts[commission.id] || [];
+                          const isDecommission = commission.type === 'decommission' || Number(commission.amount) < 0;
 
                           return (
                             <React.Fragment key={commission.id}>
-                              <TableRow className="bg-card hover:bg-muted/20 border-l-2 border-l-primary/30">
+                              <TableRow className={cn(
+                                "bg-card hover:bg-muted/20 border-l-2",
+                                isDecommission ? "border-l-red-500 bg-red-50/50" : "border-l-primary/30"
+                              )}>
                                 <TableCell className="pl-8">
                                   <Button
                                     variant="ghost"
@@ -529,7 +533,10 @@ export default function CRMCommissions() {
                                     {type.label}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="font-semibold text-emerald-600">
+                                <TableCell className={cn(
+                                  "font-semibold",
+                                  isDecommission ? "text-red-600" : "text-emerald-600"
+                                )}>
                                   {formatCurrency(Number(commission.amount))}
                                 </TableCell>
                                 <TableCell>
