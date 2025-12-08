@@ -50,7 +50,7 @@ export default function ClientLayout() {
       
       setUser(session.user);
       
-      // Check user role
+      // Check user role - allow admins to also access client space if they chose it
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -59,23 +59,23 @@ export default function ClientLayout() {
       
       const role = roleData?.role || 'client';
       
-      // If not a client, redirect to CRM
-      if (role !== 'client') {
-        toast({
-          title: "Accès refusé",
-          description: "Cet espace est réservé aux clients.",
-          variant: "destructive",
-        });
-        navigate("/crm");
-        return;
-      }
-      
-      // Fetch client data
+      // Check if user has a client record (needed for client portal)
       const { data: clientRecord } = await supabase
         .from('clients')
         .select('*')
         .eq('user_id', session.user.id)
         .maybeSingle();
+      
+      // If user is admin/team but has no client record, they shouldn't be here
+      if (role !== 'client' && !clientRecord) {
+        toast({
+          title: "Espace non disponible",
+          description: "Vous n'avez pas de compte client associé.",
+          variant: "destructive",
+        });
+        navigate("/crm");
+        return;
+      }
       
       if (clientRecord) {
         setClientData(clientRecord);
@@ -96,12 +96,16 @@ export default function ClientLayout() {
   }, [navigate, toast]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log("Logout completed (session may have been expired)");
+    }
     toast({
       title: "Déconnexion",
       description: "Vous avez été déconnecté avec succès",
     });
-    navigate("/");
+    navigate("/connexion");
   };
 
   const getInitials = () => {
