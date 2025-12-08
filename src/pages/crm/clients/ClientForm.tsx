@@ -163,11 +163,20 @@ export default function ClientForm() {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
+    // Clean up field values - convert "none" and empty strings to null
+    const cleanedAssignedAgentId = (!data.assigned_agent_id || data.assigned_agent_id === "none" || data.assigned_agent_id === "") 
+      ? null 
+      : data.assigned_agent_id;
+    
+    const cleanedManagerId = (!data.manager_id || data.manager_id === "none" || data.manager_id === "") 
+      ? null 
+      : data.manager_id;
+
     const clientData = {
       ...data,
       tags,
-      assigned_agent_id: data.assigned_agent_id === "none" ? null : (data.assigned_agent_id || null),
-      manager_id: data.manager_id || null,
+      assigned_agent_id: cleanedAssignedAgentId,
+      manager_id: cleanedManagerId,
       company_name: data.company_name || null,
       address: data.address || null,
       zip_code: data.zip_code || null,
@@ -177,6 +186,8 @@ export default function ClientForm() {
       email: data.email || null,
       mobile: data.mobile || null,
       phone: data.phone || null,
+      civil_status: (data.civil_status as string) === "none" ? null : (data.civil_status || null),
+      permit_type: (data.permit_type as string) === "none" ? null : (data.permit_type || null),
     };
 
     if (id) {
