@@ -3,6 +3,7 @@ import { useClients } from "@/hooks/useClients";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useCommissions } from "@/hooks/useCommissions";
 import { usePerformance } from "@/hooks/usePerformance";
+import { useCommissionParts } from "@/hooks/useCommissionParts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { 
@@ -10,7 +11,7 @@ import {
   MessageSquare, Loader2, BarChart3, Heart, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -30,10 +31,24 @@ export default function CRMDashboard() {
   const { policies, loading: policiesLoading } = usePolicies();
   const { commissions, loading: commissionsLoading } = useCommissions();
   const { loading: performanceLoading, companyTotals } = usePerformance();
+  const { fetchAllParts } = useCommissionParts();
 
   const [showMyContracts, setShowMyContracts] = useState(false);
+  const [allCommissionParts, setAllCommissionParts] = useState<any[]>([]);
+  const [partsLoading, setPartsLoading] = useState(true);
 
-  const loading = clientsLoading || policiesLoading || commissionsLoading || performanceLoading;
+  // Fetch all commission parts on mount
+  useEffect(() => {
+    const loadParts = async () => {
+      setPartsLoading(true);
+      const parts = await fetchAllParts();
+      setAllCommissionParts(parts);
+      setPartsLoading(false);
+    };
+    loadParts();
+  }, []);
+
+  const loading = clientsLoading || policiesLoading || commissionsLoading || performanceLoading || partsLoading;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-CH', { 
@@ -208,34 +223,41 @@ export default function CRMDashboard() {
     return result;
   }, [clients, policies]);
 
-  // Financial summary
+  // Financial summary - includes all distributed commissions to agents
   const financialSummary = useMemo(() => {
     const collaborators = clients.filter(c => c.type_adresse === 'collaborateur');
     
-    // Total commissions received (CA)
+    // Total commissions received from insurance companies (CA)
     const totalCommissions = commissions.reduce((sum, c) => sum + (c.amount || 0), 0);
     
-    // Total salaries
+    // Total fixed salaries
     const totalSalaries = collaborators.reduce((sum, c) => sum + (c.fixed_salary || 0), 0);
+    
+    // Total commissions distributed to agents (from commission_part_agent)
+    const totalDistributedCommissions = allCommissionParts.reduce((sum, part) => sum + (part.amount || 0), 0);
+    
+    // Base for social charges = fixed salaries + distributed commissions
+    const baseCharges = totalSalaries + totalDistributedCommissions;
     
     // Social charges (Swiss rates: AVS 5.05%, AC 1.1%, LPP ~7%, AANP 0.5% = ~13.65%)
     const socialChargesRate = 0.1365;
-    const socialCharges = totalSalaries * socialChargesRate;
+    const socialCharges = baseCharges * socialChargesRate;
     
-    // Total charges
-    const totalCharges = totalSalaries + socialCharges;
+    // Total charges = fixed salaries + distributed commissions + social charges on all
+    const totalCharges = totalSalaries + totalDistributedCommissions + socialCharges;
     
-    // Benefit = CA - Charges
+    // Benefit = CA - Total charges
     const benefit = totalCommissions - totalCharges;
 
     return {
       ca: totalCommissions,
       salaries: totalSalaries,
+      distributedCommissions: totalDistributedCommissions,
       socialCharges,
       totalCharges,
       benefit,
     };
-  }, [clients, commissions]);
+  }, [clients, commissions, allCommissionParts]);
 
   const currentYear = new Date().getFullYear();
   const currentMonthName = format(new Date(), 'MMMM yyyy', { locale: fr });
@@ -343,35 +365,43 @@ export default function CRMDashboard() {
                 </div>
 
                 {/* Financial & Stats Summary below chart */}
-                <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t">
-                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-                    <p className="text-[10px] opacity-80">CA</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.ca)}</p>
+                <div className="grid grid-cols-4 lg:grid-cols-8 gap-2 mt-4 pt-4 border-t">
+                  <div className="text-center p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+                    <p className="text-[9px] opacity-80">CA</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.ca)}</p>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                    <p className="text-[10px] opacity-80">Salaires</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.salaries)}</p>
+                  <div className="text-center p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                    <p className="text-[9px] opacity-80">Salaires</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.salaries)}</p>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-                    <p className="text-[10px] opacity-80">Charges</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
+                  <div className="text-center p-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+                    <p className="text-[9px] opacity-80">Com. Agents</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.distributedCommissions)}</p>
+                  </div>
+                  <div className="text-center p-2.5 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+                    <p className="text-[9px] opacity-80">Charges Soc.</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
+                  </div>
+                  <div className="text-center p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
+                    <p className="text-[9px] opacity-80">Total Charges</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.totalCharges)}</p>
                   </div>
                   <div className={cn(
-                    "text-center p-3 rounded-xl text-white",
+                    "text-center p-2.5 rounded-xl text-white",
                     financialSummary.benefit >= 0 
                       ? "bg-gradient-to-br from-green-500 to-green-600" 
                       : "bg-gradient-to-br from-red-500 to-red-600"
                   )}>
-                    <p className="text-[10px] opacity-80">Bénéfice</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.benefit)}</p>
+                    <p className="text-[9px] opacity-80">Bénéfice</p>
+                    <p className="text-sm font-bold">{formatCurrency(financialSummary.benefit)}</p>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground">Clients</p>
-                    <p className="text-lg font-bold">{companyTotals.clientsCount}</p>
+                  <div className="text-center p-2.5 rounded-xl bg-muted/50">
+                    <p className="text-[9px] text-muted-foreground">Clients</p>
+                    <p className="text-sm font-bold">{companyTotals.clientsCount}</p>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <p className="text-[10px] text-muted-foreground">Primes/mois</p>
-                    <p className="text-lg font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
+                  <div className="text-center p-2.5 rounded-xl bg-muted/50">
+                    <p className="text-[9px] text-muted-foreground">Primes/mois</p>
+                    <p className="text-sm font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
                   </div>
                 </div>
               </CardContent>

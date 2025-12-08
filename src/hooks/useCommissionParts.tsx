@@ -54,6 +54,33 @@ export function useCommissionParts() {
     }
   };
 
+  // Fetch all commission parts (for dashboard)
+  const fetchAllParts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('commission_part_agent')
+        .select(`
+          *,
+          agent:clients!agent_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data as any) || [];
+    } catch (error: any) {
+      console.error("Error fetching all parts:", error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch all commission parts for a specific agent
   const fetchPartsForAgent = async (agentId: string) => {
     try {
@@ -193,6 +220,7 @@ export function useCommissionParts() {
     parts,
     loading,
     fetchCommissionParts,
+    fetchAllParts,
     fetchPartsForAgent,
     addCommissionPart,
     updateCommissionPart,
