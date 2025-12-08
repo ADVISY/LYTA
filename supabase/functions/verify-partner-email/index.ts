@@ -37,32 +37,28 @@ serve(async (req) => {
       )
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
+
     // Create Supabase client with service role key to bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Query for collaborateur with this email (agents, managers, admins)
-    const { data: collaborateur, error } = await supabaseAdmin
+    // First, check if email exists as collaborateur in clients table
+    const { data: collaborateur, error: collabError } = await supabaseAdmin
       .from('clients')
       .select('id, first_name, last_name, company_name')
-      .eq('email', email.toLowerCase().trim())
+      .eq('email', normalizedEmail)
       .eq('type_adresse', 'collaborateur')
       .maybeSingle()
 
-    if (error) {
-      console.error('Database error:', error)
-      return new Response(
-        JSON.stringify({ error: 'Database error' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+    if (collabError) {
+      console.error('Database error (collaborateur):', collabError)
     }
 
     if (collaborateur) {
+      console.log('Found collaborateur:', collaborateur.first_name, collaborateur.last_name)
       return new Response(
         JSON.stringify({
           success: true,
@@ -77,19 +73,62 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
-    } else {
-      // Return 200 with success: false to avoid error handling issues
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Email not found as collaborateur'
-        }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
     }
+
+    // If not found as collaborateur, check if user is an admin via profiles + user_roles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error('Database error (profile):', profileError)
+    }
+
+    if (profile) {
+      // Check if this user has admin, manager, or agent role
+      const { data: roles, error: rolesError } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profile.id)
+        .in('role', ['admin', 'manager', 'agent'])
+
+      if (rolesError) {
+        console.error('Database error (roles):', rolesError)
+      }
+
+      if (roles && roles.length > 0) {
+        console.log('Found user with role:', roles[0].role)
+        return new Response(
+          JSON.stringify({
+            success: true,
+            partner: {
+              id: profile.id,
+              name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+              firstName: profile.first_name,
+              lastName: profile.last_name
+            }
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+    }
+
+    // Not found in either table
+    console.log('Email not found:', normalizedEmail)
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: 'Email not found as collaborateur or admin'
+      }),
+      { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
 
   } catch (error) {
     console.error('Error:', error)
