@@ -302,28 +302,45 @@ const Connexion = () => {
   const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect based on role if already logged in
+  // Redirect based on loginType choice (not role) if already logged in
   useEffect(() => {
-    const checkRoleAndRedirect = async () => {
+    const checkAndRedirect = async () => {
       if (user) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        // Check if user came from a specific login flow
+        const targetSpace = sessionStorage.getItem('loginTarget');
         
-        const role = roleData?.role || 'client';
-        
-        if (role === 'client') {
+        if (targetSpace === 'client') {
+          sessionStorage.removeItem('loginTarget');
           navigate("/espace-client");
-        } else {
-          navigate("/crm");
+        } else if (targetSpace === 'team') {
+          sessionStorage.removeItem('loginTarget');
+          // Verify user has team/admin access before redirecting to CRM
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          const role = roleData?.role || 'client';
+          
+          if (role === 'client') {
+            // User tried to access Team but only has client role
+            toast({
+              title: "Accès refusé",
+              description: "Vous n'avez pas accès à l'espace Team. Redirection vers l'espace client.",
+              variant: "destructive",
+            });
+            navigate("/espace-client");
+          } else {
+            navigate("/crm");
+          }
         }
+        // If no target space in session, don't auto-redirect (user just loaded page while logged in)
       }
     };
     
-    checkRoleAndRedirect();
-  }, [user, navigate]);
+    checkAndRedirect();
+  }, [user, navigate, toast]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,11 +451,14 @@ const Connexion = () => {
             variant: "destructive",
           });
         } else {
+          // Store the login target in sessionStorage for redirect after auth state changes
+          sessionStorage.setItem('loginTarget', loginType);
+          
           toast({
             title: "Connexion réussie",
             description: "Bienvenue sur votre espace Advisy.",
           });
-          // Redirect will happen via useEffect based on role
+          // Redirect will happen via useEffect based on loginType
         }
       }
     } catch (error: any) {
