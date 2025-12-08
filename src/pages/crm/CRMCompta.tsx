@@ -44,8 +44,10 @@ interface FichePaie {
   mois: string;
   annee: number;
   salaireBrut: number;
-  commissionsTotal: number;
-  commissions: { description: string; amount: number }[];
+  commissionsBrut: number;
+  reserveRate: number;
+  reserveAmount: number;
+  commissionsNet: number;
   totalBrut: number;
   charges: number;
   netAPayer: number;
@@ -302,28 +304,22 @@ export default function CRMCompta() {
           return createdAt >= debut && createdAt <= fin;
         });
         
-        const commissionDetails: { description: string; amount: number }[] = [];
-        let commissionsTotal = 0;
+        let commissionsBrut = 0;
         
         for (const commission of commissionsInMonth) {
           const parts = await fetchCommissionParts(commission.id);
           const agentPart = parts.find((p: CommissionPart) => p.agent_id === collabId);
           
           if (agentPart) {
-            const clientName = commission.policy?.client?.company_name || 
-              `${commission.policy?.client?.first_name || ''} ${commission.policy?.client?.last_name || ''}`.trim() || 'Client';
-            const productName = commission.policy?.product?.name || 'Produit';
-            
-            commissionDetails.push({
-              description: `${clientName} - ${productName}`,
-              amount: Number(agentPart.amount) || 0
-            });
-            commissionsTotal += Number(agentPart.amount) || 0;
+            commissionsBrut += Number(agentPart.amount) || 0;
           }
         }
         
         const salaireBrut = Number(collaborateur.fixed_salary) || 0;
-        const totalBrut = salaireBrut + commissionsTotal;
+        const reserveRate = Number(collaborateur.reserve_rate) || 0;
+        const reserveAmount = (commissionsBrut * reserveRate) / 100;
+        const commissionsNet = commissionsBrut - reserveAmount;
+        const totalBrut = salaireBrut + commissionsNet;
         
         // Charges sociales estimées (~15% en Suisse pour l'employé)
         const tauxCharges = 0.15;
@@ -335,8 +331,10 @@ export default function CRMCompta() {
           mois: moisOptions.find(m => m.value === selectedMois)?.label || '',
           annee,
           salaireBrut,
-          commissionsTotal,
-          commissions: commissionDetails,
+          commissionsBrut,
+          reserveRate,
+          reserveAmount,
+          commissionsNet,
           totalBrut,
           charges,
           netAPayer
@@ -628,24 +626,22 @@ export default function CRMCompta() {
                 <TableCell className="text-xs py-2 text-right">{formatCurrency(fiche.salaireBrut)}</TableCell>
               </TableRow>
               
-              {fiche.commissions.length > 0 && (
-                <>
-                  <TableRow className="bg-muted/30">
-                    <TableCell className="text-xs py-2 font-semibold" colSpan={2}>Commissions</TableCell>
-                  </TableRow>
-                  {fiche.commissions.map((comm, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-xs py-2 pl-6">{comm.description}</TableCell>
-                      <TableCell className="text-xs py-2 text-right">{formatCurrency(comm.amount)}</TableCell>
-                    </TableRow>
-                  ))}
-                </>
+              <TableRow>
+                <TableCell className="text-xs py-2 font-medium">Commissions brutes</TableCell>
+                <TableCell className="text-xs py-2 text-right">{formatCurrency(fiche.commissionsBrut)}</TableCell>
+              </TableRow>
+              
+              {fiche.reserveRate > 0 && (
+                <TableRow className="bg-orange-50">
+                  <TableCell className="text-xs py-2">Retenue compte de réserve ({fiche.reserveRate}%)</TableCell>
+                  <TableCell className="text-xs py-2 text-right text-orange-600">-{formatCurrency(fiche.reserveAmount)}</TableCell>
+                </TableRow>
               )}
               
               <TableRow className="bg-blue-50">
-                <TableCell className="text-xs py-2 font-semibold">Total Commissions</TableCell>
+                <TableCell className="text-xs py-2 font-semibold">Commissions nettes</TableCell>
                 <TableCell className="text-xs py-2 text-right font-semibold text-blue-600">
-                  {formatCurrency(fiche.commissionsTotal)}
+                  {formatCurrency(fiche.commissionsNet)}
                 </TableCell>
               </TableRow>
               
