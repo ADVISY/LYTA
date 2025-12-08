@@ -165,15 +165,20 @@ export type Database = {
           assigned_agent_id: string | null
           bank_name: string | null
           birthdate: string | null
+          bonus_rate: number | null
           city: string | null
           civil_status: string | null
+          commission_rate: number | null
           company_name: string | null
+          contract_type: string | null
           country: string | null
           created_at: string
           email: string | null
           employer: string | null
           external_ref: string | null
           first_name: string | null
+          fixed_salary: number | null
+          hire_date: string | null
           iban: string | null
           id: string
           is_company: boolean | null
@@ -189,6 +194,7 @@ export type Database = {
           type_adresse: string
           updated_at: string
           user_id: string | null
+          work_percentage: number | null
           zip_code: string | null
         }
         Insert: {
@@ -196,15 +202,20 @@ export type Database = {
           assigned_agent_id?: string | null
           bank_name?: string | null
           birthdate?: string | null
+          bonus_rate?: number | null
           city?: string | null
           civil_status?: string | null
+          commission_rate?: number | null
           company_name?: string | null
+          contract_type?: string | null
           country?: string | null
           created_at?: string
           email?: string | null
           employer?: string | null
           external_ref?: string | null
           first_name?: string | null
+          fixed_salary?: number | null
+          hire_date?: string | null
           iban?: string | null
           id?: string
           is_company?: boolean | null
@@ -220,6 +231,7 @@ export type Database = {
           type_adresse?: string
           updated_at?: string
           user_id?: string | null
+          work_percentage?: number | null
           zip_code?: string | null
         }
         Update: {
@@ -227,15 +239,20 @@ export type Database = {
           assigned_agent_id?: string | null
           bank_name?: string | null
           birthdate?: string | null
+          bonus_rate?: number | null
           city?: string | null
           civil_status?: string | null
+          commission_rate?: number | null
           company_name?: string | null
+          contract_type?: string | null
           country?: string | null
           created_at?: string
           email?: string | null
           employer?: string | null
           external_ref?: string | null
           first_name?: string | null
+          fixed_salary?: number | null
+          hire_date?: string | null
           iban?: string | null
           id?: string
           is_company?: boolean | null
@@ -251,6 +268,7 @@ export type Database = {
           type_adresse?: string
           updated_at?: string
           user_id?: string | null
+          work_percentage?: number | null
           zip_code?: string | null
         }
         Relationships: [
