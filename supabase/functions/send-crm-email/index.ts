@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -24,269 +24,513 @@ interface EmailRequest {
   data?: EmailData;
 }
 
-// Send email via Resend API
-const sendEmail = async (to: string, subject: string, html: string) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "Advisy <noreply@advisy.ch>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Resend API error: ${error}`);
-  }
-  
-  return await response.json();
-};
+// Advisy branded email wrapper
+const getEmailWrapper = (content: string) => `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advisy</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a2e;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f2f5;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .email-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .email-container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(24, 0, 173, 0.08);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #1800AD 0%, #4F46E5 50%, #7C3AED 100%);
+      padding: 40px 40px 50px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: #ffffff;
+      border-radius: 30px 30px 0 0;
+    }
+    
+    .logo-container {
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      width: 160px;
+      height: auto;
+    }
+    
+    .header-title {
+      color: #ffffff;
+      font-size: 26px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+    
+    .header-subtitle {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 15px;
+      margin-top: 8px;
+    }
+    
+    .content {
+      padding: 30px 40px 40px;
+    }
+    
+    .greeting {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1800AD;
+      margin-bottom: 20px;
+    }
+    
+    .text {
+      color: #4a4a68;
+      font-size: 15px;
+      margin-bottom: 16px;
+      line-height: 1.7;
+    }
+    
+    .highlight-box {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+      border-left: 4px solid #1800AD;
+      padding: 20px 24px;
+      margin: 24px 0;
+      border-radius: 0 12px 12px 0;
+    }
+    
+    .highlight-box strong {
+      color: #1800AD;
+    }
+    
+    .success-box {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border-left: 4px solid #10b981;
+      padding: 20px 24px;
+      margin: 24px 0;
+      border-radius: 0 12px 12px 0;
+    }
+    
+    .success-box strong {
+      color: #065f46;
+    }
+    
+    .credentials-box {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 2px solid #f59e0b;
+      padding: 28px;
+      border-radius: 12px;
+      margin: 28px 0;
+    }
+    
+    .credentials-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #92400e;
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .credential-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #78350f;
+      margin: 12px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .credential-value {
+      background: #ffffff;
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 15px;
+      color: #1a1a2e;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    
+    .warning-text {
+      font-size: 13px;
+      color: #92400e;
+      margin-top: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    
+    .features-list {
+      list-style: none;
+      padding: 0;
+      margin: 24px 0;
+    }
+    
+    .features-list li {
+      padding: 10px 0 10px 32px;
+      position: relative;
+      color: #4a4a68;
+      font-size: 15px;
+    }
+    
+    .features-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #1800AD;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    
+    .cta-container {
+      text-align: center;
+      margin: 32px 0;
+    }
+    
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #1800AD 0%, #4F46E5 100%);
+      color: #ffffff !important;
+      padding: 16px 40px;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      box-shadow: 0 4px 14px rgba(24, 0, 173, 0.35);
+      transition: all 0.3s ease;
+    }
+    
+    .cta-button:hover {
+      box-shadow: 0 6px 20px rgba(24, 0, 173, 0.45);
+      transform: translateY(-1px);
+    }
+    
+    .details-box {
+      background: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      margin: 24px 0;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .details-box h3 {
+      margin: 0 0 12px;
+      color: #1800AD;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .signature {
+      margin-top: 36px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .signature-text {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    
+    .signature-name {
+      font-weight: 600;
+      color: #1800AD;
+      font-size: 16px;
+    }
+    
+    .footer {
+      background: #f8fafc;
+      padding: 32px 40px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .footer-logo {
+      width: 100px;
+      margin-bottom: 16px;
+    }
+    
+    .footer-text {
+      color: #6b7280;
+      font-size: 13px;
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    
+    .footer-links {
+      margin-top: 16px;
+    }
+    
+    .footer-link {
+      color: #1800AD;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .footer-divider {
+      color: #d1d5db;
+      margin: 0 12px;
+    }
+    
+    .social-links {
+      margin-top: 20px;
+    }
+    
+    .social-link {
+      display: inline-block;
+      margin: 0 8px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-container">
+      ${content}
+      
+      <!-- Signature & Footer -->
+      <div class="footer">
+        <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="footer-logo" />
+        <p class="footer-text">
+          <strong>Advisy Sàrl</strong><br>
+          Votre partenaire assurance en Suisse romande
+        </p>
+        <p class="footer-text">
+          📍 Rue de Lausanne 15, 1950 Sion<br>
+          📞 +41 27 123 45 67
+        </p>
+        <div class="footer-links">
+          <a href="https://advisy.ch" class="footer-link">www.advisy.ch</a>
+          <span class="footer-divider">|</span>
+          <a href="mailto:hello@advisy.ch" class="footer-link">hello@advisy.ch</a>
+        </div>
+        <p class="footer-text" style="margin-top: 24px; font-size: 11px; color: #9ca3af;">
+          Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce message.<br>
+          © ${new Date().getFullYear()} Advisy Sàrl. Tous droits réservés.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+`;
 
 // Email templates
 const getEmailContent = (type: string, clientName: string, data?: EmailData) => {
   switch (type) {
     case "welcome":
       return {
-        subject: "Bienvenue chez Advisy - Votre partenaire assurance",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-              .container { max-width: 600px; margin: 0 auto; background: white; }
-              .header { background: linear-gradient(135deg, #1800AD 0%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
-              .header h1 { color: white; margin: 0; font-size: 28px; }
-              .content { padding: 40px 30px; }
-              .content h2 { color: #1800AD; margin-bottom: 20px; }
-              .content p { margin-bottom: 15px; color: #555; }
-              .highlight-box { background: #f0f4ff; border-left: 4px solid #1800AD; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
-              .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 14px; }
-              .footer a { color: #1800AD; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Bienvenue chez Advisy</h1>
-              </div>
-              <div class="content">
-                <h2>Bonjour ${clientName},</h2>
-                <p>Nous sommes ravis de vous accueillir parmi nos clients !</p>
-                <div class="highlight-box">
-                  <strong>Votre conseiller Advisy</strong> est désormais à votre disposition pour vous accompagner dans toutes vos démarches d'assurance en Suisse.
-                </div>
-                <p>Chez Advisy, nous nous engageons à :</p>
-                <ul>
-                  <li>Analyser vos besoins en assurance</li>
-                  <li>Comparer les meilleures offres du marché</li>
-                  <li>Vous accompagner dans vos démarches administratives</li>
-                  <li>Optimiser vos primes d'assurance</li>
-                </ul>
-                <p>Votre conseiller vous contactera prochainement pour planifier un premier entretien.</p>
-                <p>À très bientôt,</p>
-                <p><strong>L'équipe Advisy</strong></p>
-              </div>
-              <div class="footer">
-                <p>Advisy Sàrl - Votre partenaire assurance en Suisse</p>
-                <p><a href="https://advisy.ch">www.advisy.ch</a> | contact@advisy.ch</p>
-              </div>
+        subject: "🎉 Bienvenue chez Advisy - Votre partenaire assurance",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
             </div>
-          </body>
-          </html>
-        `,
+            <h1 class="header-title">Bienvenue chez Advisy !</h1>
+            <p class="header-subtitle">Votre nouveau partenaire assurance en Suisse</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <p class="text">
+              Nous sommes ravis de vous accueillir parmi nos clients ! Merci de nous avoir fait confiance pour vous accompagner dans la gestion de vos assurances.
+            </p>
+            <div class="highlight-box">
+              <strong>Votre conseiller Advisy</strong> est désormais à votre disposition pour vous accompagner dans toutes vos démarches d'assurance en Suisse.
+            </div>
+            <p class="text">Chez Advisy, nous nous engageons à :</p>
+            <ul class="features-list">
+              <li>Analyser vos besoins en assurance de manière personnalisée</li>
+              <li>Comparer les meilleures offres du marché suisse</li>
+              <li>Vous accompagner dans toutes vos démarches administratives</li>
+              <li>Optimiser vos primes et votre couverture</li>
+            </ul>
+            <p class="text">
+              Votre conseiller vous contactera prochainement pour planifier un premier entretien et faire le point sur votre situation.
+            </p>
+            <div class="signature">
+              <p class="signature-text">À très bientôt,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
       };
 
     case "contract_signed":
       return {
-        subject: "Confirmation de signature - Votre contrat Advisy",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-              .container { max-width: 600px; margin: 0 auto; background: white; }
-              .header { background: linear-gradient(135deg, #1800AD 0%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
-              .header h1 { color: white; margin: 0; font-size: 28px; }
-              .content { padding: 40px 30px; }
-              .content h2 { color: #1800AD; margin-bottom: 20px; }
-              .content p { margin-bottom: 15px; color: #555; }
-              .success-box { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
-              .details-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; }
-              .details-box h3 { margin-top: 0; color: #1800AD; }
-              .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 14px; }
-              .footer a { color: #1800AD; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>✓ Contrat signé avec succès</h1>
-              </div>
-              <div class="content">
-                <h2>Bonjour ${clientName},</h2>
-                <div class="success-box">
-                  <strong>Félicitations !</strong> Votre contrat a été signé avec succès.
-                </div>
-                ${data?.contractDetails ? `
-                <div class="details-box">
-                  <h3>Détails du contrat</h3>
-                  <p>${data.contractDetails}</p>
-                  ${data.companyName ? `<p><strong>Compagnie :</strong> ${data.companyName}</p>` : ''}
-                </div>
-                ` : ''}
-                <p>Votre contrat est maintenant actif. Vous recevrez prochainement votre police d'assurance par courrier.</p>
-                <p>Si vous avez des questions, n'hésitez pas à contacter votre conseiller${data?.agentName ? ` <strong>${data.agentName}</strong>` : ''}.</p>
-                <p>Cordialement,</p>
-                <p><strong>L'équipe Advisy</strong></p>
-              </div>
-              <div class="footer">
-                <p>Advisy Sàrl - Votre partenaire assurance en Suisse</p>
-                <p><a href="https://advisy.ch">www.advisy.ch</a> | contact@advisy.ch</p>
-              </div>
+        subject: "✅ Confirmation de signature - Votre contrat Advisy",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
             </div>
-          </body>
-          </html>
-        `,
+            <h1 class="header-title">Contrat signé avec succès ✓</h1>
+            <p class="header-subtitle">Félicitations pour votre nouvelle couverture</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <div class="success-box">
+              <strong>Félicitations !</strong> Votre contrat d'assurance a été signé avec succès et est maintenant actif.
+            </div>
+            ${data?.contractDetails || data?.companyName ? `
+            <div class="details-box">
+              <h3>📋 Détails du contrat</h3>
+              ${data.contractDetails ? `<p class="text" style="margin: 8px 0;">${data.contractDetails}</p>` : ''}
+              ${data.companyName ? `<p class="text" style="margin: 8px 0;"><strong>Compagnie d'assurance :</strong> ${data.companyName}</p>` : ''}
+            </div>
+            ` : ''}
+            <p class="text">
+              Votre police d'assurance vous sera envoyée prochainement par courrier. En attendant, tous vos documents sont disponibles dans votre espace client.
+            </p>
+            <p class="text">
+              Si vous avez des questions concernant votre contrat, n'hésitez pas à contacter ${data?.agentName ? `votre conseiller <strong>${data.agentName}</strong>` : 'votre conseiller'} ou notre équipe.
+            </p>
+            <div class="signature">
+              <p class="signature-text">Cordialement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
       };
 
     case "mandat_signed":
       return {
-        subject: "Mandat de gestion signé - Bienvenue dans votre espace client Advisy",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-              .container { max-width: 600px; margin: 0 auto; background: white; }
-              .header { background: linear-gradient(135deg, #1800AD 0%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
-              .header h1 { color: white; margin: 0; font-size: 28px; }
-              .content { padding: 40px 30px; }
-              .content h2 { color: #1800AD; margin-bottom: 20px; }
-              .content p { margin-bottom: 15px; color: #555; }
-              .success-box { background: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
-              .credentials-box { background: #fff3cd; border: 2px solid #ffc107; padding: 25px; border-radius: 8px; margin: 25px 0; }
-              .credentials-box h3 { margin-top: 0; color: #856404; }
-              .credentials-box .credential { background: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 16px; }
-              .cta-button { display: inline-block; background: #1800AD; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: bold; }
-              .warning { color: #856404; font-size: 13px; margin-top: 15px; }
-              .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 14px; }
-              .footer a { color: #1800AD; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Mandat de gestion activé</h1>
-              </div>
-              <div class="content">
-                <h2>Bonjour ${clientName},</h2>
-                <div class="success-box">
-                  <strong>Votre mandat de gestion a été signé avec succès !</strong><br>
-                  Advisy est désormais mandaté pour gérer votre portefeuille d'assurances.
-                </div>
-                <p>Nous avons créé votre espace client personnel. Vous pouvez désormais :</p>
-                <ul>
-                  <li>Consulter tous vos contrats d'assurance</li>
-                  <li>Télécharger vos documents</li>
-                  <li>Contacter votre conseiller</li>
-                  <li>Suivre vos demandes en cours</li>
-                </ul>
-                <div class="credentials-box">
-                  <h3>🔐 Vos identifiants de connexion</h3>
-                  <p><strong>Email :</strong></p>
-                  <div class="credential">${data?.clientEmail || ''}</div>
-                  <p><strong>Mot de passe temporaire :</strong></p>
-                  <div class="credential">${data?.temporaryPassword || 'Voir email séparé'}</div>
-                  <p class="warning">⚠️ Pour votre sécurité, veuillez changer votre mot de passe lors de votre première connexion.</p>
-                </div>
-                <center>
-                  <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">Accéder à mon espace client</a>
-                </center>
-                <p>Si vous avez des questions, notre équipe est à votre disposition.</p>
-                <p>Cordialement,</p>
-                <p><strong>L'équipe Advisy</strong></p>
-              </div>
-              <div class="footer">
-                <p>Advisy Sàrl - Votre partenaire assurance en Suisse</p>
-                <p><a href="https://advisy.ch">www.advisy.ch</a> | contact@advisy.ch</p>
-              </div>
+        subject: "🔐 Votre espace client Advisy est prêt !",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
             </div>
-          </body>
-          </html>
-        `,
+            <h1 class="header-title">Mandat de gestion activé</h1>
+            <p class="header-subtitle">Votre espace client personnel est prêt</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <div class="success-box">
+              <strong>Votre mandat de gestion a été signé avec succès !</strong><br>
+              Advisy est désormais mandaté pour gérer et optimiser votre portefeuille d'assurances.
+            </div>
+            <p class="text">Nous avons créé votre espace client personnel. Vous pouvez désormais :</p>
+            <ul class="features-list">
+              <li>Consulter tous vos contrats d'assurance en un seul endroit</li>
+              <li>Télécharger vos documents et attestations</li>
+              <li>Contacter directement votre conseiller dédié</li>
+              <li>Suivre l'avancement de vos demandes en temps réel</li>
+            </ul>
+            ${data?.temporaryPassword ? `
+            <div class="credentials-box">
+              <h3 class="credentials-title">🔐 Vos identifiants de connexion</h3>
+              <p class="credential-label">Adresse email</p>
+              <div class="credential-value">${data?.clientEmail || ''}</div>
+              <p class="credential-label">Mot de passe temporaire</p>
+              <div class="credential-value">${data.temporaryPassword}</div>
+              <p class="warning-text">
+                ⚠️ Pour votre sécurité, veuillez modifier votre mot de passe lors de votre première connexion.
+              </p>
+            </div>
+            ` : ''}
+            <div class="cta-container">
+              <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">
+                Accéder à mon espace client →
+              </a>
+            </div>
+            <p class="text" style="text-align: center; color: #6b7280; font-size: 14px;">
+              Si vous avez des questions, notre équipe est à votre entière disposition.
+            </p>
+            <div class="signature">
+              <p class="signature-text">Cordialement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
       };
 
     case "account_created":
       return {
-        subject: "Votre compte Advisy a été créé",
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-              .container { max-width: 600px; margin: 0 auto; background: white; }
-              .header { background: linear-gradient(135deg, #1800AD 0%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
-              .header h1 { color: white; margin: 0; font-size: 28px; }
-              .content { padding: 40px 30px; }
-              .content h2 { color: #1800AD; margin-bottom: 20px; }
-              .credentials-box { background: #e8f4fd; border: 2px solid #1800AD; padding: 25px; border-radius: 8px; margin: 25px 0; }
-              .credentials-box h3 { margin-top: 0; color: #1800AD; }
-              .credentials-box .credential { background: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 16px; border: 1px solid #ddd; }
-              .cta-button { display: inline-block; background: #1800AD; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: bold; }
-              .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 14px; }
-              .footer a { color: #1800AD; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Votre compte est prêt</h1>
-              </div>
-              <div class="content">
-                <h2>Bonjour ${clientName},</h2>
-                <p>Votre compte client Advisy a été créé avec succès.</p>
-                <div class="credentials-box">
-                  <h3>🔐 Vos identifiants</h3>
-                  <p><strong>Email :</strong></p>
-                  <div class="credential">${data?.clientEmail || ''}</div>
-                  <p><strong>Mot de passe temporaire :</strong></p>
-                  <div class="credential">${data?.temporaryPassword || ''}</div>
-                </div>
-                <center>
-                  <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">Se connecter</a>
-                </center>
-                <p>Changez votre mot de passe après votre première connexion pour sécuriser votre compte.</p>
-                <p>Cordialement,</p>
-                <p><strong>L'équipe Advisy</strong></p>
-              </div>
-              <div class="footer">
-                <p>Advisy Sàrl - Votre partenaire assurance en Suisse</p>
-                <p><a href="https://advisy.ch">www.advisy.ch</a> | contact@advisy.ch</p>
-              </div>
+        subject: "🔑 Votre compte Advisy a été créé",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
             </div>
-          </body>
-          </html>
-        `,
+            <h1 class="header-title">Votre compte est prêt !</h1>
+            <p class="header-subtitle">Connectez-vous à votre espace personnel</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <p class="text">
+              Votre compte client Advisy a été créé avec succès. Vous pouvez maintenant accéder à votre espace personnel pour gérer vos assurances.
+            </p>
+            <div class="credentials-box">
+              <h3 class="credentials-title">🔐 Vos identifiants de connexion</h3>
+              <p class="credential-label">Adresse email</p>
+              <div class="credential-value">${data?.clientEmail || ''}</div>
+              <p class="credential-label">Mot de passe temporaire</p>
+              <div class="credential-value">${data?.temporaryPassword || ''}</div>
+              <p class="warning-text">
+                ⚠️ Pensez à modifier votre mot de passe après votre première connexion.
+              </p>
+            </div>
+            <div class="cta-container">
+              <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">
+                Se connecter maintenant →
+              </a>
+            </div>
+            <div class="signature">
+              <p class="signature-text">Cordialement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
       };
 
     default:
       return {
         subject: "Notification Advisy",
-        html: `<p>Bonjour ${clientName},</p><p>Vous avez une nouvelle notification d'Advisy.</p>`,
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
+            </div>
+            <h1 class="header-title">Notification</h1>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName},</p>
+            <p class="text">Vous avez une nouvelle notification d'Advisy.</p>
+            <div class="signature">
+              <p class="signature-text">Cordialement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
       };
   }
 };
@@ -398,15 +642,34 @@ const handler = async (req: Request): Promise<Response> => {
     // Get email content
     const { subject, html } = getEmailContent(type, clientName, emailData);
 
-    // Send email via Resend
-    const emailResponse = await sendEmail(clientEmail, subject, html);
+    // Send email via Resend API
+    const emailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Advisy <hello@advisy.ch>",
+        to: [clientEmail],
+        subject,
+        html,
+      }),
+    });
+    
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      throw new Error(`Resend API error: ${errorText}`);
+    }
+    
+    const emailResult = await emailResponse.json();
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Email sent successfully:", emailResult);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        emailId: emailResponse.id,
+        emailId: emailResult.id,
         userCreated: createdUserId !== null,
         userId: createdUserId,
       }),
@@ -416,8 +679,8 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error("Error in send-crm-email function:", errorMessage);
+    console.error("Error in send-crm-email function:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
