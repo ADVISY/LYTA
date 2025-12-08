@@ -1141,6 +1141,7 @@ export default function ClientDetail() {
                           acquisition: { label: "Acquisition" },
                           renewal: { label: "Renouvellement" },
                           bonus: { label: "Bonus" },
+                          gestion: { label: "Gestion" },
                         };
                         const status = statusConfig[commission.status] || statusConfig.pending;
                         const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
