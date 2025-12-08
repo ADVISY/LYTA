@@ -54,10 +54,12 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
     manager_commission_rate_vie: 0,
   });
 
-  // Filter managers (collaborateurs with profession "manager" or "direction")
-  const availableManagers = collaborateurs.filter(
-    c => c.id !== collaborateur?.id && (c.profession === 'manager' || c.profession === 'direction')
-  );
+  // Filter managers (collaborateurs with profession "manager" or "direction") - case insensitive
+  const availableManagers = collaborateurs.filter(c => {
+    if (c.id === collaborateur?.id) return false;
+    const profession = c.profession?.toLowerCase() || '';
+    return profession === 'manager' || profession === 'direction';
+  });
 
   useEffect(() => {
     if (collaborateur) {
