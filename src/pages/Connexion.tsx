@@ -388,53 +388,61 @@ const Connexion = () => {
     </div>
   );
 
+  const renderContent = () => {
+    if (isResetPassword) {
+      return <ResetPasswordForm />;
+    }
+    
+    switch (view) {
+      case "client":
+        return (
+          <LoginForm 
+            title="Espace Client" 
+            subtitle="Connectez-vous à votre espace personnel"
+            onBack={() => setView("choice")}
+          />
+        );
+      case "team":
+        return <TeamChoiceScreen />;
+      case "team-login":
+        return (
+          <LoginForm 
+            title="Connexion CRM" 
+            subtitle="Accédez à votre espace de gestion"
+            onBack={() => setView("team")}
+          />
+        );
+      default:
+        return <ChoiceScreen />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40" />
+    <div className="min-h-screen bg-background relative">
+      <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
       <Link 
         to="/" 
-        className="absolute top-6 left-6 inline-flex items-center gap-2 text-sm font-medium text-foreground bg-card rounded-full px-4 py-2 shadow-sm border hover:shadow-md transition-all z-10"
+        className="fixed top-6 left-6 inline-flex items-center gap-2 text-sm font-medium text-foreground bg-card rounded-full px-4 py-2 shadow-sm border hover:shadow-md transition-all z-50"
       >
         <ChevronLeft className="w-4 h-4" />
         Retour au site
       </Link>
 
-      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
-        <div className="text-center mb-8 animate-fade-in">
+      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
+        <div className="text-center mb-8">
           <img 
             src={advisyLogo} 
             alt="Advisy" 
-            className="h-28 sm:h-36 mx-auto mb-6"
+            className="h-24 sm:h-32 mx-auto mb-4"
           />
-          <h1 className="text-2xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl font-bold text-foreground">
             Espace sécurisé Advisy
           </h1>
         </div>
 
-        <div className="max-w-xl w-full bg-card rounded-xl shadow-lg border p-6 sm:p-8 animate-scale-in">
-          {isResetPassword ? (
-            <ResetPasswordForm />
-          ) : (
-            <>
-              {view === "choice" && <ChoiceScreen />}
-              {view === "client" && (
-                <LoginForm 
-                  title="Espace Client" 
-                  subtitle="Connectez-vous à votre espace personnel"
-                  onBack={() => setView("choice")}
-                />
-              )}
-              {view === "team" && <TeamChoiceScreen />}
-              {view === "team-login" && (
-                <LoginForm 
-                  title="Connexion CRM" 
-                  subtitle="Accédez à votre espace de gestion"
-                  onBack={() => setView("team")}
-                />
-              )}
-            </>
-          )}
+        <div className="max-w-xl w-full bg-card rounded-xl shadow-lg border p-6 sm:p-8">
+          {renderContent()}
         </div>
       </main>
     </div>
