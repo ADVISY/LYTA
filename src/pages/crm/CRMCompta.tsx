@@ -328,16 +328,33 @@ export default function CRMCompta() {
                 </div>
                 <div className="space-y-2">
                   <Label>Collaborateur <span className="text-destructive">*</span></Label>
-                  <Select value={selectedCollaborateur} onValueChange={setSelectedCollaborateur}>
+                  <Select 
+                    value={selectedCollaborateur} 
+                    onValueChange={(value) => {
+                      console.log("Selected collaborateur:", value);
+                      setSelectedCollaborateur(value);
+                    }}
+                    disabled={loadingCollaborateurs}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un collaborateur" />
+                      <SelectValue placeholder={loadingCollaborateurs ? "Chargement..." : "Sélectionner un collaborateur"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {collaborateurs.map((collab) => (
-                        <SelectItem key={collab.id} value={collab.id}>
-                          {getCollaborateurName(collab)}
-                        </SelectItem>
-                      ))}
+                      {loadingCollaborateurs ? (
+                        <div className="p-2 text-center text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                        </div>
+                      ) : collaborateurs.length === 0 ? (
+                        <div className="p-2 text-center text-muted-foreground">
+                          Aucun collaborateur trouvé
+                        </div>
+                      ) : (
+                        collaborateurs.map((collab) => (
+                          <SelectItem key={collab.id} value={collab.id}>
+                            {getCollaborateurName(collab)}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
