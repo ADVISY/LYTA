@@ -6,12 +6,13 @@ import { usePolicies, Policy } from "@/hooks/usePolicies";
 import { useDocuments, Document } from "@/hooks/useDocuments";
 import { useSuivis, Suivi, suiviTypeLabels, suiviStatusLabels, suiviStatusColors } from "@/hooks/useSuivis";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
+import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +85,7 @@ export default function ClientDetail() {
   const { createDocument, deleteDocument } = useDocuments();
   const { suivis, loading: suivisLoading, stats: suiviStats, fetchSuivis, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis(id);
   const { commissions, loading: commissionsLoading, fetchCommissions, markAsPaid, deleteCommission } = useCommissions();
+  const { fetchCommissionParts, deleteCommissionPart } = useCommissionParts();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
@@ -99,6 +101,9 @@ export default function ClientDetail() {
   const [editSuivi, setEditSuivi] = useState<Suivi | null>(null);
   const [deleteSuiviConfirmOpen, setDeleteSuiviConfirmOpen] = useState(false);
   const [suiviToDelete, setSuiviToDelete] = useState<string | null>(null);
+  const [expandedCommissions, setExpandedCommissions] = useState<Record<string, boolean>>({});
+  const [commissionParts, setCommissionParts] = useState<Record<string, CommissionPart[]>>({});
+  const [loadingParts, setLoadingParts] = useState<Record<string, boolean>>({});
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -1074,88 +1079,190 @@ export default function ClientDetail() {
                       </p>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>N° Police</TableHead>
-                          <TableHead>Produit</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Montant</TableHead>
-                          <TableHead>Statut</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {clientCommissions.map((commission) => {
-                          const statusConfig: Record<string, { label: string; color: string }> = {
-                            due: { label: "À payer", color: "bg-amber-500" },
-                            pending: { label: "En attente", color: "bg-blue-500" },
-                            paid: { label: "Payée", color: "bg-emerald-500" },
-                          };
-                          const typeConfig: Record<string, { label: string }> = {
-                            acquisition: { label: "Acquisition" },
-                            renewal: { label: "Renouvellement" },
-                            bonus: { label: "Bonus" },
-                          };
-                          const status = statusConfig[commission.status] || statusConfig.pending;
-                          const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
+                    <div className="space-y-4">
+                      {clientCommissions.map((commission) => {
+                        const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+                          due: { label: "À payer", color: "text-amber-600", bgColor: "bg-amber-100 dark:bg-amber-900/30" },
+                          pending: { label: "En attente", color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
+                          paid: { label: "Payée", color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30" },
+                        };
+                        const typeConfig: Record<string, { label: string }> = {
+                          acquisition: { label: "Acquisition" },
+                          renewal: { label: "Renouvellement" },
+                          bonus: { label: "Bonus" },
+                        };
+                        const status = statusConfig[commission.status] || statusConfig.pending;
+                        const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
+                        const isExpanded = expandedCommissions[commission.id] || false;
+                        const parts = commissionParts[commission.id] || [];
+                        const isLoadingParts = loadingParts[commission.id] || false;
+                        
+                        const toggleExpand = async () => {
+                          const newExpanded = !isExpanded;
+                          setExpandedCommissions(prev => ({ ...prev, [commission.id]: newExpanded }));
+                          
+                          if (newExpanded && !commissionParts[commission.id]) {
+                            setLoadingParts(prev => ({ ...prev, [commission.id]: true }));
+                            const fetchedParts = await fetchCommissionParts(commission.id);
+                            setCommissionParts(prev => ({ ...prev, [commission.id]: fetchedParts }));
+                            setLoadingParts(prev => ({ ...prev, [commission.id]: false }));
+                          }
+                        };
+                        
+                        const totalAssigned = parts.reduce((sum, p) => sum + Number(p.rate || 0), 0);
 
-                          return (
-                            <TableRow key={commission.id}>
-                              <TableCell className="font-mono text-sm">
-                                {commission.policy?.policy_number || '-'}
-                              </TableCell>
-                              <TableCell>
-                                {commission.policy?.product?.name || '-'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{type.label}</Badge>
-                              </TableCell>
-                              <TableCell className="font-semibold text-emerald-600">
-                                {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
-                                  .format(Number(commission.amount))}
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={`${status.color} text-white`}>
-                                  {status.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {commission.date 
-                                  ? format(new Date(commission.date), "dd/MM/yyyy", { locale: fr })
-                                  : format(new Date(commission.created_at), "dd/MM/yyyy", { locale: fr })
-                                }
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {commission.status !== 'paid' && (
-                                      <DropdownMenuItem onClick={() => markAsPaid(commission.id)}>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Marquer comme payée
-                                      </DropdownMenuItem>
+                        return (
+                          <div key={commission.id} className="border rounded-lg overflow-hidden">
+                            {/* Main commission row */}
+                            <div 
+                              className="p-4 bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={toggleExpand}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Button variant="ghost" size="sm" className="p-0 h-auto">
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                     )}
-                                    <DropdownMenuItem 
-                                      className="text-destructive"
-                                      onClick={() => deleteCommission(commission.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Supprimer
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                                  </Button>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-sm text-muted-foreground">
+                                        {commission.policy?.policy_number || 'N/A'}
+                                      </span>
+                                      <Badge variant="outline">{type.label}</Badge>
+                                      <Badge className={`${status.bgColor} ${status.color} border-0`}>
+                                        {status.label}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {commission.policy?.product?.name || 'Produit inconnu'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <div className="text-right">
+                                    <p className="text-xl font-bold text-emerald-600">
+                                      {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                                        .format(Number(commission.amount))}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {commission.date 
+                                        ? format(new Date(commission.date), "dd MMM yyyy", { locale: fr })
+                                        : format(new Date(commission.created_at), "dd MMM yyyy", { locale: fr })
+                                      }
+                                    </p>
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                      <Button variant="ghost" size="sm">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {commission.status !== 'paid' && (
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); markAsPaid(commission.id); }}>
+                                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                                          Marquer comme payée
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem 
+                                        className="text-destructive"
+                                        onClick={(e) => { e.stopPropagation(); deleteCommission(commission.id); }}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Supprimer
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Expanded section - Commission parts */}
+                            {isExpanded && (
+                              <div className="border-t bg-muted/30 p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                  <h4 className="font-medium flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Répartition de la commission
+                                  </h4>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={totalAssigned >= 100 ? "default" : "outline"} className={totalAssigned > 100 ? "bg-destructive" : ""}>
+                                      <Percent className="h-3 w-3 mr-1" />
+                                      {totalAssigned}% attribué
+                                    </Badge>
+                                  </div>
+                                </div>
+                                
+                                {isLoadingParts ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                                  </div>
+                                ) : parts.length === 0 ? (
+                                  <div className="text-center py-6 border-2 border-dashed rounded-lg bg-background">
+                                    <UserCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                                    <p className="text-sm text-muted-foreground">Aucune répartition définie</p>
+                                    <p className="text-xs text-muted-foreground/70 mt-1">
+                                      Ajoutez des parts depuis la page Commissions
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {parts.map((part) => {
+                                      const agentName = part.agent?.first_name && part.agent?.last_name
+                                        ? `${part.agent.first_name} ${part.agent.last_name}`
+                                        : part.agent?.email || 'Agent inconnu';
+                                      
+                                      return (
+                                        <div 
+                                          key={part.id} 
+                                          className="flex items-center justify-between p-3 rounded-lg bg-background border"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                              <UserCircle className="h-6 w-6 text-primary" />
+                                            </div>
+                                            <div>
+                                              <p className="font-medium">{agentName}</p>
+                                              <p className="text-xs text-muted-foreground">{part.agent?.email}</p>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                              <p className="font-semibold text-emerald-600">
+                                                {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' })
+                                                  .format(Number(part.amount))}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {part.rate}% de la commission
+                                              </p>
+                                            </div>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={async () => {
+                                                await deleteCommissionPart(part.id);
+                                                const updatedParts = parts.filter(p => p.id !== part.id);
+                                                setCommissionParts(prev => ({ ...prev, [commission.id]: updatedParts }));
+                                              }}
+                                            >
+                                              <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </CardContent>
               </Card>
