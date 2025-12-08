@@ -76,10 +76,10 @@ export default function CRMCompta() {
       return;
     }
 
-    if (selectedCollaborateur === "all") {
+    if (!selectedCollaborateur) {
       toast({
         title: "Erreur",
-        description: "Veuillez sélectionner un collaborateur spécifique",
+        description: "Veuillez sélectionner un collaborateur",
         variant: "destructive"
       });
       return;
@@ -347,7 +347,7 @@ export default function CRMCompta() {
 
               <Button 
                 onClick={handleGenerateDecompte}
-                disabled={generating || !dateDebut || !dateFin || !selectedCollaborateur || filteredCommissions.length === 0}
+                disabled={generating || !dateDebut || !dateFin || !selectedCollaborateur}
                 className="gap-2"
               >
                 {generating ? (
