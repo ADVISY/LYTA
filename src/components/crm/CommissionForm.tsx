@@ -138,11 +138,12 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     // Add manager part if exists
     const manager = getManagerForAgent(agent.id);
     if (manager) {
+      // Manager rates are stored on the MANAGER record, not on the agent
       let managerRate = 0;
-      if (isLCA && agent.manager_commission_rate_lca) {
-        managerRate = agent.manager_commission_rate_lca;
-      } else if (isVIE && agent.manager_commission_rate_vie) {
-        managerRate = agent.manager_commission_rate_vie;
+      if (isLCA && manager.manager_commission_rate_lca) {
+        managerRate = manager.manager_commission_rate_lca;
+      } else if (isVIE && manager.manager_commission_rate_vie) {
+        managerRate = manager.manager_commission_rate_vie;
       }
       
       if (managerRate > 0) {
