@@ -28,7 +28,7 @@ const dataSources = [
 ];
 
 // Champs disponibles par source
-const fieldsBySource: Record<string, { id: string; label: string; type: string; dbField: string }[]> = {
+const fieldsBySource: Record<string, { id: string; label: string; type: string; dbField: string; isJoined?: boolean }[]> = {
   adresses: [
     { id: "adr_type_adresse", label: "Type d'adresse", type: "select", dbField: "type_adresse" },
     { id: "adr_first_name", label: "Prénom", type: "text", dbField: "first_name" },
@@ -49,6 +49,10 @@ const fieldsBySource: Record<string, { id: string; label: string; type: string; 
     { id: "adr_employer", label: "Employeur", type: "text", dbField: "employer" },
     { id: "adr_status", label: "Statut client", type: "select", dbField: "status" },
     { id: "adr_created_at", label: "Date création adresse", type: "date", dbField: "created_at" },
+    { id: "adr_agent_id", label: "Agent (ID)", type: "agent", dbField: "assigned_agent_id" },
+    { id: "adr_agent_name", label: "Nom Agent", type: "text", dbField: "agent_name", isJoined: true },
+    { id: "adr_manager_id", label: "Manager (ID)", type: "agent", dbField: "manager_id" },
+    { id: "adr_manager_name", label: "Nom Manager", type: "text", dbField: "manager_name", isJoined: true },
   ],
   contrats: [
     { id: "ctr_policy_number", label: "N° Police", type: "text", dbField: "policy_number" },
@@ -71,6 +75,8 @@ const fieldsBySource: Record<string, { id: string; label: string; type: string; 
     { id: "suv_reminder_date", label: "Date rappel", type: "date", dbField: "reminder_date" },
     { id: "suv_created_at", label: "Date création suivi", type: "date", dbField: "created_at" },
     { id: "suv_updated_at", label: "Mise à jour suivi", type: "date", dbField: "updated_at" },
+    { id: "suv_agent_id", label: "Agent suivi (ID)", type: "agent", dbField: "assigned_agent_id" },
+    { id: "suv_agent_name", label: "Agent suivi", type: "text", dbField: "agent_name", isJoined: true },
   ],
 };
 
@@ -101,6 +107,12 @@ const operatorsByFieldType: Record<string, { id: string; label: string }[]> = {
     { id: "equals", label: "Égal à" },
     { id: "not_equals", label: "Différent de" },
     { id: "in", label: "Parmi" },
+  ],
+  agent: [
+    { id: "equals", label: "Est" },
+    { id: "not_equals", label: "N'est pas" },
+    { id: "is_empty", label: "Non assigné" },
+    { id: "is_not_empty", label: "Est assigné" },
   ],
 };
 
@@ -142,6 +154,7 @@ export default function CRMRapports() {
   const [reportResults, setReportResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [activeTab, setActiveTab] = useState("adresses");
+  const [collaborateurs, setCollaborateurs] = useState<any[]>([]);
 
   // État du nouveau rapport
   const [reportName, setReportName] = useState("");
@@ -150,12 +163,22 @@ export default function CRMRapports() {
   const [filters, setFilters] = useState<ReportFilter[]>([]);
   const [conditions, setConditions] = useState<string[]>([]);
 
-  // Charger les rapports sauvegardés depuis localStorage
+  // Charger les rapports sauvegardés et les collaborateurs
   useEffect(() => {
     const saved = localStorage.getItem("crm_reports_v2");
     if (saved) {
       setSavedReports(JSON.parse(saved));
     }
+
+    // Charger les collaborateurs (agents et managers)
+    const loadCollaborateurs = async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, email")
+        .eq("type_adresse", "collaborateur");
+      if (data) setCollaborateurs(data);
+    };
+    loadCollaborateurs();
   }, []);
 
   // Sauvegarder dans localStorage
@@ -291,12 +314,18 @@ export default function CRMRapports() {
     setShowResults(true);
     
     try {
-      // Fetch clients with optional joins
+      // Fetch clients
       const { data: clientsData, error: clientsError } = await supabase
         .from("clients")
         .select("*");
       
       if (clientsError) throw clientsError;
+
+      // Build agent/manager lookup map from collaborateurs
+      const agentMap = new Map<string, string>();
+      for (const collab of collaborateurs) {
+        agentMap.set(collab.id, `${collab.first_name || ""} ${collab.last_name || ""}`.trim() || collab.email);
+      }
 
       // Fetch policies if needed
       let policiesData: any[] = [];
@@ -352,10 +381,16 @@ export default function CRMRapports() {
       for (const client of filteredClients) {
         const baseRow: any = {};
         
-        // Add address fields
+        // Add address fields with joined agent/manager names
         for (const field of fieldsBySource.adresses) {
           if (report.selectedFields.includes(field.id)) {
-            baseRow[field.label] = client[field.dbField] ?? "-";
+            if (field.id === "adr_agent_name") {
+              baseRow[field.label] = client.assigned_agent_id ? agentMap.get(client.assigned_agent_id) || "-" : "-";
+            } else if (field.id === "adr_manager_name") {
+              baseRow[field.label] = client.manager_id ? agentMap.get(client.manager_id) || "-" : "-";
+            } else {
+              baseRow[field.label] = client[field.dbField] ?? "-";
+            }
           }
         }
 
@@ -388,7 +423,11 @@ export default function CRMRapports() {
                   const fullRow = { ...row };
                   for (const field of fieldsBySource.suivis) {
                     if (report.selectedFields.includes(field.id)) {
-                      fullRow[field.label] = suivi[field.dbField] ?? "-";
+                      if (field.id === "suv_agent_name") {
+                        fullRow[field.label] = suivi.assigned_agent_id ? agentMap.get(suivi.assigned_agent_id) || "-" : "-";
+                      } else {
+                        fullRow[field.label] = suivi[field.dbField] ?? "-";
+                      }
                     }
                   }
                   results.push(fullRow);
@@ -411,7 +450,11 @@ export default function CRMRapports() {
               const row = { ...baseRow };
               for (const field of fieldsBySource.suivis) {
                 if (report.selectedFields.includes(field.id)) {
-                  row[field.label] = suivi[field.dbField] ?? "-";
+                  if (field.id === "suv_agent_name") {
+                    row[field.label] = suivi.assigned_agent_id ? agentMap.get(suivi.assigned_agent_id) || "-" : "-";
+                  } else {
+                    row[field.label] = suivi[field.dbField] ?? "-";
+                  }
                 }
               }
               results.push(row);
@@ -676,12 +719,30 @@ export default function CRMRapports() {
                                 </Select>
                                 
                                 {!["is_empty", "is_not_empty"].includes(filter.operator) && (
-                                  <Input 
-                                    value={filter.value}
-                                    onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                                    placeholder="Valeur..."
-                                    className="flex-1"
-                                  />
+                                  fieldDef?.type === "agent" ? (
+                                    <Select 
+                                      value={filter.value}
+                                      onValueChange={(v) => updateFilter(filter.id, { value: v })}
+                                    >
+                                      <SelectTrigger className="flex-1">
+                                        <SelectValue placeholder="Sélectionner un agent..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {collaborateurs.map(collab => (
+                                          <SelectItem key={collab.id} value={collab.id}>
+                                            {collab.first_name} {collab.last_name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Input 
+                                      value={filter.value}
+                                      onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
+                                      placeholder="Valeur..."
+                                      className="flex-1"
+                                    />
+                                  )
                                 )}
                                 
                                 <Button 
