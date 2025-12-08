@@ -11,6 +11,13 @@ export interface Collaborateur {
   status: string | null;
   profession: string | null;
   created_at: string;
+  // Financial fields
+  commission_rate: number | null;
+  fixed_salary: number | null;
+  bonus_rate: number | null;
+  contract_type: string | null;
+  work_percentage: number | null;
+  hire_date: string | null;
 }
 
 export type CollaborateurFormData = {
@@ -20,6 +27,13 @@ export type CollaborateurFormData = {
   mobile?: string;
   profession?: string;
   status?: string;
+  // Financial fields
+  commission_rate?: number;
+  fixed_salary?: number;
+  bonus_rate?: number;
+  contract_type?: string;
+  work_percentage?: number;
+  hire_date?: string;
 };
 
 export function useCollaborateurs() {
@@ -33,7 +47,7 @@ export function useCollaborateurs() {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, first_name, last_name, email, mobile, status, profession, created_at')
+        .select('id, first_name, last_name, email, mobile, status, profession, created_at, commission_rate, fixed_salary, bonus_rate, contract_type, work_percentage, hire_date')
         .eq('type_adresse', 'collaborateur')
         .order('first_name', { ascending: true });
 
