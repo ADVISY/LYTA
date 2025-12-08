@@ -504,14 +504,11 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
                 <div style={{ position: 'relative', zIndex: 1 }}>
                   {/* En-tête avec logo */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '15px', borderBottom: '3px solid #1800AD' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <img src={advisyLogo} alt="e-Advisy" style={{ height: '50px', width: 'auto' }} />
-                      <div>
-                        <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1800AD' }}>e-Advisy</div>
-                        <div style={{ fontSize: '10px', color: '#666' }}>Sàrl • Courtier en assurances</div>
-                        <div style={{ fontSize: '9px', color: '#999', marginTop: '3px' }}>
-                          Route de Chêne 5, 1207 Genève<br/>info@e-advisy.ch • www.e-advisy.ch
-                        </div>
+                    <div>
+                      <img src={advisyLogo} alt="Advisy" style={{ height: '50px', width: 'auto', marginBottom: '8px' }} />
+                      <div style={{ fontSize: '10px', color: '#666' }}>Sàrl • Courtier en assurances</div>
+                      <div style={{ fontSize: '9px', color: '#999', marginTop: '3px' }}>
+                        Route de Chêne 5, 1207 Genève<br/>info@e-advisy.ch • www.e-advisy.ch
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -542,12 +539,6 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
                   {client.email && <div style={{ fontSize: '11px', color: '#666' }}>{client.email}</div>}
                   {(client.mobile || client.phone) && <div style={{ fontSize: '11px', color: '#666' }}>{client.mobile || client.phone}</div>}
                   <div style={{ fontSize: '11px', color: '#666' }}>Nationalité: {client.nationality || "—"} • Permis: {client.permit_type || "—"}</div>
-                </div>
-
-                {/* Logo Advisy central */}
-                <div style={{ textAlign: 'center', margin: '30px 0', padding: '20px' }}>
-                  <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#1800AD', letterSpacing: '2px' }}>ADVISY</div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', letterSpacing: '4px' }}>VOTRE COURTIER DE CONFIANCE</div>
                 </div>
 
                 {/* Mandataire */}
@@ -614,10 +605,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
                 <div style={{ position: 'relative', zIndex: 1 }}>
                   {/* En-tête page 2 avec logo */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '10px', borderBottom: '2px solid #1800AD' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <img src={advisyLogo} alt="e-Advisy" style={{ height: '35px', width: 'auto' }} />
-                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1800AD' }}>e-Advisy</div>
-                    </div>
+                    <img src={advisyLogo} alt="Advisy" style={{ height: '35px', width: 'auto' }} />
                     <div style={{ fontSize: '10px', color: '#666' }}>Mandat de Gestion • {getClientName()}</div>
                   </div>
 
