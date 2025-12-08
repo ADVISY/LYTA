@@ -7,6 +7,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_SESSION = 10; // 10 requests per minute per session
+const MAX_REQUESTS_PER_IP = 30; // 30 requests per minute per IP
+
+// Rate limiting function
+async function checkRateLimit(
+  supabase: any,
+  sessionId: string,
+  ipAddress: string | null
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
+  
+  // Check session-based rate limit
+  const { data: sessionLimits } = await supabase
+    .from('ai_rate_limits')
+    .select('request_count, window_start')
+    .eq('session_id', sessionId)
+    .gte('window_start', windowStart);
+
+  if (sessionLimits && sessionLimits.length > 0) {
+    const totalRequests = sessionLimits.reduce((sum: number, r: any) => sum + (r.request_count || 1), 0);
+    if (totalRequests >= MAX_REQUESTS_PER_SESSION) {
+      const oldestWindow = new Date(sessionLimits[0].window_start);
+      const retryAfter = Math.ceil((oldestWindow.getTime() + RATE_LIMIT_WINDOW_MS - Date.now()) / 1000);
+      return { allowed: false, retryAfter: Math.max(retryAfter, 5) };
+    }
+  }
+
+  // Check IP-based rate limit (if IP available)
+  if (ipAddress) {
+    const { data: ipLimits } = await supabase
+      .from('ai_rate_limits')
+      .select('request_count, window_start')
+      .eq('ip_address', ipAddress)
+      .gte('window_start', windowStart);
+
+    if (ipLimits && ipLimits.length > 0) {
+      const totalRequests = ipLimits.reduce((sum: number, r: any) => sum + (r.request_count || 1), 0);
+      if (totalRequests >= MAX_REQUESTS_PER_IP) {
+        const oldestWindow = new Date(ipLimits[0].window_start);
+        const retryAfter = Math.ceil((oldestWindow.getTime() + RATE_LIMIT_WINDOW_MS - Date.now()) / 1000);
+        return { allowed: false, retryAfter: Math.max(retryAfter, 5) };
+      }
+    }
+  }
+
+  // Record this request
+  await supabase.from('ai_rate_limits').insert({
+    session_id: sessionId,
+    ip_address: ipAddress,
+    request_count: 1,
+    window_start: new Date().toISOString()
+  });
+
+  return { allowed: true };
+}
+
 const SYSTEM_PROMPTS = {
   client: `Tu es Aivy, l'assistante virtuelle d'Advisy, spécialisée dans les assurances suisses.
 
@@ -102,7 +160,55 @@ serve(async (req) => {
 
     const { messages, conversationId, sessionId, userType } = await req.json();
 
-    console.log('AI Chat request:', { conversationId, sessionId, userType, messageCount: messages.length });
+    // Get client IP for rate limiting
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     null;
+
+    console.log('AI Chat request:', { conversationId, sessionId, userType, messageCount: messages?.length, ip: clientIp });
+
+    // Validate sessionId
+    if (!sessionId || typeof sessionId !== 'string' || sessionId.length < 10) {
+      console.error('Invalid sessionId provided');
+      return new Response(
+        JSON.stringify({ error: 'Session invalide. Veuillez rafraîchir la page.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(supabase, sessionId, clientIp);
+    if (!rateLimitResult.allowed) {
+      console.log(`Rate limit exceeded for session: ${sessionId}, IP: ${clientIp}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Trop de requêtes. Veuillez patienter avant de réessayer.',
+          retryAfter: rateLimitResult.retryAfter 
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimitResult.retryAfter)
+          } 
+        }
+      );
+    }
+
+    // Validate messages
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Message requis.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize message content (prevent injection and limit length)
+    const sanitizedMessages = messages.map((msg: any) => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof msg.content === 'string' ? msg.content.slice(0, 4000) : ''
+    }));
 
     // Create or update conversation
     let conversation;
@@ -160,7 +266,7 @@ serve(async (req) => {
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages
+          ...sanitizedMessages
         ],
         temperature: 0.7,
         max_tokens: 1000,
@@ -195,8 +301,8 @@ serve(async (req) => {
       throw new Error('No response from AI');
     }
 
-    // Store user message
-    const userMessage = messages[messages.length - 1];
+    // Store user message (using sanitized content)
+    const userMessage = sanitizedMessages[sanitizedMessages.length - 1];
     await supabase
       .from('ai_messages')
       .insert({
