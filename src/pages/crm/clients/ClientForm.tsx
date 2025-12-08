@@ -28,6 +28,7 @@ import { ArrowLeft } from "lucide-react";
 const clientSchema = z.object({
   type_adresse: z.enum(["client", "collaborateur", "partenaire"]),
   assigned_agent_id: z.string().optional().nullable(),
+  manager_id: z.string().optional().nullable(),
   first_name: z.string().min(1, "Prénom requis").max(100),
   last_name: z.string().min(1, "Nom requis").max(100),
   company_name: z.string().max(200).optional().nullable(),
@@ -56,15 +57,17 @@ export default function ClientForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { createClient, updateClient, getClientById } = useClients();
-  const { agents, loading: agentsLoading } = useAgents();
+  const { agents, loading: agentsLoading, getManagerForAgent } = useAgents();
   const [loading, setLoading] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
+  const [selectedManager, setSelectedManager] = useState<{ id: string; name: string } | null>(null);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       type_adresse: "client",
       assigned_agent_id: null,
+      manager_id: null,
       first_name: "",
       last_name: "",
       company_name: null,
@@ -88,6 +91,28 @@ export default function ClientForm() {
     },
   });
 
+  // Watch for agent changes to auto-assign manager
+  const watchedAgentId = form.watch("assigned_agent_id");
+  
+  useEffect(() => {
+    if (watchedAgentId && watchedAgentId !== "none") {
+      const manager = getManagerForAgent(watchedAgentId);
+      if (manager) {
+        setSelectedManager({
+          id: manager.id,
+          name: `${manager.first_name || ''} ${manager.last_name || ''}`.trim() || manager.email || 'Manager'
+        });
+        form.setValue("manager_id", manager.id);
+      } else {
+        setSelectedManager(null);
+        form.setValue("manager_id", null);
+      }
+    } else {
+      setSelectedManager(null);
+      form.setValue("manager_id", null);
+    }
+  }, [watchedAgentId, agents]);
+
   useEffect(() => {
     if (id) {
       loadClient();
@@ -102,6 +127,7 @@ export default function ClientForm() {
       form.reset({
         type_adresse: (data.type_adresse as any) || "client",
         assigned_agent_id: data.assigned_agent_id,
+        manager_id: (data as any).manager_id || null,
         first_name: data.first_name || "",
         last_name: data.last_name || "",
         company_name: data.company_name,
@@ -140,7 +166,8 @@ export default function ClientForm() {
     const clientData = {
       ...data,
       tags,
-      assigned_agent_id: data.assigned_agent_id || null,
+      assigned_agent_id: data.assigned_agent_id === "none" ? null : (data.assigned_agent_id || null),
+      manager_id: data.manager_id || null,
       company_name: data.company_name || null,
       address: data.address || null,
       zip_code: data.zip_code || null,
@@ -565,37 +592,60 @@ export default function ClientForm() {
                   Autres informations
                 </h3>
 
-                <FormField
-                  control={form.control}
-                  name="assigned_agent_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Agent assigné</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(value === "none" ? null : value)}
-                        value={field.value || "none"}
-                        disabled={agentsLoading}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un agent" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">Aucun</SelectItem>
-                          {agents.map((agent) => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                              {agent.first_name && agent.last_name
-                                ? `${agent.first_name} ${agent.last_name}`
-                                : agent.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="assigned_agent_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Agent assigné</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                          value={field.value || "none"}
+                          disabled={agentsLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner un agent" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Aucun</SelectItem>
+                            {agents.map((agent) => (
+                              <SelectItem key={agent.id} value={agent.id}>
+                                {agent.first_name && agent.last_name
+                                  ? `${agent.first_name} ${agent.last_name}`
+                                  : agent.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Manager automatique */}
+                  <div className="space-y-2">
+                    <FormLabel>Manager attitré</FormLabel>
+                    <div className={`px-3 py-2 rounded-md border ${selectedManager ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800' : 'bg-muted'}`}>
+                      {selectedManager ? (
+                        <span className="text-amber-700 dark:text-amber-400 font-medium">
+                          {selectedManager.name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          {watchedAgentId && watchedAgentId !== "none" 
+                            ? "Aucun manager pour cet agent" 
+                            : "Sélectionnez un agent"}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Assigné automatiquement selon l'agent
+                    </p>
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <FormLabel>Tags (séparés par des virgules)</FormLabel>
