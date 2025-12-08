@@ -6,13 +6,12 @@ import { usePerformance } from "@/hooks/usePerformance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Users, FileText, DollarSign, TrendingUp, Clock, 
-  Cake, MessageSquare, ChevronRight, Loader2, 
-  BarChart3, Calendar
+  Users, FileText, DollarSign, TrendingUp, 
+  MessageSquare, Loader2, BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
-import { format, differenceInYears, isSameMonth, isSameDay, addYears } from "date-fns";
+import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   BarChart,
@@ -31,7 +30,6 @@ export default function CRMDashboard() {
   const { commissions, loading: commissionsLoading } = useCommissions();
   const { loading: performanceLoading, companyTotals } = usePerformance();
 
-  const [showMyAddresses, setShowMyAddresses] = useState(true);
   const [showMyContracts, setShowMyContracts] = useState(false);
 
   const loading = clientsLoading || policiesLoading || commissionsLoading || performanceLoading;
@@ -44,89 +42,69 @@ export default function CRMDashboard() {
     }).format(value);
   };
 
-  // Upcoming birthdays
-  const upcomingBirthdays = useMemo(() => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    
-    return clients
-      .filter(c => c.birthdate && c.type_adresse === 'client')
-      .map(c => {
-        const birthDate = new Date(c.birthdate!);
-        const nextBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
-        if (nextBirthday < today) {
-          nextBirthday.setFullYear(currentYear + 1);
-        }
-        const age = differenceInYears(nextBirthday, birthDate);
-        const isToday = isSameDay(nextBirthday, today);
-        
-        return {
-          id: c.id,
-          name: `${c.first_name || ''} ${c.last_name || ''}`.trim(),
-          date: nextBirthday,
-          age,
-          isToday,
-          displayDate: isToday ? "Aujourd'hui" : format(nextBirthday, "d MMMM", { locale: fr })
-        };
-      })
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .slice(0, 12);
-  }, [clients]);
-
-  // Monthly contracts data for chart
-  const monthlyContracts = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 
-                    'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-    
-    const data = months.map((month, index) => ({
-      month,
-      value: 0,
-    }));
-
-    policies.forEach(p => {
-      const date = new Date(p.created_at);
-      if (date.getFullYear() === currentYear) {
-        data[date.getMonth()].value += 1;
-      }
-    });
-
-    return data;
-  }, [policies]);
-
-  // Recent comments/activities
+  // All CRM activities for admin (contracts, clients, commissions)
   const recentActivities = useMemo(() => {
     const activities: { 
       id: string;
-      type: 'comment' | 'contract' | 'client';
-      author: string;
-      content: string;
-      clientName?: string;
-      productType?: string;
+      type: 'contract' | 'client' | 'commission';
+      title: string;
+      description: string;
       date: Date;
+      color: string;
+      icon: 'contract' | 'client' | 'commission';
     }[] = [];
 
-    // Add recent policies as activities
-    policies
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 8)
-      .forEach(policy => {
-        const client = clients.find(c => c.id === policy.client_id);
-        activities.push({
-          id: policy.id,
-          type: 'contract',
-          author: client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Client',
-          content: `Nouveau contrat créé`,
-          clientName: client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : undefined,
-          productType: policy.product_type || 'Assurance',
-          date: new Date(policy.created_at),
-        });
+    // Add policies/contracts
+    policies.forEach(policy => {
+      const client = clients.find(c => c.id === policy.client_id);
+      const clientName = client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Client';
+      activities.push({
+        id: `policy-${policy.id}`,
+        type: 'contract',
+        title: 'Nouveau contrat',
+        description: `${clientName} - ${policy.product_type || policy.company_name || 'Assurance'}`,
+        date: new Date(policy.created_at),
+        color: 'emerald',
+        icon: 'contract',
       });
+    });
+
+    // Add clients
+    clients.forEach(client => {
+      const name = `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.company_name || 'Client';
+      const typeLabel = client.type_adresse === 'collaborateur' ? 'Collaborateur' : 
+                        client.type_adresse === 'partenaire' ? 'Partenaire' : 'Client';
+      activities.push({
+        id: `client-${client.id}`,
+        type: 'client',
+        title: `Nouveau ${typeLabel.toLowerCase()}`,
+        description: name,
+        date: new Date(client.created_at),
+        color: 'blue',
+        icon: 'client',
+      });
+    });
+
+    // Add commissions
+    commissions.forEach(commission => {
+      const policy = policies.find(p => p.id === commission.policy_id);
+      const client = policy ? clients.find(c => c.id === policy.client_id) : null;
+      const clientName = client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Client';
+      activities.push({
+        id: `commission-${commission.id}`,
+        type: 'commission',
+        title: 'Commission enregistrée',
+        description: `${clientName} - ${commission.amount?.toFixed(2) || '0'} CHF`,
+        date: new Date(commission.created_at),
+        color: 'amber',
+        icon: 'commission',
+      });
+    });
 
     return activities
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 8);
-  }, [policies, clients]);
+      .slice(0, 50);
+  }, [policies, clients, commissions]);
 
   // Group activities by date
   const groupedActivities = useMemo(() => {
@@ -145,6 +123,27 @@ export default function CRMDashboard() {
       items,
     }));
   }, [recentActivities]);
+
+  // Monthly contracts data for chart
+  const monthlyContracts = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 
+                    'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    
+    const data = months.map((month) => ({
+      month,
+      value: 0,
+    }));
+
+    policies.forEach(p => {
+      const date = new Date(p.created_at);
+      if (date.getFullYear() === currentYear) {
+        data[date.getMonth()].value += 1;
+      }
+    });
+
+    return data;
+  }, [policies]);
 
   const currentYear = new Date().getFullYear();
 
@@ -175,76 +174,9 @@ export default function CRMDashboard() {
       {!loading && (
         <>
           {/* Main 3-column layout */}
-          <div className="grid gap-6 lg:grid-cols-[320px_1fr_360px]">
+          <div className={cn("grid gap-6", isAdmin ? "lg:grid-cols-[1fr_400px]" : "")}>
             
-            {/* Left Column - Birthdays */}
-            <Card className="border shadow-sm bg-card">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Cake className="h-4 w-4 text-rose-500" />
-                    <CardTitle className="text-sm font-semibold">Anniversaires à venir</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Mes adresses</span>
-                    <Switch 
-                      checked={showMyAddresses} 
-                      onCheckedChange={setShowMyAddresses}
-                      className="data-[state=checked]:bg-primary"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-1">
-                  {upcomingBirthdays.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Aucun anniversaire à venir
-                    </p>
-                  ) : (
-                    upcomingBirthdays.map((birthday, i) => (
-                      <div 
-                        key={birthday.id}
-                        className={cn(
-                          "flex items-center gap-3 p-2.5 rounded-lg transition-colors hover:bg-muted/50 cursor-pointer",
-                          birthday.isToday && "bg-rose-50 hover:bg-rose-100"
-                        )}
-                      >
-                        <Cake className={cn(
-                          "h-4 w-4 flex-shrink-0",
-                          birthday.isToday ? "text-rose-500" : "text-muted-foreground"
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-sm font-medium truncate",
-                            birthday.isToday && "text-rose-700"
-                          )}>
-                            {birthday.displayDate}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium truncate max-w-[120px]">{birthday.name}</p>
-                          <p className="text-xs text-muted-foreground">{birthday.age}ans</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Notes section */}
-                <div className="mt-6 pt-4 border-t">
-                  <p className="text-sm font-medium mb-2 text-muted-foreground">Bloc-notes</p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 min-h-[100px]">
-                    <textarea 
-                      placeholder="Vos notes ici..."
-                      className="w-full bg-transparent text-sm resize-none focus:outline-none min-h-[80px] text-amber-900 placeholder:text-amber-400"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Center Column - Chart */}
+            {/* Main Column - Chart */}
             <Card className="border shadow-sm bg-card">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -327,68 +259,66 @@ export default function CRMDashboard() {
               </CardContent>
             </Card>
 
-            {/* Right Column - Recent Activity */}
-            <Card className="border shadow-sm bg-card">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+            {/* Right Column - Recent Activity (Admin only) */}
+            {isAdmin && (
+              <Card className="border shadow-sm bg-card">
+                <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-blue-500" />
                     <CardTitle className="text-sm font-semibold">Dernières nouvelles</CardTitle>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Mes adresses</span>
-                    <Switch 
-                      checked={showMyAddresses} 
-                      onCheckedChange={setShowMyAddresses}
-                      className="data-[state=checked]:bg-primary"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2">
-                  {groupedActivities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Aucune activité récente
-                    </p>
-                  ) : (
-                    groupedActivities.map((group) => (
-                      <div key={group.date}>
-                        <p className="text-sm font-semibold text-foreground mb-2">{group.date}</p>
-                        <div className="space-y-2">
-                          {group.items.map((activity) => (
-                            <div 
-                              key={activity.id}
-                              className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer border-l-4 border-emerald-500"
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className="p-1.5 rounded-md bg-emerald-100 flex-shrink-0">
-                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="text-sm font-semibold text-emerald-700">Nouveau contrat</p>
-                                    <span className="text-[10px] text-muted-foreground">
-                                      {format(activity.date, "HH:mm")}
-                                    </span>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                    {groupedActivities.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Aucune activité récente
+                      </p>
+                    ) : (
+                      groupedActivities.map((group) => (
+                        <div key={group.date}>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">{group.date}</p>
+                          <div className="space-y-2">
+                            {group.items.map((activity) => {
+                              const colorClasses = {
+                                emerald: { border: 'border-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-600', title: 'text-emerald-700' },
+                                blue: { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-600', title: 'text-blue-700' },
+                                amber: { border: 'border-amber-500', bg: 'bg-amber-100', text: 'text-amber-600', title: 'text-amber-700' },
+                              };
+                              const colors = colorClasses[activity.color as keyof typeof colorClasses] || colorClasses.emerald;
+                              const IconComponent = activity.icon === 'contract' ? FileText : 
+                                                    activity.icon === 'client' ? Users : DollarSign;
+                              
+                              return (
+                                <div 
+                                  key={activity.id}
+                                  className={cn("p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border-l-4", colors.border)}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <div className={cn("p-1.5 rounded-md flex-shrink-0", colors.bg)}>
+                                      <IconComponent className={cn("h-3.5 w-3.5", colors.text)} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <p className={cn("text-xs font-semibold", colors.title)}>{activity.title}</p>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {format(activity.date, "HH:mm")}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm truncate">{activity.description}</p>
+                                    </div>
                                   </div>
-                                  <p className="text-sm font-medium">{activity.author}</p>
-                                  {activity.productType && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 border-l-2 border-muted pl-2">
-                                      {activity.productType}
-                                    </p>
-                                  )}
                                 </div>
-                              </div>
-                            </div>
-                          ))}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </>
       )}
