@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 
 export type Commission = {
   id: string;
@@ -25,7 +24,6 @@ export function useCommissions() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const fetchCommissions = async () => {
     try {
@@ -171,10 +169,8 @@ export function useCommissions() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchCommissions();
-    }
-  }, [user]);
+    fetchCommissions();
+  }, []);
 
   return {
     commissions,
