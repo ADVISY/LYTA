@@ -265,22 +265,38 @@ export default function CRMDashboard() {
       )}
 
       {!loading && (
-        <div className="space-y-6">
-          {/* Row 1: LCA/VIE Chart + Team Performance */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* LCA vs VIE Chart */}
+        <div className={cn("grid gap-6", isAdmin ? "lg:grid-cols-[1fr_400px]" : "")}>
+          {/* Main Column - Charts */}
+          <div className="space-y-6">
+            {/* Main Chart - LCA vs VIE with financial info */}
             <Card className="border shadow-sm bg-card">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-semibold">Affaires LCA vs VIE</CardTitle>
-                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
-                    {currentYear}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm font-semibold">Affaires LCA vs VIE</CardTitle>
+                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
+                      {currentYear}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-rose-500" />
+                      <span>LCA: <strong>{monthlyLcaVie.reduce((s, m) => s + m.lca, 0)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-blue-500" />
+                      <span>VIE: <strong>{monthlyLcaVie.reduce((s, m) => s + m.vie, 0)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-emerald-500" />
+                      <span>Total: <strong>{policies.length}</strong></span>
+                    </div>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="h-[280px]">
+                <div className="h-[320px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyLcaVie} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -288,12 +304,12 @@ export default function CRMDashboard() {
                         dataKey="month" 
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       />
                       <YAxis 
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       />
                       <Tooltip 
                         contentStyle={{
@@ -313,27 +329,49 @@ export default function CRMDashboard() {
                         name="lca"
                         fill="hsl(340 82% 52%)"
                         radius={[4, 4, 0, 0]}
-                        maxBarSize={30}
+                        maxBarSize={40}
                       />
                       <Bar 
                         dataKey="vie" 
                         name="vie"
                         fill="hsl(217 91% 60%)"
                         radius={[4, 4, 0, 0]}
-                        maxBarSize={30}
+                        maxBarSize={40}
                       />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Legend summary */}
-                <div className="flex justify-center gap-6 mt-2 pt-2 border-t">
-                  <div className="flex items-center gap-2">
-                    <Heart className="h-4 w-4 text-rose-500" />
-                    <span className="text-sm font-medium">LCA: {monthlyLcaVie.reduce((s, m) => s + m.lca, 0)}</span>
+
+                {/* Financial & Stats Summary below chart */}
+                <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t">
+                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+                    <p className="text-[10px] opacity-80">CA</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.ca)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-medium">VIE: {monthlyLcaVie.reduce((s, m) => s + m.vie, 0)}</span>
+                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                    <p className="text-[10px] opacity-80">Salaires</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.salaries)}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+                    <p className="text-[10px] opacity-80">Charges</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
+                  </div>
+                  <div className={cn(
+                    "text-center p-3 rounded-xl text-white",
+                    financialSummary.benefit >= 0 
+                      ? "bg-gradient-to-br from-green-500 to-green-600" 
+                      : "bg-gradient-to-br from-red-500 to-red-600"
+                  )}>
+                    <p className="text-[10px] opacity-80">Bénéfice</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.benefit)}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-muted/50">
+                    <p className="text-[10px] text-muted-foreground">Clients</p>
+                    <p className="text-lg font-bold">{companyTotals.clientsCount}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-muted/50">
+                    <p className="text-[10px] text-muted-foreground">Primes/mois</p>
+                    <p className="text-lg font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -349,11 +387,11 @@ export default function CRMDashboard() {
               </CardHeader>
               <CardContent className="pt-0">
                 {contractsByManager.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">
+                  <div className="text-center py-8 text-muted-foreground text-sm">
                     Aucune donnée d'équipe disponible
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground pb-2 border-b">
                       <span>Manager</span>
                       <span className="text-center">Ce mois</span>
@@ -363,12 +401,12 @@ export default function CRMDashboard() {
                       <div key={i} className="grid grid-cols-3 gap-2 items-center py-2 hover:bg-muted/30 rounded-lg px-2 transition-colors">
                         <span className="text-sm font-medium truncate">{manager.name}</span>
                         <div className="text-center">
-                          <span className="inline-flex items-center justify-center w-10 h-8 rounded-lg bg-violet-100 text-violet-700 font-bold text-sm">
+                          <span className="inline-flex items-center justify-center w-10 h-7 rounded-lg bg-violet-100 text-violet-700 font-bold text-sm">
                             {manager.mois}
                           </span>
                         </div>
                         <div className="text-center">
-                          <span className="inline-flex items-center justify-center w-10 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-sm">
+                          <span className="inline-flex items-center justify-center w-10 h-7 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-sm">
                             {manager.annee}
                           </span>
                         </div>
@@ -380,190 +418,66 @@ export default function CRMDashboard() {
             </Card>
           </div>
 
-          {/* Row 2: Financial Summary Chart + Recent Activities */}
-          <div className={cn("grid gap-6", isAdmin ? "lg:grid-cols-[1fr_400px]" : "")}>
-            {/* Financial Summary with Chart */}
-            <Card className="border shadow-sm bg-card">
+          {/* Right Column - Recent Activity (Admin only) */}
+          {isAdmin && (
+            <Card className="border shadow-sm bg-card h-fit">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-amber-500" />
-                  <CardTitle className="text-sm font-semibold">Résumé financier</CardTitle>
+                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                  <CardTitle className="text-sm font-semibold">Dernières nouvelles</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                {/* Financial Chart - Horizontal bar chart */}
-                <div className="h-[200px] mb-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      layout="vertical"
-                      data={[
-                        { name: 'CA (Commissions)', value: financialSummary.ca, fill: 'hsl(142 76% 45%)' },
-                        { name: 'Salaires', value: financialSummary.salaries, fill: 'hsl(217 91% 60%)' },
-                        { name: 'Charges sociales', value: financialSummary.socialCharges, fill: 'hsl(25 95% 53%)' },
-                        { name: 'Total charges', value: financialSummary.totalCharges, fill: 'hsl(346 77% 50%)' },
-                        { name: 'Bénéfice', value: Math.abs(financialSummary.benefit), fill: financialSummary.benefit >= 0 ? 'hsl(142 71% 45%)' : 'hsl(0 84% 60%)' },
-                      ]} 
-                      margin={{ top: 5, right: 30, bottom: 5, left: 100 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                      <XAxis 
-                        type="number"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                        tickFormatter={(value) => formatCurrency(value)}
-                      />
-                      <YAxis 
-                        type="category"
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                        width={95}
-                      />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                        formatter={(value: number) => [`${formatCurrency(value)} CHF`]}
-                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                      />
-                      <Bar 
-                        dataKey="value" 
-                        radius={[0, 4, 4, 0]}
-                        maxBarSize={25}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Summary cards below chart */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 pt-4 border-t">
-                  {/* CA */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-                    <p className="text-[10px] opacity-80 mb-1">CA</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.ca)}</p>
-                  </div>
-                  
-                  {/* Salaries */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                    <p className="text-[10px] opacity-80 mb-1">Salaires</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.salaries)}</p>
-                  </div>
-                  
-                  {/* Social charges */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-                    <p className="text-[10px] opacity-80 mb-1">Charges</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
-                  </div>
-                  
-                  {/* Total charges */}
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
-                    <p className="text-[10px] opacity-80 mb-1">Total</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.totalCharges)}</p>
-                  </div>
-                  
-                  {/* Benefit */}
-                  <div className={cn(
-                    "p-3 rounded-xl text-white",
-                    financialSummary.benefit >= 0 
-                      ? "bg-gradient-to-br from-green-500 to-green-600" 
-                      : "bg-gradient-to-br from-red-500 to-red-600"
-                  )}>
-                    <p className="text-[10px] opacity-80 mb-1">Bénéfice</p>
-                    <p className="text-lg font-bold">{formatCurrency(financialSummary.benefit)}</p>
-                  </div>
-                </div>
-
-                {/* Summary stats */}
-                <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t">
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <Users className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                    <p className="text-lg font-bold">{companyTotals.clientsCount}</p>
-                    <p className="text-[10px] text-muted-foreground">Clients</p>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <FileText className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                    <p className="text-lg font-bold">{companyTotals.contractsCount}</p>
-                    <p className="text-[10px] text-muted-foreground">Contrats</p>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <DollarSign className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                    <p className="text-lg font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
-                    <p className="text-[10px] text-muted-foreground">Commissions</p>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted/50">
-                    <TrendingUp className="h-5 w-5 mx-auto mb-1 text-violet-500" />
-                    <p className="text-lg font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
-                    <p className="text-[10px] text-muted-foreground">Primes/mois</p>
-                  </div>
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                  {groupedActivities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Aucune activité récente
+                    </p>
+                  ) : (
+                    groupedActivities.map((group) => (
+                      <div key={group.date}>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">{group.date}</p>
+                        <div className="space-y-2">
+                          {group.items.map((activity) => {
+                            const colorClasses = {
+                              emerald: { border: 'border-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-600', title: 'text-emerald-700' },
+                              blue: { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-600', title: 'text-blue-700' },
+                              amber: { border: 'border-amber-500', bg: 'bg-amber-100', text: 'text-amber-600', title: 'text-amber-700' },
+                            };
+                            const colors = colorClasses[activity.color as keyof typeof colorClasses] || colorClasses.emerald;
+                            const IconComponent = activity.icon === 'contract' ? FileText : 
+                                                  activity.icon === 'client' ? Users : DollarSign;
+                            
+                            return (
+                              <div 
+                                key={activity.id}
+                                className={cn("p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border-l-4", colors.border)}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className={cn("p-1.5 rounded-md flex-shrink-0", colors.bg)}>
+                                    <IconComponent className={cn("h-3.5 w-3.5", colors.text)} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <p className={cn("text-xs font-semibold", colors.title)}>{activity.title}</p>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {format(activity.date, "HH:mm")}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm truncate">{activity.description}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Right Column - Recent Activity (Admin only) */}
-            {isAdmin && (
-              <Card className="border shadow-sm bg-card">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-blue-500" />
-                    <CardTitle className="text-sm font-semibold">Dernières nouvelles</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                    {groupedActivities.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        Aucune activité récente
-                      </p>
-                    ) : (
-                      groupedActivities.map((group) => (
-                        <div key={group.date}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2">{group.date}</p>
-                          <div className="space-y-2">
-                            {group.items.map((activity) => {
-                              const colorClasses = {
-                                emerald: { border: 'border-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-600', title: 'text-emerald-700' },
-                                blue: { border: 'border-blue-500', bg: 'bg-blue-100', text: 'text-blue-600', title: 'text-blue-700' },
-                                amber: { border: 'border-amber-500', bg: 'bg-amber-100', text: 'text-amber-600', title: 'text-amber-700' },
-                              };
-                              const colors = colorClasses[activity.color as keyof typeof colorClasses] || colorClasses.emerald;
-                              const IconComponent = activity.icon === 'contract' ? FileText : 
-                                                    activity.icon === 'client' ? Users : DollarSign;
-                              
-                              return (
-                                <div 
-                                  key={activity.id}
-                                  className={cn("p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border-l-4", colors.border)}
-                                >
-                                  <div className="flex items-start gap-2">
-                                    <div className={cn("p-1.5 rounded-md flex-shrink-0", colors.bg)}>
-                                      <IconComponent className={cn("h-3.5 w-3.5", colors.text)} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-0.5">
-                                        <p className={cn("text-xs font-semibold", colors.title)}>{activity.title}</p>
-                                        <span className="text-[10px] text-muted-foreground">
-                                          {format(activity.date, "HH:mm")}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm truncate">{activity.description}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          )}
         </div>
       )}
     </div>
