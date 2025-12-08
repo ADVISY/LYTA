@@ -486,7 +486,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
               }}
             >
               {/* ========== PAGE 1 ========== */}
-              <div style={{ padding: '30px 35px', minHeight: '277mm', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ padding: '30px 35px', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
                 {/* Filigrane logo en fond */}
                 <div style={{ 
                   position: 'absolute', 
@@ -586,7 +586,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
               </div>
 
               {/* ========== PAGE 2 ========== */}
-              <div style={{ padding: '30px 35px', minHeight: '277mm', boxSizing: 'border-box', pageBreakBefore: 'always', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ padding: '30px 35px', boxSizing: 'border-box', pageBreakBefore: 'always', position: 'relative', overflow: 'hidden' }}>
                 {/* Filigrane logo en fond page 2 */}
                 <div style={{ 
                   position: 'absolute', 
