@@ -156,6 +156,39 @@ export default function CRMCommissions() {
     });
   }, [commissions, searchQuery, statusFilter, typeFilter]);
 
+  // Group commissions by client
+  const groupedCommissions = useMemo(() => {
+    const groups: Record<string, { clientId: string; clientName: string; commissions: Commission[]; totalAmount: number }> = {};
+    
+    filteredCommissions.forEach(commission => {
+      const clientId = commission.policy?.client?.id || 'unknown';
+      const clientName = commission.policy?.client?.company_name || 
+        `${commission.policy?.client?.first_name || ''} ${commission.policy?.client?.last_name || ''}`.trim() ||
+        'Client inconnu';
+      
+      if (!groups[clientId]) {
+        groups[clientId] = {
+          clientId,
+          clientName,
+          commissions: [],
+          totalAmount: 0
+        };
+      }
+      
+      groups[clientId].commissions.push(commission);
+      groups[clientId].totalAmount += Number(commission.amount || 0);
+    });
+    
+    return Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredCommissions]);
+
+  // Track expanded clients
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
+  
+  const toggleClientExpand = (clientId: string) => {
+    setExpandedClients(prev => ({ ...prev, [clientId]: !prev[clientId] }));
+  };
+
   const handleMarkAsPaid = async (id: string) => {
     await markAsPaid(id);
   };
@@ -289,17 +322,19 @@ export default function CRMCommissions() {
         </CardContent>
       </Card>
 
-      {/* Commissions Table */}
+      {/* Commissions Table - Grouped by Client */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg">Liste des commissions ({filteredCommissions.length})</CardTitle>
+          <CardTitle className="text-lg">
+            Liste des commissions ({filteredCommissions.length} commissions, {groupedCommissions.length} clients)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredCommissions.length === 0 ? (
+          ) : groupedCommissions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p>Aucune commission trouvée</p>
@@ -311,204 +346,238 @@ export default function CRMCommissions() {
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
                     <TableHead>Client</TableHead>
-                    <TableHead>Produit</TableHead>
-                    <TableHead>N° Police</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Montant</TableHead>
+                    <TableHead>Contrats</TableHead>
+                    <TableHead>Montant total</TableHead>
                     <TableHead>Statut</TableHead>
-                    <TableHead>Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCommissions.map((commission) => {
-                    const status = statusConfig[commission.status] || statusConfig.pending;
-                    const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
-                    const StatusIcon = status.icon;
-                    const isExpanded = expandedCommission === commission.id;
-                    const parts = commissionParts[commission.id] || [];
+                  {groupedCommissions.map((group) => {
+                    const isClientExpanded = expandedClients[group.clientId];
+                    const paidCount = group.commissions.filter(c => c.status === 'paid').length;
+                    const pendingCount = group.commissions.filter(c => c.status !== 'paid').length;
                     
-                    const clientName = commission.policy?.client?.company_name || 
-                      `${commission.policy?.client?.first_name || ''} ${commission.policy?.client?.last_name || ''}`.trim() ||
-                      'Client inconnu';
-
                     return (
-                      <React.Fragment key={commission.id}>
-                        <TableRow className="group">
+                      <React.Fragment key={group.clientId}>
+                        {/* Client Row */}
+                        <TableRow 
+                          className="group bg-muted/20 hover:bg-muted/40 cursor-pointer"
+                          onClick={() => toggleClientExpand(group.clientId)}
+                        >
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6"
-                              onClick={() => handleToggleExpand(commission.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleClientExpand(group.clientId);
+                              }}
                             >
-                              {isExpanded ? (
+                              {isClientExpanded ? (
                                 <ChevronDown className="h-4 w-4" />
                               ) : (
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </Button>
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {commission.policy?.client?.id ? (
-                              <button
-                                onClick={() => navigate(`/crm/clients/${commission.policy?.client?.id}`)}
-                                className="hover:text-primary hover:underline text-left"
-                              >
-                                {clientName}
-                              </button>
-                            ) : (
-                              clientName
-                            )}
-                          </TableCell>
-                          <TableCell>{commission.policy?.product?.name || '-'}</TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {commission.policy?.policy_number || '-'}
+                          <TableCell className="font-semibold">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (group.clientId !== 'unknown') {
+                                  navigate(`/crm/clients/${group.clientId}`);
+                                }
+                              }}
+                              className="hover:text-primary hover:underline text-left"
+                            >
+                              {group.clientName}
+                            </button>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className={type.color}>
-                              {type.label}
+                            <Badge variant="outline" className="font-normal">
+                              {group.commissions.length} commission{group.commissions.length > 1 ? 's' : ''}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-semibold text-emerald-600">
-                            {formatCurrency(Number(commission.amount))}
+                          <TableCell className="font-bold text-emerald-600">
+                            {formatCurrency(group.totalAmount)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary" className={cn("gap-1", status.color)}>
-                              <StatusIcon className="h-3 w-3" />
-                              {status.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {commission.paid_at 
-                              ? format(new Date(commission.paid_at), 'dd MMM yyyy', { locale: fr })
-                              : commission.date 
-                                ? format(new Date(commission.date), 'dd MMM yyyy', { locale: fr })
-                                : format(new Date(commission.created_at), 'dd MMM yyyy', { locale: fr })
-                            }
+                            <div className="flex gap-1">
+                              {paidCount > 0 && (
+                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  {paidCount}
+                                </Badge>
+                              )}
+                              {pendingCount > 0 && (
+                                <Badge variant="secondary" className="bg-amber-100 text-amber-800 gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {pendingCount}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleOpenAddPartDialog(commission)}>
-                                  <Users className="h-4 w-4 mr-2" />
-                                  Ajouter un collaborateur
-                                </DropdownMenuItem>
-                                {commission.policy?.client?.id && (
-                                  <DropdownMenuItem onClick={() => navigate(`/crm/clients/${commission.policy?.client?.id}`)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Voir le client
-                                  </DropdownMenuItem>
-                                )}
-                                {commission.status !== 'paid' && (
-                                  <DropdownMenuItem onClick={() => handleMarkAsPaid(commission.id)}>
-                                    <CheckCircle className="h-4 w-4 mr-2" />
-                                    Marquer comme payée
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    setCommissionToDelete(commission.id);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Supprimer
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (group.clientId !== 'unknown') {
+                                  navigate(`/crm/clients/${group.clientId}?tab=commissions`);
+                                }
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Voir
+                            </Button>
                           </TableCell>
                         </TableRow>
                         
-                        {/* Expanded Parts Row */}
-                        {isExpanded && (
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={9} className="py-4">
-                              {loadingParts === commission.id ? (
-                                <div className="flex items-center justify-center py-4">
-                                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                </div>
-                              ) : (
-                                <div className="space-y-3 px-4">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium flex items-center gap-2">
-                                      <Users className="h-4 w-4" />
-                                      Répartition de la commission
-                                    </h4>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleOpenAddPartDialog(commission)}
-                                    >
-                                      <Plus className="h-3 w-3 mr-1" />
-                                      Ajouter
-                                    </Button>
-                                  </div>
-                                  
-                                  {parts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
-                                      Aucune répartition définie. Cliquez sur "Ajouter" pour assigner des collaborateurs.
-                                    </p>
-                                  ) : (
-                                    <div className="grid gap-2">
-                                      {parts.map((part) => (
-                                        <div
-                                          key={part.id}
-                                          className="flex items-center justify-between p-3 bg-card rounded-lg border"
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                              <span className="text-xs font-medium text-primary">
-                                                {(part.agent?.first_name?.[0] || '') + (part.agent?.last_name?.[0] || '')}
-                                              </span>
-                                            </div>
-                                            <div>
-                                              <p className="font-medium text-sm">{getAgentName(part.agent)}</p>
-                                              <p className="text-xs text-muted-foreground">{part.agent?.email}</p>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                              <p className="font-semibold text-emerald-600">{formatCurrency(Number(part.amount))}</p>
-                                              <p className="text-xs text-muted-foreground">{part.rate}%</p>
-                                            </div>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-8 w-8 text-destructive hover:text-destructive"
-                                              onClick={() => handleDeletePart(part.id, commission.id)}
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                      
-                                      {/* Summary */}
-                                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg mt-2">
-                                        <span className="text-sm font-medium">Total attribué</span>
-                                        <div className="text-right">
-                                          <span className="font-semibold">
-                                            {formatCurrency(parts.reduce((sum, p) => sum + Number(p.amount), 0))}
-                                          </span>
-                                          <span className="text-muted-foreground ml-2">
-                                            ({parts.reduce((sum, p) => sum + Number(p.rate), 0)}%)
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
+                        {/* Expanded Commissions for this Client */}
+                        {isClientExpanded && group.commissions.map((commission) => {
+                          const status = statusConfig[commission.status] || statusConfig.pending;
+                          const type = typeConfig[commission.type || 'acquisition'] || typeConfig.acquisition;
+                          const StatusIcon = status.icon;
+                          const isCommissionExpanded = expandedCommission === commission.id;
+                          const parts = commissionParts[commission.id] || [];
+
+                          return (
+                            <React.Fragment key={commission.id}>
+                              <TableRow className="bg-card hover:bg-muted/20 border-l-2 border-l-primary/30">
+                                <TableCell className="pl-8">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => handleToggleExpand(commission.id)}
+                                  >
+                                    {isCommissionExpanded ? (
+                                      <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {commission.policy?.product?.name || '-'}
+                                  {commission.policy?.policy_number && (
+                                    <span className="ml-2 font-mono text-xs">
+                                      ({commission.policy.policy_number})
+                                    </span>
                                   )}
-                                </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className={cn("text-xs", type.color)}>
+                                    {type.label}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-semibold text-emerald-600">
+                                  {formatCurrency(Number(commission.amount))}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className={cn("gap-1 text-xs", status.color)}>
+                                    <StatusIcon className="h-3 w-3" />
+                                    {status.label}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleOpenAddPartDialog(commission)}>
+                                        <Users className="h-4 w-4 mr-2" />
+                                        Ajouter un collaborateur
+                                      </DropdownMenuItem>
+                                      {commission.status !== 'paid' && (
+                                        <DropdownMenuItem onClick={() => handleMarkAsPaid(commission.id)}>
+                                          <CheckCircle className="h-4 w-4 mr-2" />
+                                          Marquer comme payée
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          setCommissionToDelete(commission.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Supprimer
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                              
+                              {/* Expanded Parts Row */}
+                              {isCommissionExpanded && (
+                                <TableRow className="bg-muted/30 hover:bg-muted/30 border-l-2 border-l-primary/30">
+                                  <TableCell colSpan={6} className="py-3 pl-12">
+                                    {loadingParts === commission.id ? (
+                                      <div className="flex items-center justify-center py-2">
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <h4 className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
+                                            <Users className="h-3 w-3" />
+                                            Répartition
+                                          </h4>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-xs"
+                                            onClick={() => handleOpenAddPartDialog(commission)}
+                                          >
+                                            <Plus className="h-3 w-3 mr-1" />
+                                            Ajouter
+                                          </Button>
+                                        </div>
+                                        
+                                        {parts.length === 0 ? (
+                                          <p className="text-xs text-muted-foreground">
+                                            Aucune répartition définie
+                                          </p>
+                                        ) : (
+                                          <div className="flex flex-wrap gap-2">
+                                            {parts.map((part) => (
+                                              <div
+                                                key={part.id}
+                                                className="flex items-center gap-2 px-2 py-1 bg-card rounded border text-xs"
+                                              >
+                                                <span className="font-medium">{getAgentName(part.agent)}</span>
+                                                <span className="text-emerald-600 font-semibold">
+                                                  {formatCurrency(Number(part.amount))}
+                                                </span>
+                                                <span className="text-muted-foreground">({part.rate}%)</span>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-4 w-4 text-destructive hover:text-destructive"
+                                                  onClick={() => handleDeletePart(part.id, commission.id)}
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
                               )}
-                            </TableCell>
-                          </TableRow>
-                        )}
+                            </React.Fragment>
+                          );
+                        })}
                       </React.Fragment>
                     );
                   })}
