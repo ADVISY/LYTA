@@ -157,104 +157,98 @@ export default function CRMLayout() {
 
       {/* Desktop Sidebar */}
       <TooltipProvider>
-        <aside className={cn(
-          "hidden lg:flex flex-col bg-white/70 backdrop-blur-2xl border-r border-white/50 shadow-2xl shadow-primary/5 relative z-10 transition-all duration-300",
-          sidebarCollapsed ? "w-20" : "w-72"
-        )}>
+        <aside className="hidden lg:flex flex-col bg-white/70 backdrop-blur-2xl border-r border-white/50 shadow-2xl shadow-primary/5 relative z-10">
           {/* Sidebar gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-violet-500/5 pointer-events-none" />
           
-          {/* Logo Section */}
-          <div className="p-4 border-b border-primary/10 relative overflow-visible">
-            <div className={cn(
-              "flex items-center justify-center transition-all duration-300",
-              sidebarCollapsed && "absolute left-1/2 -translate-x-1/2 z-30"
-            )}>
+          {/* Logo Section - Always full width */}
+          <div className="w-72 p-6 border-b border-primary/10 relative">
+            <div className="flex items-center justify-center">
               <img 
                 src={advisyLogo} 
                 alt="Advisy" 
-                className={cn(
-                  "object-contain transition-all duration-300",
-                  sidebarCollapsed ? "h-8 w-8" : "h-12"
-                )}
+                className="h-16 object-contain"
               />
             </div>
-            {sidebarCollapsed && <div className="h-8" />}
-            {!sidebarCollapsed && (
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <p className="text-xs text-muted-foreground capitalize font-medium">
-                  {role} • en ligne
-                </p>
-              </div>
-            )}
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-xs text-muted-foreground capitalize font-medium">
+                {role} • en ligne
+              </p>
+            </div>
           </div>
 
-          {/* Collapse Toggle Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="absolute -right-3 top-20 z-20 h-6 w-6 rounded-full border bg-white shadow-md hover:bg-primary hover:text-white transition-all"
-          >
-            {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-          </Button>
+          {/* Collapsible Navigation Section */}
+          <div className={cn(
+            "flex-1 flex flex-col transition-all duration-300",
+            sidebarCollapsed ? "w-20" : "w-72"
+          )}>
+            {/* Collapse Toggle Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="absolute -right-3 top-[140px] z-20 h-6 w-6 rounded-full border bg-white shadow-md hover:bg-primary hover:text-white transition-all"
+            >
+              {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+            </Button>
 
-          {/* Navigation */}
-          <nav className={cn("flex-1 overflow-y-auto relative", sidebarCollapsed ? "p-2" : "p-4")}>
-            <NavItems collapsed={sidebarCollapsed} />
-          </nav>
+            {/* Navigation */}
+            <nav className={cn("flex-1 overflow-y-auto relative", sidebarCollapsed ? "p-2" : "p-4")}>
+              <NavItems collapsed={sidebarCollapsed} />
+            </nav>
 
-          {/* User Section */}
-          <div className={cn("border-t border-primary/10 relative", sidebarCollapsed ? "p-2" : "p-4")}>
-            {sidebarCollapsed ? (
-              <div className="flex flex-col items-center gap-2">
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center cursor-pointer">
-                      <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{getUserDisplayName()}</TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-xl hover:bg-red-500 hover:text-white"
-                      onClick={() => signOut()}
-                    >
-                      <LogOut className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Déconnexion</TooltipContent>
-                </Tooltip>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mb-4 p-4 rounded-2xl bg-gradient-to-r from-primary/5 to-violet-500/5 border border-primary/10">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center">
-                      <span className="text-lg font-bold text-primary">{getUserInitials()}</span>
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{getUserDisplayName()}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{role}</p>
-                  </div>
+            {/* User Section */}
+            <div className={cn("border-t border-primary/10 relative", sidebarCollapsed ? "p-2" : "p-4")}>
+              {sidebarCollapsed ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center cursor-pointer">
+                        <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{getUserDisplayName()}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl hover:bg-red-500 hover:text-white"
+                        onClick={() => signOut()}
+                      >
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Déconnexion</TooltipContent>
+                  </Tooltip>
                 </div>
-                <Button
-                  variant="outline"
-                  className="w-full group rounded-xl border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-300"
-                  onClick={() => signOut()}
-                >
-                  <LogOut className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
-                  Déconnexion
-                </Button>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4 p-4 rounded-2xl bg-gradient-to-r from-primary/5 to-violet-500/5 border border-primary/10">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center">
+                        <span className="text-lg font-bold text-primary">{getUserInitials()}</span>
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{getUserDisplayName()}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{role}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full group rounded-xl border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-300"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
+                    Déconnexion
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </aside>
       </TooltipProvider>
