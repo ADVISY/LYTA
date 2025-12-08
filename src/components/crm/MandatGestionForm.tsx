@@ -4,15 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileDown, Printer, FileCheck } from "lucide-react";
+import { FileDown, Printer, FileCheck, Save, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Client } from "@/hooks/useClients";
 import html2pdf from "html2pdf.js";
 import SignaturePad from "./SignaturePad";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface MandatGestionFormProps {
   client: Client;
+  onSaved?: () => void;
 }
 
 interface InsuranceInfo {
@@ -45,7 +49,7 @@ const insuranceCompanies = [
   "Autre",
 ];
 
-export default function MandatGestionForm({ client }: MandatGestionFormProps) {
+export default function MandatGestionForm({ client, onSaved }: MandatGestionFormProps) {
   const [insurances, setInsurances] = useState<InsuranceInfo>({
     rcMenage: "Non",
     auto: "Non",
@@ -59,7 +63,10 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [signatureAdvisy, setSignatureAdvisy] = useState<string | null>(null);
   const [signatureClient, setSignatureClient] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const mandatRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   const getClientName = () => {
     if (client.company_name) return client.company_name;
@@ -96,6 +103,27 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
     return list;
   };
 
+  const generatePDFBlob = async (): Promise<Blob | null> => {
+    if (!mandatRef.current) return null;
+    
+    const opt = {
+      margin: [8, 10, 8, 10] as [number, number, number, number],
+      filename: `Mandat_Gestion_${getClientName().replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.95 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      },
+      jsPDF: { unit: 'mm' as const, format: 'a4', orientation: 'portrait' as const },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    const pdfBlob = await html2pdf().set(opt).from(mandatRef.current).output('blob');
+    return pdfBlob;
+  };
+
   const handleGeneratePDF = async () => {
     if (!mandatRef.current) return;
     
@@ -114,6 +142,82 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
     };
 
     await html2pdf().set(opt).from(mandatRef.current).save();
+  };
+
+  const handleSaveMandat = async () => {
+    if (!signatureAdvisy || !signatureClient) {
+      toast({
+        title: "Signatures requises",
+        description: "Les deux signatures (Advisy et Client) sont nécessaires pour enregistrer le mandat.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!mandatRef.current) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez d'abord afficher l'aperçu du mandat.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Générer le PDF
+      const pdfBlob = await generatePDFBlob();
+      if (!pdfBlob) throw new Error("Erreur lors de la génération du PDF");
+
+      // Créer le nom du fichier
+      const fileName = `Mandat_Gestion_${getClientName().replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd_HHmmss')}.pdf`;
+      const fileKey = `mandats/${client.id}/${fileName}`;
+
+      // Upload vers Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileKey, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Créer l'entrée dans la table documents
+      const { error: docError } = await supabase
+        .from('documents')
+        .insert({
+          owner_id: client.id,
+          owner_type: 'client',
+          file_name: fileName,
+          file_key: fileKey,
+          mime_type: 'application/pdf',
+          size_bytes: pdfBlob.size,
+          doc_kind: 'mandat_gestion',
+          created_by: user?.id
+        });
+
+      if (docError) throw docError;
+
+      toast({
+        title: "Mandat enregistré",
+        description: "Le mandat de gestion signé a été sauvegardé dans les documents du client."
+      });
+
+      // Callback pour rafraîchir la liste des documents
+      onSaved?.();
+
+    } catch (error: any) {
+      console.error('Erreur sauvegarde mandat:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'enregistrer le mandat.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrint = () => {
@@ -341,7 +445,24 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
               <Printer className="h-4 w-4" />
               Imprimer
             </Button>
+            <Button 
+              onClick={handleSaveMandat} 
+              disabled={isSaving || !signatureAdvisy || !signatureClient}
+              className="gap-2 bg-green-600 hover:bg-green-700"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {isSaving ? "Enregistrement..." : "Enregistrer le mandat"}
+            </Button>
           </div>
+          {(!signatureAdvisy || !signatureClient) && (
+            <p className="text-sm text-muted-foreground">
+              Les deux signatures sont requises pour enregistrer le mandat.
+            </p>
+          )}
         </CardContent>
       </Card>
 
