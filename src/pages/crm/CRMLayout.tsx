@@ -88,7 +88,7 @@ export default function CRMLayout() {
   }
 
   const NavItems = ({ onItemClick, collapsed = false }: { onItemClick?: () => void; collapsed?: boolean }) => (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       {menuItems.map((item, index) => {
         const linkContent = (
           <NavLink
@@ -98,33 +98,51 @@ export default function CRMLayout() {
             onClick={onItemClick}
             className={({ isActive }) =>
               cn(
-                "group relative flex items-center gap-3 rounded-2xl transition-all duration-500 overflow-hidden",
-                collapsed ? "px-3 py-3 justify-center" : "px-4 py-3.5 hover:translate-x-1",
+                "group relative flex items-center gap-3 rounded-xl transition-all duration-300 overflow-hidden nav-glow",
+                collapsed ? "px-3 py-3 justify-center" : "px-4 py-3",
                 isActive
-                  ? "bg-gradient-to-r from-primary via-primary to-primary/80 text-white shadow-xl shadow-primary/30"
-                  : "hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent text-foreground/70 hover:text-foreground"
+                  ? "glass-strong text-primary shadow-soft"
+                  : "hover:glass-subtle text-foreground/60 hover:text-foreground"
               )
             }
-            style={{ animationDelay: `${index * 50}ms` }}
+            style={{ animationDelay: `${index * 30}ms` }}
           >
             {({ isActive }) => (
               <>
+                {/* Active indicator line */}
                 {isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-50" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary via-primary to-violet-500 rounded-full" />
                 )}
                 
+                {/* Icon container with gradient */}
                 <div className={cn(
-                  "relative p-2 rounded-xl transition-all duration-300",
+                  "relative p-2 rounded-lg transition-all duration-300",
                   isActive 
-                    ? "bg-white/20" 
-                    : `bg-gradient-to-br ${item.color} opacity-80 group-hover:opacity-100 group-hover:scale-110`
+                    ? `bg-gradient-to-br ${item.color} shadow-lg` 
+                    : "bg-muted/50 group-hover:bg-muted"
                 )}>
-                  <item.icon className="h-4 w-4 text-white" />
+                  <item.icon className={cn(
+                    "h-4 w-4 transition-colors",
+                    isActive ? "text-white" : "text-foreground/70 group-hover:text-foreground"
+                  )} />
                 </div>
                 
-                {!collapsed && <span className="font-medium relative z-10">{item.label}</span>}
+                {!collapsed && (
+                  <span className={cn(
+                    "font-medium relative z-10 transition-all duration-300",
+                    isActive ? "text-primary" : ""
+                  )}>
+                    {item.label}
+                  </span>
+                )}
                 
-                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                {/* Shine effect on hover */}
+                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                
+                {/* Chevron indicator for active */}
+                {isActive && !collapsed && (
+                  <ChevronRight className="ml-auto h-4 w-4 text-primary/50" />
+                )}
               </>
             )}
           </NavLink>
@@ -134,7 +152,7 @@ export default function CRMLayout() {
           return (
             <Tooltip key={item.to} delayDuration={0}>
               <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-              <TooltipContent side="right" className="font-medium">
+              <TooltipContent side="right" className="glass-strong border-primary/10 font-medium">
                 {item.label}
               </TooltipContent>
             </Tooltip>
@@ -148,31 +166,41 @@ export default function CRMLayout() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-primary/5">
-      {/* Background decorative elements */}
+      {/* Background mesh gradient */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(at_40%_20%,hsl(246_100%_94%)_0px,transparent_50%),radial-gradient(at_80%_0%,hsl(270_100%_94%)_0px,transparent_50%),radial-gradient(at_0%_50%,hsl(246_80%_95%)_0px,transparent_50%)]" />
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/8 rounded-full blur-[100px] animate-float" />
+        <div className="absolute top-1/2 -left-40 w-[400px] h-[400px] bg-violet-500/8 rounded-full blur-[80px]" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-40 right-1/3 w-[350px] h-[350px] bg-emerald-500/6 rounded-full blur-[70px]" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Glassmorphism */}
       <TooltipProvider>
-        <aside className="hidden lg:flex flex-col bg-white/70 backdrop-blur-2xl border-r border-white/50 shadow-2xl shadow-primary/5 relative z-10">
-          {/* Sidebar gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-violet-500/5 pointer-events-none" />
+        <aside className="hidden lg:flex flex-col glass-strong relative z-10 border-r-0">
+          {/* Animated gradient border */}
+          <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
           
-          {/* Logo Section - Always full width */}
-          <div className="w-72 p-6 border-b border-primary/10 relative">
+          {/* Sidebar gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-violet-500/[0.03] pointer-events-none rounded-r-2xl" />
+          
+          {/* Logo Section */}
+          <div className="w-72 p-6 border-b border-primary/5 relative">
             <div className="flex items-center justify-center">
-              <img 
-                src={advisyLogo} 
-                alt="Advisy" 
-                className="h-16 object-contain"
-              />
+              <div className="relative group">
+                <img 
+                  src={advisyLogo} 
+                  alt="Advisy" 
+                  className="h-16 object-contain transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute -inset-4 bg-primary/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
+              </div>
             </div>
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-xs text-muted-foreground capitalize font-medium">
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <div className="relative">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              </div>
+              <p className="text-xs text-muted-foreground capitalize font-medium tracking-wide">
                 {role} • en ligne
               </p>
             </div>
