@@ -265,7 +265,7 @@ export default function CRMDashboard() {
       )}
 
       {!loading && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           {/* Main Column - Charts */}
           <div className="space-y-6">
             {/* Main Chart - LCA vs VIE with financial info */}
