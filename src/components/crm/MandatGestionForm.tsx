@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Client } from "@/hooks/useClients";
 import html2pdf from "html2pdf.js";
+import SignaturePad from "./SignaturePad";
 
 interface MandatGestionFormProps {
   client: Client;
@@ -56,6 +57,8 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
   const [autreCompany, setAutreCompany] = useState("");
   const [lieu, setLieu] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [signatureAdvisy, setSignatureAdvisy] = useState<string | null>(null);
+  const [signatureClient, setSignatureClient] = useState<string | null>(null);
   const mandatRef = useRef<HTMLDivElement>(null);
 
   const getClientName = () => {
@@ -302,6 +305,23 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
             />
           </div>
 
+          {/* Signatures digitales */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Signatures</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SignaturePad
+                label="Signature e-Advisy Sàrl"
+                onSignatureChange={setSignatureAdvisy}
+                signature={signatureAdvisy}
+              />
+              <SignaturePad
+                label="Signature du Mandant"
+                onSignatureChange={setSignatureClient}
+                signature={signatureClient}
+              />
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <Button onClick={() => setShowPreview(!showPreview)} variant="outline">
@@ -434,14 +454,28 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
                   Ainsi fait à <strong>{lieu || "___________________"}</strong>, le <strong>{format(new Date(), "dd.MM.yyyy")}</strong>.
                 </p>
 
-                <div className="flex justify-between mt-12">
+                <div className="flex justify-between mt-8">
                   <div className="w-2/5">
-                    <p className="font-semibold mb-12">e-Advisy Sàrl :</p>
-                    <div className="border-t border-black pt-2">Signature</div>
+                    <p className="font-semibold mb-2">e-Advisy Sàrl :</p>
+                    {signatureAdvisy ? (
+                      <div className="border border-gray-200 bg-white p-2 rounded">
+                        <img src={signatureAdvisy} alt="Signature e-Advisy" className="h-16 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="h-16 border-b border-black" />
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">Signature</p>
                   </div>
                   <div className="w-2/5">
-                    <p className="font-semibold mb-12">Le Mandant :</p>
-                    <div className="border-t border-black pt-2">Signature</div>
+                    <p className="font-semibold mb-2">Le Mandant :</p>
+                    {signatureClient ? (
+                      <div className="border border-gray-200 bg-white p-2 rounded">
+                        <img src={signatureClient} alt="Signature Mandant" className="h-16 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="h-16 border-b border-black" />
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">Signature</p>
                   </div>
                 </div>
 
