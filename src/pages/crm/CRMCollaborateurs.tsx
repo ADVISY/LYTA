@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   UserCog, Plus, Users, Search, Edit, Trash2, 
-  Phone, Mail, Briefcase, UserCheck, UserX, Loader2
+  Phone, Mail, Briefcase, UserCheck, UserX, Loader2, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollaborateurs, Collaborateur, CollaborateurFormData } from "@/hooks/useCollaborateurs";
 import { CollaborateurForm } from "@/components/crm/CollaborateurForm";
+import { CollaboratorPermissionsDialog } from "@/components/crm/CollaboratorPermissionsDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,13 @@ export default function CRMCollaborateurs() {
   const [editingCollaborateur, setEditingCollaborateur] = useState<Collaborateur | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [collaborateurToDelete, setCollaborateurToDelete] = useState<Collaborateur | null>(null);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [permissionsCollaborateur, setPermissionsCollaborateur] = useState<Collaborateur | null>(null);
+
+  const handlePermissions = (collaborateur: Collaborateur) => {
+    setPermissionsCollaborateur(collaborateur);
+    setPermissionsOpen(true);
+  };
 
   const filteredCollaborateurs = useMemo(() => {
     if (!search.trim()) return collaborateurs;
@@ -243,11 +251,20 @@ export default function CRMCollaborateurs() {
                         {format(new Date(collaborateur.created_at), 'dd MMM yyyy', { locale: fr })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            size="icon" 
+                            variant="ghost"
+                            onClick={() => handlePermissions(collaborateur)}
+                            title="Gérer les permissions"
+                          >
+                            <Shield className="h-4 w-4" />
+                          </Button>
                           <Button 
                             size="icon" 
                             variant="ghost"
                             onClick={() => handleEdit(collaborateur)}
+                            title="Modifier"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -256,6 +273,7 @@ export default function CRMCollaborateurs() {
                             variant="ghost"
                             className="text-destructive hover:text-destructive"
                             onClick={() => handleDeleteClick(collaborateur)}
+                            title="Supprimer"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -299,6 +317,13 @@ export default function CRMCollaborateurs() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Permissions Dialog */}
+      <CollaboratorPermissionsDialog
+        open={permissionsOpen}
+        onOpenChange={setPermissionsOpen}
+        collaborateur={permissionsCollaborateur}
+      />
     </div>
   );
 }

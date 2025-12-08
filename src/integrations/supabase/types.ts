@@ -270,6 +270,50 @@ export type Database = {
           },
         ]
       }
+      collaborator_permissions: {
+        Row: {
+          can_create: boolean
+          can_delete: boolean
+          can_read: boolean
+          can_update: boolean
+          collaborator_id: string
+          created_at: string
+          id: string
+          module: string
+          updated_at: string
+        }
+        Insert: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_read?: boolean
+          can_update?: boolean
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          module: string
+          updated_at?: string
+        }
+        Update: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_read?: boolean
+          can_update?: boolean
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          module?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_permissions_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_part_agent: {
         Row: {
           agent_id: string
