@@ -27,6 +27,7 @@ const menuItems = [
   { to: "/crm/clients", icon: Users, label: "Adresses", color: "from-emerald-500 to-teal-500" },
   { to: "/crm/contrats", icon: FileCheck, label: "Contrats", color: "from-violet-500 to-purple-500" },
   { to: "/crm/commissions", icon: DollarSign, label: "Commissions", color: "from-green-500 to-emerald-500" },
+  { to: "/crm/compta", icon: FileText, label: "Compta", color: "from-amber-500 to-orange-500" },
   { to: "/crm/compagnies", icon: Building2, label: "Compagnies", color: "from-red-500 to-orange-500" },
   { to: "/crm/collaborateurs", icon: UserCog, label: "Collaborateurs", color: "from-pink-500 to-rose-500" },
   { to: "/crm/rapports", icon: BarChart3, label: "Rapports", color: "from-indigo-500 to-violet-500" },

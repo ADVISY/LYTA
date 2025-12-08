@@ -36,6 +36,7 @@ import CRMCollaborateurs from "./pages/crm/CRMCollaborateurs";
 import CRMRapports from "./pages/crm/CRMRapports";
 import CRMParametres from "./pages/crm/CRMParametres";
 import CRMCompagnies from "./pages/crm/CRMCompagnies";
+import CRMCompta from "./pages/crm/CRMCompta";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
             <Route path="rapports" element={<CRMRapports />} />
             <Route path="parametres" element={<CRMParametres />} />
             <Route path="compagnies" element={<CRMCompagnies />} />
+            <Route path="compta" element={<CRMCompta />} />
           </Route>
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
