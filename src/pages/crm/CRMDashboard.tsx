@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, FileText, DollarSign, TrendingUp, Clock, FileCheck, ChevronRight, Loader2, AlertCircle, UserCheck, Building2, UsersRound, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
 import { PerformanceCard } from "@/components/crm/PerformanceCard";
 import { TeamPerformanceCard } from "@/components/crm/TeamPerformanceCard";
+import { Chart3DBar, Chart3DDonut, Chart3DMetric } from "@/components/crm/charts";
 
 export default function CRMDashboard() {
   const { role, isAdmin, isManager, isAgent, isPartner, isClient } = useUserRole();
@@ -32,10 +33,28 @@ export default function CRMDashboard() {
       style: 'decimal',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0 
-    }).format(value) + ' CHF';
+    }).format(value);
   };
 
-  // Recent activities based on real data
+  // Chart data for enterprise view
+  const barChartData = useMemo(() => [
+    { label: 'Clients', value: companyTotals.clientsCount, color: '#3b82f6' },
+    { label: 'Actifs', value: companyTotals.activeClients, color: '#10b981' },
+    { label: 'Contrats', value: companyTotals.contractsCount, color: '#8b5cf6' },
+    { label: 'En attente', value: companyTotals.pendingContracts, color: '#f59e0b' },
+  ], [companyTotals]);
+
+  const donutChartData = useMemo(() => [
+    { label: 'Payées', value: companyTotals.paidCommissions, color: '#10b981' },
+    { label: 'En attente', value: companyTotals.pendingCommissions, color: '#f59e0b' },
+  ], [companyTotals]);
+
+  const conversionRate = useMemo(() => {
+    if (companyTotals.clientsCount === 0) return 0;
+    return Math.round((companyTotals.activeClients / companyTotals.clientsCount) * 100);
+  }, [companyTotals]);
+
+  // Recent activities
   const recentActivities = useMemo(() => {
     const activities: { icon: any; text: string; time: string; color: string }[] = [];
     
@@ -102,7 +121,6 @@ export default function CRMDashboard() {
     ];
   }, [policies, commissions]);
 
-  // Determine which performance view to show
   const showAdminView = isAdmin;
   const showManagerView = isManager && !isAdmin;
 
@@ -150,7 +168,7 @@ export default function CRMDashboard() {
 
       {!loading && (
         <>
-          {/* Admin View */}
+          {/* Admin View with 3D Charts */}
           {showAdminView && (
             <Tabs defaultValue="entreprise" className="space-y-6">
               <TabsList className="bg-white/80 backdrop-blur border shadow-sm">
@@ -172,72 +190,151 @@ export default function CRMDashboard() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Company-wide view */}
-              <TabsContent value="entreprise" className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <Users className="h-8 w-8 opacity-80" />
-                        <div>
-                          <p className="text-3xl font-bold">{companyTotals.clientsCount}</p>
-                          <p className="text-sm opacity-80">Clients ({companyTotals.activeClients} actifs)</p>
-                        </div>
-                      </div>
+              {/* Company-wide view with 3D Charts */}
+              <TabsContent value="entreprise" className="space-y-8">
+                {/* Hero metrics row */}
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* 3D Metric - Conversion Rate */}
+                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50/50 backdrop-blur overflow-hidden">
+                    <CardHeader className="pb-0">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Taux de conversion</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DMetric 
+                          value={`${conversionRate}%`}
+                          label="prospects → actifs"
+                          progress={conversionRate}
+                          color="#3b82f6"
+                        />
+                      </Suspense>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-8 w-8 opacity-80" />
-                        <div>
-                          <p className="text-3xl font-bold">{companyTotals.contractsCount}</p>
-                          <p className="text-sm opacity-80">Contrats ({companyTotals.activeContracts} actifs)</p>
-                        </div>
-                      </div>
+
+                  {/* 3D Metric - Commissions */}
+                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 backdrop-blur overflow-hidden">
+                    <CardHeader className="pb-0">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Commissions payées</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DMetric 
+                          value={`${formatCurrency(companyTotals.paidCommissions)}`}
+                          label="CHF encaissées"
+                          progress={companyTotals.totalCommissions > 0 ? (companyTotals.paidCommissions / companyTotals.totalCommissions) * 100 : 0}
+                          color="#10b981"
+                        />
+                      </Suspense>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <DollarSign className="h-8 w-8 opacity-80" />
-                        <div>
-                          <p className="text-2xl font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
-                          <p className="text-sm opacity-80">Commissions totales</p>
-                        </div>
-                      </div>
+
+                  {/* 3D Metric - Monthly Premiums */}
+                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/50 backdrop-blur overflow-hidden">
+                    <CardHeader className="pb-0">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Primes mensuelles</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DMetric 
+                          value={`${formatCurrency(companyTotals.totalPremiumsMonthly)}`}
+                          label="CHF / mois"
+                          progress={75}
+                          color="#8b5cf6"
+                        />
+                      </Suspense>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3">
-                        <TrendingUp className="h-8 w-8 opacity-80" />
-                        <div>
-                          <p className="text-2xl font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
-                          <p className="text-sm opacity-80">Primes mensuelles</p>
-                        </div>
+                </div>
+
+                {/* Charts row */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* 3D Bar Chart */}
+                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        Clients & Contrats
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Suspense fallback={<div className="h-[300px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DBar data={barChartData} />
+                      </Suspense>
+                    </CardContent>
+                  </Card>
+
+                  {/* 3D Donut Chart */}
+                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        Répartition Commissions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Suspense fallback={<div className="h-[280px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DDonut 
+                          data={donutChartData}
+                          centerValue={`${formatCurrency(companyTotals.totalCommissions)}`}
+                          centerLabel="Total CHF"
+                        />
+                      </Suspense>
+                      <div className="px-6 pb-4 flex justify-center gap-6">
+                        {donutChartData.map(item => (
+                          <div key={item.label} className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-sm text-muted-foreground">{item.label}: {formatCurrency(item.value)} CHF</span>
+                          </div>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Card className="border-0 shadow-lg bg-white/80 backdrop-blur">
-                    <CardContent className="p-6 text-center">
-                      <p className="text-4xl font-bold text-primary">{companyTotals.collaboratorsCount}</p>
-                      <p className="text-sm text-muted-foreground">Collaborateurs</p>
+                {/* Summary cards */}
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <Users className="h-7 w-7 opacity-80" />
+                        <div>
+                          <p className="text-2xl font-bold">{companyTotals.clientsCount}</p>
+                          <p className="text-xs opacity-80">Clients total</p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-lg bg-white/80 backdrop-blur">
-                    <CardContent className="p-6 text-center">
-                      <p className="text-4xl font-bold text-emerald-600">{formatCurrency(companyTotals.paidCommissions)}</p>
-                      <p className="text-sm text-muted-foreground">Commissions payées</p>
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-7 w-7 opacity-80" />
+                        <div>
+                          <p className="text-2xl font-bold">{companyTotals.contractsCount}</p>
+                          <p className="text-xs opacity-80">Contrats total</p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-lg bg-white/80 backdrop-blur">
-                    <CardContent className="p-6 text-center">
-                      <p className="text-4xl font-bold text-amber-600">{formatCurrency(companyTotals.pendingCommissions)}</p>
-                      <p className="text-sm text-muted-foreground">Commissions en attente</p>
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <DollarSign className="h-7 w-7 opacity-80" />
+                        <div>
+                          <p className="text-lg font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
+                          <p className="text-xs opacity-80">Commissions CHF</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <UsersRound className="h-7 w-7 opacity-80" />
+                        <div>
+                          <p className="text-2xl font-bold">{companyTotals.collaboratorsCount}</p>
+                          <p className="text-xs opacity-80">Collaborateurs</p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -341,67 +438,64 @@ export default function CRMDashboard() {
             </Tabs>
           )}
 
-          {/* Agent/Partner/Client View - Simple KPIs + Activity */}
+          {/* Agent/Partner/Client View */}
           {!showAdminView && !showManagerView && (
-            <>
-              {/* KPI Cards */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
-                  <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-blue-500 to-indigo-600 group-hover:opacity-40 group-hover:scale-150 transition-all duration-700" />
-                  <CardContent className="p-6 relative">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg w-fit mb-4">
-                      <Users className="h-5 w-5 text-white" />
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground">Clients</p>
-                    <p className="text-3xl font-bold">{companyTotals.clientsCount}</p>
-                    <p className="text-xs text-muted-foreground">{companyTotals.activeClients} actifs</p>
-                  </CardContent>
-                </Card>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-blue-500 to-indigo-600 group-hover:opacity-40 transition-all duration-700" />
+                <CardContent className="p-6 relative">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg w-fit mb-4">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Clients</p>
+                  <p className="text-3xl font-bold">{companyTotals.clientsCount}</p>
+                  <p className="text-xs text-muted-foreground">{companyTotals.activeClients} actifs</p>
+                </CardContent>
+              </Card>
 
-                <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
-                  <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-emerald-500 to-teal-600 group-hover:opacity-40 group-hover:scale-150 transition-all duration-700" />
-                  <CardContent className="p-6 relative">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg w-fit mb-4">
-                      <FileText className="h-5 w-5 text-white" />
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground">Contrats</p>
-                    <p className="text-3xl font-bold">{companyTotals.contractsCount}</p>
-                    <p className="text-xs text-muted-foreground">{companyTotals.activeContracts} actifs</p>
-                  </CardContent>
-                </Card>
+              <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-emerald-500 to-teal-600 group-hover:opacity-40 transition-all duration-700" />
+                <CardContent className="p-6 relative">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg w-fit mb-4">
+                    <FileText className="h-5 w-5 text-white" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Contrats</p>
+                  <p className="text-3xl font-bold">{companyTotals.contractsCount}</p>
+                  <p className="text-xs text-muted-foreground">{companyTotals.activeContracts} actifs</p>
+                </CardContent>
+              </Card>
 
-                {(isPartner || isAgent) && (
-                  <>
-                    <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
-                      <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-amber-500 to-orange-600 group-hover:opacity-40 group-hover:scale-150 transition-all duration-700" />
-                      <CardContent className="p-6 relative">
-                        <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg w-fit mb-4">
-                          <DollarSign className="h-5 w-5 text-white" />
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">Commissions</p>
-                        <p className="text-3xl font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(companyTotals.pendingCommissions)} en attente</p>
-                      </CardContent>
-                    </Card>
+              {(isPartner || isAgent) && (
+                <>
+                  <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
+                    <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-amber-500 to-orange-600 group-hover:opacity-40 transition-all duration-700" />
+                    <CardContent className="p-6 relative">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg w-fit mb-4">
+                        <DollarSign className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Commissions</p>
+                      <p className="text-3xl font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(companyTotals.pendingCommissions)} en attente</p>
+                    </CardContent>
+                  </Card>
 
-                    <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
-                      <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-violet-500 to-purple-600 group-hover:opacity-40 group-hover:scale-150 transition-all duration-700" />
-                      <CardContent className="p-6 relative">
-                        <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg w-fit mb-4">
-                          <TrendingUp className="h-5 w-5 text-white" />
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">Primes mensuelles</p>
-                        <p className="text-3xl font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(companyTotals.totalPremiumsYearly)} annuelles</p>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-              </div>
-            </>
+                  <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/80 backdrop-blur">
+                    <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-20 blur-3xl bg-gradient-to-br from-violet-500 to-purple-600 group-hover:opacity-40 transition-all duration-700" />
+                    <CardContent className="p-6 relative">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg w-fit mb-4">
+                        <TrendingUp className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Primes mensuelles</p>
+                      <p className="text-3xl font-bold">{formatCurrency(companyTotals.totalPremiumsMonthly)}</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(companyTotals.totalPremiumsYearly)} annuelles</p>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
           )}
 
-          {/* Activity and To-Do Section (for all roles) */}
+          {/* Activity and To-Do Section */}
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="border-0 shadow-xl bg-white/80 backdrop-blur overflow-hidden">
               <CardContent className="p-6">
