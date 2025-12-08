@@ -81,7 +81,8 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
   const isLCA = productCategory.includes("health") || productCategory.includes("santé") || productCategory.includes("lca");
   const isVIE = productCategory.includes("life") || productCategory.includes("vie") || productCategory.includes("3e pilier") || productCategory.includes("pilier");
 
-  const totalAmount = form.watch("amount") || 0;
+  const watchedAmount = form.watch("amount");
+  const totalAmount = typeof watchedAmount === 'number' ? watchedAmount : parseFloat(String(watchedAmount)) || 0;
   const totalAssignedRate = commissionParts.reduce((sum, p) => sum + p.rate, 0);
   const remainingRate = 100 - totalAssignedRate;
 
