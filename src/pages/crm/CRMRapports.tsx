@@ -799,164 +799,91 @@ export default function CRMRapports() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Liste des rapports */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Liste des rapports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {savedReports.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Sources</TableHead>
-                    <TableHead>Créé par</TableHead>
-                    <TableHead>Mise à jour</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+      {/* Liste des rapports */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Liste des rapports</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {savedReports.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Sources</TableHead>
+                  <TableHead>Créé par</TableHead>
+                  <TableHead>Mise à jour</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {savedReports.map(report => (
+                  <TableRow key={report.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {getSourceIcon(report.sources)}
+                        {report.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {report.sources.map(s => (
+                          <Badge key={s} variant="outline" className="text-xs">
+                            {dataSources.find(ds => ds.id === s)?.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {report.createdBy}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(new Date(report.updatedAt), "dd.MM.yyyy HH:mm", { locale: fr })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => executeReport(report)}
+                          disabled={isExecuting}
+                          title="Exécuter"
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => openEditReport(report)}
+                          title="Modifier"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleDeleteReport(report.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {savedReports.map(report => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {getSourceIcon(report.sources)}
-                          {report.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {report.sources.map(s => (
-                            <Badge key={s} variant="outline" className="text-xs">
-                              {dataSources.find(ds => ds.id === s)?.label}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {report.createdBy}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(report.updatedAt), "dd.MM.yyyy HH:mm", { locale: fr })}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => executeReport(report)}
-                            disabled={isExecuting}
-                            title="Exécuter"
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => openEditReport(report)}
-                            title="Modifier"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => handleDeleteReport(report.id)}
-                            title="Supprimer"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-center py-12">
-                <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">Aucun rapport créé</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Cliquez sur "Nouveau rapport" pour créer votre premier rapport
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Rapports rapides */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Rapports rapides</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start gap-3"
-              onClick={() => {
-                setSelectedSources(["adresses"]);
-                setSelectedFields(fieldsBySource.adresses.slice(0, 6).map(f => f.id));
-                setActiveTab("adresses");
-                setIsNewReportOpen(true);
-              }}
-            >
-              <Users className="h-4 w-4" />
-              Liste d'adresses
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start gap-3"
-              onClick={() => {
-                setSelectedSources(["adresses", "contrats"]);
-                setSelectedFields([
-                  ...fieldsBySource.adresses.slice(0, 4).map(f => f.id),
-                  ...fieldsBySource.contrats.slice(0, 4).map(f => f.id)
-                ]);
-                setActiveTab("adresses");
-                setIsNewReportOpen(true);
-              }}
-            >
-              <FileCheck className="h-4 w-4" />
-              Adresses + Contrats
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start gap-3"
-              onClick={() => {
-                setSelectedSources(["adresses", "suivis"]);
-                setSelectedFields([
-                  ...fieldsBySource.adresses.slice(0, 4).map(f => f.id),
-                  ...fieldsBySource.suivis.slice(0, 4).map(f => f.id)
-                ]);
-                setActiveTab("adresses");
-                setIsNewReportOpen(true);
-              }}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Adresses + Suivis
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start gap-3"
-              onClick={() => {
-                setSelectedSources(["adresses", "contrats", "suivis"]);
-                setSelectedFields([
-                  ...fieldsBySource.adresses.slice(0, 3).map(f => f.id),
-                  ...fieldsBySource.contrats.slice(0, 3).map(f => f.id),
-                  ...fieldsBySource.suivis.slice(0, 3).map(f => f.id)
-                ]);
-                setActiveTab("adresses");
-                setIsNewReportOpen(true);
-              }}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Rapport complet
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-12">
+              <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Aucun rapport créé</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Cliquez sur "Nouveau rapport" pour créer votre premier rapport
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Résultats */}
       {showResults && (
