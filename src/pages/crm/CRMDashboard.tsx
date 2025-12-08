@@ -380,9 +380,9 @@ export default function CRMDashboard() {
             </Card>
           </div>
 
-          {/* Row 2: Financial Summary + Recent Activities */}
+          {/* Row 2: Financial Summary Chart + Recent Activities */}
           <div className={cn("grid gap-6", isAdmin ? "lg:grid-cols-[1fr_400px]" : "")}>
-            {/* Financial Summary */}
+            {/* Financial Summary with Chart */}
             <Card className="border shadow-sm bg-card">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
@@ -391,45 +391,89 @@ export default function CRMDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* Financial Chart - Horizontal bar chart */}
+                <div className="h-[200px] mb-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      layout="vertical"
+                      data={[
+                        { name: 'CA (Commissions)', value: financialSummary.ca, fill: 'hsl(142 76% 45%)' },
+                        { name: 'Salaires', value: financialSummary.salaries, fill: 'hsl(217 91% 60%)' },
+                        { name: 'Charges sociales', value: financialSummary.socialCharges, fill: 'hsl(25 95% 53%)' },
+                        { name: 'Total charges', value: financialSummary.totalCharges, fill: 'hsl(346 77% 50%)' },
+                        { name: 'Bénéfice', value: Math.abs(financialSummary.benefit), fill: financialSummary.benefit >= 0 ? 'hsl(142 71% 45%)' : 'hsl(0 84% 60%)' },
+                      ]} 
+                      margin={{ top: 5, right: 30, bottom: 5, left: 100 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                      <XAxis 
+                        type="number"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <YAxis 
+                        type="category"
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        width={95}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number) => [`${formatCurrency(value)} CHF`]}
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        radius={[0, 4, 4, 0]}
+                        maxBarSize={25}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Summary cards below chart */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 pt-4 border-t">
                   {/* CA */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-                    <p className="text-xs opacity-80 mb-1">Chiffre d'affaires</p>
-                    <p className="text-xl font-bold">{formatCurrency(financialSummary.ca)}</p>
-                    <p className="text-[10px] opacity-70">CHF</p>
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+                    <p className="text-[10px] opacity-80 mb-1">CA</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.ca)}</p>
                   </div>
                   
                   {/* Salaries */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                    <p className="text-xs opacity-80 mb-1">Salaires</p>
-                    <p className="text-xl font-bold">{formatCurrency(financialSummary.salaries)}</p>
-                    <p className="text-[10px] opacity-70">CHF/mois</p>
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                    <p className="text-[10px] opacity-80 mb-1">Salaires</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.salaries)}</p>
                   </div>
                   
                   {/* Social charges */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-                    <p className="text-xs opacity-80 mb-1">Charges sociales</p>
-                    <p className="text-xl font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
-                    <p className="text-[10px] opacity-70">~13.65%</p>
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+                    <p className="text-[10px] opacity-80 mb-1">Charges</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.socialCharges)}</p>
                   </div>
                   
                   {/* Total charges */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
-                    <p className="text-xs opacity-80 mb-1">Total charges</p>
-                    <p className="text-xl font-bold">{formatCurrency(financialSummary.totalCharges)}</p>
-                    <p className="text-[10px] opacity-70">CHF</p>
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
+                    <p className="text-[10px] opacity-80 mb-1">Total</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.totalCharges)}</p>
                   </div>
                   
                   {/* Benefit */}
                   <div className={cn(
-                    "p-4 rounded-xl text-white",
+                    "p-3 rounded-xl text-white",
                     financialSummary.benefit >= 0 
                       ? "bg-gradient-to-br from-green-500 to-green-600" 
                       : "bg-gradient-to-br from-red-500 to-red-600"
                   )}>
-                    <p className="text-xs opacity-80 mb-1">Bénéfice</p>
-                    <p className="text-xl font-bold">{formatCurrency(financialSummary.benefit)}</p>
-                    <p className="text-[10px] opacity-70">CA - Charges</p>
+                    <p className="text-[10px] opacity-80 mb-1">Bénéfice</p>
+                    <p className="text-lg font-bold">{formatCurrency(financialSummary.benefit)}</p>
                   </div>
                 </div>
 
