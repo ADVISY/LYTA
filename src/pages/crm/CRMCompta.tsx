@@ -379,11 +379,6 @@ export default function CRMCompta() {
                 </div>
               )}
 
-              {/* Debug: Show current state */}
-              <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-                Debug: dateDebut={dateDebut || "vide"} | dateFin={dateFin || "vide"} | collaborateur={selectedCollaborateur || "vide"}
-              </div>
-              
               <Button 
                 onClick={handleGenerateDecompte}
                 disabled={generating || !dateDebut || !dateFin || !selectedCollaborateur}
