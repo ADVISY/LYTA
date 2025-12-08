@@ -359,10 +359,11 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
               {/* En-tête avec design élégant */}
               <div className="flex justify-between items-start mb-10 pb-6" style={{ borderBottom: '3px solid #1800AD' }}>
                 <div>
-                  <div className="text-4xl font-bold tracking-tight" style={{ color: '#1800AD', fontFamily: 'Georgia, serif' }}>
-                    e-Advisy
-                  </div>
-                  <div className="text-sm tracking-widest text-gray-500 mt-1">SÀRL</div>
+                  <img 
+                    src="/lovable-uploads/ce98b523-cd01-48ac-bd35-5e801dd578ac.png" 
+                    alt="e-Advisy" 
+                    style={{ height: '60px', objectFit: 'contain' }}
+                  />
                   <div className="text-xs text-gray-400 mt-3">
                     Route de Chêne 5 • 1207 Genève<br />
                     info@e-advisy.ch • www.e-advisy.ch
