@@ -35,6 +35,7 @@ import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
 import ContractForm from "@/components/crm/ContractForm";
 import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
+import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import {
   Table,
   TableBody,
@@ -414,6 +415,43 @@ export default function ClientDetail() {
                       </p>
                     </div>
                   </div>
+                  
+                  {/* Section spéciale pour les collaborateurs - Taux et commissions */}
+                  {client.type_adresse === 'collaborateur' && (
+                    <div className="mt-8 pt-6 border-t">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Percent className="h-5 w-5 text-primary" />
+                        Rémunération et réserve
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 p-4 rounded-xl">
+                          <p className="text-sm text-muted-foreground">Taux LCA</p>
+                          <p className="text-2xl font-bold text-blue-600">{client.commission_rate_lca || 0}%</p>
+                        </div>
+                        <div className="bg-purple-50 p-4 rounded-xl">
+                          <p className="text-sm text-muted-foreground">Taux Vie (3e pilier)</p>
+                          <p className="text-2xl font-bold text-purple-600">{client.commission_rate_vie || 0}%</p>
+                        </div>
+                        <div className="bg-orange-50 p-4 rounded-xl">
+                          <p className="text-sm text-muted-foreground">Taux de réserve</p>
+                          <p className="text-2xl font-bold text-orange-600">{client.reserve_rate || 0}%</p>
+                        </div>
+                        <div className="bg-emerald-50 p-4 rounded-xl">
+                          <p className="text-sm text-muted-foreground">Salaire fixe</p>
+                          <p className="text-2xl font-bold text-emerald-600">
+                            {client.fixed_salary 
+                              ? new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(client.fixed_salary)
+                              : 'CHF 0.00'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Compte de réserve - simulation basée sur les commissions */}
+                      {client.reserve_rate && client.reserve_rate > 0 && (
+                        <ReserveAccountCard clientId={client.id} reserveRate={client.reserve_rate} />
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

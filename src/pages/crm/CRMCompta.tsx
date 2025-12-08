@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, FileText, Printer, Download, Eye, Loader2, Users, Calendar, DollarSign, Building2 } from "lucide-react";
+import { Calculator, FileText, Printer, Download, Eye, Loader2, Users, Calendar, DollarSign, Building2, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import advisyLogo from "@/assets/advisy-logo.svg";
+import html2pdf from "html2pdf.js";
 
 interface DecompteCommission {
   commission: Commission;
@@ -197,6 +198,40 @@ export default function CRMCompta() {
     `);
     printWindow.document.close();
     printWindow.print();
+  };
+
+  // Download as PDF
+  const handleDownloadPDF = async () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+
+    const agentName = selectedAgentForPreview 
+      ? `${selectedAgentForPreview.first_name || ''}_${selectedAgentForPreview.last_name || ''}`.trim().replace(/\s+/g, '_')
+      : 'collaborateur';
+    const fileName = `Decompte_${agentName}_${dateDebut}_${dateFin}.pdf`;
+
+    const opt = {
+      margin: [10, 10, 10, 10] as [number, number, number, number],
+      filename: fileName,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    try {
+      await html2pdf().set(opt).from(printContent).save();
+      toast({
+        title: "PDF téléchargé",
+        description: `Le décompte a été téléchargé: ${fileName}`,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la génération du PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   // Save decompte to agent's documents
@@ -425,6 +460,10 @@ export default function CRMCompta() {
             <DialogTitle className="flex items-center justify-between">
               <span>Prévisualisation du décompte</span>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Télécharger PDF
+                </Button>
                 <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
                   <Printer className="h-4 w-4" />
                   Imprimer

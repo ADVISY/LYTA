@@ -33,6 +33,19 @@ export type Client = {
   created_at: string;
   updated_at: string;
   external_ref?: string | null;
+  // Collaborateur fields
+  commission_rate?: number | null;
+  commission_rate_lca?: number | null;
+  commission_rate_vie?: number | null;
+  fixed_salary?: number | null;
+  bonus_rate?: number | null;
+  contract_type?: string | null;
+  work_percentage?: number | null;
+  hire_date?: string | null;
+  manager_id?: string | null;
+  manager_commission_rate_lca?: number | null;
+  manager_commission_rate_vie?: number | null;
+  reserve_rate?: number | null;
   assigned_agent?: {
     id: string;
     first_name?: string | null;
