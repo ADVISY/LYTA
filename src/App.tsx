@@ -18,6 +18,7 @@ import PrevoyanceLPP from "./pages/entreprises/PrevoyanceLPP";
 import APropos from "./pages/APropos";
 import Carriere from "./pages/Carriere";
 import Connexion from "./pages/Connexion";
+import PartnerContractSubmit from "./pages/PartnerContractSubmit";
 import Simulateurs from "./pages/Simulateurs";
 import Assurances from "./pages/Assurances";
 import MentionsLegales from "./pages/MentionsLegales";
@@ -71,6 +72,7 @@ const App = () => (
           <Route path="/carriere" element={<Carriere />} />
           <Route path="/simulateurs" element={<Simulateurs />} />
           <Route path="/connexion" element={<Connexion />} />
+          <Route path="/deposer-contrat" element={<PartnerContractSubmit />} />
           
           {/* Legal Pages */}
           <Route path="/mentions-legales" element={<MentionsLegales />} />
