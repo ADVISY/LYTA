@@ -22,6 +22,10 @@ export interface Collaborateur {
   address: string | null;
   city: string | null;
   postal_code: string | null;
+  canton: string | null;
+  civil_status: string | null;
+  nationality: string | null;
+  permit_type: string | null;
 }
 
 export function useCollaborateursCommission() {
@@ -37,7 +41,7 @@ export function useCollaborateursCommission() {
         // Récupérer les collaborateurs depuis la table clients (type_adresse = 'collaborateur')
         const { data, error } = await supabase
           .from('clients')
-          .select('id, first_name, last_name, email, profession, commission_rate, commission_rate_lca, commission_rate_vie, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate, fixed_salary, bonus_rate, work_percentage, contract_type, address, city, postal_code')
+          .select('id, first_name, last_name, email, profession, commission_rate, commission_rate_lca, commission_rate_vie, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate, fixed_salary, bonus_rate, work_percentage, contract_type, address, city, postal_code, canton, civil_status, nationality, permit_type')
           .eq('type_adresse', 'collaborateur')
           .order('first_name', { ascending: true });
 

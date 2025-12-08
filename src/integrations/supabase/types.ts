@@ -166,6 +166,7 @@ export type Database = {
           bank_name: string | null
           birthdate: string | null
           bonus_rate: number | null
+          canton: string | null
           city: string | null
           civil_status: string | null
           commission_rate: number | null
@@ -209,6 +210,7 @@ export type Database = {
           bank_name?: string | null
           birthdate?: string | null
           bonus_rate?: number | null
+          canton?: string | null
           city?: string | null
           civil_status?: string | null
           commission_rate?: number | null
@@ -252,6 +254,7 @@ export type Database = {
           bank_name?: string | null
           birthdate?: string | null
           bonus_rate?: number | null
+          canton?: string | null
           city?: string | null
           civil_status?: string | null
           commission_rate?: number | null

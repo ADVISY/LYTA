@@ -49,9 +49,46 @@ interface FichePaie {
   reserveAmount: number;
   commissionsNet: number;
   totalBrut: number;
-  charges: number;
+  // Charges sociales
+  avs: number;
+  ac: number;
+  lpp: number;
+  aanp: number;
+  totalChargesSociales: number;
+  // Impôt à la source
+  canton: string;
+  tauxImpotSource: number;
+  impotSource: number;
+  // Totaux
+  totalDeductions: number;
   netAPayer: number;
 }
+
+// Barèmes simplifiés impôt à la source par canton (taux moyen pour célibataire, revenu ~5000 CHF/mois)
+// Ces taux sont indicatifs et varient selon la situation familiale et le revenu
+const TAUX_IMPOT_SOURCE: Record<string, { celibataire: number; marie: number }> = {
+  'GE': { celibataire: 0.14, marie: 0.08 },
+  'VD': { celibataire: 0.13, marie: 0.07 },
+  'VS': { celibataire: 0.10, marie: 0.05 },
+  'FR': { celibataire: 0.11, marie: 0.06 },
+  'NE': { celibataire: 0.12, marie: 0.06 },
+  'JU': { celibataire: 0.13, marie: 0.07 },
+  'BE': { celibataire: 0.12, marie: 0.06 },
+  'ZH': { celibataire: 0.10, marie: 0.05 },
+  'BS': { celibataire: 0.14, marie: 0.08 },
+  'AG': { celibataire: 0.09, marie: 0.05 },
+  'LU': { celibataire: 0.09, marie: 0.05 },
+  'TI': { celibataire: 0.11, marie: 0.06 },
+  'SG': { celibataire: 0.10, marie: 0.05 },
+  'DEFAULT': { celibataire: 0.11, marie: 0.06 },
+};
+
+const getTauxImpotSource = (canton: string | null, civilStatus: string | null): number => {
+  const cantonCode = canton?.toUpperCase() || 'DEFAULT';
+  const taux = TAUX_IMPOT_SOURCE[cantonCode] || TAUX_IMPOT_SOURCE['DEFAULT'];
+  const isMarie = civilStatus?.toLowerCase().includes('marié') || civilStatus?.toLowerCase().includes('marie');
+  return isMarie ? taux.marie : taux.celibataire;
+};
 
 export default function CRMCompta() {
   const { commissions, loading: loadingCommissions } = useCommissions();
@@ -321,10 +358,20 @@ export default function CRMCompta() {
         const commissionsNet = commissionsBrut - reserveAmount;
         const totalBrut = salaireBrut + commissionsNet;
         
-        // Charges sociales estimées (~15% en Suisse pour l'employé)
-        const tauxCharges = 0.15;
-        const charges = totalBrut * tauxCharges;
-        const netAPayer = totalBrut - charges;
+        // Charges sociales
+        const avs = totalBrut * 0.053;  // AVS/AI/APG
+        const ac = totalBrut * 0.011;   // Assurance chômage
+        const lpp = totalBrut * 0.07;   // LPP (2e pilier)
+        const aanp = totalBrut * 0.016; // AANP
+        const totalChargesSociales = avs + ac + lpp + aanp;
+        
+        // Impôt à la source
+        const canton = collaborateur.canton || 'VD';
+        const tauxImpotSource = getTauxImpotSource(canton, collaborateur.civil_status);
+        const impotSource = totalBrut * tauxImpotSource;
+        
+        const totalDeductions = totalChargesSociales + impotSource;
+        const netAPayer = totalBrut - totalDeductions;
         
         fiches.push({
           collaborateur,
@@ -336,7 +383,15 @@ export default function CRMCompta() {
           reserveAmount,
           commissionsNet,
           totalBrut,
-          charges,
+          avs,
+          ac,
+          lpp,
+          aanp,
+          totalChargesSociales,
+          canton,
+          tauxImpotSource,
+          impotSource,
+          totalDeductions,
           netAPayer
         });
       }
@@ -660,34 +715,59 @@ export default function CRMCompta() {
           <h3 className="text-sm font-semibold text-primary mb-3 pb-2 border-b">Déductions</h3>
           <Table>
             <TableBody>
+              {/* Charges sociales */}
+              <TableRow className="bg-muted/30">
+                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>Cotisations sociales</TableCell>
+              </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2">AVS/AI/APG (5.3%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">AVS/AI/APG (5.3%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
-                  -{formatCurrency(fiche.totalBrut * 0.053)}
+                  -{formatCurrency(fiche.avs)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2">AC (1.1%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">AC (1.1%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
-                  -{formatCurrency(fiche.totalBrut * 0.011)}
+                  -{formatCurrency(fiche.ac)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2">LPP (~7%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">LPP - 2e pilier (~7%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
-                  -{formatCurrency(fiche.totalBrut * 0.07)}
+                  -{formatCurrency(fiche.lpp)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2">AANP (1.6%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">AANP (1.6%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
-                  -{formatCurrency(fiche.totalBrut * 0.016)}
+                  -{formatCurrency(fiche.aanp)}
                 </TableCell>
               </TableRow>
-              <TableRow className="bg-red-50">
-                <TableCell className="text-xs py-2 font-semibold">Total déductions (~15%)</TableCell>
-                <TableCell className="text-xs py-2 text-right font-semibold text-red-600">
-                  -{formatCurrency(fiche.charges)}
+              <TableRow className="bg-red-50/50">
+                <TableCell className="text-xs py-2 font-medium">Sous-total cotisations (~15%)</TableCell>
+                <TableCell className="text-xs py-2 text-right font-medium text-red-600">
+                  -{formatCurrency(fiche.totalChargesSociales)}
+                </TableCell>
+              </TableRow>
+              
+              {/* Impôt à la source */}
+              <TableRow className="bg-muted/30">
+                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>Impôt à la source</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="text-xs py-2 pl-4">
+                  Canton {fiche.canton} ({(fiche.tauxImpotSource * 100).toFixed(1)}%)
+                </TableCell>
+                <TableCell className="text-xs py-2 text-right text-red-600">
+                  -{formatCurrency(fiche.impotSource)}
+                </TableCell>
+              </TableRow>
+              
+              {/* Total déductions */}
+              <TableRow className="bg-red-100">
+                <TableCell className="text-xs py-2 font-bold">TOTAL DÉDUCTIONS</TableCell>
+                <TableCell className="text-xs py-2 text-right font-bold text-red-600">
+                  -{formatCurrency(fiche.totalDeductions)}
                 </TableCell>
               </TableRow>
             </TableBody>
