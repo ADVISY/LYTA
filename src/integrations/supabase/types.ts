@@ -1076,6 +1076,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_client: { Args: { client_id: string }; Returns: boolean }
       can_view_financial_data: { Args: never; Returns: boolean }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       create_audit_log: {
