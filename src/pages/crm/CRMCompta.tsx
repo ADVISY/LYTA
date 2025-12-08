@@ -34,7 +34,7 @@ export default function CRMCompta() {
   const [activeTab, setActiveTab] = useState("decomptes");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
-  const [selectedCollaborateur, setSelectedCollaborateur] = useState<string>("all");
+  const [selectedCollaborateur, setSelectedCollaborateur] = useState<string>("");
   const [generating, setGenerating] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [decompteData, setDecompteData] = useState<DecompteCommission[]>([]);
@@ -76,31 +76,48 @@ export default function CRMCompta() {
       return;
     }
 
+    if (selectedCollaborateur === "all") {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un collaborateur spécifique",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setGenerating(true);
     try {
+      const debut = new Date(dateDebut);
+      const fin = new Date(dateFin);
+      fin.setHours(23, 59, 59, 999);
+      
       const decomptes: DecompteCommission[] = [];
       
+      // Loop through filtered commissions and fetch their parts
       for (const commission of filteredCommissions) {
         const parts = await fetchCommissionParts(commission.id);
         
-        // Filter by selected collaborateur if needed
-        if (selectedCollaborateur !== "all") {
-          const hasAgent = parts.some(p => p.agent_id === selectedCollaborateur);
-          if (!hasAgent) continue;
+        // Check if this collaborator has a part in this commission
+        const agentPart = parts.find((p: CommissionPart) => p.agent_id === selectedCollaborateur);
+        if (agentPart) {
+          decomptes.push({ commission, parts });
         }
-        
-        decomptes.push({ commission, parts });
+      }
+      
+      if (decomptes.length === 0) {
+        toast({
+          title: "Aucune commission",
+          description: "Aucune commission trouvée pour ce collaborateur sur cette période",
+        });
+        setGenerating(false);
+        return;
       }
       
       setDecompteData(decomptes);
       
       // Find selected agent for preview
-      if (selectedCollaborateur !== "all") {
-        const agent = collaborateurs.find(c => c.id === selectedCollaborateur);
-        setSelectedAgentForPreview(agent || null);
-      } else {
-        setSelectedAgentForPreview(null);
-      }
+      const agent = collaborateurs.find(c => c.id === selectedCollaborateur);
+      setSelectedAgentForPreview(agent || null);
       
       setPreviewOpen(true);
     } catch (error) {
@@ -289,13 +306,12 @@ export default function CRMCompta() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Collaborateur</Label>
+                  <Label>Collaborateur <span className="text-destructive">*</span></Label>
                   <Select value={selectedCollaborateur} onValueChange={setSelectedCollaborateur}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Tous les collaborateurs" />
+                      <SelectValue placeholder="Sélectionner un collaborateur" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Tous les collaborateurs</SelectItem>
                       {collaborateurs.map((collab) => (
                         <SelectItem key={collab.id} value={collab.id}>
                           {getCollaborateurName(collab)}
@@ -327,7 +343,7 @@ export default function CRMCompta() {
 
               <Button 
                 onClick={handleGenerateDecompte}
-                disabled={generating || !dateDebut || !dateFin || filteredCommissions.length === 0}
+                disabled={generating || !dateDebut || !dateFin || !selectedCollaborateur || filteredCommissions.length === 0}
                 className="gap-2"
               >
                 {generating ? (
