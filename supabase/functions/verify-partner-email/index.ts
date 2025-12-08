@@ -43,12 +43,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Query for partner with this email
-    const { data: partner, error } = await supabaseAdmin
+    // Query for collaborateur with this email (agents, managers, admins)
+    const { data: collaborateur, error } = await supabaseAdmin
       .from('clients')
       .select('id, first_name, last_name, company_name')
       .eq('email', email.toLowerCase().trim())
-      .eq('type_adresse', 'partenaire')
+      .eq('type_adresse', 'collaborateur')
       .maybeSingle()
 
     if (error) {
@@ -62,15 +62,15 @@ serve(async (req) => {
       )
     }
 
-    if (partner) {
+    if (collaborateur) {
       return new Response(
         JSON.stringify({
           success: true,
           partner: {
-            id: partner.id,
-            name: partner.company_name || `${partner.first_name} ${partner.last_name}`,
-            firstName: partner.first_name,
-            lastName: partner.last_name
+            id: collaborateur.id,
+            name: collaborateur.company_name || `${collaborateur.first_name || ''} ${collaborateur.last_name || ''}`.trim(),
+            firstName: collaborateur.first_name,
+            lastName: collaborateur.last_name
           }
         }),
         { 
@@ -81,7 +81,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Email not found as partner'
+          error: 'Email not found as collaborateur'
         }),
         { 
           status: 404,

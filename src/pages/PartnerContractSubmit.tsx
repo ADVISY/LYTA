@@ -636,44 +636,44 @@ const PartnerContractSubmit = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40" />
+    <div className="min-h-screen bg-background relative">
+      <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
       <Link 
         to="/connexion" 
-        className="absolute top-6 left-6 inline-flex items-center gap-2 text-sm font-medium text-foreground bg-card rounded-full px-4 py-2 shadow-sm border hover:shadow-md transition-all z-10"
+        className="fixed top-6 left-6 inline-flex items-center gap-2 text-sm font-medium text-foreground bg-card rounded-full px-4 py-2 shadow-sm border hover:shadow-md transition-all z-50"
       >
         <ChevronLeft className="w-4 h-4" />
         Retour
       </Link>
 
-      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
-        <div className="text-center mb-8 animate-fade-in">
+      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
+        <div className="text-center mb-8">
           <img src={advisyLogo} alt="Advisy" className="h-20 sm:h-24 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-foreground mb-2">
             Déposer un contrat
           </h1>
           <p className="text-muted-foreground">
-            {step === "email" && "Identifiez-vous avec votre email partenaire"}
+            {step === "email" && "Identifiez-vous avec votre email collaborateur"}
             {step === "selectType" && "Choisissez le type de formulaire"}
             {step === "form" && `Formulaire ${formType}`}
           </p>
         </div>
 
-        <div className="max-w-2xl w-full bg-card rounded-lg shadow-lg border p-6 sm:p-8 animate-scale-in max-h-[80vh] overflow-y-auto">
+        <div className="max-w-2xl w-full bg-card rounded-xl shadow-lg border p-6 sm:p-8 max-h-[80vh] overflow-y-auto">
           {step === "email" && (
             <form onSubmit={handleEmailVerify} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="partner-email">Email partenaire</Label>
+                <Label htmlFor="partner-email">Email collaborateur</Label>
                 <Input
                   id="partner-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="votre@entreprise.ch"
+                  placeholder="votre@advisy.ch"
                 />
               </div>
-              <Button type="submit" disabled={verifying} className="w-full mt-6">
+              <Button type="submit" disabled={verifying} className="w-full mt-4">
                 {verifying ? "Vérification..." : "Continuer"}
               </Button>
             </form>
