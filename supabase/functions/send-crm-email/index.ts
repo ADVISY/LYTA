@@ -331,7 +331,7 @@ const getEmailWrapper = (content: string) => `
         <div class="footer-links">
           <a href="https://e-advisy.ch" class="footer-link">www.e-advisy.ch</a>
           <span class="footer-divider">|</span>
-          <a href="mailto:hello@advisy.ch" class="footer-link">hello@advisy.ch</a>
+          <a href="mailto:hello@e-advisy.ch" class="footer-link">hello@e-advisy.ch</a>
         </div>
         <p class="footer-text" style="margin-top: 24px; font-size: 11px; color: #9ca3af;">
           Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce message.<br>
@@ -458,7 +458,7 @@ const getEmailContent = (type: string, clientName: string, data?: EmailData) => 
             </div>
             ` : ''}
             <div class="cta-container">
-              <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">
+              <a href="${data?.loginUrl || 'https://e-advisy.ch/connexion'}" class="cta-button">
                 Accéder à mon espace client →
               </a>
             </div>
@@ -500,7 +500,7 @@ const getEmailContent = (type: string, clientName: string, data?: EmailData) => 
               </p>
             </div>
             <div class="cta-container">
-              <a href="${data?.loginUrl || 'https://advisy.ch/connexion'}" class="cta-button">
+              <a href="${data?.loginUrl || 'https://e-advisy.ch/connexion'}" class="cta-button">
                 Se connecter maintenant →
               </a>
             </div>
@@ -540,7 +540,7 @@ const getEmailContent = (type: string, clientName: string, data?: EmailData) => 
               <li>Poser toutes vos questions sur vos assurances</li>
             </ul>
             <div class="cta-container">
-              <a href="https://advisy.ch" class="cta-button">
+              <a href="https://e-advisy.ch" class="cta-button">
                 Prendre rendez-vous →
               </a>
             </div>
@@ -583,7 +583,7 @@ const getEmailContent = (type: string, clientName: string, data?: EmailData) => 
               <li><strong>RC Ménage :</strong> Couverture premium au prix standard</li>
             </ul>
             <div class="cta-container">
-              <a href="https://advisy.ch" class="cta-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+              <a href="https://e-advisy.ch" class="cta-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                 Découvrir les offres →
               </a>
             </div>
@@ -711,7 +711,7 @@ const handler = async (req: Request): Promise<Response> => {
           ...emailData,
           temporaryPassword,
           clientEmail,
-          loginUrl: `${Deno.env.get("SITE_URL") || "https://advisy.ch"}/connexion`,
+          loginUrl: `${Deno.env.get("SITE_URL") || "https://e-advisy.ch"}/connexion`,
         };
 
         console.log(`User account created for ${clientEmail}`);
@@ -720,7 +720,7 @@ const handler = async (req: Request): Promise<Response> => {
         emailData = {
           ...emailData,
           clientEmail,
-          loginUrl: `${Deno.env.get("SITE_URL") || "https://advisy.ch"}/connexion`,
+          loginUrl: `${Deno.env.get("SITE_URL") || "https://e-advisy.ch"}/connexion`,
         };
       }
     }
