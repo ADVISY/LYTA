@@ -165,12 +165,12 @@ export default function CRMLayout() {
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-violet-500/5 pointer-events-none" />
           
           {/* Logo Section */}
-          <div className={cn("border-b border-primary/10 relative", sidebarCollapsed ? "p-3" : "p-6")}>
+          <div className="p-4 border-b border-primary/10 relative">
             <div className="flex items-center justify-center">
               <img 
                 src={advisyLogo} 
                 alt="Advisy" 
-                className={cn("object-contain transition-all duration-300", sidebarCollapsed ? "h-10" : "h-16")} 
+                className="h-12 object-contain"
               />
             </div>
             {!sidebarCollapsed && (
