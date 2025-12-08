@@ -1,104 +1,974 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Settings, User, Bell, Shield, Palette, Database, ChevronRight, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Settings, User, Building2, Package, Percent, UserPlus, Moon, Sun, 
+  Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
-const settingsSections = [
-  { label: "Profil", icon: User, color: "from-blue-500 to-indigo-600", bgColor: "from-blue-500/20 to-indigo-600/10", description: "Informations personnelles" },
-  { label: "Notifications", icon: Bell, color: "from-amber-500 to-orange-600", bgColor: "from-amber-500/20 to-orange-600/10", description: "Préférences d'alertes" },
-  { label: "Sécurité", icon: Shield, color: "from-emerald-500 to-teal-600", bgColor: "from-emerald-500/20 to-teal-600/10", description: "Mot de passe et 2FA" },
-  { label: "Apparence", icon: Palette, color: "from-violet-500 to-purple-600", bgColor: "from-violet-500/20 to-purple-600/10", description: "Thème et affichage" },
-  { label: "Données", icon: Database, color: "from-slate-500 to-gray-600", bgColor: "from-slate-500/20 to-gray-600/10", description: "Export et import" },
+// Couleurs disponibles pour le thème
+const themeColors = [
+  { id: "blue", label: "Bleu", color: "hsl(221, 83%, 53%)", class: "bg-blue-600" },
+  { id: "violet", label: "Violet", color: "hsl(262, 83%, 58%)", class: "bg-violet-600" },
+  { id: "green", label: "Vert", color: "hsl(142, 76%, 36%)", class: "bg-green-600" },
+  { id: "orange", label: "Orange", color: "hsl(24, 95%, 53%)", class: "bg-orange-500" },
+  { id: "red", label: "Rouge", color: "hsl(0, 84%, 60%)", class: "bg-red-500" },
+  { id: "pink", label: "Rose", color: "hsl(330, 81%, 60%)", class: "bg-pink-500" },
+  { id: "teal", label: "Sarcelle", color: "hsl(173, 80%, 40%)", class: "bg-teal-500" },
+  { id: "indigo", label: "Indigo", color: "hsl(239, 84%, 67%)", class: "bg-indigo-500" },
 ];
 
 export default function CRMParametres() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("profil");
+  
+  // Profil
+  const [profile, setProfile] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+  });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: "",
+  });
+  const [showPasswords, setShowPasswords] = useState(false);
+
+  // Compagnies
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [isAddingCompany, setIsAddingCompany] = useState(false);
+  const [newCompany, setNewCompany] = useState({ name: "", logo_url: "" });
+  const [editingCompany, setEditingCompany] = useState<any>(null);
+
+  // Produits
+  const [products, setProducts] = useState<any[]>([]);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: "", category: "", company_id: "", description: "" });
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+
+  // Taux de commission par défaut
+  const [defaultRates, setDefaultRates] = useState({
+    lca: 16,
+    vie: 4,
+    manager_lca: 2,
+    manager_vie: 1,
+    reserve: 10,
+  });
+
+  // Apparence
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [selectedColor, setSelectedColor] = useState("blue");
+
+  // Nouvel utilisateur
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "agent",
+  });
+
+  // Charger les données
+  useEffect(() => {
+    loadProfile();
+    loadCompanies();
+    loadProducts();
+    loadSettings();
+  }, [user]);
+
+  const loadProfile = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (data) {
+      setProfile({
+        firstName: data.first_name || "",
+        lastName: data.last_name || "",
+        email: data.email || user.email || "",
+        phone: data.phone || "",
+      });
+    }
+  };
+
+  const loadCompanies = async () => {
+    const { data } = await supabase.from("insurance_companies").select("*").order("name");
+    if (data) setCompanies(data);
+  };
+
+  const loadProducts = async () => {
+    const { data } = await supabase
+      .from("insurance_products")
+      .select("*, company:insurance_companies(name)")
+      .order("name");
+    if (data) setProducts(data);
+  };
+
+  const loadSettings = () => {
+    // Charger depuis localStorage
+    const saved = localStorage.getItem("crm_settings");
+    if (saved) {
+      const settings = JSON.parse(saved);
+      setIsDarkMode(settings.darkMode || false);
+      setSelectedColor(settings.themeColor || "blue");
+      setDefaultRates(settings.defaultRates || defaultRates);
+    }
+    
+    // Appliquer le thème
+    if (localStorage.getItem("crm_dark_mode") === "true") {
+      setIsDarkMode(true);
+      document.documentElement.classList.add("dark");
+    }
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem("crm_settings", JSON.stringify({
+      darkMode: isDarkMode,
+      themeColor: selectedColor,
+      defaultRates,
+    }));
+    toast.success("Paramètres enregistrés");
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        phone: profile.phone,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      toast.error("Erreur lors de la mise à jour du profil");
+    } else {
+      toast.success("Profil mis à jour");
+      setIsEditingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
+    if (passwords.new.length < 8) {
+      toast.error("Le mot de passe doit contenir au moins 8 caractères");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: passwords.new,
+    });
+
+    if (error) {
+      toast.error("Erreur lors du changement de mot de passe");
+    } else {
+      toast.success("Mot de passe modifié avec succès");
+      setShowPasswordChange(false);
+      setPasswords({ current: "", new: "", confirm: "" });
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!profile.email) return;
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(profile.email);
+    if (error) {
+      toast.error("Erreur lors de l'envoi de l'email");
+    } else {
+      toast.success("Email de réinitialisation envoyé");
+    }
+  };
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem("crm_dark_mode", String(newMode));
+    if (newMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
+  // CRUD Compagnies
+  const handleAddCompany = async () => {
+    if (!newCompany.name.trim()) {
+      toast.error("Le nom est requis");
+      return;
+    }
+    const { error } = await supabase.from("insurance_companies").insert(newCompany);
+    if (error) {
+      toast.error("Erreur lors de l'ajout");
+    } else {
+      toast.success("Compagnie ajoutée");
+      setNewCompany({ name: "", logo_url: "" });
+      setIsAddingCompany(false);
+      loadCompanies();
+    }
+  };
+
+  const handleUpdateCompany = async () => {
+    if (!editingCompany) return;
+    const { error } = await supabase
+      .from("insurance_companies")
+      .update({ name: editingCompany.name, logo_url: editingCompany.logo_url })
+      .eq("id", editingCompany.id);
+    if (error) {
+      toast.error("Erreur lors de la mise à jour");
+    } else {
+      toast.success("Compagnie mise à jour");
+      setEditingCompany(null);
+      loadCompanies();
+    }
+  };
+
+  const handleDeleteCompany = async (id: string) => {
+    const { error } = await supabase.from("insurance_companies").delete().eq("id", id);
+    if (error) {
+      toast.error("Erreur: cette compagnie a des produits associés");
+    } else {
+      toast.success("Compagnie supprimée");
+      loadCompanies();
+    }
+  };
+
+  // CRUD Produits
+  const handleAddProduct = async () => {
+    if (!newProduct.name.trim() || !newProduct.company_id || !newProduct.category) {
+      toast.error("Tous les champs sont requis");
+      return;
+    }
+    const { error } = await supabase.from("insurance_products").insert(newProduct);
+    if (error) {
+      toast.error("Erreur lors de l'ajout");
+    } else {
+      toast.success("Produit ajouté");
+      setNewProduct({ name: "", category: "", company_id: "", description: "" });
+      setIsAddingProduct(false);
+      loadProducts();
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+    const { error } = await supabase
+      .from("insurance_products")
+      .update({
+        name: editingProduct.name,
+        category: editingProduct.category,
+        company_id: editingProduct.company_id,
+        description: editingProduct.description,
+      })
+      .eq("id", editingProduct.id);
+    if (error) {
+      toast.error("Erreur lors de la mise à jour");
+    } else {
+      toast.success("Produit mis à jour");
+      setEditingProduct(null);
+      loadProducts();
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const { error } = await supabase.from("insurance_products").delete().eq("id", id);
+    if (error) {
+      toast.error("Erreur: ce produit est utilisé dans des contrats");
+    } else {
+      toast.success("Produit supprimé");
+      loadProducts();
+    }
+  };
+
+  // Ajouter un utilisateur (invitation)
+  const handleInviteUser = async () => {
+    if (!newUser.email.trim()) {
+      toast.error("L'email est requis");
+      return;
+    }
+    // Note: L'invitation nécessite des fonctions admin côté serveur
+    // Pour l'instant, on affiche un message
+    toast.info("Fonctionnalité d'invitation en cours de développement. Contactez un administrateur.");
+    setIsAddingUser(false);
+    setNewUser({ email: "", firstName: "", lastName: "", role: "agent" });
+  };
+
+  const productCategories = [
+    { id: "health", label: "Santé" },
+    { id: "life", label: "Vie / 3e pilier" },
+    { id: "auto", label: "Auto" },
+    { id: "property", label: "Ménage / RC" },
+    { id: "legal", label: "Protection juridique" },
+    { id: "lpp", label: "LPP" },
+    { id: "other", label: "Autre" },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Header with decorative background */}
-      <div className="relative">
-        <div className="absolute -inset-4 bg-gradient-to-r from-slate-500/10 via-gray-500/5 to-transparent rounded-3xl blur-2xl" />
-        <div className="relative flex items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-500 to-gray-600 rounded-2xl blur-lg opacity-50" />
-            <div className="relative p-4 rounded-2xl bg-gradient-to-br from-slate-500 to-gray-600 shadow-xl">
-              <Settings className="h-7 w-7 text-white" />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Paramètres
-            </h1>
-            <p className="text-muted-foreground">Configurez votre CRM selon vos besoins</p>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <div className="p-3 rounded-xl bg-gradient-to-br from-slate-500 to-gray-600 shadow-lg">
+          <Settings className="h-6 w-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">Paramètres</h1>
+          <p className="text-muted-foreground text-sm">Configurez votre CRM</p>
         </div>
       </div>
 
-      {/* Settings Sections Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {settingsSections.map((section, index) => (
-          <Card 
-            key={section.label} 
-            className={cn(
-              "group relative border-0 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden",
-              "hover:-translate-y-2 hover:scale-[1.02]",
-              "bg-white/80 backdrop-blur-sm"
-            )}
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            {/* Gradient background on hover */}
-            <div className={cn(
-              "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-              section.bgColor
-            )} />
-            
-            {/* Shine effect */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-            
-            <CardContent className="p-6 relative">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="relative">
-                    <div className={cn(
-                      "absolute inset-0 bg-gradient-to-br rounded-xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity",
-                      section.color
-                    )} />
-                    <div className={cn(
-                      "relative p-3 rounded-xl bg-gradient-to-br shadow-lg group-hover:scale-110 transition-transform duration-300",
-                      section.color
-                    )}>
-                      <section.icon className="h-5 w-5 text-white" />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+          <TabsTrigger value="profil" className="gap-2">
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">Profil</span>
+          </TabsTrigger>
+          <TabsTrigger value="compagnies" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Compagnies</span>
+          </TabsTrigger>
+          <TabsTrigger value="produits" className="gap-2">
+            <Package className="h-4 w-4" />
+            <span className="hidden sm:inline">Produits</span>
+          </TabsTrigger>
+          <TabsTrigger value="commissions" className="gap-2">
+            <Percent className="h-4 w-4" />
+            <span className="hidden sm:inline">Commissions</span>
+          </TabsTrigger>
+          <TabsTrigger value="apparence" className="gap-2">
+            <Palette className="h-4 w-4" />
+            <span className="hidden sm:inline">Apparence</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* PROFIL */}
+        <TabsContent value="profil" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Informations personnelles</CardTitle>
+                {!isEditingProfile && (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditingProfile(true)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Modifier
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Prénom</Label>
+                  <Input 
+                    value={profile.firstName}
+                    onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                    disabled={!isEditingProfile}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom</Label>
+                  <Input 
+                    value={profile.lastName}
+                    onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                    disabled={!isEditingProfile}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input value={profile.email} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone</Label>
+                  <Input 
+                    value={profile.phone}
+                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    disabled={!isEditingProfile}
+                  />
+                </div>
+              </div>
+              {isEditingProfile && (
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={handleUpdateProfile}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Enregistrer
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsEditingProfile(false)}>
+                    Annuler
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Sécurité
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!showPasswordChange ? (
+                <div className="flex gap-4">
+                  <Button variant="outline" onClick={() => setShowPasswordChange(true)}>
+                    Modifier le mot de passe
+                  </Button>
+                  <Button variant="ghost" onClick={handleResetPassword}>
+                    Demander un nouveau mot de passe par email
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>Nouveau mot de passe</Label>
+                    <div className="relative">
+                      <Input 
+                        type={showPasswords ? "text" : "password"}
+                        value={passwords.new}
+                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0"
+                        onClick={() => setShowPasswords(!showPasswords)}
+                      >
+                        {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-lg group-hover:text-primary transition-colors">{section.label}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{section.description}</p>
+                  <div className="space-y-2">
+                    <Label>Confirmer le mot de passe</Label>
+                    <Input 
+                      type={showPasswords ? "text" : "password"}
+                      value={passwords.confirm}
+                      onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleChangePassword}>
+                      Changer le mot de passe
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowPasswordChange(false)}>
+                      Annuler
+                    </Button>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Ajouter un utilisateur */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Utilisateurs
+                </CardTitle>
+                <Button size="sm" onClick={() => setIsAddingUser(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isAddingUser ? (
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input 
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Prénom</Label>
+                      <Input 
+                        value={newUser.firstName}
+                        onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nom</Label>
+                      <Input 
+                        value={newUser.lastName}
+                        onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Rôle</Label>
+                    <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Administrateur</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="agent">Agent</SelectItem>
+                        <SelectItem value="backoffice">Backoffice</SelectItem>
+                        <SelectItem value="compta">Comptabilité</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleInviteUser}>
+                      Inviter
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsAddingUser(false)}>
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Invitez de nouveaux utilisateurs à rejoindre votre CRM.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* COMPAGNIES */}
+        <TabsContent value="compagnies" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Compagnies d'assurance</CardTitle>
+                <Button size="sm" onClick={() => setIsAddingCompany(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isAddingCompany && (
+                <div className="mb-4 p-4 border rounded-lg bg-muted/30 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nom</Label>
+                      <Input 
+                        value={newCompany.name}
+                        onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>URL du logo (optionnel)</Label>
+                      <Input 
+                        value={newCompany.logo_url}
+                        onChange={(e) => setNewCompany({ ...newCompany, logo_url: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleAddCompany}>Ajouter</Button>
+                    <Button size="sm" variant="outline" onClick={() => setIsAddingCompany(false)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Produits</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {companies.map(company => (
+                    <TableRow key={company.id}>
+                      <TableCell>
+                        {editingCompany?.id === company.id ? (
+                          <Input 
+                            value={editingCompany.name}
+                            onChange={(e) => setEditingCompany({ ...editingCompany, name: e.target.value })}
+                          />
+                        ) : (
+                          <span className="font-medium">{company.name}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {products.filter(p => p.company_id === company.id).length} produits
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {editingCompany?.id === company.id ? (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" onClick={handleUpdateCompany}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setEditingCompany(null)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => setEditingCompany(company)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => handleDeleteCompany(company.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PRODUITS */}
+        <TabsContent value="produits" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Produits d'assurance</CardTitle>
+                <Button size="sm" onClick={() => setIsAddingProduct(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isAddingProduct && (
+                <div className="mb-4 p-4 border rounded-lg bg-muted/30 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nom du produit</Label>
+                      <Input 
+                        value={newProduct.name}
+                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Compagnie</Label>
+                      <Select 
+                        value={newProduct.company_id}
+                        onValueChange={(v) => setNewProduct({ ...newProduct, company_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Catégorie</Label>
+                      <Select 
+                        value={newProduct.category}
+                        onValueChange={(v) => setNewProduct({ ...newProduct, category: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productCategories.map(cat => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description (optionnel)</Label>
+                      <Input 
+                        value={newProduct.description}
+                        onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleAddProduct}>Ajouter</Button>
+                    <Button size="sm" variant="outline" onClick={() => setIsAddingProduct(false)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Compagnie</TableHead>
+                    <TableHead>Catégorie</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.slice(0, 20).map(product => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.company?.name || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {productCategories.find(c => c.id === product.category)?.label || product.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setEditingProduct(product)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteProduct(product.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {products.length > 20 && (
+                <p className="text-sm text-muted-foreground text-center mt-4">
+                  Affichage de 20 produits sur {products.length}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dialog d'édition produit */}
+          <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Modifier le produit</DialogTitle>
+              </DialogHeader>
+              {editingProduct && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nom</Label>
+                    <Input 
+                      value={editingProduct.name}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Compagnie</Label>
+                    <Select 
+                      value={editingProduct.company_id}
+                      onValueChange={(v) => setEditingProduct({ ...editingProduct, company_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Catégorie</Label>
+                    <Select 
+                      value={editingProduct.category}
+                      onValueChange={(v) => setEditingProduct({ ...editingProduct, category: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productCategories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleUpdateProduct}>Enregistrer</Button>
+                    <Button variant="outline" onClick={() => setEditingProduct(null)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* COMMISSIONS */}
+        <TabsContent value="commissions" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Taux de commission par défaut</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Taux agents</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Commission LCA (santé complémentaire)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number"
+                          value={defaultRates.lca}
+                          onChange={(e) => setDefaultRates({ ...defaultRates, lca: Number(e.target.value) })}
+                          className="w-20 text-right"
+                        />
+                        <span className="text-muted-foreground">×</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Commission VIE (3e pilier)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number"
+                          value={defaultRates.vie}
+                          onChange={(e) => setDefaultRates({ ...defaultRates, vie: Number(e.target.value) })}
+                          className="w-20 text-right"
+                        />
+                        <span className="text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-medium">Taux managers</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Part manager LCA</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number"
+                          value={defaultRates.manager_lca}
+                          onChange={(e) => setDefaultRates({ ...defaultRates, manager_lca: Number(e.target.value) })}
+                          className="w-20 text-right"
+                        />
+                        <span className="text-muted-foreground">×</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Part manager VIE</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number"
+                          value={defaultRates.manager_vie}
+                          onChange={(e) => setDefaultRates({ ...defaultRates, manager_vie: Number(e.target.value) })}
+                          className="w-20 text-right"
+                        />
+                        <span className="text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between max-w-md">
+                  <Label>Taux de réserve par défaut</Label>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="number"
+                      value={defaultRates.reserve}
+                      onChange={(e) => setDefaultRates({ ...defaultRates, reserve: Number(e.target.value) })}
+                      className="w-20 text-right"
+                    />
+                    <span className="text-muted-foreground">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={saveSettings}>
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer les taux
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* APPARENCE */}
+        <TabsContent value="apparence" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Thème</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                  <div>
+                    <p className="font-medium">Mode sombre</p>
+                    <p className="text-sm text-muted-foreground">Basculer entre mode jour et mode nuit</p>
+                  </div>
+                </div>
+                <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      {/* Premium Feature Card */}
-      <Card className="relative border-0 shadow-xl overflow-hidden bg-gradient-to-br from-primary/5 via-violet-500/5 to-primary/5">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSJyZ2JhKDEwMCw1MCwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-30" />
-        
-        <CardContent className="relative flex flex-col items-center justify-center py-16">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary to-violet-600 rounded-3xl blur-2xl opacity-30 animate-pulse" />
-            <div className="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-violet-600/10 border border-primary/20 flex items-center justify-center">
-              <Sparkles className="h-12 w-12 text-primary" />
-            </div>
-          </div>
-          <p className="text-xl font-bold bg-gradient-to-r from-primary to-violet-600 bg-clip-text text-transparent">
-            Configuration avancée
-          </p>
-          <p className="text-sm text-muted-foreground mt-2 text-center max-w-md">
-            Les paramètres détaillés et options de personnalisation avancées seront bientôt disponibles
-          </p>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Couleur principale</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                {themeColors.map(color => (
+                  <button
+                    key={color.id}
+                    onClick={() => {
+                      setSelectedColor(color.id);
+                      toast.success(`Couleur ${color.label} sélectionnée`);
+                    }}
+                    className={cn(
+                      "w-12 h-12 rounded-full transition-all",
+                      color.class,
+                      selectedColor === color.id 
+                        ? "ring-4 ring-offset-2 ring-offset-background scale-110" 
+                        : "hover:scale-105"
+                    )}
+                    title={color.label}
+                  >
+                    {selectedColor === color.id && (
+                      <Check className="h-6 w-6 text-white mx-auto" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground mt-4">
+                Note: Le changement de couleur nécessite un rechargement de la page.
+              </p>
+              <Button className="mt-4" onClick={saveSettings}>
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
