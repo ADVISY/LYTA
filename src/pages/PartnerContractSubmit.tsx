@@ -99,23 +99,24 @@ const PartnerContractSubmit = () => {
     setVerifying(true);
 
     try {
-      const { data: partner, error } = await supabase
-        .from('clients')
-        .select('id, first_name, last_name, company_name')
-        .eq('email', email)
-        .eq('type_adresse', 'partenaire')
-        .maybeSingle();
+      const response = await supabase.functions.invoke('verify-partner-email', {
+        body: { email: email.trim().toLowerCase() }
+      });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Erreur de vérification');
+      }
 
-      if (partner) {
-        setPartnerId(partner.id);
-        setPartnerName(partner.company_name || `${partner.first_name} ${partner.last_name}`);
-        setAgentName(`${partner.first_name || ''} ${partner.last_name || ''}`.trim());
+      const result = response.data;
+
+      if (result.success && result.partner) {
+        setPartnerId(result.partner.id);
+        setPartnerName(result.partner.name);
+        setAgentName(`${result.partner.firstName || ''} ${result.partner.lastName || ''}`.trim());
         setStep("selectType");
         toast({
           title: "Email vérifié",
-          description: `Bienvenue ${partner.company_name || partner.first_name}`,
+          description: `Bienvenue ${result.partner.name}`,
         });
       } else {
         toast({
