@@ -12,13 +12,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ChevronsUpDown, Search, User, FileCheck, Plus, Trash2, Users, Percent } from "lucide-react";
+import { Check, ChevronsUpDown, Search, User, FileCheck, Plus, Trash2, Users, Percent, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useClients, Client } from "@/hooks/useClients";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useCommissions } from "@/hooks/useCommissions";
 import { useCommissionParts } from "@/hooks/useCommissionParts";
 import { useCollaborateursCommission, Collaborateur } from "@/hooks/useCollaborateursCommission";
+import { supabase } from "@/integrations/supabase/client";
 
 const commissionSchema = z.object({
   policy_id: z.string().min(1, "Veuillez sélectionner un contrat"),
@@ -56,6 +57,8 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
   const [clientOpen, setClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasMandat, setHasMandat] = useState(false);
+  const [checkingMandat, setCheckingMandat] = useState(false);
   
   // Commission parts state
   const [commissionParts, setCommissionParts] = useState<PartAgent[]>([]);
@@ -82,9 +85,41 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
   const isVIE = productCategory.includes("life") || productCategory.includes("vie") || productCategory.includes("3e pilier") || productCategory.includes("pilier");
 
   const watchedAmount = form.watch("amount");
+  const watchedType = form.watch("type");
   const totalAmount = typeof watchedAmount === 'number' ? watchedAmount : parseFloat(String(watchedAmount)) || 0;
   const totalAssignedRate = commissionParts.reduce((sum, p) => sum + p.rate, 0);
   const remainingRate = 100 - totalAssignedRate;
+
+  // Check if client has a signed mandat de gestion
+  useEffect(() => {
+    const checkMandat = async () => {
+      if (!selectedClient) {
+        setHasMandat(false);
+        return;
+      }
+      
+      setCheckingMandat(true);
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('id')
+          .eq('owner_id', selectedClient.id)
+          .eq('owner_type', 'client')
+          .eq('doc_kind', 'mandat_gestion')
+          .limit(1);
+        
+        if (error) throw error;
+        setHasMandat(data && data.length > 0);
+      } catch (error) {
+        console.error("Error checking mandat:", error);
+        setHasMandat(false);
+      } finally {
+        setCheckingMandat(false);
+      }
+    };
+    
+    checkMandat();
+  }, [selectedClient]);
 
   useEffect(() => {
     if (open) {
@@ -474,6 +509,12 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                         <SelectItem value="acquisition">Acquisition</SelectItem>
                         <SelectItem value="renewal">Renouvellement</SelectItem>
                         <SelectItem value="bonus">Bonus</SelectItem>
+                        <SelectItem 
+                          value="gestion" 
+                          disabled={!hasMandat}
+                        >
+                          Gestion (annuelle)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -481,6 +522,35 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 )}
               />
             </div>
+
+            {/* Warning if gestion selected without mandat */}
+            {watchedType === "gestion" && !hasMandat && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                <p className="text-sm">
+                  Mandat de gestion requis pour ce type de commission. Veuillez d'abord créer un mandat de gestion pour ce client.
+                </p>
+              </div>
+            )}
+
+            {/* Info about mandat */}
+            {selectedClient && (
+              <div className={cn(
+                "flex items-center gap-2 p-3 rounded-lg text-sm",
+                hasMandat 
+                  ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                  : "bg-muted border border-border text-muted-foreground"
+              )}>
+                <FileCheck className="h-4 w-4 flex-shrink-0" />
+                {checkingMandat ? (
+                  <span>Vérification du mandat de gestion...</span>
+                ) : hasMandat ? (
+                  <span>✓ Mandat de gestion signé - Commission de gestion autorisée</span>
+                ) : (
+                  <span>Pas de mandat de gestion signé - Les commissions de gestion sont désactivées</span>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               {/* Status */}

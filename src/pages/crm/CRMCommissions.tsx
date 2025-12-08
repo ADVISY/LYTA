@@ -30,6 +30,7 @@ const typeConfig: Record<string, { label: string; color: string }> = {
   acquisition: { label: "Acquisition", color: "bg-violet-100 text-violet-800" },
   renewal: { label: "Renouvellement", color: "bg-cyan-100 text-cyan-800" },
   bonus: { label: "Bonus", color: "bg-pink-100 text-pink-800" },
+  gestion: { label: "Gestion", color: "bg-emerald-100 text-emerald-800" },
 };
 
 export default function CRMCommissions() {
@@ -360,6 +361,7 @@ export default function CRMCommissions() {
                 <SelectItem value="acquisition">Acquisition</SelectItem>
                 <SelectItem value="renewal">Renouvellement</SelectItem>
                 <SelectItem value="bonus">Bonus</SelectItem>
+                <SelectItem value="gestion">Gestion</SelectItem>
               </SelectContent>
             </Select>
           </div>
