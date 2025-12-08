@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useMemo, Suspense } from "react";
 import { PerformanceCard } from "@/components/crm/PerformanceCard";
 import { TeamPerformanceCard } from "@/components/crm/TeamPerformanceCard";
-import { Chart3DBar, Chart3DDonut, Chart3DMetric } from "@/components/crm/charts";
+import { Chart3DBar, Chart3DDonut, Chart3DMetric, Chart3DYearly } from "@/components/crm/charts";
 
 export default function CRMDashboard() {
   const { role, isAdmin, isManager, isAgent, isPartner, isClient } = useUserRole();
@@ -53,6 +53,66 @@ export default function CRMDashboard() {
     if (companyTotals.clientsCount === 0) return 0;
     return Math.round((companyTotals.activeClients / companyTotals.clientsCount) * 100);
   }, [companyTotals]);
+
+  // Yearly commission data grouped by year and month
+  const yearlyCommissionData = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years: { [key: number]: { month: number; value: number }[] } = {};
+    
+    // Initialize last 3 years
+    for (let y = currentYear - 2; y <= currentYear; y++) {
+      years[y] = Array(12).fill(null).map((_, i) => ({ month: i + 1, value: 0 }));
+    }
+    
+    // Group commissions by year and month
+    commissions.forEach(c => {
+      const date = c.date ? new Date(c.date) : new Date(c.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      if (years[year]) {
+        const monthData = years[year].find(m => m.month === month);
+        if (monthData) {
+          monthData.value += c.amount || 0;
+        }
+      }
+    });
+    
+    return Object.entries(years).map(([year, data]) => ({
+      year: parseInt(year),
+      data,
+      total: data.reduce((sum, d) => sum + d.value, 0)
+    })).sort((a, b) => b.year - a.year);
+  }, [commissions]);
+
+  // Yearly contracts data
+  const yearlyContractsData = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years: { [key: number]: { month: number; value: number }[] } = {};
+    
+    for (let y = currentYear - 2; y <= currentYear; y++) {
+      years[y] = Array(12).fill(null).map((_, i) => ({ month: i + 1, value: 0 }));
+    }
+    
+    policies.forEach(p => {
+      const date = new Date(p.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      if (years[year]) {
+        const monthData = years[year].find(m => m.month === month);
+        if (monthData) {
+          monthData.value += 1;
+        }
+      }
+    });
+    
+    return Object.entries(years).map(([year, data]) => ({
+      year: parseInt(year),
+      data,
+      total: data.reduce((sum, d) => sum + d.value, 0)
+    })).sort((a, b) => b.year - a.year);
+  }, [policies]);
 
   // Recent activities
   const recentActivities = useMemo(() => {
@@ -287,6 +347,35 @@ export default function CRMDashboard() {
                           </div>
                         ))}
                       </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Yearly Charts */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
+                    <CardContent className="p-6">
+                      <Suspense fallback={<div className="h-[380px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DYearly
+                          yearlyData={yearlyCommissionData}
+                          color="#10b981"
+                          title="Commissions par mois"
+                          valueLabel="CHF"
+                        />
+                      </Suspense>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
+                    <CardContent className="p-6">
+                      <Suspense fallback={<div className="h-[380px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <Chart3DYearly
+                          yearlyData={yearlyContractsData}
+                          color="#8b5cf6"
+                          title="Contrats par mois"
+                          valueLabel="contrats"
+                        />
+                      </Suspense>
                     </CardContent>
                   </Card>
                 </div>
