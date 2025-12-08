@@ -265,7 +265,7 @@ export default function CRMDashboard() {
       )}
 
       {!loading && (
-        <div className={cn("grid gap-6", isAdmin ? "lg:grid-cols-[1fr_400px]" : "")}>
+        <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
           {/* Main Column - Charts */}
           <div className="space-y-6">
             {/* Main Chart - LCA vs VIE with financial info */}
@@ -418,8 +418,7 @@ export default function CRMDashboard() {
             </Card>
           </div>
 
-          {/* Right Column - Recent Activity (Admin only) */}
-          {isAdmin && (
+          {/* Right Column - Recent Activity */}
             <Card className="border shadow-sm bg-card h-fit">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
@@ -477,7 +476,6 @@ export default function CRMDashboard() {
                 </div>
               </CardContent>
             </Card>
-          )}
         </div>
       )}
     </div>
