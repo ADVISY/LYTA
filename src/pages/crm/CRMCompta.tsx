@@ -427,20 +427,14 @@ export default function CRMCompta() {
             )}
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-muted/50 p-4 rounded-xl text-center">
                 <p className="text-2xl font-bold text-primary">{previewTotals.commissionsCount}</p>
                 <p className="text-sm text-muted-foreground">Commissions</p>
               </div>
-              <div className="bg-muted/50 p-4 rounded-xl text-center">
-                <p className="text-2xl font-bold text-primary">{formatCurrency(previewTotals.totalCommissions)}</p>
-                <p className="text-sm text-muted-foreground">Total brut</p>
-              </div>
               <div className="bg-emerald-50 p-4 rounded-xl text-center">
                 <p className="text-2xl font-bold text-emerald-600">{formatCurrency(previewTotals.totalAgentAmount)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedAgentForPreview ? 'Part collaborateur' : 'Total réparti'}
-                </p>
+                <p className="text-sm text-muted-foreground">Total à percevoir</p>
               </div>
             </div>
 
@@ -454,8 +448,7 @@ export default function CRMCompta() {
                   <TableHead className="text-white">N° Police</TableHead>
                   <TableHead className="text-white">Agent</TableHead>
                   <TableHead className="text-white">Manager</TableHead>
-                  <TableHead className="text-white text-right">Montant total</TableHead>
-                  <TableHead className="text-white text-right">Part agent</TableHead>
+                  <TableHead className="text-white text-right">Montant</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -488,9 +481,6 @@ export default function CRMCompta() {
                       <TableCell className="font-mono text-sm">{commission.policy?.policy_number || '-'}</TableCell>
                       <TableCell className="text-sm">{agentName}</TableCell>
                       <TableCell className="text-sm">{managerName}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {formatCurrency(Number(commission.amount))}
-                      </TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">
                         {agentPart ? formatCurrency(Number(agentPart.amount)) : '-'}
                       </TableCell>
