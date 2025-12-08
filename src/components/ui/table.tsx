@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-xl glass-strong">
+    <div className="relative w-full overflow-auto rounded-lg border border-border bg-card">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   ),
@@ -15,10 +15,7 @@ const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   ({ className, ...props }, ref) => (
     <thead 
       ref={ref} 
-      className={cn(
-        "[&_tr]:border-b bg-gradient-to-r from-primary/[0.06] via-violet-500/[0.04] to-transparent",
-        className
-      )} 
+      className={cn("[&_tr]:border-b bg-muted/50", className)} 
       {...props} 
     />
   ),
@@ -36,10 +33,7 @@ const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttribut
   ({ className, ...props }, ref) => (
     <tfoot 
       ref={ref} 
-      className={cn(
-        "border-t bg-gradient-to-r from-muted/50 to-transparent font-medium [&>tr]:last:border-b-0", 
-        className
-      )} 
+      className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)} 
       {...props} 
     />
   ),
@@ -51,9 +45,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        "border-b border-primary/5 transition-all duration-200 data-[state=selected]:bg-primary/5",
-        "hover:bg-gradient-to-r hover:from-primary/[0.03] hover:to-transparent",
-        "group cursor-pointer",
+        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
         className
       )}
       {...props}
@@ -67,8 +59,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        "h-12 px-4 text-left align-middle font-semibold text-foreground/70 text-xs uppercase tracking-wider",
-        "[&:has([role=checkbox])]:pr-0",
+        "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -81,11 +72,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
   ({ className, ...props }, ref) => (
     <td 
       ref={ref} 
-      className={cn(
-        "p-4 align-middle [&:has([role=checkbox])]:pr-0",
-        "group-hover:text-foreground transition-colors",
-        className
-      )} 
+      className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} 
       {...props} 
     />
   ),

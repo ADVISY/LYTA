@@ -74,16 +74,6 @@ All colors MUST be HSL.
     --crm-info: 199 89% 48%;
     --crm-danger: 0 84% 60%;
 
-    /* Glassmorphism Tokens */
-    --glass-bg: 0 0% 100% / 0.7;
-    --glass-border: 0 0% 100% / 0.3;
-    --glass-blur: 20px;
-    --glass-shadow: 0 8px 32px rgba(24, 0, 173, 0.1);
-    
-    /* Enhanced gradients */
-    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%);
-    --gradient-mesh: radial-gradient(at 40% 20%, hsl(246 100% 94%) 0px, transparent 50%), radial-gradient(at 80% 0%, hsl(270 100% 94%) 0px, transparent 50%), radial-gradient(at 0% 50%, hsl(246 80% 95%) 0px, transparent 50%);
-    --gradient-shine: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.8) 45%, rgba(255, 255, 255, 0.8) 50%, transparent 55%);
   }
 }
 
@@ -238,187 +228,39 @@ html {
   animation: parallax-float 6s ease-in-out infinite;
 }
 
-/* Glassmorphism Utilities */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+/* Clean Utility Classes */
+.card-clean {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
 }
 
-.glass-strong {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 32px rgba(24, 0, 173, 0.08);
+.card-clean:hover {
+  box-shadow: var(--shadow-soft);
 }
 
-.glass-subtle {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.glass-dark {
-  background: rgba(24, 0, 80, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Shine effect for cards */
-@keyframes card-shine {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.shine-effect {
-  position: relative;
+/* Clean table styles */
+.table-clean {
+  background: hsl(var(--card));
+  border-radius: var(--radius);
   overflow: hidden;
+  border: 1px solid hsl(var(--border));
 }
 
-.shine-effect::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.5) 45%, rgba(255, 255, 255, 0.5) 50%, transparent 55%);
-  background-size: 200% 100%;
-  animation: card-shine 3s ease-in-out infinite;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
+.table-clean thead {
+  background: hsl(var(--muted));
 }
 
-.shine-effect:hover::before {
-  opacity: 1;
+.table-clean tbody tr {
+  transition: background 0.15s ease;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Enhanced table styles */
-.table-glass {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(16px);
-  border-radius: 1rem;
-  overflow: hidden;
+.table-clean tbody tr:hover {
+  background: hsl(var(--muted) / 0.5);
 }
 
-.table-glass thead {
-  background: linear-gradient(135deg, hsl(246 100% 34% / 0.08) 0%, hsl(270 100% 50% / 0.05) 100%);
-}
-
-.table-glass tbody tr {
-  transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(24, 0, 173, 0.05);
-}
-
-.table-glass tbody tr:hover {
-  background: linear-gradient(90deg, hsl(246 100% 34% / 0.03) 0%, transparent 100%);
-}
-
-/* Form input glass style */
-.input-glass {
-  background: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(24, 0, 173, 0.1) !important;
-  transition: all 0.3s ease;
-}
-
-.input-glass:focus {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: hsl(246 100% 50%) !important;
-  box-shadow: 0 0 0 3px hsl(246 100% 50% / 0.1), 0 4px 12px rgba(24, 0, 173, 0.1) !important;
-}
-
-/* Floating label effect */
-.floating-label {
-  position: relative;
-}
-
-.floating-label label {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  transition: all 0.2s ease;
-  pointer-events: none;
-  color: hsl(240 8% 45%);
-  font-size: 0.875rem;
-}
-
-.floating-label input:focus + label,
-.floating-label input:not(:placeholder-shown) + label {
-  top: -8px;
-  left: 8px;
-  font-size: 0.75rem;
-  background: white;
-  padding: 0 4px;
-  color: hsl(246 100% 34%);
-}
-
-/* Sidebar hover glow */
-.nav-glow {
-  position: relative;
-}
-
-.nav-glow::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(135deg, hsl(246 100% 50% / 0.3) 0%, hsl(270 100% 60% / 0.2) 100%);
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: -1;
-  filter: blur(8px);
-}
-
-.nav-glow:hover::after {
-  opacity: 1;
-}
-
-/* Card hover lift */
-.card-lift {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(24, 0, 173, 0.12);
-}
-
-/* Animated border gradient */
-@keyframes border-flow {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-.border-animated {
-  position: relative;
-  background: white;
-}
-
-.border-animated::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  padding: 2px;
-  background: linear-gradient(90deg, hsl(246 100% 50%), hsl(270 100% 60%), hsl(246 100% 50%));
-  background-size: 200% 100%;
-  border-radius: inherit;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: border-flow 3s ease infinite;
+.table-clean tbody tr:last-child {
+  border-bottom: none;
 }

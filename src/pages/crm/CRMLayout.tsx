@@ -77,19 +77,15 @@ export default function CRMLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary/20 to-slate-900">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-20 w-20 border-4 border-primary/30 border-t-primary" />
-          <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
-          <Sparkles className="absolute inset-0 m-auto h-8 w-8 text-primary animate-pulse" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-muted border-t-primary" />
       </div>
     );
   }
 
   const NavItems = ({ onItemClick, collapsed = false }: { onItemClick?: () => void; collapsed?: boolean }) => (
     <div className="space-y-1">
-      {menuItems.map((item, index) => {
+      {menuItems.map((item) => {
         const linkContent = (
           <NavLink
             key={item.to}
@@ -98,50 +94,19 @@ export default function CRMLayout() {
             onClick={onItemClick}
             className={({ isActive }) =>
               cn(
-                "group relative flex items-center gap-3 rounded-xl transition-all duration-300 overflow-hidden nav-glow",
-                collapsed ? "px-3 py-3 justify-center" : "px-4 py-3",
+                "flex items-center gap-3 rounded-lg transition-colors",
+                collapsed ? "px-3 py-2.5 justify-center" : "px-3 py-2.5",
                 isActive
-                  ? "glass-strong text-primary shadow-soft"
-                  : "hover:glass-subtle text-foreground/60 hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )
             }
-            style={{ animationDelay: `${index * 30}ms` }}
           >
             {({ isActive }) => (
               <>
-                {/* Active indicator line */}
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary via-primary to-violet-500 rounded-full" />
-                )}
-                
-                {/* Icon container with gradient */}
-                <div className={cn(
-                  "relative p-2 rounded-lg transition-all duration-300",
-                  isActive 
-                    ? `bg-gradient-to-br ${item.color} shadow-lg` 
-                    : "bg-muted/50 group-hover:bg-muted"
-                )}>
-                  <item.icon className={cn(
-                    "h-4 w-4 transition-colors",
-                    isActive ? "text-white" : "text-foreground/70 group-hover:text-foreground"
-                  )} />
-                </div>
-                
+                <item.icon className="h-4 w-4 shrink-0" />
                 {!collapsed && (
-                  <span className={cn(
-                    "font-medium relative z-10 transition-all duration-300",
-                    isActive ? "text-primary" : ""
-                  )}>
-                    {item.label}
-                  </span>
-                )}
-                
-                {/* Shine effect on hover */}
-                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                
-                {/* Chevron indicator for active */}
-                {isActive && !collapsed && (
-                  <ChevronRight className="ml-auto h-4 w-4 text-primary/50" />
+                  <span className="text-sm font-medium">{item.label}</span>
                 )}
               </>
             )}
@@ -152,7 +117,7 @@ export default function CRMLayout() {
           return (
             <Tooltip key={item.to} delayDuration={0}>
               <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-              <TooltipContent side="right" className="glass-strong border-primary/10 font-medium">
+              <TooltipContent side="right" className="font-medium">
                 {item.label}
               </TooltipContent>
             </Tooltip>
@@ -165,42 +130,23 @@ export default function CRMLayout() {
   );
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-primary/5">
-      {/* Background mesh gradient */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(at_40%_20%,hsl(246_100%_94%)_0px,transparent_50%),radial-gradient(at_80%_0%,hsl(270_100%_94%)_0px,transparent_50%),radial-gradient(at_0%_50%,hsl(246_80%_95%)_0px,transparent_50%)]" />
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/8 rounded-full blur-[100px] animate-float" />
-        <div className="absolute top-1/2 -left-40 w-[400px] h-[400px] bg-violet-500/8 rounded-full blur-[80px]" style={{ animationDelay: '1s' }} />
-        <div className="absolute -bottom-40 right-1/3 w-[350px] h-[350px] bg-emerald-500/6 rounded-full blur-[70px]" style={{ animationDelay: '2s' }} />
-      </div>
+    <div className="min-h-screen flex bg-background">
 
-      {/* Desktop Sidebar - Glassmorphism */}
+      {/* Desktop Sidebar */}
       <TooltipProvider>
-        <aside className="hidden lg:flex flex-col glass-strong relative z-10 border-r-0">
-          {/* Animated gradient border */}
-          <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
-          
-          {/* Sidebar gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-violet-500/[0.03] pointer-events-none rounded-r-2xl" />
-          
+        <aside className="hidden lg:flex flex-col bg-card border-r border-border">
           {/* Logo Section */}
-          <div className="w-72 p-6 border-b border-primary/5 relative">
+          <div className="w-72 p-6 border-b border-border">
             <div className="flex items-center justify-center">
-              <div className="relative group">
-                <img 
-                  src={advisyLogo} 
-                  alt="Advisy" 
-                  className="h-16 object-contain transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute -inset-4 bg-primary/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
-              </div>
+              <img 
+                src={advisyLogo} 
+                alt="Advisy" 
+                className="h-14 object-contain"
+              />
             </div>
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              </div>
-              <p className="text-xs text-muted-foreground capitalize font-medium tracking-wide">
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <p className="text-xs text-muted-foreground capitalize">
                 {role} • en ligne
               </p>
             </div>
@@ -227,12 +173,12 @@ export default function CRMLayout() {
             </nav>
 
             {/* User Section */}
-            <div className={cn("border-t border-primary/10 relative", sidebarCollapsed ? "p-2" : "p-4")}>
+            <div className={cn("border-t border-border", sidebarCollapsed ? "p-2" : "p-4")}>
               {sidebarCollapsed ? (
                 <div className="flex flex-col items-center gap-2">
                   <Tooltip delayDuration={0}>
                     <TooltipTrigger asChild>
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center cursor-pointer">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center cursor-pointer">
                         <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
                       </div>
                     </TooltipTrigger>
@@ -243,7 +189,7 @@ export default function CRMLayout() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-10 w-10 rounded-xl hover:bg-red-500 hover:text-white"
+                        className="h-10 w-10 rounded-lg hover:bg-destructive hover:text-destructive-foreground"
                         onClick={() => signOut()}
                       >
                         <LogOut className="h-4 w-4" />
@@ -254,24 +200,24 @@ export default function CRMLayout() {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-3 mb-4 p-4 rounded-2xl bg-gradient-to-r from-primary/5 to-violet-500/5 border border-primary/10">
+                  <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-muted">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/30 flex items-center justify-center">
-                        <span className="text-lg font-bold text-primary">{getUserInitials()}</span>
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{getUserDisplayName()}</p>
+                      <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
                       <p className="text-xs text-muted-foreground capitalize">{role}</p>
                     </div>
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full group rounded-xl border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all duration-300"
+                    className="w-full"
                     onClick={() => signOut()}
                   >
-                    <LogOut className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
+                    <LogOut className="h-4 w-4 mr-2" />
                     Déconnexion
                   </Button>
                 </>
@@ -282,28 +228,28 @@ export default function CRMLayout() {
       </TooltipProvider>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-2xl border-b border-primary/10 shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
         <div className="flex items-center justify-between p-4">
           <img src={advisyLogo} alt="Advisy" className="h-10 object-contain" />
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover:bg-primary/10 rounded-xl">
+              <Button variant="ghost" size="icon">
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0 bg-white/95 backdrop-blur-2xl">
-              <div className="p-6 border-b border-primary/10 flex flex-col items-center">
+            <SheetContent side="left" className="w-80 p-0">
+              <div className="p-6 border-b border-border flex flex-col items-center">
                 <img src={advisyLogo} alt="Advisy" className="h-14 object-contain" />
                 <p className="text-xs text-muted-foreground capitalize mt-2">{role}</p>
               </div>
               <nav className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
                 <NavItems onItemClick={() => setMobileMenuOpen(false)} />
               </nav>
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-primary/10 bg-white/80">
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-card">
                 <p className="text-sm font-medium mb-4 truncate px-2">{getUserDisplayName()}</p>
                 <Button
                   variant="outline"
-                  className="w-full rounded-xl"
+                  className="w-full"
                   onClick={() => signOut()}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -316,7 +262,7 @@ export default function CRMLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto relative z-10">
+      <main className="flex-1 overflow-auto">
         <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
