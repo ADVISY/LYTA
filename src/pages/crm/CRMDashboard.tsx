@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useMemo, Suspense } from "react";
 import { PerformanceCard } from "@/components/crm/PerformanceCard";
 import { TeamPerformanceCard } from "@/components/crm/TeamPerformanceCard";
-import { Chart3DBar, Chart3DDonut, Chart3DMetric, Chart3DYearly } from "@/components/crm/charts";
+import { Chart3DActivity } from "@/components/crm/charts";
 
 export default function CRMDashboard() {
   const { role, isAdmin, isManager, isAgent, isPartner, isClient } = useUserRole();
@@ -36,83 +36,103 @@ export default function CRMDashboard() {
     }).format(value);
   };
 
-  // Chart data for enterprise view
-  const barChartData = useMemo(() => [
-    { label: 'Clients', value: companyTotals.clientsCount, color: '#3b82f6' },
-    { label: 'Actifs', value: companyTotals.activeClients, color: '#10b981' },
-    { label: 'Contrats', value: companyTotals.contractsCount, color: '#8b5cf6' },
-    { label: 'En attente', value: companyTotals.pendingContracts, color: '#f59e0b' },
-  ], [companyTotals]);
-
-  const donutChartData = useMemo(() => [
-    { label: 'Payées', value: companyTotals.paidCommissions, color: '#10b981' },
-    { label: 'En attente', value: companyTotals.pendingCommissions, color: '#f59e0b' },
-  ], [companyTotals]);
-
-  const conversionRate = useMemo(() => {
-    if (companyTotals.clientsCount === 0) return 0;
-    return Math.round((companyTotals.activeClients / companyTotals.clientsCount) * 100);
-  }, [companyTotals]);
-
-  // Yearly commission data grouped by year and month
-  const yearlyCommissionData = useMemo(() => {
+  // Activity data for main 3D chart
+  const activityData = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    const years: { [key: number]: { month: number; value: number }[] } = {};
+    const years: { [key: number]: { vie: number[]; lca: number[]; clients: number[]; commissions: number[] } } = {};
     
     // Initialize last 3 years
     for (let y = currentYear - 2; y <= currentYear; y++) {
-      years[y] = Array(12).fill(null).map((_, i) => ({ month: i + 1, value: 0 }));
+      years[y] = {
+        vie: Array(12).fill(0),
+        lca: Array(12).fill(0),
+        clients: Array(12).fill(0),
+        commissions: Array(12).fill(0),
+      };
     }
     
-    // Group commissions by year and month
-    commissions.forEach(c => {
-      const date = c.date ? new Date(c.date) : new Date(c.created_at);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      
-      if (years[year]) {
-        const monthData = years[year].find(m => m.month === month);
-        if (monthData) {
-          monthData.value += c.amount || 0;
-        }
-      }
-    });
-    
-    return Object.entries(years).map(([year, data]) => ({
-      year: parseInt(year),
-      data,
-      total: data.reduce((sum, d) => sum + d.value, 0)
-    })).sort((a, b) => b.year - a.year);
-  }, [commissions]);
-
-  // Yearly contracts data
-  const yearlyContractsData = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years: { [key: number]: { month: number; value: number }[] } = {};
-    
-    for (let y = currentYear - 2; y <= currentYear; y++) {
-      years[y] = Array(12).fill(null).map((_, i) => ({ month: i + 1, value: 0 }));
-    }
-    
+    // Group policies by type and month
     policies.forEach(p => {
       const date = new Date(p.created_at);
       const year = date.getFullYear();
-      const month = date.getMonth() + 1;
+      const month = date.getMonth();
       
       if (years[year]) {
-        const monthData = years[year].find(m => m.month === month);
-        if (monthData) {
-          monthData.value += 1;
+        const monthlyPremium = p.premium_monthly || 0;
+        const productType = p.product_type?.toLowerCase() || '';
+        
+        // Vie = 3e pilier, life insurance
+        if (productType.includes('vie') || productType.includes('pilier') || productType.includes('life')) {
+          years[year].vie[month] += monthlyPremium * 12; // Volume annuel
+        }
+        // LCA = complementary health
+        else if (productType.includes('lca') || productType.includes('complémentaire') || productType.includes('complementaire')) {
+          years[year].lca[month] += monthlyPremium * 12;
+        }
+        // Default to LCA for health
+        else if (productType.includes('santé') || productType.includes('sante') || productType.includes('health')) {
+          years[year].lca[month] += monthlyPremium * 12;
         }
       }
     });
-    
+
+    // Group clients by month
+    clients.filter(c => c.type_adresse === 'client').forEach(c => {
+      const date = new Date(c.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      
+      if (years[year]) {
+        years[year].clients[month] += 1;
+      }
+    });
+
+    // Group commissions by month
+    commissions.forEach(c => {
+      const date = c.date ? new Date(c.date) : new Date(c.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      
+      if (years[year]) {
+        years[year].commissions[month] += c.amount || 0;
+      }
+    });
+
+    // Convert to chart format
     return Object.entries(years).map(([year, data]) => ({
       year: parseInt(year),
-      data,
-      total: data.reduce((sum, d) => sum + d.value, 0)
+      metrics: [
+        {
+          id: 'vie',
+          label: 'Volume Vie / 3e Pilier',
+          shortLabel: 'Vie',
+          color: '#8b5cf6',
+          values: data.vie,
+        },
+        {
+          id: 'lca',
+          label: 'Volume LCA / Santé',
+          shortLabel: 'LCA',
+          color: '#10b981',
+          values: data.lca,
+        },
+        {
+          id: 'commissions',
+          label: 'Commissions',
+          shortLabel: 'Com.',
+          color: '#f59e0b',
+          values: data.commissions,
+        },
+        {
+          id: 'clients',
+          label: 'Nouveaux clients',
+          shortLabel: 'Clients',
+          color: '#3b82f6',
+          values: data.clients.map(v => v * 1000), // Scale for visibility
+        },
+      ],
     })).sort((a, b) => b.year - a.year);
-  }, [policies]);
+  }, [policies, clients, commissions]);
 
   // Recent activities
   const recentActivities = useMemo(() => {
@@ -250,135 +270,16 @@ export default function CRMDashboard() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Company-wide view with 3D Charts */}
+              {/* Company-wide view with single 3D Activity Chart */}
               <TabsContent value="entreprise" className="space-y-8">
-                {/* Hero metrics row */}
-                <div className="grid gap-6 lg:grid-cols-3">
-                  {/* 3D Metric - Conversion Rate */}
-                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50/50 backdrop-blur overflow-hidden">
-                    <CardHeader className="pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Taux de conversion</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DMetric 
-                          value={`${conversionRate}%`}
-                          label="prospects → actifs"
-                          progress={conversionRate}
-                          color="#3b82f6"
-                        />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-
-                  {/* 3D Metric - Commissions */}
-                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 backdrop-blur overflow-hidden">
-                    <CardHeader className="pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Commissions payées</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DMetric 
-                          value={`${formatCurrency(companyTotals.paidCommissions)}`}
-                          label="CHF encaissées"
-                          progress={companyTotals.totalCommissions > 0 ? (companyTotals.paidCommissions / companyTotals.totalCommissions) * 100 : 0}
-                          color="#10b981"
-                        />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-
-                  {/* 3D Metric - Monthly Premiums */}
-                  <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/50 backdrop-blur overflow-hidden">
-                    <CardHeader className="pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Primes mensuelles</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Suspense fallback={<div className="h-[200px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DMetric 
-                          value={`${formatCurrency(companyTotals.totalPremiumsMonthly)}`}
-                          label="CHF / mois"
-                          progress={75}
-                          color="#8b5cf6"
-                        />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Charts row */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {/* 3D Bar Chart */}
-                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5 text-primary" />
-                        Clients & Contrats
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Suspense fallback={<div className="h-[300px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DBar data={barChartData} />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-
-                  {/* 3D Donut Chart */}
-                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-primary" />
-                        Répartition Commissions
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Suspense fallback={<div className="h-[280px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DDonut 
-                          data={donutChartData}
-                          centerValue={`${formatCurrency(companyTotals.totalCommissions)}`}
-                          centerLabel="Total CHF"
-                        />
-                      </Suspense>
-                      <div className="px-6 pb-4 flex justify-center gap-6">
-                        {donutChartData.map(item => (
-                          <div key={item.label} className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm text-muted-foreground">{item.label}: {formatCurrency(item.value)} CHF</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Yearly Charts */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
-                    <CardContent className="p-6">
-                      <Suspense fallback={<div className="h-[380px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DYearly
-                          yearlyData={yearlyCommissionData}
-                          color="#10b981"
-                          title="Commissions par mois"
-                          valueLabel="CHF"
-                        />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur overflow-hidden">
-                    <CardContent className="p-6">
-                      <Suspense fallback={<div className="h-[380px] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                        <Chart3DYearly
-                          yearlyData={yearlyContractsData}
-                          color="#8b5cf6"
-                          title="Contrats par mois"
-                          valueLabel="contrats"
-                        />
-                      </Suspense>
-                    </CardContent>
-                  </Card>
-                </div>
+                {/* Main 3D Activity Chart */}
+                <Card className="border-0 shadow-xl bg-white/95 backdrop-blur overflow-hidden">
+                  <CardContent className="p-8">
+                    <Suspense fallback={<div className="h-[550px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                      <Chart3DActivity yearlyData={activityData} />
+                    </Suspense>
+                  </CardContent>
+                </Card>
 
                 {/* Summary cards */}
                 <div className="grid gap-4 md:grid-cols-4">
@@ -388,7 +289,7 @@ export default function CRMDashboard() {
                         <Users className="h-7 w-7 opacity-80" />
                         <div>
                           <p className="text-2xl font-bold">{companyTotals.clientsCount}</p>
-                          <p className="text-xs opacity-80">Clients total</p>
+                          <p className="text-xs opacity-80">Clients en gestion</p>
                         </div>
                       </div>
                     </CardContent>
@@ -399,7 +300,7 @@ export default function CRMDashboard() {
                         <FileText className="h-7 w-7 opacity-80" />
                         <div>
                           <p className="text-2xl font-bold">{companyTotals.contractsCount}</p>
-                          <p className="text-xs opacity-80">Contrats total</p>
+                          <p className="text-xs opacity-80">Contrats actifs</p>
                         </div>
                       </div>
                     </CardContent>
@@ -409,8 +310,8 @@ export default function CRMDashboard() {
                       <div className="flex items-center gap-3">
                         <DollarSign className="h-7 w-7 opacity-80" />
                         <div>
-                          <p className="text-lg font-bold">{formatCurrency(companyTotals.totalCommissions)}</p>
-                          <p className="text-xs opacity-80">Commissions CHF</p>
+                          <p className="text-lg font-bold">{formatCurrency(companyTotals.totalCommissions)} CHF</p>
+                          <p className="text-xs opacity-80">Commissions YTD</p>
                         </div>
                       </div>
                     </CardContent>
