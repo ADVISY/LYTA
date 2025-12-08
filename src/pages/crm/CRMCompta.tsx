@@ -88,21 +88,38 @@ export default function CRMCompta() {
     setGenerating(true);
     try {
       const debut = new Date(dateDebut);
+      debut.setHours(0, 0, 0, 0);
       const fin = new Date(dateFin);
       fin.setHours(23, 59, 59, 999);
+      
+      console.log("Generating decompte for:", selectedCollaborateur);
+      console.log("Date range:", debut, "to", fin);
+      console.log("All commissions:", commissions.length);
+      
+      // Filter commissions by date range here instead of relying on filteredCommissions
+      const commissionsInRange = commissions.filter(c => {
+        const createdAt = new Date(c.created_at);
+        return createdAt >= debut && createdAt <= fin;
+      });
+      
+      console.log("Commissions in date range:", commissionsInRange.length);
       
       const decomptes: DecompteCommission[] = [];
       
       // Loop through filtered commissions and fetch their parts
-      for (const commission of filteredCommissions) {
+      for (const commission of commissionsInRange) {
         const parts = await fetchCommissionParts(commission.id);
+        console.log("Commission", commission.id, "has parts:", parts.length);
         
         // Check if this collaborator has a part in this commission
         const agentPart = parts.find((p: CommissionPart) => p.agent_id === selectedCollaborateur);
         if (agentPart) {
+          console.log("Found part for agent:", agentPart);
           decomptes.push({ commission, parts });
         }
       }
+      
+      console.log("Total decomptes found:", decomptes.length);
       
       if (decomptes.length === 0) {
         toast({
