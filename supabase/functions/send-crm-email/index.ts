@@ -18,7 +18,7 @@ interface EmailData {
 }
 
 interface EmailRequest {
-  type: "welcome" | "contract_signed" | "mandat_signed" | "account_created";
+  type: "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
   clientEmail: string;
   clientName: string;
   data?: EmailData;
@@ -506,6 +506,92 @@ const getEmailContent = (type: string, clientName: string, data?: EmailData) => 
             </div>
             <div class="signature">
               <p class="signature-text">Cordialement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
+      };
+
+    case "relation_client":
+      return {
+        subject: "💬 Votre conseiller Advisy prend de vos nouvelles",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
+            </div>
+            <h1 class="header-title">Comment allez-vous ?</h1>
+            <p class="header-subtitle">Votre conseiller Advisy pense à vous</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <p class="text">
+              Nous espérons que vous allez bien ! En tant que votre partenaire assurance de confiance, nous souhaitons prendre de vos nouvelles et nous assurer que vos couvertures correspondent toujours à votre situation actuelle.
+            </p>
+            <div class="highlight-box">
+              <strong>Votre situation a-t-elle changé ?</strong><br>
+              Mariage, naissance, déménagement, changement professionnel... Ces événements peuvent impacter vos besoins en assurance.
+            </div>
+            <p class="text">N'hésitez pas à nous contacter pour :</p>
+            <ul class="features-list">
+              <li>Faire le point sur vos contrats actuels</li>
+              <li>Adapter vos couvertures à votre nouvelle situation</li>
+              <li>Optimiser vos primes d'assurance</li>
+              <li>Poser toutes vos questions sur vos assurances</li>
+            </ul>
+            <div class="cta-container">
+              <a href="https://advisy.ch" class="cta-button">
+                Prendre rendez-vous →
+              </a>
+            </div>
+            <p class="text" style="text-align: center; color: #6b7280; font-size: 14px;">
+              Nous sommes là pour vous accompagner à chaque étape de votre vie.
+            </p>
+            <div class="signature">
+              <p class="signature-text">Chaleureusement,</p>
+              <p class="signature-name">L'équipe Advisy</p>
+            </div>
+          </div>
+        `),
+      };
+
+    case "offre_speciale":
+      return {
+        subject: "🎁 Offre exclusive pour vous - Économisez sur vos assurances !",
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">
+              <img src="https://advisy.ch/advisy-logo.png" alt="Advisy" class="logo" />
+            </div>
+            <h1 class="header-title">Offre Spéciale 🎁</h1>
+            <p class="header-subtitle">Des économies exclusives pour nos clients</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName} 👋</p>
+            <p class="text">
+              Bonne nouvelle ! Nous avons négocié des offres exclusives auprès de nos partenaires assureurs pour vous permettre de réaliser des économies significatives.
+            </p>
+            <div class="highlight-box" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left-color: #f59e0b;">
+              <strong style="color: #92400e;">🔥 Offres limitées dans le temps</strong><br>
+              <span style="color: #78350f;">Profitez de tarifs préférentiels sur plusieurs types d'assurances jusqu'à la fin du mois !</span>
+            </div>
+            <p class="text">Nos offres du moment :</p>
+            <ul class="features-list">
+              <li><strong>Assurance Santé :</strong> Jusqu'à 15% de réduction sur les complémentaires</li>
+              <li><strong>3e Pilier :</strong> Bonus de bienvenue pour toute nouvelle souscription</li>
+              <li><strong>Assurance Auto :</strong> -10% sur votre première année</li>
+              <li><strong>RC Ménage :</strong> Couverture premium au prix standard</li>
+            </ul>
+            <div class="cta-container">
+              <a href="https://advisy.ch" class="cta-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                Découvrir les offres →
+              </a>
+            </div>
+            <p class="text" style="text-align: center; color: #6b7280; font-size: 14px;">
+              Contactez-nous pour bénéficier de ces offres exclusives réservées à nos clients.
+            </p>
+            <div class="signature">
+              <p class="signature-text">À très bientôt,</p>
               <p class="signature-name">L'équipe Advisy</p>
             </div>
           </div>
