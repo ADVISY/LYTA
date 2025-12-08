@@ -358,157 +358,184 @@ export default function MandatGestionForm({ client }: MandatGestionFormProps) {
               style={{ 
                 fontFamily: 'Arial, Helvetica, sans-serif', 
                 lineHeight: 1.4,
-                padding: '25px 30px',
                 width: '190mm',
-                minHeight: '277mm',
                 fontSize: '11px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
               }}
             >
-              {/* En-tête compact */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px', paddingBottom: '10px', borderBottom: '2px solid #1800AD' }}>
-                <div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1800AD' }}>e-Advisy</div>
-                  <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>Sàrl • Courtier en assurances</div>
-                  <div style={{ fontSize: '9px', color: '#999', marginTop: '4px' }}>
-                    Route de Chêne 5, 1207 Genève • info@e-advisy.ch
+              {/* ========== PAGE 1 ========== */}
+              <div style={{ padding: '30px 35px', minHeight: '277mm', boxSizing: 'border-box', position: 'relative' }}>
+                {/* En-tête */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '15px', borderBottom: '3px solid #1800AD' }}>
+                  <div>
+                    <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#1800AD' }}>e-Advisy</div>
+                    <div style={{ fontSize: '11px', color: '#666', marginTop: '3px' }}>Sàrl • Courtier en assurances</div>
+                    <div style={{ fontSize: '10px', color: '#999', marginTop: '5px' }}>
+                      Route de Chêne 5, 1207 Genève<br/>info@e-advisy.ch • www.e-advisy.ch
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '10px', backgroundColor: '#1800AD', color: 'white', padding: '4px 12px', borderRadius: '12px', display: 'inline-block' }}>
+                      Inscrit FINMA
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#666', marginTop: '5px' }}>
+                      {format(new Date(), "dd.MM.yyyy")}
+                    </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '9px', backgroundColor: '#1800AD', color: 'white', padding: '3px 8px', borderRadius: '10px', display: 'inline-block' }}>
-                    FINMA
+
+                {/* Titre principal */}
+                <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                  <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1800AD', letterSpacing: '3px', margin: 0 }}>
+                    MANDAT DE GESTION
+                  </h1>
+                  <div style={{ width: '80px', height: '3px', backgroundColor: '#1800AD', margin: '10px auto 0' }} />
+                </div>
+
+                {/* Mandant */}
+                <div style={{ backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e9ecef', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#666', marginBottom: '8px', letterSpacing: '2px', fontWeight: 'bold' }}>Le Mandant</div>
+                  <div style={{ fontWeight: 'bold', color: '#1800AD', fontSize: '16px', marginBottom: '5px' }}>{getClientName()}</div>
+                  <div style={{ fontSize: '12px', color: '#333', marginBottom: '3px' }}>{getFullAddress()}</div>
+                  <div style={{ fontSize: '12px', color: '#333', marginBottom: '3px' }}>{getLocality()}</div>
+                  <div style={{ fontSize: '11px', color: '#666' }}>Né(e) le {getBirthdate()}</div>
+                  {client.email && <div style={{ fontSize: '11px', color: '#666' }}>{client.email}</div>}
+                  {(client.mobile || client.phone) && <div style={{ fontSize: '11px', color: '#666' }}>{client.mobile || client.phone}</div>}
+                  <div style={{ fontSize: '11px', color: '#666' }}>Nationalité: {client.nationality || "—"} • Permis: {client.permit_type || "—"}</div>
+                </div>
+
+                {/* Logo Advisy central */}
+                <div style={{ textAlign: 'center', margin: '30px 0', padding: '20px' }}>
+                  <div style={{ fontSize: '40px', fontWeight: 'bold', color: '#1800AD', letterSpacing: '2px' }}>ADVISY</div>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', letterSpacing: '4px' }}>VOTRE COURTIER DE CONFIANCE</div>
+                </div>
+
+                {/* Mandataire */}
+                <div style={{ backgroundColor: '#1800AD', color: 'white', padding: '15px 20px', borderRadius: '8px', marginBottom: '25px' }}>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px', letterSpacing: '2px', fontWeight: 'bold' }}>Le Mandataire</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '5px' }}>e-Advisy Sàrl</div>
+                  <div style={{ fontSize: '12px' }}>Route de Chêne 5</div>
+                  <div style={{ fontSize: '12px' }}>1207 Genève, Suisse</div>
+                  <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '5px' }}>info@e-advisy.ch • +41 22 XXX XX XX</div>
+                </div>
+
+                {/* Portefeuille d'assurances */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '10px', paddingBottom: '5px', borderBottom: '2px solid #1800AD', letterSpacing: '1px' }}>
+                    PORTEFEUILLE D'ASSURANCES ACTUEL
                   </div>
-                </div>
-              </div>
-
-              {/* Titre principal compact */}
-              <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1800AD', letterSpacing: '2px', margin: 0 }}>
-                  MANDAT DE GESTION
-                </h1>
-                <div style={{ width: '60px', height: '2px', backgroundColor: '#1800AD', margin: '6px auto 0' }} />
-              </div>
-
-              {/* Parties contractantes en ligne */}
-              <div style={{ display: 'flex', gap: '15px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-                  <div style={{ fontSize: '8px', textTransform: 'uppercase', color: '#666', marginBottom: '4px', letterSpacing: '1px' }}>Le Mandant</div>
-                  <div style={{ fontWeight: 'bold', color: '#1800AD', fontSize: '12px' }}>{getClientName()}</div>
-                  <div style={{ fontSize: '10px', color: '#333' }}>{getFullAddress()}, {getLocality()}</div>
-                  <div style={{ fontSize: '9px', color: '#666' }}>Né(e) le {getBirthdate()}</div>
-                  {client.email && <div style={{ fontSize: '9px', color: '#666' }}>{client.email}</div>}
-                </div>
-                <div style={{ flex: 1, backgroundColor: '#1800AD', color: 'white', padding: '10px', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '8px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '4px', letterSpacing: '1px' }}>Le Mandataire</div>
-                  <div style={{ fontWeight: 'bold', fontSize: '12px' }}>e-Advisy Sàrl</div>
-                  <div style={{ fontSize: '10px' }}>Route de Chêne 5, 1207 Genève</div>
-                  <div style={{ fontSize: '9px', opacity: 0.8 }}>Suisse</div>
-                </div>
-              </div>
-
-              {/* Assurances actuelles compact */}
-              {getInsurancesList().length > 0 && (
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#1800AD', marginBottom: '5px', paddingBottom: '3px', borderBottom: '1px solid #1800AD' }}>
-                    PORTEFEUILLE ACTUEL
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#1800AD', color: 'white' }}>
-                        <th style={{ padding: '4px 8px', textAlign: 'left' }}>Type</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'left' }}>Compagnie</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getInsurancesList().map((ins, idx) => (
-                        <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white' }}>
-                          <td style={{ padding: '4px 8px', borderBottom: '1px solid #e9ecef' }}>{ins.type}</td>
-                          <td style={{ padding: '4px 8px', borderBottom: '1px solid #e9ecef', fontWeight: 500 }}>{ins.company}</td>
+                  {getInsurancesList().length > 0 ? (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#1800AD', color: 'white' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold' }}>Type d'assurance</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold' }}>Compagnie actuelle</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {getInsurancesList().map((ins, idx) => (
+                          <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white' }}>
+                            <td style={{ padding: '8px 12px', borderBottom: '1px solid #e9ecef' }}>{ins.type}</td>
+                            <td style={{ padding: '8px 12px', borderBottom: '1px solid #e9ecef', fontWeight: 600, color: '#1800AD' }}>{ins.company}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px', textAlign: 'center', color: '#666', fontSize: '11px' }}>
+                      Aucune assurance existante renseignée
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* Articles du contrat compacts */}
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#1800AD', marginBottom: '5px', paddingBottom: '3px', borderBottom: '1px solid #1800AD' }}>
-                  CONDITIONS DU MANDAT
-                </div>
-
-                <div style={{ fontSize: '9px', lineHeight: 1.4, textAlign: 'justify' }}>
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>1.</strong> <strong>Objet :</strong> Mandat de gestion dans le domaine des assurances de tous types.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>2.</strong> <strong>Prestations :</strong> e-Advisy négocie les meilleurs contrats en fonction des besoins du Mandant et obtient procuration pour modifier, annuler ou conclure des polices.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>3.</strong> <strong>Statut :</strong> Courtier indépendant inscrit FINMA, collaborant avec les principaux assureurs autorisés en Suisse.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>4.</strong> <strong>Responsabilité :</strong> Couverte par une assurance RC professionnelle.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>5.</strong> <strong>Obligations :</strong> Le Mandant fournit les informations nécessaires et garde toute liberté de choix.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>6.</strong> <strong>Rémunération :</strong> Commissions versées par les assureurs. Aucun frais au Mandant.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>7.</strong> <strong>Procuration :</strong> Obtenir renseignements, modifier données/couvertures, résilier contrats.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>8.</strong> <strong>Durée :</strong> Valable dès signature jusqu'à révocation écrite. Remplace tout mandat antérieur.</p>
-                  
-                  <p style={{ margin: '4px 0' }}><strong style={{ color: '#1800AD' }}>9.</strong> <strong>For juridique :</strong> Droit suisse. For à Genève.</p>
+                {/* Pied de page 1 */}
+                <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', borderTop: '1px solid #e9ecef', paddingTop: '10px', marginTop: 'auto' }}>
+                  Page 1/2 • Mandat de Gestion • {getClientName()}
                 </div>
               </div>
 
-              {/* Déclaration compacte */}
-              <div style={{ padding: '8px 10px', marginBottom: '12px', fontSize: '9px', fontStyle: 'italic', backgroundColor: '#f8f9fa', borderLeft: '3px solid #1800AD', borderRadius: '3px' }}>
-                Par sa signature, le Mandant confirme avoir reçu, lu et compris ce document, met fin à tout mandat antérieur, et autorise e-Advisy à agir en son nom auprès des assureurs.
-              </div>
-
-              {/* Date et lieu */}
-              <div style={{ textAlign: 'center', marginBottom: '12px', fontSize: '10px' }}>
-                Fait à <strong>{lieu || "_______________"}</strong>, le <strong>{format(new Date(), "dd MMMM yyyy", { locale: fr })}</strong>
-              </div>
-
-              {/* Signatures côte à côte */}
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '12px' }}>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ height: '70px', backgroundColor: '#fafafa', border: '1px dashed #1800AD', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                    {signatureAdvisy ? (
-                      <img src={signatureAdvisy} alt="Signature e-Advisy" style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ color: '#999', fontSize: '9px' }}>Signature e-Advisy</span>
-                    )}
-                  </div>
-                  <div style={{ borderTop: '2px solid #1800AD', paddingTop: '4px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '10px', color: '#1800AD' }}>e-Advisy Sàrl</div>
-                    <div style={{ fontSize: '8px', color: '#666' }}>Le Mandataire</div>
-                  </div>
+              {/* ========== PAGE 2 ========== */}
+              <div style={{ padding: '30px 35px', minHeight: '277mm', boxSizing: 'border-box', pageBreakBefore: 'always' }}>
+                {/* En-tête page 2 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '10px', borderBottom: '2px solid #1800AD' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1800AD' }}>e-Advisy</div>
+                  <div style={{ fontSize: '10px', color: '#666' }}>Mandat de Gestion • {getClientName()}</div>
                 </div>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ height: '70px', backgroundColor: '#fafafa', border: '1px dashed #1800AD', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                    {signatureClient ? (
-                      <img src={signatureClient} alt="Signature Mandant" style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ color: '#999', fontSize: '9px' }}>Signature du Mandant</span>
-                    )}
+
+                {/* Conditions du mandat */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '12px', paddingBottom: '5px', borderBottom: '2px solid #1800AD', letterSpacing: '1px' }}>
+                    CONDITIONS DU MANDAT
                   </div>
-                  <div style={{ borderTop: '2px solid #1800AD', paddingTop: '4px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '10px', color: '#1800AD' }}>{getClientName()}</div>
-                    <div style={{ fontSize: '8px', color: '#666' }}>Le Mandant</div>
+
+                  <div style={{ fontSize: '10px', lineHeight: 1.6, textAlign: 'justify' }}>
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>1. Objet du contrat :</strong> Le présent contrat est un mandat de gestion dans le domaine des assurances de tous types.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>2. Prestations :</strong> e-Advisy négocie les meilleurs contrats d'assurance en fonction des besoins du Mandant. Celui-ci donne procuration au courtier pour entreprendre toutes les démarches nécessaires à la modification, annulation ou conclusion de polices d'assurance.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>3. Statut :</strong> e-Advisy, inscrite auprès de la FINMA en tant que courtier indépendant, collabore de manière neutre avec les principaux assureurs autorisés en Suisse.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>4. Responsabilité :</strong> e-Advisy répond des négligences ou fautes en relation avec l'activité de conseil. Ces risques sont couverts par une assurance RC professionnelle.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>5. Obligations du Mandant :</strong> Le Mandant s'engage à fournir toutes les informations nécessaires et garde toute liberté dans le choix des assureurs.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>6. Rémunération :</strong> e-Advisy est uniquement rémunérée par les commissions versées par les assureurs. Aucun frais n'est facturé au Mandant.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>7. Procuration :</strong> Le Mandant autorise e-Advisy à obtenir tous types de renseignements auprès des assureurs, modifier les données personnelles et couvertures, et résilier les contrats d'assurance.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>8. Durée :</strong> Le mandat est valable dès signature jusqu'à révocation écrite. Il remplace tout mandat antérieur.</p>
+                    
+                    <p style={{ margin: '8px 0' }}><strong style={{ color: '#1800AD' }}>9. For juridique :</strong> Droit suisse applicable. For juridique à Genève.</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Contact du mandant compact */}
-              <div style={{ display: 'flex', gap: '15px', fontSize: '9px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', marginBottom: '10px' }}>
-                <div><span style={{ color: '#666' }}>Tél:</span> {client.mobile || client.phone || "—"}</div>
-                <div><span style={{ color: '#666' }}>Email:</span> {client.email || "—"}</div>
-                <div><span style={{ color: '#666' }}>Nat./Permis:</span> {client.nationality || "—"} / {client.permit_type || "—"}</div>
-              </div>
+                {/* Déclaration */}
+                <div style={{ padding: '12px 15px', marginBottom: '20px', fontSize: '10px', fontStyle: 'italic', backgroundColor: '#f8f9fa', borderLeft: '4px solid #1800AD', borderRadius: '4px' }}>
+                  Par sa signature, le Mandant confirme avoir reçu, lu et compris le présent document, met fin à tout mandat de gestion antérieur, et autorise e-Advisy à agir en son nom auprès des compagnies d'assurances.
+                </div>
 
-              {/* Pied de page compact */}
-              <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '8px', textAlign: 'center', fontSize: '8px', color: '#999' }}>
-                <span style={{ fontWeight: 'bold', color: '#1800AD' }}>e-Advisy Sàrl</span> • Route de Chêne 5, 1207 Genève • info@e-advisy.ch • www.e-advisy.ch
-                <br />Généré le {format(new Date(), "dd.MM.yyyy 'à' HH:mm")}
+                {/* Date et lieu */}
+                <div style={{ textAlign: 'center', marginBottom: '25px', fontSize: '12px' }}>
+                  Fait à <strong>{lieu || "_______________"}</strong>, le <strong>{format(new Date(), "dd MMMM yyyy", { locale: fr })}</strong>
+                </div>
+
+                {/* Signatures */}
+                <div style={{ display: 'flex', gap: '30px', marginBottom: '30px' }}>
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ height: '90px', backgroundColor: '#fafafa', border: '2px dashed #1800AD', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                      {signatureAdvisy ? (
+                        <img src={signatureAdvisy} alt="Signature e-Advisy" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />
+                      ) : (
+                        <span style={{ color: '#999', fontSize: '10px' }}>Signature e-Advisy</span>
+                      )}
+                    </div>
+                    <div style={{ borderTop: '2px solid #1800AD', paddingTop: '8px' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#1800AD' }}>e-Advisy Sàrl</div>
+                      <div style={{ fontSize: '10px', color: '#666' }}>Le Mandataire</div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ height: '90px', backgroundColor: '#fafafa', border: '2px dashed #1800AD', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                      {signatureClient ? (
+                        <img src={signatureClient} alt="Signature Mandant" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />
+                      ) : (
+                        <span style={{ color: '#999', fontSize: '10px' }}>Signature du Mandant</span>
+                      )}
+                    </div>
+                    <div style={{ borderTop: '2px solid #1800AD', paddingTop: '8px' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#1800AD' }}>{getClientName()}</div>
+                      <div style={{ fontSize: '10px', color: '#666' }}>Le Mandant</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pied de page final */}
+                <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '15px', textAlign: 'center', fontSize: '9px', color: '#999' }}>
+                  <div style={{ fontWeight: 'bold', color: '#1800AD', fontSize: '11px' }}>e-Advisy Sàrl</div>
+                  <div>Route de Chêne 5 • 1207 Genève • Suisse</div>
+                  <div>info@e-advisy.ch • www.e-advisy.ch</div>
+                  <div style={{ marginTop: '8px' }}>Document généré le {format(new Date(), "dd.MM.yyyy 'à' HH:mm")} • Page 2/2</div>
+                </div>
               </div>
             </div>
           </CardContent>
