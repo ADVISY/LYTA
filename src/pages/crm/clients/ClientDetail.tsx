@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ import ContractForm from "@/components/crm/ContractForm";
 import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
+import MandatGestionForm from "@/components/crm/MandatGestionForm";
 import {
   Table,
   TableBody,
@@ -324,6 +325,10 @@ export default function ClientDetail() {
               <TabsTrigger value="commissions">
                 <DollarSign className="h-4 w-4 mr-2" />
                 Commissions ({clientCommissions.length})
+              </TabsTrigger>
+              <TabsTrigger value="mandat">
+                <FileSignature className="h-4 w-4 mr-2" />
+                Mandat
               </TabsTrigger>
             </TabsList>
 
@@ -1334,6 +1339,10 @@ export default function ClientDetail() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="mandat">
+              <MandatGestionForm client={client} />
             </TabsContent>
           </Tabs>
         </div>
