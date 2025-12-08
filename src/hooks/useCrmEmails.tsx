@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type EmailType = "welcome" | "contract_signed" | "mandat_signed" | "account_created";
+type EmailType = "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
 
 interface EmailData {
   contractDetails?: string;
@@ -48,6 +48,8 @@ export const useCrmEmails = () => {
         contract_signed: "Confirmation de signature envoyée",
         mandat_signed: "Email avec identifiants envoyé",
         account_created: "Identifiants de connexion envoyés",
+        relation_client: "Email relation client envoyé",
+        offre_speciale: "Email d'offre spéciale envoyé",
       };
 
       toast({

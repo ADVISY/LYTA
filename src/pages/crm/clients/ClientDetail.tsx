@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +37,7 @@ import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import MandatGestionForm from "@/components/crm/MandatGestionForm";
+import SendEmailDialog from "@/components/crm/SendEmailDialog";
 import {
   Table,
   TableBody,
@@ -301,10 +302,17 @@ export default function ClientDetail() {
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate(`/crm/clients/${id}/edit`)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Modifier
-        </Button>
+        <div className="flex items-center gap-2">
+          <SendEmailDialog
+            clientEmail={client.email || ""}
+            clientName={getClientName()}
+            disabled={!client.email}
+          />
+          <Button onClick={() => navigate(`/crm/clients/${id}/edit`)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Modifier
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6">
