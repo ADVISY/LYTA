@@ -47,6 +47,7 @@ import ClientDocuments from "./pages/client/ClientDocuments";
 import ClientMessages from "./pages/client/ClientMessages";
 import ClientNotifications from "./pages/client/ClientNotifications";
 import ClientProfile from "./pages/client/ClientProfile";
+import ClientClaims from "./pages/client/ClientClaims";
 
 const queryClient = new QueryClient();
 
@@ -105,11 +106,12 @@ const App = () => (
             <Route path="compta" element={<CRMCompta />} />
           </Route>
           
-          {/* Client Portal Routes */}
+{/* Client Portal Routes */}
           <Route path="/espace-client" element={<ClientLayout />}>
             <Route index element={<ClientDashboard />} />
             <Route path="contrats" element={<ClientContracts />} />
             <Route path="documents" element={<ClientDocuments />} />
+            <Route path="sinistres" element={<ClientClaims />} />
             <Route path="messages" element={<ClientMessages />} />
             <Route path="notifications" element={<ClientNotifications />} />
             <Route path="profil" element={<ClientProfile />} />

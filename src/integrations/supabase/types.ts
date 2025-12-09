@@ -186,6 +186,100 @@ export type Database = {
         }
         Relationships: []
       }
+      claim_documents: {
+        Row: {
+          claim_id: string
+          created_at: string
+          document_id: string
+          id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          document_id: string
+          id?: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_documents_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      claims: {
+        Row: {
+          claim_type: string
+          client_id: string
+          created_at: string
+          description: string
+          id: string
+          incident_date: string
+          policy_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          claim_type: string
+          client_id: string
+          created_at?: string
+          description: string
+          id?: string
+          incident_date: string
+          policy_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          claim_type?: string
+          client_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          incident_date?: string
+          policy_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
