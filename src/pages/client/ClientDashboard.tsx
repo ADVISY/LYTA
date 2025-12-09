@@ -17,7 +17,8 @@ import {
   Scale,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -161,6 +162,10 @@ export default function ClientDashboard() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
+            <Button variant="outline" className="gap-2" onClick={() => navigate('/espace-client/sinistres')}>
+              <AlertTriangle className="h-4 w-4" />
+              Déclarer un sinistre
+            </Button>
             <Button variant="outline" className="gap-2" onClick={() => navigate('/espace-client/messages')}>
               <Send className="h-4 w-4" />
               Contacter mon conseiller

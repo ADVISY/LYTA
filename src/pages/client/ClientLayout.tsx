@@ -15,7 +15,8 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import advisyLogo from "@/assets/advisy-logo.svg";
@@ -24,6 +25,7 @@ const menuItems = [
   { to: "/espace-client", icon: Home, label: "Accueil", end: true },
   { to: "/espace-client/contrats", icon: FileText, label: "Mes contrats" },
   { to: "/espace-client/documents", icon: FolderOpen, label: "Mes documents" },
+  { to: "/espace-client/sinistres", icon: AlertTriangle, label: "Sinistres" },
   { to: "/espace-client/messages", icon: MessageCircle, label: "Messages" },
   { to: "/espace-client/notifications", icon: Bell, label: "Notifications" },
   { to: "/espace-client/profil", icon: User, label: "Mon profil" },
