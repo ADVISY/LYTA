@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { TenantProvider } from "./contexts/TenantContext";
 import { ThemeProvider } from "./hooks/useTheme";
+import { CelebrationProvider } from "./hooks/useCelebration";
 import Connexion from "./pages/Connexion";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -51,13 +52,14 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <TenantProvider>
-              <Routes>
+      <CelebrationProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <TenantProvider>
+                <Routes>
               {/* Redirect root to login */}
               <Route path="/" element={<Navigate to="/connexion" replace />} />
               
@@ -104,13 +106,14 @@ const App = () => (
                 <Route path="profil" element={<ClientProfile />} />
               </Route>
               
-              {/* Catch-all */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </TenantProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+                {/* Catch-all */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              </TenantProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </CelebrationProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

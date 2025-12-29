@@ -29,6 +29,7 @@ import { NotificationBell } from "@/components/crm/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
+import { SoundToggle } from "@/components/crm/SoundToggle";
 
 const menuItems = [
   { to: "/crm", icon: LayoutDashboard, label: "Drive", end: true, color: "from-blue-500 to-indigo-500" },
@@ -181,6 +182,7 @@ export default function CRMLayout() {
                 />
               )}
               <div className="flex items-center gap-1">
+                <SoundToggle />
                 <ThemeToggle />
                 <NotificationBell />
               </div>
@@ -282,6 +284,7 @@ export default function CRMLayout() {
             <img src={advisyLogo} alt="Advisy" className="h-10 object-contain" />
           )}
           <div className="flex items-center gap-1">
+            <SoundToggle />
             <ThemeToggle />
             <NotificationBell />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

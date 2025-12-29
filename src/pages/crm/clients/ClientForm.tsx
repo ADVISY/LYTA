@@ -6,6 +6,7 @@ import * as z from "zod";
 import { useClients } from "@/hooks/useClients";
 import { useAgents } from "@/hooks/useAgents";
 import { useCrmEmails } from "@/hooks/useCrmEmails";
+import { useCelebration } from "@/hooks/useCelebration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,7 @@ export default function ClientForm() {
   const { createClient, updateClient, getClientById } = useClients();
   const { agents, loading: agentsLoading, getManagerForAgent } = useAgents();
   const { sendWelcomeEmail } = useCrmEmails();
+  const { celebrate } = useCelebration();
   const [loading, setLoading] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
   const [selectedManager, setSelectedManager] = useState<{ id: string; name: string } | null>(null);
@@ -204,6 +206,9 @@ export default function ClientForm() {
     } else {
       const { data: newClient, error } = await createClient(clientData);
       if (!error && newClient) {
+        // Celebrate the new client!
+        celebrate('client_added');
+        
         // Send welcome email for new clients (not collaborateurs/partenaires)
         if (clientData.type_adresse === "client" && clientData.email) {
           const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
