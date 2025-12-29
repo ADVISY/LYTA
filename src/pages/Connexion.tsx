@@ -386,7 +386,27 @@ const Connexion = () => {
     checkAndRedirect();
   }, [user, navigate, toast]);
 
-  // Function to redirect user to their tenant subdomain
+  // Function to check if subdomain is reachable
+  const checkSubdomainReachable = async (url: string): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+      
+      const response = await fetch(`${url}/cdn-cgi/trace`, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return true; // If no error, assume reachable
+    } catch (error) {
+      console.log('Subdomain not reachable, using fallback:', error);
+      return false;
+    }
+  };
+
+  // Function to redirect user to their tenant subdomain (with fallback)
   const redirectToTenantSubdomain = async (userId: string) => {
     try {
       // Get user's tenant assignment
@@ -419,14 +439,25 @@ const Connexion = () => {
       const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
       
       if (isLocalhost) {
-        // In dev mode, use query param
+        // In dev mode, always use query param
         navigate(`/crm?tenant=${tenant.slug}`);
       } else {
-        // In production, redirect to subdomain
+        // In production, try subdomain first, fallback to query param
         const protocol = window.location.protocol;
         const baseDomain = hostname.split('.').slice(-2).join('.'); // Get base domain like lyta.ch
-        const tenantUrl = `${protocol}//${tenant.slug}.${baseDomain}/crm`;
-        window.location.href = tenantUrl;
+        const tenantUrl = `${protocol}//${tenant.slug}.${baseDomain}`;
+        
+        // Check if subdomain is reachable
+        const isReachable = await checkSubdomainReachable(tenantUrl);
+        
+        if (isReachable) {
+          // Subdomain works, redirect there
+          window.location.href = `${tenantUrl}/crm`;
+        } else {
+          // Subdomain not ready, use fallback with query param
+          console.log(`Subdomain ${tenant.slug}.${baseDomain} not ready, using fallback`);
+          navigate(`/crm?tenant=${tenant.slug}`);
+        }
       }
     } catch (error) {
       console.error('Error redirecting to tenant:', error);
