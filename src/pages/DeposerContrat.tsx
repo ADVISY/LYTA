@@ -35,10 +35,21 @@ import {
   Briefcase,
   Upload,
   Mail,
-  LogOut
+  LogOut,
+  FileText,
+  AlertCircle
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import DocumentUpload from "@/components/crm/DocumentUpload";
 import lytaLogo from "@/assets/lyta-logo.svg";
+
+type UploadedDocument = {
+  file_key: string;
+  file_name: string;
+  doc_kind: string;
+  mime_type: string;
+  size_bytes: number;
+};
 
 type Client = {
   id: string;
@@ -229,6 +240,45 @@ export default function DeposerContrat() {
     emailRetour: "",
     commentaires: "",
   });
+
+  // Documents state for each form
+  const [sanaDocuments, setSanaDocuments] = useState<UploadedDocument[]>([]);
+  const [vitaDocuments, setVitaDocuments] = useState<UploadedDocument[]>([]);
+  const [medioDocuments, setMedioDocuments] = useState<UploadedDocument[]>([]);
+  const [businessDocuments, setBusinessDocuments] = useState<UploadedDocument[]>([]);
+
+  // Required documents for each form type
+  const sanaRequiredDocs = [
+    "Pièce d'identité (recto/verso)",
+    "Attestation de résidence",
+    "Bulletin de salaire (3 derniers mois)",
+    "Permis de séjour (si applicable)",
+    "Proposition signée",
+  ];
+
+  const vitaRequiredDocs = [
+    "Pièce d'identité (recto/verso)",
+    "Proposition signée",
+    "Questionnaire de santé complété",
+    "Justificatif de domicile",
+    "Dernière déclaration fiscale (optionnel)",
+  ];
+
+  const medioRequiredDocs = [
+    "Pièce d'identité (recto/verso)",
+    "Proposition signée",
+    "Questionnaire médical",
+    "Attestation d'assurance LAMal actuelle",
+  ];
+
+  const businessRequiredDocs = [
+    "Extrait du registre du commerce",
+    "Statuts de l'entreprise",
+    "Pièce d'identité du chef d'entreprise",
+    "Bilan des 2 derniers exercices",
+    "Liste du personnel avec salaires",
+    "Contrat de bail (si locataire)",
+  ];
 
   // Load clients when verified
   useEffect(() => {
@@ -777,14 +827,36 @@ export default function DeposerContrat() {
                 <Label>Commentaires</Label>
                 <Textarea value={sanaForm.commentaires} onChange={(e) => setSanaForm(prev => ({ ...prev, commentaires: e.target.value }))} placeholder="Informations complémentaires..." rows={3} />
               </div>
+
+              {/* Documents Section */}
+              <div className="space-y-4 p-4 border-2 border-dashed border-king/30 rounded-lg bg-king/5">
+                <div className="flex items-center gap-2 text-king">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Documents à fournir</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {sanaRequiredDocs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+                <DocumentUpload
+                  onUpload={(doc) => setSanaDocuments(prev => [...prev, doc])}
+                  onRemove={(index) => setSanaDocuments(prev => prev.filter((_, i) => i !== index))}
+                  documents={sanaDocuments}
+                />
+              </div>
+
               <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
                 <Checkbox id="sana-confirm" checked={sanaForm.confirmDocuments} onCheckedChange={(checked) => setSanaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))} />
                 <div className="space-y-1">
                   <Label htmlFor="sana-confirm" className="font-medium cursor-pointer">Je confirme avoir téléchargé tous les documents requis</Label>
-                  <p className="text-sm text-muted-foreground">Carte d'identité, attestation de résidence, bulletins de salaire, etc.</p>
+                  <p className="text-sm text-muted-foreground">Vous avez ajouté {sanaDocuments.length} document(s)</p>
                 </div>
               </div>
-              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitSana} disabled={submitting}>
+              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitSana} disabled={submitting || sanaDocuments.length === 0}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Upload className="mr-2 h-4 w-4" />Soumettre le formulaire SANA</>}
               </Button>
             </CardContent>
@@ -854,14 +926,36 @@ export default function DeposerContrat() {
                 <Label>Commentaires</Label>
                 <Textarea value={vitaForm.commentaires} onChange={(e) => setVitaForm(prev => ({ ...prev, commentaires: e.target.value }))} placeholder="Informations complémentaires..." rows={3} />
               </div>
+
+              {/* Documents Section */}
+              <div className="space-y-4 p-4 border-2 border-dashed border-king/30 rounded-lg bg-king/5">
+                <div className="flex items-center gap-2 text-king">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Documents à fournir</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {vitaRequiredDocs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+                <DocumentUpload
+                  onUpload={(doc) => setVitaDocuments(prev => [...prev, doc])}
+                  onRemove={(index) => setVitaDocuments(prev => prev.filter((_, i) => i !== index))}
+                  documents={vitaDocuments}
+                />
+              </div>
+
               <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
                 <Checkbox id="vita-confirm" checked={vitaForm.confirmDocuments} onCheckedChange={(checked) => setVitaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))} />
                 <div className="space-y-1">
                   <Label htmlFor="vita-confirm" className="font-medium cursor-pointer">Je confirme avoir téléchargé tous les documents requis</Label>
-                  <p className="text-sm text-muted-foreground">Proposition signée, questionnaire de santé, justificatifs, etc.</p>
+                  <p className="text-sm text-muted-foreground">Vous avez ajouté {vitaDocuments.length} document(s)</p>
                 </div>
               </div>
-              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitVita} disabled={submitting}>
+              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitVita} disabled={submitting || vitaDocuments.length === 0}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Upload className="mr-2 h-4 w-4" />Soumettre le formulaire VITA</>}
               </Button>
             </CardContent>
@@ -930,14 +1024,36 @@ export default function DeposerContrat() {
                 <Label>Commentaires</Label>
                 <Textarea value={medioForm.commentaires} onChange={(e) => setMedioForm(prev => ({ ...prev, commentaires: e.target.value }))} placeholder="Informations complémentaires..." rows={3} />
               </div>
+
+              {/* Documents Section */}
+              <div className="space-y-4 p-4 border-2 border-dashed border-king/30 rounded-lg bg-king/5">
+                <div className="flex items-center gap-2 text-king">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Documents à fournir</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {medioRequiredDocs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+                <DocumentUpload
+                  onUpload={(doc) => setMedioDocuments(prev => [...prev, doc])}
+                  onRemove={(index) => setMedioDocuments(prev => prev.filter((_, i) => i !== index))}
+                  documents={medioDocuments}
+                />
+              </div>
+
               <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
                 <Checkbox id="medio-confirm" checked={medioForm.confirmDocuments} onCheckedChange={(checked) => setMedioForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))} />
                 <div className="space-y-1">
                   <Label htmlFor="medio-confirm" className="font-medium cursor-pointer">Je confirme avoir téléchargé tous les documents requis</Label>
-                  <p className="text-sm text-muted-foreground">Proposition, questionnaire médical, pièce d'identité, etc.</p>
+                  <p className="text-sm text-muted-foreground">Vous avez ajouté {medioDocuments.length} document(s)</p>
                 </div>
               </div>
-              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitMedio} disabled={submitting}>
+              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitMedio} disabled={submitting || medioDocuments.length === 0}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Upload className="mr-2 h-4 w-4" />Soumettre le formulaire MEDIO</>}
               </Button>
             </CardContent>
@@ -1057,7 +1173,28 @@ export default function DeposerContrat() {
                 <Textarea value={businessForm.commentaires} onChange={(e) => setBusinessForm(prev => ({ ...prev, commentaires: e.target.value }))} placeholder="Besoins spécifiques, détails des couvertures souhaitées..." rows={4} />
               </div>
 
-              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitBusiness} disabled={submitting}>
+              {/* Documents Section */}
+              <div className="space-y-4 p-4 border-2 border-dashed border-king/30 rounded-lg bg-king/5">
+                <div className="flex items-center gap-2 text-king">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Documents à fournir</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {businessRequiredDocs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+                <DocumentUpload
+                  onUpload={(doc) => setBusinessDocuments(prev => [...prev, doc])}
+                  onRemove={(index) => setBusinessDocuments(prev => prev.filter((_, i) => i !== index))}
+                  documents={businessDocuments}
+                />
+              </div>
+
+              <Button className="w-full bg-king hover:bg-king-dark text-white" size="lg" onClick={handleSubmitBusiness} disabled={submitting || businessDocuments.length === 0}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Envoi en cours...</> : <><Upload className="mr-2 h-4 w-4" />Soumettre le formulaire BUSINESS</>}
               </Button>
             </CardContent>
