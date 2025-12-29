@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import DocumentUpload from "@/components/crm/DocumentUpload";
-import lytaLogo from "@/assets/lyta-logo.svg";
+import lytaLogo from "@/assets/lyta-logo-full.svg";
 
 type UploadedDocument = {
   file_key: string;
