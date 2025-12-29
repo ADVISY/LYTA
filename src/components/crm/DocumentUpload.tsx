@@ -54,10 +54,10 @@ export default function DocumentUpload({ onUpload, onRemove, documents = [], sho
     setUploading(true);
 
     try {
-      // Generate unique file path
+      // Generate unique file path - use public-deposits folder for public access
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
+      const filePath = `public-deposits/${fileName}`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
