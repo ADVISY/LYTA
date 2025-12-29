@@ -67,7 +67,7 @@ const App = () => (
               {/* Login Page */}
               <Route path="/connexion" element={<Connexion />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/deposer-contrat" element={<ProtectedRoute><DeposerContrat /></ProtectedRoute>} />
+              <Route path="/deposer-contrat" element={<DeposerContrat />} />
               
               {/* CRM Routes */}
               <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
