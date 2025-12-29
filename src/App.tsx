@@ -9,6 +9,7 @@ import { ThemeProvider } from "./hooks/useTheme";
 import { CelebrationProvider } from "./hooks/useCelebration";
 import Connexion from "./pages/Connexion";
 import ResetPassword from "./pages/ResetPassword";
+import DeposerContrat from "./pages/DeposerContrat";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -66,6 +67,7 @@ const App = () => (
               {/* Login Page */}
               <Route path="/connexion" element={<Connexion />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/deposer-contrat" element={<ProtectedRoute><DeposerContrat /></ProtectedRoute>} />
               
               {/* CRM Routes */}
               <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
