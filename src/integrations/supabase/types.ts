@@ -518,6 +518,54 @@ export type Database = {
           },
         ]
       }
+      commission_history: {
+        Row: {
+          change_type: string
+          changed_by: string | null
+          commission_id: string
+          created_at: string
+          id: string
+          new_value: Json | null
+          note: string
+          old_value: Json | null
+        }
+        Insert: {
+          change_type: string
+          changed_by?: string | null
+          commission_id: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          note: string
+          old_value?: Json | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string | null
+          commission_id?: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          note?: string
+          old_value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_history_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "commissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_part_agent: {
         Row: {
           agent_id: string
@@ -683,6 +731,162 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decompte_lines: {
+        Row: {
+          base_amount: number
+          client_name: string | null
+          commission_amount: number
+          commission_id: string | null
+          commission_rate: number
+          company_name: string | null
+          contract_date: string | null
+          created_at: string
+          decommission_amount: number
+          decompte_id: string
+          id: string
+          net_amount: number
+          notes: string | null
+          policy_id: string | null
+          product_name: string | null
+        }
+        Insert: {
+          base_amount?: number
+          client_name?: string | null
+          commission_amount?: number
+          commission_id?: string | null
+          commission_rate?: number
+          company_name?: string | null
+          contract_date?: string | null
+          created_at?: string
+          decommission_amount?: number
+          decompte_id: string
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          policy_id?: string | null
+          product_name?: string | null
+        }
+        Update: {
+          base_amount?: number
+          client_name?: string | null
+          commission_amount?: number
+          commission_id?: string | null
+          commission_rate?: number
+          company_name?: string | null
+          contract_date?: string | null
+          created_at?: string
+          decommission_amount?: number
+          decompte_id?: string
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          policy_id?: string | null
+          product_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decompte_lines_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "commissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decompte_lines_decompte_id_fkey"
+            columns: ["decompte_id"]
+            isOneToOne: false
+            referencedRelation: "decomptes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decompte_lines_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decomptes: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          status: string
+          tenant_id: string | null
+          total_commissions: number
+          total_decommissions: number
+          total_net: number
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          tenant_id?: string | null
+          total_commissions?: number
+          total_decommissions?: number
+          total_net?: number
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          tenant_id?: string | null
+          total_commissions?: number
+          total_decommissions?: number
+          total_net?: number
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decomptes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decomptes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decomptes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decomptes_validated_by_fkey"
+            columns: ["validated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -986,6 +1190,109 @@ export type Database = {
             columns: ["manager_partner_id"]
             isOneToOne: false
             referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payouts: {
+        Row: {
+          agent_id: string
+          amount: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          decompte_id: string | null
+          id: string
+          notes: string | null
+          payment_date: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          status: string
+          tenant_id: string | null
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          agent_id: string
+          amount: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          decompte_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          agent_id?: string
+          amount?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          decompte_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_decompte_id_fkey"
+            columns: ["decompte_id"]
+            isOneToOne: false
+            referencedRelation: "decomptes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_validated_by_fkey"
+            columns: ["validated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1766,6 +2073,19 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_policy_commission: {
+        Args: { p_agent_id?: string; p_policy_id: string }
+        Returns: {
+          agent_amount: number
+          agent_rate: number
+          base_amount: number
+          commission_type: string
+          manager_amount: number
+          manager_id: string
+          manager_rate: number
+          total_commission: number
+        }[]
+      }
       can_access_client: { Args: { client_id: string }; Returns: boolean }
       can_see_commissions_scope: { Args: never; Returns: string }
       can_view_financial_data: { Args: never; Returns: boolean }
@@ -1834,7 +2154,10 @@ export type Database = {
         | "backoffice"
         | "compta"
         | "king"
+      commission_status: "estimated" | "confirmed" | "cancelled"
       dashboard_scope: "personal" | "team" | "global"
+      decompte_status: "draft" | "validated" | "paid" | "cancelled"
+      payout_status: "pending" | "paid" | "cancelled"
       permission_action:
         | "view"
         | "create"
@@ -1994,7 +2317,10 @@ export const Constants = {
         "compta",
         "king",
       ],
+      commission_status: ["estimated", "confirmed", "cancelled"],
       dashboard_scope: ["personal", "team", "global"],
+      decompte_status: ["draft", "validated", "paid", "cancelled"],
+      payout_status: ["pending", "paid", "cancelled"],
       permission_action: [
         "view",
         "create",
