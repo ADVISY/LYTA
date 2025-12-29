@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, LayoutDashboard, FileUp, User, Users } from "lucide-react";
+import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
@@ -151,9 +151,10 @@ const LoginForm = ({
 interface ChoiceScreenProps {
   onClientClick: () => void;
   onTeamClick: () => void;
+  onSuperAdminClick: () => void;
 }
 
-const ChoiceScreen = ({ onClientClick, onTeamClick }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
       <h2 className="text-xl font-bold text-foreground mb-2">Bienvenue sur Advisy</h2>
@@ -184,6 +185,22 @@ const ChoiceScreen = ({ onClientClick, onTeamClick }: ChoiceScreenProps) => (
         <div className="text-center">
           <h3 className="text-lg font-bold text-foreground">TEAM</h3>
           <p className="text-sm text-muted-foreground mt-1">Membres Advisy</p>
+        </div>
+      </button>
+    </div>
+
+    {/* Super Admin Button */}
+    <div className="pt-4 border-t">
+      <button
+        onClick={onSuperAdminClick}
+        className="w-full flex items-center justify-center gap-3 p-4 border-2 border-amber-500/30 rounded-xl hover:border-amber-500 hover:bg-amber-500/5 transition-all group"
+      >
+        <div className="p-2 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+          <Crown className="h-6 w-6" />
+        </div>
+        <div className="text-left">
+          <h3 className="text-sm font-bold text-amber-600">SUPER ADMIN</h3>
+          <p className="text-xs text-muted-foreground">Accès plateforme LYTA</p>
         </div>
       </button>
     </div>
@@ -558,6 +575,7 @@ const Connexion = () => {
           <ChoiceScreen
             onClientClick={() => { resetForm(); setLoginType("client"); setView("client"); }}
             onTeamClick={() => { resetForm(); setLoginType("team"); setView("team"); }}
+            onSuperAdminClick={() => navigate("/king/wizard")}
           />
         );
     }
