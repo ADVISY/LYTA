@@ -73,7 +73,68 @@ All colors MUST be HSL.
     --crm-warning: 38 92% 50%;
     --crm-info: 199 89% 48%;
     --crm-danger: 0 84% 60%;
+  }
 
+  .dark {
+    /* Dark Mode - Advisy Brand */
+    --background: 240 15% 8%;
+    --foreground: 240 10% 95%;
+
+    --card: 240 12% 12%;
+    --card-foreground: 240 10% 95%;
+
+    --popover: 240 12% 10%;
+    --popover-foreground: 240 10% 95%;
+
+    /* Primary: Advisy Blue - lighter for dark mode */
+    --primary: 246 100% 60%;
+    --primary-foreground: 240 15% 8%;
+    --primary-light: 246 100% 70%;
+    --primary-dark: 246 100% 50%;
+    --primary-glow: 246 100% 75%;
+
+    /* Secondary */
+    --secondary: 240 12% 18%;
+    --secondary-foreground: 240 10% 95%;
+    
+    --neutral-light: 240 10% 25%;
+    --neutral-mid: 240 8% 50%;
+    --neutral-dark: 240 10% 70%;
+
+    --muted: 240 12% 16%;
+    --muted-foreground: 240 8% 65%;
+
+    --accent: 246 50% 20%;
+    --accent-foreground: 246 100% 70%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 12% 20%;
+    --input: 240 12% 18%;
+    --ring: 246 100% 60%;
+
+    /* Dark Mode Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(246 100% 50%) 0%, hsl(246 100% 65%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(246 100% 40%) 0%, hsl(246 100% 55%) 50%, hsl(270 100% 60%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(240 15% 10%) 0%, hsl(246 30% 12%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(240 12% 14%) 0%, hsl(246 20% 16%) 100%);
+    
+    --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.4);
+    --shadow-medium: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 40px rgba(100, 50, 255, 0.3), 0 0 80px rgba(100, 50, 255, 0.1);
+
+    /* CRM Specific Tokens - Dark */
+    --crm-sidebar: 240 12% 10%;
+    --crm-sidebar-active: 246 100% 60%;
+    --crm-card: 240 12% 12%;
+    --crm-card-hover: 246 30% 15%;
+    --crm-success: 142 60% 45%;
+    --crm-warning: 38 80% 55%;
+    --crm-info: 199 80% 55%;
+    --crm-danger: 0 70% 55%;
   }
 }
 

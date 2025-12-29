@@ -26,6 +26,9 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import advisyLogo from "@/assets/advisy-logo.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/crm/NotificationBell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
+import { UserAvatar } from "@/components/crm/UserAvatar";
 
 const menuItems = [
   { to: "/crm", icon: LayoutDashboard, label: "Drive", end: true, color: "from-blue-500 to-indigo-500" },
@@ -46,6 +49,16 @@ export default function CRMLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Check if we should show welcome message (on first load after login)
+  useEffect(() => {
+    const hasShownWelcome = sessionStorage.getItem('welcomeShown');
+    if (!hasShownWelcome && user) {
+      setShowWelcome(true);
+      sessionStorage.setItem('welcomeShown', 'true');
+    }
+  }, [user]);
 
   // Get tenant logo or fallback to default
   const tenantLogo = tenant?.branding?.logo_url || advisyLogo;
@@ -138,6 +151,15 @@ export default function CRMLayout() {
 
   return (
     <div className="min-h-screen flex bg-background">
+      {/* Welcome Message */}
+      {showWelcome && (
+        <WelcomeMessage
+          firstName={profile?.first_name}
+          lastName={profile?.last_name}
+          type="login"
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
 
       {/* Desktop Sidebar */}
       <TooltipProvider>
@@ -158,7 +180,10 @@ export default function CRMLayout() {
                   className="h-14 object-contain"
                 />
               )}
-              <NotificationBell />
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <NotificationBell />
+              </div>
             </div>
             {tenant && (
               <div className="mt-2 px-2 py-1 bg-primary/10 rounded text-xs text-primary font-medium text-center">
@@ -256,7 +281,8 @@ export default function CRMLayout() {
           ) : (
             <img src={advisyLogo} alt="Advisy" className="h-10 object-contain" />
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
             <NotificationBell />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
