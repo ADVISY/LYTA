@@ -5,7 +5,7 @@ import { ChevronLeft, LayoutDashboard, FileUp, User, Users } from "lucide-react"
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
-import advisyLogo from "@/assets/advisy-logo.svg";
+import lytaLogo from "@/assets/lyta-logo.svg";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -558,19 +558,12 @@ const Connexion = () => {
     <div className="min-h-screen bg-background relative">
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
-      <Link 
-        to="/" 
-        className="fixed top-6 left-6 inline-flex items-center gap-2 text-sm font-medium text-foreground bg-card rounded-full px-4 py-2 shadow-sm border hover:shadow-md transition-all z-50"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Retour au site
-      </Link>
 
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           <img 
-            src={advisyLogo} 
-            alt="Advisy" 
+            src={lytaLogo} 
+            alt="LYTA" 
             className="h-24 sm:h-32 mx-auto"
           />
         </div>
