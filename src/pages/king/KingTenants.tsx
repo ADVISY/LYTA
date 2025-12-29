@@ -46,11 +46,13 @@ export default function KingTenants() {
       if (error) throw error;
       return data || [];
     },
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Fetch stats for each tenant
+  // Fetch stats for each tenant with auto-refresh
   const { data: tenantsStats } = useQuery({
     queryKey: ['king-tenants-stats'],
+    refetchInterval: 30000, // Refresh every 30 seconds
     queryFn: async () => {
       // Get all clients grouped by tenant with type_adresse
       const { data: clientsData } = await supabase
