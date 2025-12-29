@@ -375,7 +375,8 @@ const Connexion = () => {
             });
             navigate("/espace-client");
           } else {
-            navigate("/crm");
+            // Redirect to tenant subdomain if available
+            await redirectToTenantSubdomain(user.id);
           }
         }
         // If no target space in session, don't auto-redirect (user just loaded page while logged in)
@@ -384,6 +385,54 @@ const Connexion = () => {
     
     checkAndRedirect();
   }, [user, navigate, toast]);
+
+  // Function to redirect user to their tenant subdomain
+  const redirectToTenantSubdomain = async (userId: string) => {
+    try {
+      // Get user's tenant assignment
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('user_tenant_assignments')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (assignmentError || !assignment?.tenant_id) {
+        // No tenant assignment, just go to CRM
+        navigate("/crm");
+        return;
+      }
+
+      // Get tenant slug
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('slug')
+        .eq('id', assignment.tenant_id)
+        .maybeSingle();
+
+      if (tenantError || !tenant?.slug) {
+        // Can't find tenant, just go to CRM
+        navigate("/crm");
+        return;
+      }
+
+      const hostname = window.location.hostname;
+      const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
+      
+      if (isLocalhost) {
+        // In dev mode, use query param
+        navigate(`/crm?tenant=${tenant.slug}`);
+      } else {
+        // In production, redirect to subdomain
+        const protocol = window.location.protocol;
+        const baseDomain = hostname.split('.').slice(-2).join('.'); // Get base domain like lyta.ch
+        const tenantUrl = `${protocol}//${tenant.slug}.${baseDomain}/crm`;
+        window.location.href = tenantUrl;
+      }
+    } catch (error) {
+      console.error('Error redirecting to tenant:', error);
+      navigate("/crm");
+    }
+  };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
