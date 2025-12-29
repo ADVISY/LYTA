@@ -52,10 +52,10 @@ export default function KingTenants() {
   const { data: tenantsStats } = useQuery({
     queryKey: ['king-tenants-stats'],
     queryFn: async () => {
-      // Get all clients grouped by tenant
+      // Get all clients grouped by tenant with type_adresse
       const { data: clientsData } = await supabase
         .from('clients')
-        .select('tenant_id, tags');
+        .select('tenant_id, type_adresse');
       
       // Get all policies grouped by tenant
       const { data: policiesData } = await supabase
@@ -70,15 +70,15 @@ export default function KingTenants() {
       // Calculate stats per tenant
       const stats: Record<string, TenantStats> = {};
       
-      // Count clients and collaborateurs per tenant
+      // Count clients and collaborateurs per tenant based on type_adresse
       clientsData?.forEach(client => {
         const tenantId = client.tenant_id || 'no-tenant';
         if (!stats[tenantId]) {
           stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0 };
         }
         
-        const isCollaborateur = client.tags?.includes('collaborateur') || client.tags?.includes('agent');
-        if (isCollaborateur) {
+        // collaborateur and partenaire are considered as collaborateurs
+        if (client.type_adresse === 'collaborateur' || client.type_adresse === 'partenaire') {
           stats[tenantId].collaborateurs++;
         } else {
           stats[tenantId].clients++;
