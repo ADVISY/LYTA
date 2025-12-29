@@ -1314,6 +1314,94 @@ export type Database = {
           },
         ]
       }
+      tenant_role_permissions: {
+        Row: {
+          action: Database["public"]["Enums"]["permission_action"]
+          allowed: boolean
+          created_at: string
+          id: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["permission_action"]
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          module: Database["public"]["Enums"]["permission_module"]
+          role_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["permission_action"]
+          allowed?: boolean
+          created_at?: string
+          id?: string
+          module?: Database["public"]["Enums"]["permission_module"]
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_roles: {
+        Row: {
+          can_see_all_commissions: boolean
+          can_see_own_commissions: boolean
+          can_see_team_commissions: boolean
+          created_at: string
+          dashboard_scope: Database["public"]["Enums"]["dashboard_scope"]
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system_role: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_see_all_commissions?: boolean
+          can_see_own_commissions?: boolean
+          can_see_team_commissions?: boolean
+          created_at?: string
+          dashboard_scope?: Database["public"]["Enums"]["dashboard_scope"]
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system_role?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_see_all_commissions?: boolean
+          can_see_own_commissions?: boolean
+          can_see_team_commissions?: boolean
+          created_at?: string
+          dashboard_scope?: Database["public"]["Enums"]["dashboard_scope"]
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system_role?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_security_settings: {
         Row: {
           created_at: string
@@ -1457,6 +1545,62 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_tenant_roles: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          role_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          role_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          role_id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tenant_roles_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tenant_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tenant_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_tenant_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1623,6 +1767,7 @@ export type Database = {
     }
     Functions: {
       can_access_client: { Args: { client_id: string }; Returns: boolean }
+      can_see_commissions_scope: { Args: never; Returns: string }
       can_view_financial_data: { Args: never; Returns: boolean }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       create_audit_log: {
@@ -1658,11 +1803,22 @@ export type Database = {
           status: string
         }[]
       }
+      get_user_dashboard_scope: {
+        Args: never
+        Returns: Database["public"]["Enums"]["dashboard_scope"]
+      }
       get_user_tenant_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      has_tenant_permission: {
+        Args: {
+          _action: Database["public"]["Enums"]["permission_action"]
+          _module: Database["public"]["Enums"]["permission_module"]
         }
         Returns: boolean
       }
@@ -1678,6 +1834,29 @@ export type Database = {
         | "backoffice"
         | "compta"
         | "king"
+      dashboard_scope: "personal" | "team" | "global"
+      permission_action:
+        | "view"
+        | "create"
+        | "update"
+        | "delete"
+        | "export"
+        | "deposit"
+        | "cancel"
+        | "generate"
+        | "validate"
+        | "modify_rules"
+      permission_module:
+        | "clients"
+        | "contracts"
+        | "partners"
+        | "products"
+        | "collaborators"
+        | "commissions"
+        | "decomptes"
+        | "payout"
+        | "dashboard"
+        | "settings"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1814,6 +1993,31 @@ export const Constants = {
         "backoffice",
         "compta",
         "king",
+      ],
+      dashboard_scope: ["personal", "team", "global"],
+      permission_action: [
+        "view",
+        "create",
+        "update",
+        "delete",
+        "export",
+        "deposit",
+        "cancel",
+        "generate",
+        "validate",
+        "modify_rules",
+      ],
+      permission_module: [
+        "clients",
+        "contracts",
+        "partners",
+        "products",
+        "collaborators",
+        "commissions",
+        "decomptes",
+        "payout",
+        "dashboard",
+        "settings",
       ],
     },
   },
