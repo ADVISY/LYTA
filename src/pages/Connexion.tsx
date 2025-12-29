@@ -9,6 +9,7 @@ import lytaLogo from "@/assets/lyta-logo.svg";
 import advisyLogo from "@/assets/advisy-logo.svg";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
 
@@ -703,6 +704,10 @@ const Connexion = () => {
     <div className="min-h-screen bg-background relative">
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
+      {/* Theme Toggle Button */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
 
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
