@@ -76,53 +76,123 @@ serve(async (req) => {
       throw new Error("Tenant not found");
     }
 
-    // Generate a secure temporary password
-    const tempPassword = crypto.randomUUID().slice(0, 16) + "Aa1!";
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
 
-    // Create the user in Supabase Auth
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        first_name,
-        last_name,
-        phone,
-        language: language || "fr",
-        tenant_id,
-        tenant_name: tenant.name,
-      },
-    });
+    let userId: string;
+    let isNewUser = false;
 
-    if (createError) {
-      if (createError.message.includes("already been registered")) {
-        throw new Error("Un utilisateur avec cet email existe déjà");
+    if (existingUser) {
+      // User already exists - link them to the tenant
+      console.log("User already exists, linking to tenant:", existingUser.id);
+      userId = existingUser.id;
+
+      // Check if user is already assigned to this tenant
+      const { data: existingAssignment } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("tenant_id", tenant_id)
+        .maybeSingle();
+
+      if (existingAssignment) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            user_id: userId,
+            email,
+            tenant_id,
+            already_assigned: true,
+            message: "L'utilisateur était déjà assigné à ce tenant.",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
       }
-      throw createError;
-    }
 
-    if (!newUser.user) {
-      throw new Error("Failed to create user");
-    }
+      // Update user role to admin if they're just a client
+      const { data: currentRole } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .single();
 
-    // Assign 'admin' role to the new user
-    const { error: roleInsertError } = await supabaseAdmin
-      .from("user_roles")
-      .insert({
-        user_id: newUser.user.id,
-        role: "admin",
+      if (currentRole?.role === "client") {
+        await supabaseAdmin
+          .from("user_roles")
+          .update({ role: "admin" })
+          .eq("user_id", userId);
+        console.log("Upgraded user role from client to admin");
+      }
+
+    } else {
+      // Create new user
+      isNewUser = true;
+      const tempPassword = crypto.randomUUID().slice(0, 16) + "Aa1!";
+
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name,
+          last_name,
+          phone,
+          language: language || "fr",
+          tenant_id,
+          tenant_name: tenant.name,
+        },
       });
 
-    if (roleInsertError) {
-      console.error("Error assigning role:", roleInsertError);
-      // Continue anyway - we can fix the role later
+      if (createError) {
+        throw createError;
+      }
+
+      if (!newUser.user) {
+        throw new Error("Failed to create user");
+      }
+
+      userId = newUser.user.id;
+
+      // Assign 'admin' role to the new user
+      await supabaseAdmin
+        .from("user_roles")
+        .insert({
+          user_id: userId,
+          role: "admin",
+        });
+
+      // Create profile for the user
+      await supabaseAdmin
+        .from("profiles")
+        .upsert({
+          id: userId,
+          email,
+          first_name,
+          last_name,
+          phone,
+        });
+
+      // Send password reset email so admin can set their own password
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+        },
+      });
+
+      console.log("New admin user created:", userId);
     }
 
     // Create tenant assignment
     const { error: assignmentError } = await supabaseAdmin
       .from("user_tenant_assignments")
       .insert({
-        user_id: newUser.user.id,
+        user_id: userId,
         tenant_id: tenant_id,
         is_platform_admin: false,
       });
@@ -131,49 +201,24 @@ serve(async (req) => {
       console.error("Error creating tenant assignment:", assignmentError);
     }
 
-    // Create profile for the user
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .upsert({
-        id: newUser.user.id,
-        email,
-        first_name,
-        last_name,
-        phone,
-      });
-
-    if (profileError) {
-      console.error("Error creating profile:", profileError);
-    }
-
-    // Send password reset email so admin can set their own password
-    const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: {
-        redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
-      },
-    });
-
-    if (resetError) {
-      console.error("Error generating reset link:", resetError);
-    }
-
-    // TODO: Send invitation email via Resend with the reset link
-    console.log("Admin user created successfully:", {
-      userId: newUser.user.id,
+    console.log("Admin user linked to tenant successfully:", {
+      userId,
       email,
       tenantId: tenant_id,
       tenantName: tenant.name,
+      isNewUser,
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        user_id: newUser.user.id,
+        user_id: userId,
         email,
         tenant_id,
-        message: "Admin créé avec succès. Un email d'invitation a été envoyé.",
+        is_new_user: isNewUser,
+        message: isNewUser 
+          ? "Admin créé avec succès. Un email d'invitation a été envoyé."
+          : "Utilisateur existant lié au tenant avec succès.",
       }),
       {
         status: 200,
