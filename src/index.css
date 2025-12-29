@@ -73,6 +73,12 @@ All colors MUST be HSL.
     --crm-warning: 38 92% 50%;
     --crm-info: 199 89% 48%;
     --crm-danger: 0 84% 60%;
+
+    /* King Gold Color */
+    --king-gold: 45 93% 47%;
+    --king-gold-light: 45 93% 60%;
+    --king-gold-dark: 40 90% 40%;
+    --king-gold-glow: 45 93% 70%;
   }
 
   .dark {
@@ -135,6 +141,12 @@ All colors MUST be HSL.
     --crm-warning: 38 80% 55%;
     --crm-info: 199 80% 55%;
     --crm-danger: 0 70% 55%;
+
+    /* King Gold Color - Dark Mode */
+    --king-gold: 45 90% 55%;
+    --king-gold-light: 45 90% 65%;
+    --king-gold-dark: 40 85% 45%;
+    --king-gold-glow: 45 90% 70%;
   }
 }
 

@@ -54,6 +54,12 @@ export default {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+        king: {
+          DEFAULT: "hsl(var(--king-gold))",
+          light: "hsl(var(--king-gold-light))",
+          dark: "hsl(var(--king-gold-dark))",
+          glow: "hsl(var(--king-gold-glow))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
