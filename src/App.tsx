@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import Connexion from "./pages/Connexion";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -49,6 +50,7 @@ const App = () => (
             
             {/* Login Page */}
             <Route path="/connexion" element={<Connexion />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* CRM Routes */}
             <Route path="/crm" element={<ProtectedRoute><CRMLayout /></ProtectedRoute>}>
