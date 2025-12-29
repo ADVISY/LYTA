@@ -12,13 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
-  Users, UserCheck, AlertCircle, Loader2
+  Users, UserCheck, AlertCircle, Loader2, KeyRound
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RolesManager } from "@/components/crm/settings/RolesManager";
+import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 
 // Couleurs disponibles pour le thème
 const themeColors = [
@@ -473,7 +475,7 @@ export default function CRMParametres() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+        <TabsList className="flex flex-wrap gap-1 h-auto w-full max-w-4xl">
           <TabsTrigger value="profil" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profil</span>
@@ -481,6 +483,14 @@ export default function CRMParametres() {
           <TabsTrigger value="comptes" className="gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Comptes</span>
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Rôles</span>
+          </TabsTrigger>
+          <TabsTrigger value="utilisateurs" className="gap-2">
+            <KeyRound className="h-4 w-4" />
+            <span className="hidden sm:inline">Permissions</span>
           </TabsTrigger>
           <TabsTrigger value="compagnies" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -834,6 +844,16 @@ export default function CRMParametres() {
               </div>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        {/* RÔLES */}
+        <TabsContent value="roles" className="space-y-6 mt-6">
+          <RolesManager />
+        </TabsContent>
+
+        {/* UTILISATEURS & PERMISSIONS */}
+        <TabsContent value="utilisateurs" className="space-y-6 mt-6">
+          <UserRolesManager />
         </TabsContent>
 
         {/* COMPAGNIES */}

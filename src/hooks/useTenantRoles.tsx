@@ -446,8 +446,8 @@ export function useRolePermissions(roleId: string | null) {
           .from('tenant_role_permissions')
           .insert({
             role_id: roleId,
-            module,
-            action,
+            module: module as any,
+            action: action as any,
             allowed,
           });
       }

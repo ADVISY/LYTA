@@ -124,7 +124,7 @@ export function usePermissions(): UsePermissionsReturn {
           commissionScope = 'all';
           break;
         }
-        if (ur.tenant_roles?.can_see_team_commissions && commissionScope !== 'all' && commissionScope !== 'team') {
+        if (ur.tenant_roles?.can_see_team_commissions && commissionScope !== 'team') {
           commissionScope = 'team';
         }
         if (ur.tenant_roles?.can_see_own_commissions && commissionScope === 'none') {
