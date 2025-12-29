@@ -563,8 +563,8 @@ const Connexion = () => {
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           <img 
-            src={view === "client" || loginType === "client" ? advisyLogo : lytaLogo} 
-            alt={view === "client" || loginType === "client" ? "Advisy" : "LYTA"} 
+            src={view === "client" ? advisyLogo : lytaLogo} 
+            alt={view === "client" ? "Advisy" : "LYTA"} 
             className="h-24 sm:h-32 mx-auto"
           />
         </div>
