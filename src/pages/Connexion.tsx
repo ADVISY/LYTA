@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import lytaLogo from "@/assets/lyta-logo.svg";
+import advisyLogo from "@/assets/advisy-logo.svg";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -562,8 +563,8 @@ const Connexion = () => {
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           <img 
-            src={lytaLogo} 
-            alt="LYTA" 
+            src={view === "client" || loginType === "client" ? advisyLogo : lytaLogo} 
+            alt={view === "client" || loginType === "client" ? "Advisy" : "LYTA"} 
             className="h-24 sm:h-32 mx-auto"
           />
         </div>
