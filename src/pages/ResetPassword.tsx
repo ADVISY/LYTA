@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import lytaLogo from "@/assets/lyta-logo.svg";
+import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { useAuth } from "@/hooks/useAuth";
 
 const ResetPassword = () => {

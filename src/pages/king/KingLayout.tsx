@@ -19,7 +19,7 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import lytaLogo from "@/assets/lyta-logo.svg";
+import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [

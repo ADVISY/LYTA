@@ -5,7 +5,7 @@ import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown } from "lucide
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
-import lytaLogo from "@/assets/lyta-logo.svg";
+import lytaLogo from "@/assets/lyta-logo-full.svg";
 import advisyLogo from "@/assets/advisy-logo.svg";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
