@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useCelebration } from "@/hooks/useCelebration";
 import {
   Card,
@@ -37,7 +36,9 @@ import {
   Shield,
   Briefcase,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  LogOut
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import lytaLogo from "@/assets/lyta-logo.svg";
@@ -50,6 +51,13 @@ type Client = {
   email: string | null;
   phone: string | null;
   mobile: string | null;
+};
+
+type VerifiedPartner = {
+  id: string;
+  name: string;
+  firstName: string | null;
+  lastName: string | null;
 };
 
 // Form types for each category
@@ -148,9 +156,14 @@ type BusinessFormData = {
 
 export default function DeposerContrat() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
   const { celebrate } = useCelebration();
   const { toast } = useToast();
+
+  // Email verification state
+  const [verificationStep, setVerificationStep] = useState<'email' | 'form'>('email');
+  const [partnerEmail, setPartnerEmail] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifiedPartner, setVerifiedPartner] = useState<VerifiedPartner | null>(null);
 
   const [activeTab, setActiveTab] = useState("sana");
   const [loading, setLoading] = useState(false);
@@ -253,29 +266,102 @@ export default function DeposerContrat() {
     inclureCGA: "",
   });
 
-  // Redirect if not authenticated
+  // Load clients when verified
   useEffect(() => {
-    if (!authLoading && !user) {
-      sessionStorage.setItem('loginTarget', 'team');
-      navigate("/connexion");
-    }
-  }, [user, authLoading, navigate]);
-
-  // Load clients
-  useEffect(() => {
-    if (user) {
+    if (verifiedPartner) {
       loadClients();
     }
-  }, [user]);
+  }, [verifiedPartner]);
+
+  // Set agent name when partner is verified
+  useEffect(() => {
+    if (verifiedPartner) {
+      const agentName = verifiedPartner.name || `${verifiedPartner.firstName || ''} ${verifiedPartner.lastName || ''}`.trim();
+      setSanaForm(prev => ({ ...prev, agentName }));
+      setVitaForm(prev => ({ ...prev, agentName }));
+      setMedioForm(prev => ({ ...prev, agentName }));
+    }
+  }, [verifiedPartner]);
+
+  const handleVerifyEmail = async () => {
+    if (!partnerEmail.trim()) {
+      toast({
+        title: "Email requis",
+        description: "Veuillez entrer votre adresse email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(partnerEmail.trim())) {
+      toast({
+        title: "Email invalide",
+        description: "Veuillez entrer une adresse email valide",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-partner-email', {
+        body: { email: partnerEmail.trim().toLowerCase() }
+      });
+
+      if (error) {
+        throw new Error(error.message || "Erreur de vérification");
+      }
+
+      if (data?.success && data?.partner) {
+        setVerifiedPartner(data.partner);
+        setVerificationStep('form');
+        toast({
+          title: "Bienvenue !",
+          description: `Accès autorisé pour ${data.partner.name}`,
+        });
+      } else {
+        toast({
+          title: "Accès refusé",
+          description: "Cet email n'est pas enregistré comme collaborateur LYTA",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Verification error:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de vérifier l'email",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setVerifiedPartner(null);
+    setVerificationStep('email');
+    setPartnerEmail("");
+    setClients([]);
+    setSelectedClientId("");
+  };
 
   const loadClients = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("clients")
-      .select("id, first_name, last_name, company_name, email, phone, mobile")
-      .order("last_name");
-    if (data) setClients(data);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, company_name, email, phone, mobile")
+        .neq("type_adresse", "collaborateur")
+        .order("last_name");
+      if (data) setClients(data);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredClients = clients.filter((client) => {
@@ -354,7 +440,7 @@ export default function DeposerContrat() {
         product_id: "00000000-0000-0000-0000-000000000001", // Placeholder
         start_date: sanaForm.lamalDateEffet || new Date().toISOString().split("T")[0],
         status: "pending",
-        notes: `SANA - Agent: ${sanaForm.agentName}\nLAMal Date: ${sanaForm.lamalDateEffet}\nLCA Date: ${sanaForm.lcaDateEffet}\nLCA Production: ${sanaForm.lcaProduction}\n${sanaForm.commentaires}`,
+        notes: `SANA - Agent: ${sanaForm.agentName}\nEmail Agent: ${partnerEmail}\nLAMal Date: ${sanaForm.lamalDateEffet}\nLCA Date: ${sanaForm.lcaDateEffet}\nLCA Production: ${sanaForm.lcaProduction}\n${sanaForm.commentaires}`,
         product_type: "sana",
       });
 
@@ -375,7 +461,7 @@ export default function DeposerContrat() {
         lamalDateEffet: "",
         lcaDateEffet: "",
         lcaProduction: "",
-        agentName: "",
+        agentName: verifiedPartner?.name || "",
         commentaires: "",
         confirmDocuments: false,
       });
@@ -417,7 +503,7 @@ export default function DeposerContrat() {
         start_date: vitaForm.vitaDateEffet || new Date().toISOString().split("T")[0],
         premium_monthly: parseFloat(vitaForm.vitaPrimeMensuelle) || 0,
         status: "pending",
-        notes: `VITA - Agent: ${vitaForm.agentName}\nDurée: ${vitaForm.vitaDureeContrat}\n${vitaForm.commentaires}`,
+        notes: `VITA - Agent: ${vitaForm.agentName}\nEmail Agent: ${partnerEmail}\nDurée: ${vitaForm.vitaDureeContrat}\n${vitaForm.commentaires}`,
         product_type: "vita",
       });
 
@@ -437,7 +523,7 @@ export default function DeposerContrat() {
         vitaDateEffet: "",
         vitaDureeContrat: "",
         vitaPrimeMensuelle: "",
-        agentName: "",
+        agentName: verifiedPartner?.name || "",
         commentaires: "",
         confirmDocuments: false,
       });
@@ -478,7 +564,7 @@ export default function DeposerContrat() {
         product_id: "00000000-0000-0000-0000-000000000003", // Placeholder
         start_date: medioForm.dateEffet || new Date().toISOString().split("T")[0],
         status: "pending",
-        notes: `MEDIO - Agent: ${medioForm.agentName}\nType: ${medioForm.typeCouverture}\nProduction: ${medioForm.production}\n${medioForm.commentaires}`,
+        notes: `MEDIO - Agent: ${medioForm.agentName}\nEmail Agent: ${partnerEmail}\nType: ${medioForm.typeCouverture}\nProduction: ${medioForm.production}\n${medioForm.commentaires}`,
         product_type: "medio",
       });
 
@@ -498,7 +584,7 @@ export default function DeposerContrat() {
         dateEffet: "",
         typeCouverture: "",
         production: "",
-        agentName: "",
+        agentName: verifiedPartner?.name || "",
         commentaires: "",
         confirmDocuments: false,
       });
@@ -515,10 +601,10 @@ export default function DeposerContrat() {
   };
 
   const handleSubmitBusiness = async () => {
-    if (!businessForm.entrepriseNom || !businessForm.chefNom || !businessForm.chefPrenom) {
+    if (!businessForm.entrepriseNom || !businessForm.chefPrenom || !businessForm.chefNom) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs obligatoires",
+        description: "Veuillez remplir les informations de l'entreprise et du chef d'entreprise",
         variant: "destructive",
       });
       return;
@@ -531,9 +617,9 @@ export default function DeposerContrat() {
         product_id: "00000000-0000-0000-0000-000000000004", // Placeholder
         start_date: businessForm.dateEffet || new Date().toISOString().split("T")[0],
         status: "pending",
-        notes: `BUSINESS - Entreprise: ${businessForm.entrepriseNom}\nActivité: ${businessForm.entrepriseActivite}\nForme: ${businessForm.formeSociete}\nChef: ${businessForm.chefPrenom} ${businessForm.chefNom}\n${businessForm.commentaires}`,
+        notes: `BUSINESS - Email Agent: ${partnerEmail}\nEntreprise: ${businessForm.entrepriseNom}\nChef: ${businessForm.chefPrenom} ${businessForm.chefNom}\nActivité: ${businessForm.entrepriseActivite}\n${businessForm.commentaires}`,
         product_type: "business",
-        company_name: businessForm.entrepriseNom,
+        products_data: businessForm,
       });
 
       if (error) throw error;
@@ -606,7 +692,77 @@ export default function DeposerContrat() {
     }
   };
 
-  if (authLoading || loading) {
+  // Email verification screen
+  if (verificationStep === 'email') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+        {/* Header */}
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <img src={lytaLogo} alt="LYTA" className="h-8" />
+            </div>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="container py-16 max-w-md">
+          <Card className="border-2">
+            <CardHeader className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Accès Collaborateurs</CardTitle>
+              <CardDescription>
+                Entrez votre adresse email professionnelle pour accéder au formulaire de dépôt de contrat
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Adresse email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="votre.email@exemple.com"
+                  value={partnerEmail}
+                  onChange={(e) => setPartnerEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleVerifyEmail();
+                    }
+                  }}
+                  disabled={verifying}
+                />
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={handleVerifyEmail}
+                disabled={verifying}
+              >
+                {verifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Vérification...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Vérifier mon accès
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                Seuls les collaborateurs enregistrés chez LYTA peuvent déposer des contrats
+              </p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  // Loading state while fetching clients
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -620,15 +776,17 @@ export default function DeposerContrat() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/connexion")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <img src={lytaLogo} alt="LYTA" className="h-8" />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
+              <User className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">{verifiedPartner?.name}</span>
+            </div>
             <ThemeToggle />
-            <Button variant="outline" onClick={() => navigate("/crm")}>
-              Accéder au CRM
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Déconnexion
             </Button>
           </div>
         </div>
@@ -698,169 +856,168 @@ export default function DeposerContrat() {
           </CardContent>
         </Card>
 
-        {/* Form Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+        {/* Tabs for different form types */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="sana" className="flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              SANA
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">SANA</span>
             </TabsTrigger>
             <TabsTrigger value="vita" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              VITA
+              <Heart className="h-4 w-4" />
+              <span className="hidden sm:inline">VITA</span>
             </TabsTrigger>
             <TabsTrigger value="medio" className="flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              MEDIO
+              <FileCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">MEDIO</span>
             </TabsTrigger>
             <TabsTrigger value="business" className="flex items-center gap-2">
               <Briefcase className="h-4 w-4" />
-              BUSINESS
+              <span className="hidden sm:inline">BUSINESS</span>
             </TabsTrigger>
           </TabsList>
 
           {/* SANA Tab */}
           <TabsContent value="sana">
             <Card>
-              <CardHeader className="bg-gradient-to-r from-rose-500/10 to-pink-500/10 rounded-t-lg">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-rose-500" />
-                  Formulaire de production LYTA - SANA
+                  <Shield className="h-5 w-5 text-blue-500" />
+                  Formulaire SANA - Assurance Maladie
                 </CardTitle>
-                <CardDescription>Assurance maladie LAMal / LCA</CardDescription>
+                <CardDescription>
+                  Pour les contrats LAMal et LCA
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6">
                 {/* Client Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nom *</Label>
+                    <Label htmlFor="sana-nom">Nom du client *</Label>
                     <Input
-                      placeholder="Nom du client"
+                      id="sana-nom"
                       value={sanaForm.clientName}
                       onChange={(e) => setSanaForm(prev => ({ ...prev, clientName: e.target.value }))}
+                      placeholder="Nom de famille"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Prénom *</Label>
+                    <Label htmlFor="sana-prenom">Prénom du client *</Label>
                     <Input
-                      placeholder="Prénom du client"
+                      id="sana-prenom"
                       value={sanaForm.clientPrenom}
                       onChange={(e) => setSanaForm(prev => ({ ...prev, clientPrenom: e.target.value }))}
+                      placeholder="Prénom"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Email *</Label>
+                    <Label htmlFor="sana-email">Email du client *</Label>
                     <Input
+                      id="sana-email"
                       type="email"
-                      placeholder="Email du client"
                       value={sanaForm.clientEmail}
                       onChange={(e) => setSanaForm(prev => ({ ...prev, clientEmail: e.target.value }))}
+                      placeholder="email@exemple.com"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Téléphone *</Label>
+                    <Label htmlFor="sana-tel">Téléphone</Label>
                     <Input
-                      placeholder="N° de téléphone"
+                      id="sana-tel"
                       value={sanaForm.clientTel}
                       onChange={(e) => setSanaForm(prev => ({ ...prev, clientTel: e.target.value }))}
+                      placeholder="+41 79 000 00 00"
                     />
                   </div>
                 </div>
 
-                {/* Contract Info */}
-                <div className="space-y-2">
-                  <Label>LAMal - Date d'effet</Label>
-                  <Input
-                    type="date"
-                    value={sanaForm.lamalDateEffet}
-                    onChange={(e) => setSanaForm(prev => ({ ...prev, lamalDateEffet: e.target.value }))}
-                  />
+                {/* Contract Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sana-lamal-date">Date d'effet LAMal</Label>
+                    <Input
+                      id="sana-lamal-date"
+                      type="date"
+                      value={sanaForm.lamalDateEffet}
+                      onChange={(e) => setSanaForm(prev => ({ ...prev, lamalDateEffet: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sana-lca-date">Date d'effet LCA</Label>
+                    <Input
+                      id="sana-lca-date"
+                      type="date"
+                      value={sanaForm.lcaDateEffet}
+                      onChange={(e) => setSanaForm(prev => ({ ...prev, lcaDateEffet: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sana-lca-prod">Production LCA (CHF)</Label>
+                    <Input
+                      id="sana-lca-prod"
+                      type="number"
+                      value={sanaForm.lcaProduction}
+                      onChange={(e) => setSanaForm(prev => ({ ...prev, lcaProduction: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sana-agent">Nom de l'agent</Label>
+                    <Input
+                      id="sana-agent"
+                      value={sanaForm.agentName}
+                      onChange={(e) => setSanaForm(prev => ({ ...prev, agentName: e.target.value }))}
+                      placeholder="Votre nom"
+                    />
+                  </div>
                 </div>
 
+                {/* Comments */}
                 <div className="space-y-2">
-                  <Label>LCA - Date d'effet</Label>
-                  <Input
-                    type="date"
-                    value={sanaForm.lcaDateEffet}
-                    onChange={(e) => setSanaForm(prev => ({ ...prev, lcaDateEffet: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>LCA - Production (SANA)</Label>
-                  <Input
-                    placeholder="Montant de la production"
-                    value={sanaForm.lcaProduction}
-                    onChange={(e) => setSanaForm(prev => ({ ...prev, lcaProduction: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Nom de l'agent LYTA *</Label>
-                  <Input
-                    placeholder="Votre nom complet"
-                    value={sanaForm.agentName}
-                    onChange={(e) => setSanaForm(prev => ({ ...prev, agentName: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Commentaires</Label>
+                  <Label htmlFor="sana-comments">Commentaires</Label>
                   <Textarea
-                    placeholder="Pour les familles, en cas de différence sur les dates, utilisez cet espace..."
+                    id="sana-comments"
                     value={sanaForm.commentaires}
                     onChange={(e) => setSanaForm(prev => ({ ...prev, commentaires: e.target.value }))}
+                    placeholder="Informations complémentaires..."
                     rows={3}
                   />
                 </div>
 
-                {/* Documents Info */}
-                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-amber-800 dark:text-amber-200 mb-2">
-                        Vous pouvez ajouter plusieurs documents, merci de les regrouper PAR PERSONNE
-                      </p>
-                      <ul className="list-disc pl-4 space-y-1 text-amber-700 dark:text-amber-300">
-                        <li>Proposition avec déclaration de santé</li>
-                        <li>Copie des anciennes polices (sauf en cas d'augmentation des couvertures)</li>
-                        <li>Copie ou photo des pièces d'identité</li>
-                        <li>Documents de résiliations (LAMal & LCA)</li>
-                      </ul>
-                    </div>
+                {/* Document confirmation */}
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                  <Checkbox
+                    id="sana-confirm"
+                    checked={sanaForm.confirmDocuments}
+                    onCheckedChange={(checked) => 
+                      setSanaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="sana-confirm" className="font-medium cursor-pointer">
+                      Je confirme avoir téléchargé tous les documents requis
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Carte d'identité, attestation de résidence, bulletins de salaire, etc.
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="confirm-sana"
-                    checked={sanaForm.confirmDocuments}
-                    onCheckedChange={(checked) => setSanaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))}
-                  />
-                  <label htmlFor="confirm-sana" className="text-sm font-medium cursor-pointer">
-                    Je confirme avoir téléchargé tous les documents requis
-                  </label>
-                </div>
-
-                <Button
-                  className="w-full"
+                <Button 
+                  className="w-full" 
                   size="lg"
                   onClick={handleSubmitSana}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Envoi en cours...
                     </>
                   ) : (
                     <>
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Soumettre SANA
+                      <Upload className="mr-2 h-4 w-4" />
+                      Soumettre le formulaire SANA
                     </>
                   )}
                 </Button>
@@ -871,160 +1028,155 @@ export default function DeposerContrat() {
           {/* VITA Tab */}
           <TabsContent value="vita">
             <Card>
-              <CardHeader className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-t-lg">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-blue-500" />
-                  Formulaire de production LYTA - VITA
+                  <Heart className="h-5 w-5 text-red-500" />
+                  Formulaire VITA - Assurance Vie
                 </CardTitle>
-                <CardDescription>Assurance vie / Prévoyance / 3e pilier</CardDescription>
+                <CardDescription>
+                  Pour les contrats d'assurance vie
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6">
                 {/* Client Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nom *</Label>
+                    <Label htmlFor="vita-nom">Nom du client *</Label>
                     <Input
-                      placeholder="Nom du client"
+                      id="vita-nom"
                       value={vitaForm.clientName}
                       onChange={(e) => setVitaForm(prev => ({ ...prev, clientName: e.target.value }))}
+                      placeholder="Nom de famille"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Prénom *</Label>
+                    <Label htmlFor="vita-prenom">Prénom du client *</Label>
                     <Input
-                      placeholder="Prénom du client"
+                      id="vita-prenom"
                       value={vitaForm.clientPrenom}
                       onChange={(e) => setVitaForm(prev => ({ ...prev, clientPrenom: e.target.value }))}
+                      placeholder="Prénom"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Email *</Label>
+                    <Label htmlFor="vita-email">Email du client *</Label>
                     <Input
+                      id="vita-email"
                       type="email"
-                      placeholder="Email du client"
                       value={vitaForm.clientEmail}
                       onChange={(e) => setVitaForm(prev => ({ ...prev, clientEmail: e.target.value }))}
+                      placeholder="email@exemple.com"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Téléphone *</Label>
+                    <Label htmlFor="vita-tel">Téléphone</Label>
                     <Input
-                      placeholder="N° de téléphone"
+                      id="vita-tel"
                       value={vitaForm.clientTel}
                       onChange={(e) => setVitaForm(prev => ({ ...prev, clientTel: e.target.value }))}
+                      placeholder="+41 79 000 00 00"
                     />
                   </div>
                 </div>
 
-                {/* Contract Info */}
-                <div className="space-y-2">
-                  <Label>Vita - Date d'effet</Label>
-                  <Input
-                    type="date"
-                    value={vitaForm.vitaDateEffet}
-                    onChange={(e) => setVitaForm(prev => ({ ...prev, vitaDateEffet: e.target.value }))}
-                  />
+                {/* Contract Details */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="vita-date">Date d'effet</Label>
+                    <Input
+                      id="vita-date"
+                      type="date"
+                      value={vitaForm.vitaDateEffet}
+                      onChange={(e) => setVitaForm(prev => ({ ...prev, vitaDateEffet: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vita-duree">Durée du contrat</Label>
+                    <Select
+                      value={vitaForm.vitaDureeContrat}
+                      onValueChange={(value) => setVitaForm(prev => ({ ...prev, vitaDureeContrat: value }))}
+                    >
+                      <SelectTrigger id="vita-duree">
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 ans</SelectItem>
+                        <SelectItem value="10">10 ans</SelectItem>
+                        <SelectItem value="15">15 ans</SelectItem>
+                        <SelectItem value="20">20 ans</SelectItem>
+                        <SelectItem value="25">25 ans</SelectItem>
+                        <SelectItem value="30">30 ans</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vita-prime">Prime mensuelle (CHF)</Label>
+                    <Input
+                      id="vita-prime"
+                      type="number"
+                      value={vitaForm.vitaPrimeMensuelle}
+                      onChange={(e) => setVitaForm(prev => ({ ...prev, vitaPrimeMensuelle: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Vita - Durée du contrat</Label>
-                  <Select 
-                    value={vitaForm.vitaDureeContrat} 
-                    onValueChange={(v) => setVitaForm(prev => ({ ...prev, vitaDureeContrat: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner la durée" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 ans</SelectItem>
-                      <SelectItem value="10">10 ans</SelectItem>
-                      <SelectItem value="15">15 ans</SelectItem>
-                      <SelectItem value="20">20 ans</SelectItem>
-                      <SelectItem value="25">25 ans</SelectItem>
-                      <SelectItem value="30">30 ans</SelectItem>
-                      <SelectItem value="retraite">Jusqu'à la retraite</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Vita - Prime mensuelle nette (diviser par 12 si annuelle)</Label>
+                  <Label htmlFor="vita-agent">Nom de l'agent</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={vitaForm.vitaPrimeMensuelle}
-                    onChange={(e) => setVitaForm(prev => ({ ...prev, vitaPrimeMensuelle: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Nom de l'agent LYTA *</Label>
-                  <Input
-                    placeholder="Votre nom complet"
+                    id="vita-agent"
                     value={vitaForm.agentName}
                     onChange={(e) => setVitaForm(prev => ({ ...prev, agentName: e.target.value }))}
+                    placeholder="Votre nom"
                   />
                 </div>
 
+                {/* Comments */}
                 <div className="space-y-2">
-                  <Label>Commentaires</Label>
+                  <Label htmlFor="vita-comments">Commentaires</Label>
                   <Textarea
-                    placeholder="Informations supplémentaires..."
+                    id="vita-comments"
                     value={vitaForm.commentaires}
                     onChange={(e) => setVitaForm(prev => ({ ...prev, commentaires: e.target.value }))}
+                    placeholder="Informations complémentaires..."
                     rows={3}
                   />
                 </div>
 
-                {/* Documents Info */}
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-                        Documents requis pour VITA
-                      </p>
-                      <ul className="list-disc pl-4 space-y-1 text-blue-700 dark:text-blue-300">
-                        <li>Proposition avec déclaration de santé</li>
-                        <li>Copie ou photo des pièces d'identité (certifiées)</li>
-                        <li>Formulaire d'adéquation</li>
-                        <li>Formulaire débit direct</li>
-                        <li>Procès-verbal de conseil (VITA)</li>
-                      </ul>
-                    </div>
+                {/* Document confirmation */}
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                  <Checkbox
+                    id="vita-confirm"
+                    checked={vitaForm.confirmDocuments}
+                    onCheckedChange={(checked) => 
+                      setVitaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="vita-confirm" className="font-medium cursor-pointer">
+                      Je confirme avoir téléchargé tous les documents requis
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Proposition signée, questionnaire de santé, justificatifs, etc.
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="confirm-vita"
-                    checked={vitaForm.confirmDocuments}
-                    onCheckedChange={(checked) => setVitaForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))}
-                  />
-                  <label htmlFor="confirm-vita" className="text-sm font-medium cursor-pointer">
-                    Je confirme avoir téléchargé tous les documents requis
-                  </label>
-                </div>
-
-                <Button
-                  className="w-full"
+                <Button 
+                  className="w-full" 
                   size="lg"
                   onClick={handleSubmitVita}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Envoi en cours...
                     </>
                   ) : (
                     <>
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Soumettre VITA
+                      <Upload className="mr-2 h-4 w-4" />
+                      Soumettre le formulaire VITA
                     </>
                   )}
                 </Button>
@@ -1035,155 +1187,154 @@ export default function DeposerContrat() {
           {/* MEDIO Tab */}
           <TabsContent value="medio">
             <Card>
-              <CardHeader className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-t-lg">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-emerald-500" />
-                  Formulaire de production LYTA - MEDIO
+                  <FileCheck className="h-5 w-5 text-green-500" />
+                  Formulaire MEDIO - Complémentaire Santé
                 </CardTitle>
-                <CardDescription>Assurances complémentaires (Non-vie)</CardDescription>
+                <CardDescription>
+                  Pour les assurances complémentaires
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6">
                 {/* Client Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nom *</Label>
+                    <Label htmlFor="medio-nom">Nom du client *</Label>
                     <Input
-                      placeholder="Nom du client"
+                      id="medio-nom"
                       value={medioForm.clientName}
                       onChange={(e) => setMedioForm(prev => ({ ...prev, clientName: e.target.value }))}
+                      placeholder="Nom de famille"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Prénom *</Label>
+                    <Label htmlFor="medio-prenom">Prénom du client *</Label>
                     <Input
-                      placeholder="Prénom du client"
+                      id="medio-prenom"
                       value={medioForm.clientPrenom}
                       onChange={(e) => setMedioForm(prev => ({ ...prev, clientPrenom: e.target.value }))}
+                      placeholder="Prénom"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Email *</Label>
+                    <Label htmlFor="medio-email">Email du client *</Label>
                     <Input
+                      id="medio-email"
                       type="email"
-                      placeholder="Email du client"
                       value={medioForm.clientEmail}
                       onChange={(e) => setMedioForm(prev => ({ ...prev, clientEmail: e.target.value }))}
+                      placeholder="email@exemple.com"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Téléphone *</Label>
+                    <Label htmlFor="medio-tel">Téléphone</Label>
                     <Input
-                      placeholder="N° de téléphone"
+                      id="medio-tel"
                       value={medioForm.clientTel}
                       onChange={(e) => setMedioForm(prev => ({ ...prev, clientTel: e.target.value }))}
+                      placeholder="+41 79 000 00 00"
                     />
                   </div>
                 </div>
 
-                {/* Contract Info */}
-                <div className="space-y-2">
-                  <Label>Date d'effet</Label>
-                  <Input
-                    type="date"
-                    value={medioForm.dateEffet}
-                    onChange={(e) => setMedioForm(prev => ({ ...prev, dateEffet: e.target.value }))}
-                  />
+                {/* Contract Details */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="medio-date">Date d'effet</Label>
+                    <Input
+                      id="medio-date"
+                      type="date"
+                      value={medioForm.dateEffet}
+                      onChange={(e) => setMedioForm(prev => ({ ...prev, dateEffet: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="medio-type">Type de couverture</Label>
+                    <Select
+                      value={medioForm.typeCouverture}
+                      onValueChange={(value) => setMedioForm(prev => ({ ...prev, typeCouverture: value }))}
+                    >
+                      <SelectTrigger id="medio-type">
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ambulatoire">Ambulatoire</SelectItem>
+                        <SelectItem value="hospitalisation">Hospitalisation</SelectItem>
+                        <SelectItem value="dentaire">Dentaire</SelectItem>
+                        <SelectItem value="optique">Optique</SelectItem>
+                        <SelectItem value="complet">Complet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="medio-prod">Production (CHF)</Label>
+                    <Input
+                      id="medio-prod"
+                      type="number"
+                      value={medioForm.production}
+                      onChange={(e) => setMedioForm(prev => ({ ...prev, production: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Type de couverture</Label>
-                  <Select 
-                    value={medioForm.typeCouverture} 
-                    onValueChange={(v) => setMedioForm(prev => ({ ...prev, typeCouverture: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner le type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto</SelectItem>
-                      <SelectItem value="menage">Ménage / RC</SelectItem>
-                      <SelectItem value="juridique">Protection juridique</SelectItem>
-                      <SelectItem value="voyage">Assurance voyage</SelectItem>
-                      <SelectItem value="autre">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Production</Label>
+                  <Label htmlFor="medio-agent">Nom de l'agent</Label>
                   <Input
-                    placeholder="Montant de la production"
-                    value={medioForm.production}
-                    onChange={(e) => setMedioForm(prev => ({ ...prev, production: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Nom de l'agent LYTA *</Label>
-                  <Input
-                    placeholder="Votre nom complet"
+                    id="medio-agent"
                     value={medioForm.agentName}
                     onChange={(e) => setMedioForm(prev => ({ ...prev, agentName: e.target.value }))}
+                    placeholder="Votre nom"
                   />
                 </div>
 
+                {/* Comments */}
                 <div className="space-y-2">
-                  <Label>Commentaires</Label>
+                  <Label htmlFor="medio-comments">Commentaires</Label>
                   <Textarea
-                    placeholder="Informations supplémentaires..."
+                    id="medio-comments"
                     value={medioForm.commentaires}
                     onChange={(e) => setMedioForm(prev => ({ ...prev, commentaires: e.target.value }))}
+                    placeholder="Informations complémentaires..."
                     rows={3}
                   />
                 </div>
 
-                {/* Documents Info */}
-                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">
-                        Documents requis pour MEDIO
-                      </p>
-                      <ul className="list-disc pl-4 space-y-1 text-emerald-700 dark:text-emerald-300">
-                        <li>Proposition signée</li>
-                        <li>Copie des anciennes polices</li>
-                        <li>Pièce d'identité</li>
-                        <li>Documents de résiliation</li>
-                      </ul>
-                    </div>
+                {/* Document confirmation */}
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                  <Checkbox
+                    id="medio-confirm"
+                    checked={medioForm.confirmDocuments}
+                    onCheckedChange={(checked) => 
+                      setMedioForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="medio-confirm" className="font-medium cursor-pointer">
+                      Je confirme avoir téléchargé tous les documents requis
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Proposition, questionnaire médical, pièce d'identité, etc.
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="confirm-medio"
-                    checked={medioForm.confirmDocuments}
-                    onCheckedChange={(checked) => setMedioForm(prev => ({ ...prev, confirmDocuments: checked as boolean }))}
-                  />
-                  <label htmlFor="confirm-medio" className="text-sm font-medium cursor-pointer">
-                    Je confirme avoir téléchargé tous les documents requis
-                  </label>
-                </div>
-
-                <Button
-                  className="w-full"
+                <Button 
+                  className="w-full" 
                   size="lg"
                   onClick={handleSubmitMedio}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Envoi en cours...
                     </>
                   ) : (
                     <>
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Soumettre MEDIO
+                      <Upload className="mr-2 h-4 w-4" />
+                      Soumettre le formulaire MEDIO
                     </>
                   )}
                 </Button>
@@ -1194,574 +1345,218 @@ export default function DeposerContrat() {
           {/* BUSINESS Tab */}
           <TabsContent value="business">
             <Card>
-              <CardHeader className="bg-gradient-to-r from-purple-500/10 to-violet-500/10 rounded-t-lg">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-purple-500" />
-                  Formulaire complet Entreprise
+                  Formulaire BUSINESS - Assurance Entreprise
                 </CardTitle>
-                <CardDescription>Assurances PME / Entreprises</CardDescription>
+                <CardDescription>
+                  Pour les contrats d'assurance entreprise (RC, LAA, etc.)
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6 space-y-8">
-                {/* Renseignements généraux */}
+              <CardContent className="space-y-8">
+                {/* Company Info */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Renseignements généraux</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Informations de l'entreprise
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Nom de l'entreprise *</Label>
+                      <Label htmlFor="biz-nom">Nom de l'entreprise *</Label>
                       <Input
-                        placeholder="Nom de l'entreprise"
+                        id="biz-nom"
                         value={businessForm.entrepriseNom}
                         onChange={(e) => setBusinessForm(prev => ({ ...prev, entrepriseNom: e.target.value }))}
+                        placeholder="Raison sociale"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Activité de l'entreprise *</Label>
+                      <Label htmlFor="biz-activite">Activité</Label>
                       <Input
-                        placeholder="Activité"
+                        id="biz-activite"
                         value={businessForm.entrepriseActivite}
                         onChange={(e) => setBusinessForm(prev => ({ ...prev, entrepriseActivite: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Forme de la Société *</Label>
-                      <RadioGroup 
-                        value={businessForm.formeSociete} 
-                        onValueChange={(v) => setBusinessForm(prev => ({ ...prev, formeSociete: v }))}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="sa" id="sa" />
-                          <label htmlFor="sa">SA</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="sarl" id="sarl" />
-                          <label htmlFor="sarl">Sàrl</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="snc" id="snc" />
-                          <label htmlFor="snc">Société en Nom Collectif</label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Nouvelle création ? *</Label>
-                      <RadioGroup 
-                        value={businessForm.nouvelleCreation} 
-                        onValueChange={(v) => setBusinessForm(prev => ({ ...prev, nouvelleCreation: v }))}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="oui" id="nc-oui" />
-                          <label htmlFor="nc-oui">Oui</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="non" id="nc-non" />
-                          <label htmlFor="nc-non">Non</label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Adresse de l'entreprise *</Label>
-                    <Textarea
-                      placeholder="Adresse complète"
-                      value={businessForm.entrepriseAdresse}
-                      onChange={(e) => setBusinessForm(prev => ({ ...prev, entrepriseAdresse: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Prénom du Chef d'Entreprise *</Label>
-                      <Input
-                        placeholder="Prénom"
-                        value={businessForm.chefPrenom}
-                        onChange={(e) => setBusinessForm(prev => ({ ...prev, chefPrenom: e.target.value }))}
+                        placeholder="Secteur d'activité"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Nom du Chef d'Entreprise *</Label>
-                      <Input
-                        placeholder="Nom"
-                        value={businessForm.chefNom}
-                        onChange={(e) => setBusinessForm(prev => ({ ...prev, chefNom: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Civilité *</Label>
-                      <Select 
-                        value={businessForm.civilite} 
-                        onValueChange={(v) => setBusinessForm(prev => ({ ...prev, civilite: v }))}
+                      <Label htmlFor="biz-forme">Forme juridique</Label>
+                      <Select
+                        value={businessForm.formeSociete}
+                        onValueChange={(value) => setBusinessForm(prev => ({ ...prev, formeSociete: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="biz-forme">
                           <SelectValue placeholder="Sélectionner" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="madame">Madame</SelectItem>
-                          <SelectItem value="monsieur">Monsieur</SelectItem>
+                          <SelectItem value="sa">SA</SelectItem>
+                          <SelectItem value="sarl">Sàrl</SelectItem>
+                          <SelectItem value="ri">Raison individuelle</SelectItem>
+                          <SelectItem value="snc">SNC</SelectItem>
+                          <SelectItem value="association">Association</SelectItem>
+                          <SelectItem value="fondation">Fondation</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Date de naissance</Label>
+                      <Label>Nouvelle création ?</Label>
+                      <RadioGroup
+                        value={businessForm.nouvelleCreation}
+                        onValueChange={(value) => setBusinessForm(prev => ({ ...prev, nouvelleCreation: value }))}
+                        className="flex gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="oui" id="nouvelle-oui" />
+                          <Label htmlFor="nouvelle-oui">Oui</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="non" id="nouvelle-non" />
+                          <Label htmlFor="nouvelle-non">Non</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="biz-adresse">Adresse de l'entreprise</Label>
+                    <Input
+                      id="biz-adresse"
+                      value={businessForm.entrepriseAdresse}
+                      onChange={(e) => setBusinessForm(prev => ({ ...prev, entrepriseAdresse: e.target.value }))}
+                      placeholder="Adresse complète"
+                    />
+                  </div>
+                </div>
+
+                {/* CEO Info */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Chef d'entreprise
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="chef-civilite">Civilité</Label>
+                      <Select
+                        value={businessForm.civilite}
+                        onValueChange={(value) => setBusinessForm(prev => ({ ...prev, civilite: value }))}
+                      >
+                        <SelectTrigger id="chef-civilite">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="m">Monsieur</SelectItem>
+                          <SelectItem value="mme">Madame</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chef-prenom">Prénom *</Label>
                       <Input
+                        id="chef-prenom"
+                        value={businessForm.chefPrenom}
+                        onChange={(e) => setBusinessForm(prev => ({ ...prev, chefPrenom: e.target.value }))}
+                        placeholder="Prénom"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chef-nom">Nom *</Label>
+                      <Input
+                        id="chef-nom"
+                        value={businessForm.chefNom}
+                        onChange={(e) => setBusinessForm(prev => ({ ...prev, chefNom: e.target.value }))}
+                        placeholder="Nom"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chef-naissance">Date de naissance</Label>
+                      <Input
+                        id="chef-naissance"
                         type="date"
                         value={businessForm.dateNaissance}
                         onChange={(e) => setBusinessForm(prev => ({ ...prev, dateNaissance: e.target.value }))}
                       />
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Adresse du Chef d'Entreprise *</Label>
-                    <Textarea
-                      placeholder="Adresse complète"
-                      value={businessForm.chefAdresse}
-                      onChange={(e) => setBusinessForm(prev => ({ ...prev, chefAdresse: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Nationalité *</Label>
+                      <Label htmlFor="chef-nationalite">Nationalité</Label>
                       <Input
-                        placeholder="Nationalité"
+                        id="chef-nationalite"
                         value={businessForm.nationalite}
                         onChange={(e) => setBusinessForm(prev => ({ ...prev, nationalite: e.target.value }))}
+                        placeholder="Nationalité"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Permis de séjour *</Label>
-                      <Input
-                        placeholder="Type de permis"
+                      <Label htmlFor="chef-permis">Type de permis</Label>
+                      <Select
                         value={businessForm.permis}
-                        onChange={(e) => setBusinessForm(prev => ({ ...prev, permis: e.target.value }))}
-                      />
+                        onValueChange={(value) => setBusinessForm(prev => ({ ...prev, permis: value }))}
+                      >
+                        <SelectTrigger id="chef-permis">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="suisse">Citoyen Suisse</SelectItem>
+                          <SelectItem value="c">Permis C</SelectItem>
+                          <SelectItem value="b">Permis B</SelectItem>
+                          <SelectItem value="g">Permis G</SelectItem>
+                          <SelectItem value="l">Permis L</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
 
-                {/* Responsabilité Civile */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Responsabilité Civile</h3>
-                  
+                {/* Date and Contact */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Souhaitez-vous une offre responsabilité civile ? *</Label>
-                    <RadioGroup 
-                      value={businessForm.offreRC} 
-                      onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offreRC: v }))}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="oui" id="rc-oui" />
-                          <label htmlFor="rc-oui">Oui</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="non" id="rc-non" />
-                          <label htmlFor="rc-non">Non</label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {businessForm.offreRC === "oui" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Quel type de contrat RC souhaitez-vous ? *</Label>
-                        <RadioGroup 
-                          value={businessForm.typeContratRC} 
-                          onValueChange={(v) => setBusinessForm(prev => ({ ...prev, typeContratRC: v }))}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="base" id="rc-base" />
-                            <label htmlFor="rc-base">RC De Base (Bureau)</label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="specifique" id="rc-spec" />
-                            <label htmlFor="rc-spec">RC Spécifique À L'activité</label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Chiffre d'Affaire *</Label>
-                          <Input
-                            placeholder="CHF"
-                            value={businessForm.chiffreAffaire}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, chiffreAffaire: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Somme d'Assurance</Label>
-                          <Select 
-                            value={businessForm.sommeAssuranceRC} 
-                            onValueChange={(v) => setBusinessForm(prev => ({ ...prev, sommeAssuranceRC: v }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="3mio">3 Mio.</SelectItem>
-                              <SelectItem value="5mio">5 Mio.</SelectItem>
-                              <SelectItem value="10mio">10 Mio.</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Franchise</Label>
-                        <Select 
-                          value={businessForm.franchiseRC} 
-                          onValueChange={(v) => setBusinessForm(prev => ({ ...prev, franchiseRC: v }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">0.--</SelectItem>
-                            <SelectItem value="200">200.--</SelectItem>
-                            <SelectItem value="500">500.--</SelectItem>
-                            <SelectItem value="1000">1000.--</SelectItem>
-                            <SelectItem value="2000">2000.--</SelectItem>
-                            <SelectItem value="5000">5000.--</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Assurance choses entreprise */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Assurance choses entreprise</h3>
-                  
-                  <div className="space-y-2">
-                    <Label>Souhaitez-vous une Assurance Choses pour l'Entreprise ? *</Label>
-                    <RadioGroup 
-                      value={businessForm.offreChoses} 
-                      onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offreChoses: v }))}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="oui" id="choses-oui" />
-                          <label htmlFor="choses-oui">Oui</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="non" id="choses-non" />
-                          <label htmlFor="choses-non">Non</label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {businessForm.offreChoses === "oui" && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="incendie"
-                          checked={businessForm.incendie}
-                          onCheckedChange={(checked) => setBusinessForm(prev => ({ ...prev, incendie: checked as boolean }))}
-                        />
-                        <label htmlFor="incendie">Incendie</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="evenements"
-                          checked={businessForm.evenementsNaturels}
-                          onCheckedChange={(checked) => setBusinessForm(prev => ({ ...prev, evenementsNaturels: checked as boolean }))}
-                        />
-                        <label htmlFor="evenements">Événements naturels</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="vol"
-                          checked={businessForm.vol}
-                          onCheckedChange={(checked) => setBusinessForm(prev => ({ ...prev, vol: checked as boolean }))}
-                        />
-                        <label htmlFor="vol">Vol</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="degat-eau"
-                          checked={businessForm.degatEau}
-                          onCheckedChange={(checked) => setBusinessForm(prev => ({ ...prev, degatEau: checked as boolean }))}
-                        />
-                        <label htmlFor="degat-eau">Dégât d'eau</label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Assurance personnes employés */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Assurances de personnes employés</h3>
-                  
-                  <div className="space-y-2">
-                    <Label>Souhaitez-vous une assurance pour les employés ? *</Label>
-                    <RadioGroup 
-                      value={businessForm.offrePersonnes} 
-                      onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offrePersonnes: v }))}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="oui" id="pers-oui" />
-                          <label htmlFor="pers-oui">Oui</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="non" id="pers-non" />
-                          <label htmlFor="pers-non">Non</label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {businessForm.offrePersonnes === "oui" && (
-                    <>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Nombre de Femmes</Label>
-                          <Input
-                            type="number"
-                            value={businessForm.nbFemmes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, nbFemmes: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Age moyen Femmes</Label>
-                          <Input
-                            type="number"
-                            value={businessForm.ageMoyenFemmes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, ageMoyenFemmes: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Somme salaires Femmes</Label>
-                          <Input
-                            placeholder="CHF"
-                            value={businessForm.salairesFemmes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, salairesFemmes: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Nombre d'Hommes</Label>
-                          <Input
-                            type="number"
-                            value={businessForm.nbHommes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, nbHommes: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Age moyen Hommes</Label>
-                          <Input
-                            type="number"
-                            value={businessForm.ageMoyenHommes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, ageMoyenHommes: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Somme salaires Hommes</Label>
-                          <Input
-                            placeholder="CHF"
-                            value={businessForm.salairesHommes}
-                            onChange={(e) => setBusinessForm(prev => ({ ...prev, salairesHommes: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Offre LAA Obligatoire ?</Label>
-                          <RadioGroup 
-                            value={businessForm.offreLAA} 
-                            onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offreLAA: v }))}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="oui" id="laa-oui" />
-                                <label htmlFor="laa-oui">Oui</label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="non" id="laa-non" />
-                                <label htmlFor="laa-non">Non</label>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Offre LAA Complémentaire ?</Label>
-                          <RadioGroup 
-                            value={businessForm.offreLAAComplementaire} 
-                            onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offreLAAComplementaire: v }))}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="oui" id="laac-oui" />
-                                <label htmlFor="laac-oui">Oui</label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="non" id="laac-non" />
-                                <label htmlFor="laac-non">Non</label>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Perte de gain maladie collective ?</Label>
-                          <RadioGroup 
-                            value={businessForm.offrePerteGain} 
-                            onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offrePerteGain: v }))}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="oui" id="pg-oui" />
-                                <label htmlFor="pg-oui">Oui</label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="non" id="pg-non" />
-                                <label htmlFor="pg-non">Non</label>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Assurance chef d'entreprise ?</Label>
-                          <RadioGroup 
-                            value={businessForm.offreChefEntreprise} 
-                            onValueChange={(v) => setBusinessForm(prev => ({ ...prev, offreChefEntreprise: v }))}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="oui" id="chef-oui" />
-                                <label htmlFor="chef-oui">Oui</label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="non" id="chef-non" />
-                                <label htmlFor="chef-non">Non</label>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Finalisation */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Finalisation</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Date du prochain RDV client *</Label>
-                      <Input
-                        type="date"
-                        value={businessForm.dateRDV}
-                        onChange={(e) => setBusinessForm(prev => ({ ...prev, dateRDV: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date d'effet *</Label>
-                      <Input
-                        type="date"
-                        value={businessForm.dateEffet}
-                        onChange={(e) => setBusinessForm(prev => ({ ...prev, dateEffet: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Email pour retour des offres *</Label>
+                    <Label htmlFor="biz-date-effet">Date d'effet souhaitée</Label>
                     <Input
+                      id="biz-date-effet"
+                      type="date"
+                      value={businessForm.dateEffet}
+                      onChange={(e) => setBusinessForm(prev => ({ ...prev, dateEffet: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="biz-email">Email de retour</Label>
+                    <Input
+                      id="biz-email"
                       type="email"
-                      placeholder="Votre email"
                       value={businessForm.emailRetour}
                       onChange={(e) => setBusinessForm(prev => ({ ...prev, emailRetour: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Langue des offres</Label>
-                    <RadioGroup 
-                      value={businessForm.langue} 
-                      onValueChange={(v) => setBusinessForm(prev => ({ ...prev, langue: v }))}
-                      className="flex flex-wrap gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="fr" id="lang-fr" />
-                        <label htmlFor="lang-fr">Français</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="de" id="lang-de" />
-                        <label htmlFor="lang-de">Allemand</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="it" id="lang-it" />
-                        <label htmlFor="lang-it">Italien</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="en" id="lang-en" />
-                        <label htmlFor="lang-en">Anglais</label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Commentaires</Label>
-                    <Textarea
-                      placeholder="Informations supplémentaires..."
-                      value={businessForm.commentaires}
-                      onChange={(e) => setBusinessForm(prev => ({ ...prev, commentaires: e.target.value }))}
-                      rows={3}
+                      placeholder="email@entreprise.ch"
                     />
                   </div>
                 </div>
 
-                <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-purple-600 mt-0.5" />
-                    <div className="text-sm text-purple-700 dark:text-purple-300">
-                      <p className="font-medium mb-1">Extrait du registre de commerce à inclure</p>
-                      <a 
-                        href="http://zefix.admin.ch/" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="underline hover:no-underline"
-                      >
-                        http://zefix.admin.ch/
-                      </a>
-                    </div>
-                  </div>
+                {/* Comments */}
+                <div className="space-y-2">
+                  <Label htmlFor="biz-comments">Commentaires</Label>
+                  <Textarea
+                    id="biz-comments"
+                    value={businessForm.commentaires}
+                    onChange={(e) => setBusinessForm(prev => ({ ...prev, commentaires: e.target.value }))}
+                    placeholder="Besoins spécifiques, détails des couvertures souhaitées..."
+                    rows={4}
+                  />
                 </div>
 
-                <Button
-                  className="w-full"
+                <Button 
+                  className="w-full" 
                   size="lg"
                   onClick={handleSubmitBusiness}
                   disabled={submitting}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Envoi en cours...
                     </>
                   ) : (
                     <>
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Soumettre BUSINESS
+                      <Upload className="mr-2 h-4 w-4" />
+                      Soumettre le formulaire BUSINESS
                     </>
                   )}
                 </Button>
