@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useDocuments } from "@/hooks/useDocuments";
+import { useCelebration } from "@/hooks/useCelebration";
 import {
   Dialog,
   DialogContent,
@@ -108,6 +109,7 @@ const isLamalProduct = (productName: string | null | undefined): boolean => {
 export default function ContractForm({ clientId, open, onOpenChange, onSuccess, editMode = false, policyId }: ContractFormProps) {
   const { createDocument } = useDocuments();
   const { createPolicy, updatePolicy, policies } = usePolicies();
+  const { celebrate } = useCelebration();
   const { toast } = useToast();
   
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -520,6 +522,11 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             });
           }
         }
+      }
+      
+      // Celebrate the new contract!
+      if (!editMode) {
+        celebrate('contract_added');
       }
       
       toast({
