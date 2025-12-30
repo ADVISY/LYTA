@@ -71,8 +71,9 @@ serve(async (req: Request): Promise<Response> => {
 
         const data = await response.json();
         results.push({ phone: recipient.phone, success: response.ok, sid: data.sid });
-      } catch (error) {
-        results.push({ phone: recipient.phone, success: false, error: error.message });
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ phone: recipient.phone, success: false, error: errorMessage });
       }
     }
 
@@ -87,10 +88,11 @@ serve(async (req: Request): Promise<Response> => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("SMS error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
