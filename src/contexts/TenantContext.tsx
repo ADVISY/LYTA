@@ -92,67 +92,50 @@ export function TenantProvider({ children }: TenantProviderProps) {
       }
 
       try {
-        // Fetch tenant by slug
-        const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .select(`
-            id,
-            name,
-            slug,
-            email,
-            status,
-            tenant_branding (
-              logo_url,
-              primary_color,
-              secondary_color,
-              display_name
-            )
-          `)
-          .eq('slug', slug)
-          .maybeSingle();
+        // Use RPC function to fetch tenant branding (works without authentication)
+        const { data: brandingData, error: brandingError } = await supabase
+          .rpc('get_tenant_branding_by_slug', { p_slug: slug });
 
-        if (tenantError) {
-          console.error('Error fetching tenant:', tenantError);
+        if (brandingError) {
+          console.error('Error fetching tenant branding:', brandingError);
           setError('Erreur lors du chargement du cabinet');
           setIsLoading(false);
           return;
         }
 
-        if (!tenantData) {
+        // RPC returns an array, get first result
+        const tenantBranding = Array.isArray(brandingData) ? brandingData[0] : brandingData;
+
+        if (!tenantBranding || !tenantBranding.tenant_id) {
           setError(`Cabinet "${slug}" non trouvé`);
           setIsLoading(false);
           return;
         }
 
-        if (tenantData.status === 'suspended') {
+        if (tenantBranding.tenant_status === 'suspended') {
           setError('Ce cabinet est actuellement suspendu');
           setIsLoading(false);
           return;
         }
 
-        // Format tenant data
-        const brandingRaw = (tenantData as any).tenant_branding;
-        const branding = Array.isArray(brandingRaw) ? brandingRaw[0] : brandingRaw;
-        
         console.log('Tenant branding loaded:', { 
           slug, 
-          brandingRaw, 
-          branding,
-          logo_url: branding?.logo_url 
+          tenantBranding,
+          logo_url: tenantBranding.logo_url 
         });
 
         const formattedTenant: Tenant = {
-          id: tenantData.id,
-          name: tenantData.name,
-          slug: tenantData.slug,
-          email: tenantData.email,
-          status: tenantData.status,
-          branding: branding ? {
-            logo_url: branding.logo_url || null,
-            primary_color: branding.primary_color || null,
-            secondary_color: branding.secondary_color || null,
-            display_name: branding.display_name || null,
-          } : undefined,
+          id: tenantBranding.tenant_id,
+          name: tenantBranding.tenant_name,
+          slug: slug,
+          email: '', // Not needed for branding display
+          status: tenantBranding.tenant_status,
+          branding: {
+            logo_url: tenantBranding.logo_url || null,
+            primary_color: tenantBranding.primary_color || null,
+            secondary_color: tenantBranding.secondary_color || null,
+            display_name: tenantBranding.display_name || null,
+          },
         };
 
         setTenant(formattedTenant);
