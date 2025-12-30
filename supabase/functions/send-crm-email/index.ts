@@ -624,6 +624,58 @@ const handler = async (req: Request): Promise<Response> => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // SECURITY: Verify authentication for sensitive email types
+    // Types that can create/modify user accounts MUST be authenticated
+    const sensitiveTypes = ['mandat_signed', 'account_created'];
+    
+    if (sensitiveTypes.includes(type)) {
+      const authHeader = req.headers.get('Authorization');
+      
+      if (!authHeader) {
+        console.error(`Unauthorized access attempt for sensitive email type: ${type}`);
+        return new Response(
+          JSON.stringify({ error: "Authentication required for this email type" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Create a client with the user's token to verify they are authenticated
+      const supabaseUser = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      
+      if (authError || !user) {
+        console.error(`Authentication failed for sensitive email type: ${type}`, authError);
+        return new Response(
+          JSON.stringify({ error: "Invalid or expired authentication" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Verify the user has appropriate role (admin, agent, manager, backoffice, partner)
+      const { data: roleData, error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      const allowedRoles = ['admin', 'agent', 'manager', 'backoffice', 'partner', 'king'];
+      
+      if (roleError || !roleData || !allowedRoles.includes(roleData.role)) {
+        console.error(`User ${user.id} lacks permission for ${type} email`);
+        return new Response(
+          JSON.stringify({ error: "Insufficient permissions for this email type" }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      console.log(`Authenticated request from user ${user.id} (role: ${roleData.role}) for ${type}`);
+    }
+
     // Fetch tenant branding
     let branding: TenantBranding | null = null;
     let tenantName = 'LYTA';

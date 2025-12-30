@@ -159,6 +159,7 @@ export type Database = {
           id: number
           ip_address: unknown
           metadata: Json | null
+          tenant_id: string | null
           user_agent: string | null
           user_id: string | null
         }
@@ -170,6 +171,7 @@ export type Database = {
           id?: number
           ip_address?: unknown
           metadata?: Json | null
+          tenant_id?: string | null
           user_agent?: string | null
           user_id?: string | null
         }
@@ -181,10 +183,19 @@ export type Database = {
           id?: number
           ip_address?: unknown
           metadata?: Json | null
+          tenant_id?: string | null
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       claim_documents: {
         Row: {
@@ -1934,6 +1945,93 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          agent_id: string | null
+          amount: number
+          contract_id: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          locked: boolean
+          metadata: Json | null
+          notes: string | null
+          status: string
+          tenant_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          amount: number
+          contract_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          locked?: boolean
+          metadata?: Json | null
+          notes?: string | null
+          status?: string
+          tenant_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          amount?: number
+          contract_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          locked?: boolean
+          metadata?: Json | null
+          notes?: string | null
+          status?: string
+          tenant_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2092,6 +2190,7 @@ export type Database = {
           reserve_rate: number | null
           status: string | null
           tags: string[] | null
+          tenant_id: string | null
           type_adresse: string | null
           updated_at: string | null
           user_id: string | null
@@ -2136,6 +2235,7 @@ export type Database = {
           reserve_rate?: never
           status?: string | null
           tags?: string[] | null
+          tenant_id?: string | null
           type_adresse?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2180,6 +2280,7 @@ export type Database = {
           reserve_rate?: never
           status?: string | null
           tags?: string[] | null
+          tenant_id?: string | null
           type_adresse?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2199,6 +2300,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
           {
@@ -2238,6 +2346,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: number
+      }
+      create_cancellation_transaction: {
+        Args: { p_reason?: string; p_transaction_id: string }
+        Returns: string
       }
       get_partner_policies: {
         Args: {
