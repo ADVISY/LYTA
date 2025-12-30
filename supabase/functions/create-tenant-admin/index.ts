@@ -319,6 +319,31 @@ serve(async (req) => {
         console.log("Upgraded user role from client to admin");
       }
 
+      // Update profile with tenant info
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          first_name: first_name || existingUser.user_metadata?.first_name,
+          last_name: last_name || existingUser.user_metadata?.last_name,
+          phone: phone || existingUser.user_metadata?.phone,
+        })
+        .eq("id", userId);
+
+      // Send password reset email for existing users too
+      const { error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+        },
+      });
+
+      if (linkError) {
+        console.error("Error generating password reset link for existing user:", linkError);
+      } else {
+        console.log("Password reset link sent to existing user:", email);
+      }
+
     } else {
       // Create new user
       isNewUser = true;
