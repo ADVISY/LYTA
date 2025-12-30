@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
 
 export default function KingTenantDetail() {
   const { tenantId } = useParams();
@@ -531,16 +532,12 @@ export default function KingTenantDetail() {
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="logo_url">URL du logo</Label>
-                    <Input
-                      id="logo_url"
-                      placeholder="https://exemple.com/logo.png"
-                      value={brandingData.logo_url}
-                      onChange={(e) => setBrandingData({ ...brandingData, logo_url: e.target.value })}
+                    <Label>Logo du cabinet</Label>
+                    <TenantLogoUpload
+                      currentLogoUrl={brandingData.logo_url}
+                      onUploadComplete={(url) => setBrandingData({ ...brandingData, logo_url: url })}
+                      tenantSlug={tenant?.slug}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Utilisez une URL publique pour votre logo (PNG ou SVG recommandé)
-                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="display_name">Nom affiché</Label>
