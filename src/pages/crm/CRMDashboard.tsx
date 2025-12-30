@@ -6,19 +6,23 @@ import { usePerformance } from "@/hooks/usePerformance";
 import { useCommissionParts } from "@/hooks/useCommissionParts";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Users, FileText, DollarSign, TrendingUp, 
-  MessageSquare, Loader2, BarChart3, Heart, Shield,
+  Loader2, BarChart3, Heart, Shield,
   Trophy, Star, Crown, Target, Zap, Award,
-  Calendar, Filter, ChevronRight
+  Calendar, Filter, Bell, Medal, Flame,
+  CheckCircle, Clock, AlertCircle, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   BarChart,
@@ -28,11 +32,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  LineChart,
-  Line,
   ComposedChart,
-  Area,
+  Line,
 } from "recharts";
 
 type PeriodFilter = 'week' | 'month' | 'quarter' | 'year';
@@ -46,6 +47,7 @@ export default function CRMDashboard() {
   const { commissions, loading: commissionsLoading } = useCommissions();
   const { loading: performanceLoading, companyTotals, myPerformance, myTeam, individualPerformance, teamPerformance } = usePerformance();
   const { fetchAllParts, fetchPartsForAgent } = useCommissionParts();
+  const { notifications, unreadCount, markAsRead } = useNotifications();
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
   const [productFilter, setProductFilter] = useState<string>('all');
@@ -74,7 +76,6 @@ export default function CRMDashboard() {
         setMyCommissionParts(parts);
         
         if (dashboardScope === 'team' && myTeam) {
-          // Get team members' parts too
           const teamParts = [...parts];
           for (const member of myTeam.teamMembers) {
             const memberParts = await fetchPartsForAgent(member.id);
@@ -119,7 +120,6 @@ export default function CRMDashboard() {
   const filteredPolicies = useMemo(() => {
     let filtered = policies;
 
-    // Filter by dashboard scope
     if (dashboardScope === 'personal' && myCollaborator) {
       const myClientIds = clients.filter(c => c.assigned_agent_id === myCollaborator.id).map(c => c.id);
       filtered = filtered.filter(p => myClientIds.includes(p.client_id));
@@ -129,13 +129,11 @@ export default function CRMDashboard() {
       filtered = filtered.filter(p => teamClientIds.includes(p.client_id));
     }
 
-    // Filter by agent
     if (agentFilter !== 'all') {
       const agentClientIds = clients.filter(c => c.assigned_agent_id === agentFilter).map(c => c.id);
       filtered = filtered.filter(p => agentClientIds.includes(p.client_id));
     }
 
-    // Filter by product type
     if (productFilter !== 'all') {
       filtered = filtered.filter(p => {
         const type = (p.product_type || '').toLowerCase();
@@ -156,6 +154,20 @@ export default function CRMDashboard() {
     });
   }, [filteredPolicies, periodRange]);
 
+  // Calculate commission from real commissions data (coherent with CRM)
+  const realCommissions = useMemo(() => {
+    const periodCommissions = commissions.filter(c => {
+      const date = new Date(c.created_at);
+      return isWithinInterval(date, periodRange);
+    });
+
+    const totalAmount = periodCommissions.reduce((sum, c) => sum + (c.amount || 0), 0);
+    const paidAmount = periodCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + (c.amount || 0), 0);
+    const pendingAmount = periodCommissions.filter(c => c.status !== 'paid').reduce((sum, c) => sum + (c.amount || 0), 0);
+
+    return { total: totalAmount, paid: paidAmount, pending: pendingAmount, count: periodCommissions.length };
+  }, [commissions, periodRange]);
+
   // Calculate CA using specified rules: LCA * 16, VIE * 5%
   const calculateCA = useMemo(() => {
     let lcaTotal = 0;
@@ -166,10 +178,8 @@ export default function CRMDashboard() {
       const yearlyPremium = p.premium_yearly || (p.premium_monthly || 0) * 12;
 
       if (type.includes('vie') || type.includes('pilier') || type.includes('3')) {
-        // VIE: volume * 5%
         vieTotal += yearlyPremium * 0.05;
       } else {
-        // LCA: montant * 16 (assuming it's monthly premium * 16)
         const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
         lcaTotal += monthlyPremium * 16;
       }
@@ -178,7 +188,7 @@ export default function CRMDashboard() {
     return { lca: lcaTotal, vie: vieTotal, total: lcaTotal + vieTotal };
   }, [periodPolicies]);
 
-  // KPI Stats
+  // KPI Stats - Using real data
   const kpiStats = useMemo(() => {
     const activeContracts = filteredPolicies.filter(p => p.status === 'active').length;
     const periodContracts = periodPolicies.length;
@@ -191,30 +201,26 @@ export default function CRMDashboard() {
       return type.includes('vie') || type.includes('pilier') || type.includes('3');
     }).length;
 
-    // Personal commission from parts
-    const myCommission = myCommissionParts.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const confirmedCommission = myCommissionParts.filter(p => p.status === 'paid').reduce((sum, p) => sum + (p.amount || 0), 0);
-    const estimatedCommission = myCommissionParts.filter(p => p.status !== 'paid').reduce((sum, p) => sum + (p.amount || 0), 0);
-
     return {
       activeContracts,
       periodContracts,
       lcaContracts,
       vieContracts,
       caEstimated: calculateCA.total,
-      myCommission,
-      confirmedCommission,
-      estimatedCommission,
+      totalCommission: realCommissions.total,
+      paidCommission: realCommissions.paid,
+      pendingCommission: realCommissions.pending,
     };
-  }, [filteredPolicies, periodPolicies, myCommissionParts, calculateCA]);
+  }, [filteredPolicies, periodPolicies, calculateCA, realCommissions]);
 
-  // Top 5 performers (photos only, no numbers for gamification)
+  // Top performers with real contract counts - Enhanced for podium
   const topPerformers = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
 
-    // Calculate contracts per agent for current month
-    const agentScores = individualPerformance.map(agent => {
+    const collaborateurs = clients.filter(c => c.type_adresse === 'collaborateur');
+    
+    const agentScores = collaborateurs.map(agent => {
       const agentClientIds = clients.filter(c => c.assigned_agent_id === agent.id).map(c => c.id);
       const monthContracts = policies.filter(p => {
         const date = new Date(p.created_at);
@@ -223,17 +229,29 @@ export default function CRMDashboard() {
                date.getFullYear() === currentYear;
       }).length;
 
+      // Calculate commission for this agent from real data
+      const agentCommissions = commissions.filter(c => {
+        const policy = policies.find(p => p.id === c.policy_id);
+        if (!policy) return false;
+        const client = clients.find(cl => cl.id === policy.client_id);
+        return client?.assigned_agent_id === agent.id;
+      });
+      const totalCommission = agentCommissions.reduce((sum, c) => sum + (c.amount || 0), 0);
+
       return {
-        ...agent,
+        id: agent.id,
+        name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || 'Agent',
+        photoUrl: (agent as any).photo_url || null,
         monthContracts,
-        initials: agent.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        totalCommission,
+        initials: `${(agent.first_name || 'A')[0]}${(agent.last_name || 'G')[0]}`.toUpperCase(),
       };
     }).filter(a => a.monthContracts > 0);
 
     return agentScores.sort((a, b) => b.monthContracts - a.monthContracts).slice(0, 5);
-  }, [individualPerformance, clients, policies]);
+  }, [clients, policies, commissions]);
 
-  // Employee of the month (highest contracts)
+  // Employee of the month
   const employeeOfMonth = topPerformers[0] || null;
 
   // Manager of the month
@@ -251,10 +269,14 @@ export default function CRMDashboard() {
                date.getFullYear() === currentYear;
       }).length;
 
+      const manager = clients.find(c => c.id === team.managerId);
+
       return {
         name: team.managerName,
         id: team.managerId,
         monthContracts,
+        teamSize: team.teamMembers.length,
+        photoUrl: (manager as any)?.photo_url || null,
         initials: team.managerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
       };
     }).filter(m => m.monthContracts > 0);
@@ -262,7 +284,7 @@ export default function CRMDashboard() {
     return managerScores.sort((a, b) => b.monthContracts - a.monthContracts)[0] || null;
   }, [teamPerformance, clients, policies]);
 
-  // Monthly chart data with CA trend
+  // Monthly chart data
   const monthlyChartData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     const currentYear = new Date().getFullYear();
@@ -270,6 +292,12 @@ export default function CRMDashboard() {
     return months.map((month, i) => {
       const monthPolicies = filteredPolicies.filter(p => {
         const date = new Date(p.created_at);
+        return date.getFullYear() === currentYear && date.getMonth() === i;
+      });
+
+      // Real commissions for this month
+      const monthCommissions = commissions.filter(c => {
+        const date = new Date(c.created_at);
         return date.getFullYear() === currentYear && date.getMonth() === i;
       });
 
@@ -292,9 +320,11 @@ export default function CRMDashboard() {
         }
       });
 
-      return { month, lca, vie, total: lca + vie, ca: Math.round(caLca + caVie) };
+      const commission = monthCommissions.reduce((sum, c) => sum + (c.amount || 0), 0);
+
+      return { month, lca, vie, total: lca + vie, ca: Math.round(caLca + caVie), commission: Math.round(commission) };
     });
-  }, [filteredPolicies]);
+  }, [filteredPolicies, commissions]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-CH', { 
@@ -326,6 +356,22 @@ export default function CRMDashboard() {
     month: 'Ce mois',
     quarter: 'Ce trimestre',
     year: 'Cette année',
+  };
+
+  // Recent notifications (last 5)
+  const recentNotifications = notifications.slice(0, 5);
+
+  const getNotificationIcon = (kind: string) => {
+    switch (kind) {
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'warning':
+        return <AlertCircle className="h-4 w-4 text-amber-500" />;
+      case 'error':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Bell className="h-4 w-4 text-blue-500" />;
+    }
   };
 
   return (
@@ -467,20 +513,20 @@ export default function CRMDashboard() {
               </Card>
             )}
 
-            {/* Personal Commission (visible if has commission scope) */}
+            {/* Real Commissions from database */}
             {commissionScope !== 'none' && (
               <Card className="border shadow-sm bg-gradient-to-br from-blue-500/10 to-blue-600/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Ma commission</p>
-                      <p className="text-3xl font-bold">{formatCurrency(kpiStats.myCommission)}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Commissions</p>
+                      <p className="text-3xl font-bold">{formatCurrency(kpiStats.totalCommission)}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-emerald-600">
-                          ✓ {formatCurrency(kpiStats.confirmedCommission)}
+                          ✓ {formatCurrency(kpiStats.paidCommission)}
                         </span>
                         <span className="text-xs text-amber-600">
-                          ~ {formatCurrency(kpiStats.estimatedCommission)}
+                          ~ {formatCurrency(kpiStats.pendingCommission)}
                         </span>
                       </div>
                     </div>
@@ -493,7 +539,7 @@ export default function CRMDashboard() {
             )}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+          <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
             {/* Main Column */}
             <div className="space-y-6">
               {/* Combined Chart: Contracts + CA */}
@@ -557,6 +603,7 @@ export default function CRMDashboard() {
                           }}
                           formatter={(value: any, name: string) => {
                             if (name === 'ca') return [`${formatCurrency(value)} CHF`, 'CA'];
+                            if (name === 'commission') return [`${formatCurrency(value)} CHF`, 'Commission'];
                             return [value, name === 'lca' ? 'LCA' : 'VIE'];
                           }}
                         />
@@ -610,9 +657,9 @@ export default function CRMDashboard() {
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-violet-500/10">
-                        <p className="text-[9px] text-muted-foreground">Total Contrats</p>
+                        <p className="text-[9px] text-muted-foreground">Commissions</p>
                         <p className="text-sm font-bold text-violet-600">
-                          {monthlyChartData.reduce((s, m) => s + m.total, 0)}
+                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.commission, 0))}
                         </p>
                       </div>
                     </div>
@@ -626,7 +673,7 @@ export default function CRMDashboard() {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <div className="p-3 rounded-full bg-primary/20">
-                        <Star className="h-6 w-6 text-primary" />
+                        <Flame className="h-6 w-6 text-primary" />
                       </div>
                       <div>
                         <h3 className="font-semibold">
@@ -638,7 +685,7 @@ export default function CRMDashboard() {
                         </h3>
                         <p className="text-sm text-muted-foreground">
                           {kpiStats.periodContracts} contrat{kpiStats.periodContracts > 1 ? 's' : ''} ce mois • 
-                          Objectif : 10 contrats
+                          Objectif : 10 contrats • Commission: {formatCurrency(kpiStats.totalCommission)} CHF
                         </p>
                       </div>
                     </div>
@@ -647,74 +694,155 @@ export default function CRMDashboard() {
               )}
             </div>
 
-            {/* Right Column - Gamification & Activity */}
+            {/* Right Column - Gamification, Notifications & Activity */}
             <div className="space-y-6">
-              {/* Top 5 - Photos Only */}
+              {/* PODIUM - Enhanced Gamification */}
               <Card className="border shadow-sm bg-card overflow-hidden">
-                <CardHeader className="pb-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-amber-500" />
-                    <CardTitle className="text-sm font-semibold">Top 5 du mois</CardTitle>
+                <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-amber-500" />
+                      <CardTitle className="text-sm font-semibold">Podium du mois</CardTitle>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {format(new Date(), 'MMMM yyyy', { locale: fr })}
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4">
                   {topPerformers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
+                    <p className="text-sm text-muted-foreground text-center py-6">
                       Pas encore de données ce mois
                     </p>
                   ) : (
-                    <div className="flex justify-center gap-2">
-                      {topPerformers.map((performer, i) => (
-                        <div key={performer.id} className="relative">
-                          <Avatar className={cn(
-                            "border-2",
-                            i === 0 && "w-14 h-14 border-amber-400",
-                            i === 1 && "w-12 h-12 border-gray-400",
-                            i === 2 && "w-12 h-12 border-orange-400",
-                            i > 2 && "w-10 h-10 border-muted"
-                          )}>
-                            <AvatarFallback className={cn(
-                              "font-bold",
-                              i === 0 && "bg-amber-100 text-amber-700",
-                              i === 1 && "bg-gray-100 text-gray-700",
-                              i === 2 && "bg-orange-100 text-orange-700",
-                              i > 2 && "bg-muted"
-                            )}>
-                              {performer.initials}
-                            </AvatarFallback>
-                          </Avatar>
-                          {i < 3 && (
-                            <div className={cn(
-                              "absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
-                              i === 0 && "bg-amber-400",
-                              i === 1 && "bg-gray-400",
-                              i === 2 && "bg-orange-400"
-                            )}>
-                              {i + 1}
+                    <>
+                      {/* Podium visual */}
+                      <div className="flex justify-center items-end gap-2 mb-4 h-[120px]">
+                        {/* 2nd place */}
+                        {topPerformers[1] && (
+                          <div className="flex flex-col items-center">
+                            <Avatar className="w-12 h-12 border-2 border-gray-400 mb-1">
+                              {topPerformers[1].photoUrl ? (
+                                <AvatarImage src={topPerformers[1].photoUrl} />
+                              ) : null}
+                              <AvatarFallback className="bg-gray-100 text-gray-700 font-bold text-sm">
+                                {topPerformers[1].initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="w-16 h-16 bg-gradient-to-t from-gray-300 to-gray-200 rounded-t-lg flex items-center justify-center">
+                              <Medal className="h-6 w-6 text-gray-600" />
                             </div>
-                          )}
+                            <span className="text-[10px] font-medium mt-1 truncate max-w-[60px]">
+                              {topPerformers[1].name.split(' ')[0]}
+                            </span>
+                            <Badge variant="secondary" className="text-[9px] mt-0.5">
+                              {topPerformers[1].monthContracts} contrats
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* 1st place */}
+                        {topPerformers[0] && (
+                          <div className="flex flex-col items-center -mt-4">
+                            <div className="relative">
+                              <Avatar className="w-14 h-14 border-3 border-amber-400 mb-1">
+                                {topPerformers[0].photoUrl ? (
+                                  <AvatarImage src={topPerformers[0].photoUrl} />
+                                ) : null}
+                                <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
+                                  {topPerformers[0].initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <Crown className="h-5 w-5 text-amber-500 absolute -top-3 left-1/2 -translate-x-1/2" />
+                            </div>
+                            <div className="w-16 h-24 bg-gradient-to-t from-amber-400 to-amber-300 rounded-t-lg flex items-center justify-center">
+                              <Trophy className="h-8 w-8 text-amber-700" />
+                            </div>
+                            <span className="text-xs font-semibold mt-1 truncate max-w-[70px]">
+                              {topPerformers[0].name.split(' ')[0]}
+                            </span>
+                            <Badge className="text-[9px] mt-0.5 bg-amber-500">
+                              {topPerformers[0].monthContracts} contrats
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* 3rd place */}
+                        {topPerformers[2] && (
+                          <div className="flex flex-col items-center">
+                            <Avatar className="w-11 h-11 border-2 border-orange-400 mb-1">
+                              {topPerformers[2].photoUrl ? (
+                                <AvatarImage src={topPerformers[2].photoUrl} />
+                              ) : null}
+                              <AvatarFallback className="bg-orange-100 text-orange-700 font-bold text-sm">
+                                {topPerformers[2].initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="w-16 h-12 bg-gradient-to-t from-orange-300 to-orange-200 rounded-t-lg flex items-center justify-center">
+                              <Medal className="h-5 w-5 text-orange-600" />
+                            </div>
+                            <span className="text-[10px] font-medium mt-1 truncate max-w-[60px]">
+                              {topPerformers[2].name.split(' ')[0]}
+                            </span>
+                            <Badge variant="secondary" className="text-[9px] mt-0.5">
+                              {topPerformers[2].monthContracts} contrats
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Remaining performers */}
+                      {topPerformers.slice(3).length > 0 && (
+                        <div className="space-y-1 pt-2 border-t">
+                          {topPerformers.slice(3).map((performer, i) => (
+                            <div 
+                              key={performer.id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-muted/30"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-muted-foreground w-4">{i + 4}</span>
+                                <Avatar className="w-7 h-7">
+                                  {performer.photoUrl ? (
+                                    <AvatarImage src={performer.photoUrl} />
+                                  ) : null}
+                                  <AvatarFallback className="text-xs">
+                                    {performer.initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm truncate">{performer.name}</span>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {performer.monthContracts}
+                              </Badge>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
 
               {/* Employee & Manager of the Month */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Employee of the Month */}
                 <Card className="border shadow-sm bg-gradient-to-br from-amber-500/5 to-amber-500/10">
                   <CardContent className="p-3 text-center">
                     <Crown className="h-5 w-5 text-amber-500 mx-auto mb-2" />
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Employé du mois</p>
                     {employeeOfMonth ? (
                       <>
-                        <Avatar className="w-10 h-10 mx-auto my-2 border-2 border-amber-400">
+                        <Avatar className="w-12 h-12 mx-auto my-2 border-2 border-amber-400">
+                          {employeeOfMonth.photoUrl ? (
+                            <AvatarImage src={employeeOfMonth.photoUrl} />
+                          ) : null}
                           <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
                             {employeeOfMonth.initials}
                           </AvatarFallback>
                         </Avatar>
                         <p className="text-xs font-medium truncate">{employeeOfMonth.name}</p>
+                        <p className="text-[10px] text-emerald-600 font-semibold">
+                          {employeeOfMonth.monthContracts} contrats
+                        </p>
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground mt-2">À déterminer</p>
@@ -722,19 +850,24 @@ export default function CRMDashboard() {
                   </CardContent>
                 </Card>
 
-                {/* Manager of the Month */}
                 <Card className="border shadow-sm bg-gradient-to-br from-violet-500/5 to-violet-500/10">
                   <CardContent className="p-3 text-center">
                     <Award className="h-5 w-5 text-violet-500 mx-auto mb-2" />
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Manager du mois</p>
                     {managerOfMonth ? (
                       <>
-                        <Avatar className="w-10 h-10 mx-auto my-2 border-2 border-violet-400">
+                        <Avatar className="w-12 h-12 mx-auto my-2 border-2 border-violet-400">
+                          {managerOfMonth.photoUrl ? (
+                            <AvatarImage src={managerOfMonth.photoUrl} />
+                          ) : null}
                           <AvatarFallback className="bg-violet-100 text-violet-700 font-bold">
                             {managerOfMonth.initials}
                           </AvatarFallback>
                         </Avatar>
                         <p className="text-xs font-medium truncate">{managerOfMonth.name}</p>
+                        <p className="text-[10px] text-emerald-600 font-semibold">
+                          {managerOfMonth.monthContracts} contrats (équipe)
+                        </p>
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground mt-2">À déterminer</p>
@@ -742,6 +875,70 @@ export default function CRMDashboard() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Recent Notifications */}
+              <Card className="border shadow-sm bg-card">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-blue-500" />
+                      <CardTitle className="text-sm font-semibold">Notifications</CardTitle>
+                    </div>
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {recentNotifications.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Aucune notification
+                    </p>
+                  ) : (
+                    <ScrollArea className="h-[180px]">
+                      <div className="space-y-2">
+                        {recentNotifications.map(notif => (
+                          <div 
+                            key={notif.id}
+                            className={cn(
+                              "flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                              notif.read_at ? "bg-muted/30" : "bg-blue-50 dark:bg-blue-950/20",
+                              "hover:bg-muted/50"
+                            )}
+                            onClick={() => !notif.read_at && markAsRead(notif.id)}
+                          >
+                            <div className="mt-0.5">
+                              {getNotificationIcon(notif.kind)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn(
+                                "text-sm truncate",
+                                !notif.read_at && "font-medium"
+                              )}>
+                                {notif.title}
+                              </p>
+                              {notif.message && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {notif.message}
+                                </p>
+                              )}
+                              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: fr })}
+                              </p>
+                            </div>
+                            {!notif.read_at && (
+                              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Quick Stats (Team view for managers) */}
               {dashboardScope === 'team' && myTeam && (
