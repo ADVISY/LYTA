@@ -3486,6 +3486,10 @@ export type Database = {
       get_tenant_branding_by_slug: {
         Args: { p_slug: string }
         Returns: {
+          company_address: string
+          company_email: string
+          company_phone: string
+          company_website: string
           display_name: string
           logo_url: string
           primary_color: string

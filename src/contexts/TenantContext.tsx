@@ -177,8 +177,16 @@ export function TenantProvider({ children }: TenantProviderProps) {
             primary_color: tenantBranding.primary_color || null,
             secondary_color: tenantBranding.secondary_color || null,
             display_name: tenantBranding.display_name || null,
+            company_address: tenantBranding.company_address || null,
+            company_phone: tenantBranding.company_phone || null,
+            company_email: tenantBranding.company_email || null,
+            company_website: tenantBranding.company_website || null,
           },
         };
+
+        // Update page title dynamically based on tenant
+        const tenantDisplayName = formattedTenant.branding?.display_name || formattedTenant.name;
+        document.title = `${tenantDisplayName} - Espace Client`;
 
         setTenant(formattedTenant);
         
