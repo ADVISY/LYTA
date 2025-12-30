@@ -18,7 +18,6 @@ import {
   ChevronLeft,
   Wand2,
   Crown,
-  Upload,
   Mail,
   Plus,
   X,
@@ -31,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
 
 interface TenantFormData {
   // Step 1 - Info cabinet
@@ -486,23 +486,12 @@ export default function KingWizard() {
           {currentStep === 2 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="logo_url">URL du logo</Label>
-                <div className="flex gap-4">
-                  <Input
-                    id="logo_url"
-                    value={formData.logo_url}
-                    onChange={(e) => updateFormData("logo_url", e.target.value)}
-                    placeholder="https://example.com/logo.png"
-                    className="flex-1"
-                  />
-                  <Button variant="outline" disabled>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload (bientôt)
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Format recommandé: PNG ou SVG avec fond transparent
-                </p>
+                <Label>Logo du cabinet</Label>
+                <TenantLogoUpload
+                  currentLogoUrl={formData.logo_url}
+                  onUploadComplete={(url) => updateFormData("logo_url", url)}
+                  tenantSlug={formData.slug || "new-tenant"}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="primary_color">Couleur principale</Label>
