@@ -629,7 +629,12 @@ export default function DeposerContrat() {
           style={tenantPrimaryColor ? { borderBottomColor: tenantPrimaryColor } : undefined}
         >
           <div className="container flex h-16 items-center justify-between">
-            <img src={tenantLogo} alt={tenantName} className="h-8 max-w-[150px] object-contain" />
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => window.location.href = '/connexion'}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <img src={tenantLogo} alt={tenantName} className="h-8 max-w-[150px] object-contain" />
+            </div>
             <ThemeToggle />
           </div>
         </header>
