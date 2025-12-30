@@ -208,6 +208,54 @@ export default function CRMDashboard() {
     return { lca: lcaTotal, vie: vieTotal, total: lcaTotal + vieTotal };
   }, [periodPolicies]);
 
+  // Calculate CA en vigueur (from active contracts only)
+  const calculateCAEnVigueur = useMemo(() => {
+    const activePolices = filteredPolicies.filter(p => p.status === 'active');
+    let lcaTotal = 0;
+    let vieTotal = 0;
+
+    activePolices.forEach(p => {
+      const type = (p.product_type || '').toLowerCase();
+      const yearlyPremium = p.premium_yearly || (p.premium_monthly || 0) * 12;
+      const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
+
+      if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
+        vieTotal += yearlyPremium * 0.05;
+      } else {
+        lcaTotal += monthlyPremium * 16;
+      }
+    });
+
+    return { lca: lcaTotal, vie: vieTotal, total: lcaTotal + vieTotal };
+  }, [filteredPolicies]);
+
+  // Commissions by period (for display)
+  const commissionsByPeriod = useMemo(() => {
+    const periodCommissions = commissions.filter(c => {
+      const date = new Date(c.created_at);
+      return isWithinInterval(date, periodRange);
+    });
+
+    // Group by month/year
+    const grouped = periodCommissions.reduce((acc, c) => {
+      const date = new Date(c.created_at);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!acc[key]) {
+        acc[key] = { total: 0, paid: 0, pending: 0, count: 0 };
+      }
+      acc[key].total += c.amount || 0;
+      acc[key].count++;
+      if (c.status === 'paid') {
+        acc[key].paid += c.amount || 0;
+      } else {
+        acc[key].pending += c.amount || 0;
+      }
+      return acc;
+    }, {} as Record<string, { total: number; paid: number; pending: number; count: number }>);
+
+    return { grouped, list: periodCommissions };
+  }, [commissions, periodRange]);
+
   // KPI Stats - Using real data
   const kpiStats = useMemo(() => {
     const activeContracts = filteredPolicies.filter(p => p.status === 'active').length;
@@ -234,11 +282,12 @@ export default function CRMDashboard() {
       lcaContracts,
       vieContracts,
       caEstimated: calculateCA.total,
+      caEnVigueur: calculateCAEnVigueur.total,
       totalCommission: realCommissions.total,
       paidCommission: realCommissions.paid,
       pendingCommission: realCommissions.pending,
     };
-  }, [filteredPolicies, periodPolicies, calculateCA, realCommissions]);
+  }, [filteredPolicies, periodPolicies, calculateCA, calculateCAEnVigueur, realCommissions]);
 
   // Top performers with real contract counts - Enhanced for podium
   const topPerformers = useMemo(() => {
@@ -542,31 +591,92 @@ export default function CRMDashboard() {
               </Card>
             )}
 
-            {/* Real Commissions from database */}
-            {commissionScope !== 'none' && (
-              <Card className="border shadow-sm bg-gradient-to-br from-blue-500/10 to-blue-600/5">
+            {/* CA en Vigueur (from active contracts) */}
+            {(canSeeFinancials || commissionScope !== 'none') && (
+              <Card className="border shadow-sm bg-gradient-to-br from-teal-500/10 to-teal-600/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Commissions</p>
-                      <p className="text-3xl font-bold">{formatCurrency(kpiStats.totalCommission)}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-emerald-600">
-                          ✓ {formatCurrency(kpiStats.paidCommission)}
-                        </span>
-                        <span className="text-xs text-amber-600">
-                          ~ {formatCurrency(kpiStats.pendingCommission)}
-                        </span>
-                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">CA en vigueur</p>
+                      <p className="text-3xl font-bold">{formatCurrency(kpiStats.caEnVigueur)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Contrats actifs
+                      </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-blue-500/20">
-                      <Zap className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 rounded-xl bg-teal-500/20">
+                      <TrendingUp className="h-6 w-6 text-teal-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
           </div>
+
+          {/* Commissions by Period */}
+          {commissionScope !== 'none' && commissionsByPeriod.list.length > 0 && (
+            <Card className="border shadow-sm bg-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm font-semibold">Commissions par période</CardTitle>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {commissionsByPeriod.list.length} commissions
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Total */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-200/50">
+                    <p className="text-xs text-muted-foreground mb-1">Total</p>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(realCommissions.total)} CHF</p>
+                  </div>
+                  {/* Paid */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-200/50">
+                    <p className="text-xs text-muted-foreground mb-1">Payées</p>
+                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(realCommissions.paid)} CHF</p>
+                  </div>
+                  {/* Pending */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-200/50">
+                    <p className="text-xs text-muted-foreground mb-1">En attente</p>
+                    <p className="text-2xl font-bold text-amber-600">{formatCurrency(realCommissions.pending)} CHF</p>
+                  </div>
+                  {/* Count */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-violet-500/10 to-violet-600/5 border border-violet-200/50">
+                    <p className="text-xs text-muted-foreground mb-1">Nombre</p>
+                    <p className="text-2xl font-bold text-violet-600">{realCommissions.count}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Real Commissions from database - Compact Card (only if no commissions in period) */}
+          {commissionScope !== 'none' && commissionsByPeriod.list.length === 0 && (
+            <Card className="border shadow-sm bg-gradient-to-br from-blue-500/10 to-blue-600/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Commissions</p>
+                    <p className="text-3xl font-bold">{formatCurrency(kpiStats.totalCommission)}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-emerald-600">
+                        ✓ {formatCurrency(kpiStats.paidCommission)}
+                      </span>
+                      <span className="text-xs text-amber-600">
+                        ~ {formatCurrency(kpiStats.pendingCommission)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-500/20">
+                    <Zap className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
             {/* Main Column */}
