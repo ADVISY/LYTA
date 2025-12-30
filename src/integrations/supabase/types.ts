@@ -1518,6 +1518,53 @@ export type Database = {
           },
         ]
       }
+      scheduled_emails: {
+        Row: {
+          created_at: string
+          email_type: string
+          error_message: string | null
+          id: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          target_id: string
+          target_type: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_type: string
+          error_message?: string | null
+          id?: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          target_id: string
+          target_type: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          email_type?: string
+          error_message?: string | null
+          id?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          target_id?: string
+          target_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_emails_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suivis: {
         Row: {
           assigned_agent_id: string | null
@@ -1644,6 +1691,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tenant_branding_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_email_automation: {
+        Row: {
+          auto_account_created_email: boolean | null
+          auto_contract_deposit_email: boolean | null
+          auto_contract_signed_email: boolean | null
+          auto_mandat_signed_email: boolean | null
+          auto_welcome_email: boolean | null
+          created_at: string
+          enable_birthday_email: boolean | null
+          enable_follow_up_reminder: boolean | null
+          enable_renewal_reminder: boolean | null
+          follow_up_reminder_days: number | null
+          id: string
+          renewal_reminder_days_before: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_account_created_email?: boolean | null
+          auto_contract_deposit_email?: boolean | null
+          auto_contract_signed_email?: boolean | null
+          auto_mandat_signed_email?: boolean | null
+          auto_welcome_email?: boolean | null
+          created_at?: string
+          enable_birthday_email?: boolean | null
+          enable_follow_up_reminder?: boolean | null
+          enable_renewal_reminder?: boolean | null
+          follow_up_reminder_days?: number | null
+          id?: string
+          renewal_reminder_days_before?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_account_created_email?: boolean | null
+          auto_contract_deposit_email?: boolean | null
+          auto_contract_signed_email?: boolean | null
+          auto_mandat_signed_email?: boolean | null
+          auto_welcome_email?: boolean | null
+          created_at?: string
+          enable_birthday_email?: boolean | null
+          enable_follow_up_reminder?: boolean | null
+          enable_renewal_reminder?: boolean | null
+          follow_up_reminder_days?: number | null
+          id?: string
+          renewal_reminder_days_before?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_email_automation_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: true
             referencedRelation: "tenants"
@@ -2188,6 +2294,8 @@ export type Database = {
         Returns: boolean
       }
       is_king: { Args: never; Returns: boolean }
+      schedule_follow_up_reminders: { Args: never; Returns: undefined }
+      schedule_renewal_reminders: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:
