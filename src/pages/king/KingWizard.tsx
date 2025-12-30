@@ -19,6 +19,9 @@ import {
   Wand2,
   Crown,
   Upload,
+  Mail,
+  Plus,
+  X,
 } from "lucide-react";
 import {
   Select,
@@ -38,6 +41,7 @@ interface TenantFormData {
   address: string;
   slug: string;
   status: "test" | "active" | "suspended";
+  contract_notification_emails: string[];
   
   // Step 2 - Branding
   logo_url: string;
@@ -69,6 +73,7 @@ const initialFormData: TenantFormData = {
   address: "",
   slug: "",
   status: "test",
+  contract_notification_emails: [],
   logo_url: "",
   primary_color: "#0066FF",
   secondary_color: "#1a1a2e",
@@ -181,6 +186,7 @@ export default function KingWizard() {
           address: formData.address || null,
           slug: formData.slug,
           status: formData.status,
+          contract_notification_emails: formData.contract_notification_emails.filter(e => e.trim()),
         })
         .select()
         .single();
@@ -422,6 +428,56 @@ export default function KingWizard() {
                     <SelectItem value="suspended">Suspendu</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              
+              {/* Contract notification emails */}
+              <div className="space-y-2 md:col-span-2">
+                <Label className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Emails notification dépôt contrat
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Ces adresses recevront un email lors de chaque dépôt de contrat par les collaborateurs
+                </p>
+                <div className="space-y-2">
+                  {formData.contract_notification_emails.map((email, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          const newEmails = [...formData.contract_notification_emails];
+                          newEmails[index] = e.target.value;
+                          updateFormData("contract_notification_emails", newEmails);
+                        }}
+                        placeholder="backoffice@cabinet.ch"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const newEmails = formData.contract_notification_emails.filter((_, i) => i !== index);
+                          updateFormData("contract_notification_emails", newEmails);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      updateFormData("contract_notification_emails", [...formData.contract_notification_emails, ""]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un email
+                  </Button>
+                </div>
               </div>
             </div>
           )}

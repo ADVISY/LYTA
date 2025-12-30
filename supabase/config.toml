@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-crm-email]
 verify_jwt = false
+
+[functions.send-contract-deposit-email]
+verify_jwt = false

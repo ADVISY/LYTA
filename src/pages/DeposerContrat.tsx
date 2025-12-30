@@ -419,6 +419,30 @@ export default function DeposerContrat() {
     }
   };
 
+  const sendContractDepositEmail = async (formType: 'sana' | 'vita' | 'medio' | 'business', formData: any, documents: any[]) => {
+    try {
+      await supabase.functions.invoke('send-contract-deposit-email', {
+        body: {
+          contractData: {
+            formType,
+            clientName: formData.clientName || formData.chefNom || '',
+            clientPrenom: formData.clientPrenom || formData.chefPrenom || '',
+            clientEmail: formData.clientEmail || formData.emailRetour || '',
+            clientTel: formData.clientTel || '',
+            agentName: formData.agentName || verifiedPartner?.name || '',
+            agentEmail: partnerEmail,
+            formData,
+            documents: documents.map(d => ({ file_name: d.file_name, doc_kind: d.doc_kind, file_key: d.file_key })),
+            tenantSlug: 'lyta', // Default tenant for now
+          }
+        }
+      });
+      console.log('Contract deposit email sent successfully');
+    } catch (error) {
+      console.error('Error sending contract deposit email:', error);
+    }
+  };
+
   const handleSubmitSana = async () => {
     if (!sanaForm.clientName || !sanaForm.clientPrenom || !sanaForm.clientEmail) {
       toast({ title: "Erreur", description: "Veuillez remplir tous les champs obligatoires", variant: "destructive" });
@@ -441,6 +465,9 @@ export default function DeposerContrat() {
       });
 
       if (error) throw error;
+
+      // Send notification email
+      await sendContractDepositEmail('sana', sanaForm, sanaDocuments);
 
       celebrate("contract_added");
       toast({ title: "Formulaire SANA envoyé !", description: "Votre demande a été soumise avec succès" });
@@ -483,6 +510,9 @@ export default function DeposerContrat() {
 
       if (error) throw error;
 
+      // Send notification email
+      await sendContractDepositEmail('vita', vitaForm, vitaDocuments);
+
       celebrate("contract_added");
       toast({ title: "Formulaire VITA envoyé !", description: "Votre demande a été soumise avec succès" });
 
@@ -523,6 +553,9 @@ export default function DeposerContrat() {
 
       if (error) throw error;
 
+      // Send notification email
+      await sendContractDepositEmail('medio', medioForm, medioDocuments);
+
       celebrate("contract_added");
       toast({ title: "Formulaire MEDIO envoyé !", description: "Votre demande a été soumise avec succès" });
 
@@ -559,6 +592,9 @@ export default function DeposerContrat() {
       });
 
       if (error) throw error;
+
+      // Send notification email
+      await sendContractDepositEmail('business', businessForm, businessDocuments);
 
       celebrate("contract_added");
       toast({ title: "Formulaire BUSINESS envoyé !", description: "Votre demande a été soumise avec succès" });

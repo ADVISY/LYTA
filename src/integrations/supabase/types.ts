@@ -1768,6 +1768,7 @@ export type Database = {
       tenants: {
         Row: {
           address: string | null
+          contract_notification_emails: string[] | null
           created_at: string
           email: string
           id: string
@@ -1780,6 +1781,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          contract_notification_emails?: string[] | null
           created_at?: string
           email: string
           id?: string
@@ -1792,6 +1794,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          contract_notification_emails?: string[] | null
           created_at?: string
           email?: string
           id?: string
