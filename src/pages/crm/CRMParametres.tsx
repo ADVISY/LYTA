@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
-  Users, UserCheck, AlertCircle, Loader2, KeyRound
+  Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
+import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 
 // Couleurs disponibles pour le thème
 const themeColors = [
@@ -507,6 +508,10 @@ export default function CRMParametres() {
           <TabsTrigger value="apparence" className="gap-2">
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Apparence</span>
+          </TabsTrigger>
+          <TabsTrigger value="emails" className="gap-2">
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Emails</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1268,6 +1273,11 @@ export default function CRMParametres() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* EMAILS */}
+        <TabsContent value="emails" className="space-y-6 mt-6">
+          <EmailAutomationSettings />
         </TabsContent>
       </Tabs>
     </div>
