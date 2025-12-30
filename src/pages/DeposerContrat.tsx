@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCelebration } from "@/hooks/useCelebration";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   Card,
   CardContent,
@@ -41,7 +42,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import DocumentUpload from "@/components/crm/DocumentUpload";
-import lytaLogo from "@/assets/lyta-logo-full.svg";
+import lytaLogoFallback from "@/assets/lyta-logo-full.svg";
 
 type UploadedDocument = {
   file_key: string;
@@ -166,6 +167,12 @@ const formTypes = [
 export default function DeposerContrat() {
   const { celebrate } = useCelebration();
   const { toast } = useToast();
+  const { tenant, isLoading: tenantLoading } = useTenant();
+
+  // Get tenant branding
+  const tenantLogo = tenant?.branding?.logo_url || lytaLogoFallback;
+  const tenantName = tenant?.branding?.display_name || tenant?.name || 'LYTA';
+  const tenantPrimaryColor = tenant?.branding?.primary_color;
 
   // Email verification state
   const [verificationStep, setVerificationStep] = useState<'email' | 'selection' | 'form'>('email');
@@ -617,18 +624,27 @@ export default function DeposerContrat() {
   if (verificationStep === 'email') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header 
+          className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+          style={tenantPrimaryColor ? { borderBottomColor: tenantPrimaryColor } : undefined}
+        >
           <div className="container flex h-16 items-center justify-between">
-            <img src={lytaLogo} alt="LYTA" className="h-8" />
+            <img src={tenantLogo} alt={tenantName} className="h-8 max-w-[150px] object-contain" />
             <ThemeToggle />
           </div>
         </header>
 
         <main className="container py-16 max-w-md">
-          <Card className="border-2">
+          <Card className="border-2" style={tenantPrimaryColor ? { borderColor: `${tenantPrimaryColor}20` } : undefined}>
             <CardHeader className="text-center space-y-4">
-              <div className="mx-auto w-16 h-16 bg-king/10 rounded-full flex items-center justify-center">
-                <Mail className="h-8 w-8 text-king" />
+              <div 
+                className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: tenantPrimaryColor ? `${tenantPrimaryColor}15` : 'hsl(var(--primary)/0.1)' }}
+              >
+                <Mail 
+                  className="h-8 w-8" 
+                  style={{ color: tenantPrimaryColor || 'hsl(var(--primary))' }} 
+                />
               </div>
               <CardTitle className="text-2xl">Accès Collaborateurs</CardTitle>
               <CardDescription>
@@ -646,10 +662,15 @@ export default function DeposerContrat() {
                   onChange={(e) => setPartnerEmail(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyEmail(); }}
                   disabled={verifying}
+                  style={tenantPrimaryColor ? { '--ring': tenantPrimaryColor } as React.CSSProperties : undefined}
                 />
               </div>
               <Button 
-                className="w-full bg-king hover:bg-king-dark text-white" 
+                className="w-full text-white" 
+                style={{ 
+                  backgroundColor: tenantPrimaryColor || 'hsl(var(--primary))',
+                  '--tw-ring-color': tenantPrimaryColor || 'hsl(var(--primary))'
+                } as React.CSSProperties}
                 onClick={handleVerifyEmail}
                 disabled={verifying}
               >
@@ -660,7 +681,7 @@ export default function DeposerContrat() {
                 )}
               </Button>
               <p className="text-xs text-center text-muted-foreground">
-                Seuls les collaborateurs enregistrés chez LYTA peuvent déposer des contrats
+                Seuls les collaborateurs enregistrés chez {tenantName} peuvent déposer des contrats
               </p>
             </CardContent>
           </Card>
@@ -673,12 +694,18 @@ export default function DeposerContrat() {
   if (verificationStep === 'selection') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header 
+          className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+          style={tenantPrimaryColor ? { borderBottomColor: tenantPrimaryColor } : undefined}
+        >
           <div className="container flex h-16 items-center justify-between">
-            <img src={lytaLogo} alt="LYTA" className="h-8" />
+            <img src={tenantLogo} alt={tenantName} className="h-8 max-w-[150px] object-contain" />
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-king/10 rounded-full">
-                <User className="h-4 w-4 text-king" />
+              <div 
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full"
+                style={{ backgroundColor: tenantPrimaryColor ? `${tenantPrimaryColor}15` : 'hsl(var(--primary)/0.1)' }}
+              >
+                <User className="h-4 w-4" style={{ color: tenantPrimaryColor || 'hsl(var(--primary))' }} />
                 <span className="text-sm font-medium">{verifiedPartner?.name}</span>
               </div>
               <ThemeToggle />
@@ -692,7 +719,7 @@ export default function DeposerContrat() {
 
         <main className="container py-12 max-w-4xl">
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold tracking-tight">Formulaire de production LYTA</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Formulaire de production {tenantName}</h1>
             <p className="text-muted-foreground mt-2">Sélectionnez le type de contrat à déposer</p>
           </div>
 
@@ -703,7 +730,19 @@ export default function DeposerContrat() {
                 <button
                   key={form.id}
                   onClick={() => handleSelectFormType(form.id)}
-                  className="group relative overflow-hidden rounded-2xl border-2 border-border bg-card p-6 text-left transition-all hover:border-king hover:shadow-lg hover:shadow-king/10 focus:outline-none focus:ring-2 focus:ring-king focus:ring-offset-2"
+                  className="group relative overflow-hidden rounded-2xl border-2 border-border bg-card p-6 text-left transition-all hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{ 
+                    '--hover-border': tenantPrimaryColor || 'hsl(var(--primary))',
+                    '--hover-shadow': tenantPrimaryColor ? `${tenantPrimaryColor}20` : 'hsl(var(--primary)/0.1)'
+                  } as React.CSSProperties}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = tenantPrimaryColor || 'hsl(var(--primary))';
+                    e.currentTarget.style.boxShadow = `0 10px 25px ${tenantPrimaryColor ? tenantPrimaryColor + '20' : 'hsl(var(--primary)/0.1)'}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '';
+                    e.currentTarget.style.boxShadow = '';
+                  }}
                 >
                   <div className={`absolute inset-0 bg-gradient-to-br ${form.color} opacity-0 group-hover:opacity-5 transition-opacity`} />
                   <div className="relative">
@@ -711,11 +750,11 @@ export default function DeposerContrat() {
                       <Icon className="h-7 w-7 text-white" />
                     </div>
                     <h3 className="text-xl font-bold">{form.title}</h3>
-                    <p className="text-base font-medium text-king mt-1">{form.subtitle}</p>
+                    <p className="text-base font-medium mt-1" style={{ color: tenantPrimaryColor || 'hsl(var(--primary))' }}>{form.subtitle}</p>
                     <p className="text-sm text-muted-foreground mt-2">{form.description}</p>
                   </div>
                   <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ArrowLeft className="h-5 w-5 text-king rotate-180" />
+                    <ArrowLeft className="h-5 w-5 rotate-180" style={{ color: tenantPrimaryColor || 'hsl(var(--primary))' }} />
                   </div>
                 </button>
               );
@@ -741,17 +780,23 @@ export default function DeposerContrat() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header 
+        className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        style={tenantPrimaryColor ? { borderBottomColor: tenantPrimaryColor } : undefined}
+      >
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={handleBackToSelection}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <img src={lytaLogo} alt="LYTA" className="h-8" />
+            <img src={tenantLogo} alt={tenantName} className="h-8 max-w-[150px] object-contain" />
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-king/10 rounded-full">
-              <User className="h-4 w-4 text-king" />
+            <div 
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full"
+              style={{ backgroundColor: tenantPrimaryColor ? `${tenantPrimaryColor}15` : 'hsl(var(--primary)/0.1)' }}
+            >
+              <User className="h-4 w-4" style={{ color: tenantPrimaryColor || 'hsl(var(--primary))' }} />
               <span className="text-sm font-medium">{verifiedPartner?.name}</span>
             </div>
             <ThemeToggle />
