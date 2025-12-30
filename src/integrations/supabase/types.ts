@@ -231,6 +231,13 @@ export type Database = {
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "claim_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents_expiring_soon"
+            referencedColumns: ["id"]
+          },
         ]
       }
       claims: {
@@ -958,47 +965,247 @@ export type Database = {
           },
         ]
       }
-      documents: {
+      document_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_reminders: {
         Row: {
           created_at: string
-          created_by: string | null
-          doc_kind: string | null
-          file_key: string
-          file_name: string
+          days_before: number
+          document_id: string
           id: string
-          mime_type: string | null
-          owner_id: string
-          owner_type: string
-          size_bytes: number | null
+          notification_sent: boolean | null
+          notified_at: string | null
+          reminder_date: string
+          reminder_type: string
           tenant_id: string | null
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
-          doc_kind?: string | null
-          file_key: string
-          file_name: string
+          days_before?: number
+          document_id: string
           id?: string
-          mime_type?: string | null
-          owner_id: string
-          owner_type: string
-          size_bytes?: number | null
+          notification_sent?: boolean | null
+          notified_at?: string | null
+          reminder_date: string
+          reminder_type?: string
           tenant_id?: string | null
         }
         Update: {
           created_at?: string
-          created_by?: string | null
-          doc_kind?: string | null
-          file_key?: string
-          file_name?: string
+          days_before?: number
+          document_id?: string
           id?: string
-          mime_type?: string | null
-          owner_id?: string
-          owner_type?: string
-          size_bytes?: number | null
+          notification_sent?: boolean | null
+          notified_at?: string | null
+          reminder_date?: string
+          reminder_type?: string
           tenant_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_reminders_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_reminders_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents_expiring_soon"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_reminders_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          file_key: string
+          file_name: string
+          id: string
+          is_active: boolean | null
+          mime_type: string | null
+          name: string
+          tenant_id: string | null
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_key: string
+          file_name: string
+          id?: string
+          is_active?: boolean | null
+          mime_type?: string | null
+          name: string
+          tenant_id?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_key?: string
+          file_name?: string
+          id?: string
+          is_active?: boolean | null
+          mime_type?: string | null
+          name?: string
+          tenant_id?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          doc_kind: string | null
+          expires_at: string | null
+          file_key: string
+          file_name: string
+          id: string
+          is_template: boolean | null
+          metadata: Json | null
+          mime_type: string | null
+          owner_id: string
+          owner_type: string
+          parent_document_id: string | null
+          size_bytes: number | null
+          tags: string[] | null
+          template_name: string | null
+          tenant_id: string | null
+          version: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_kind?: string | null
+          expires_at?: string | null
+          file_key: string
+          file_name: string
+          id?: string
+          is_template?: boolean | null
+          metadata?: Json | null
+          mime_type?: string | null
+          owner_id: string
+          owner_type: string
+          parent_document_id?: string | null
+          size_bytes?: number | null
+          tags?: string[] | null
+          template_name?: string | null
+          tenant_id?: string | null
+          version?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_kind?: string | null
+          expires_at?: string | null
+          file_key?: string
+          file_name?: string
+          id?: string
+          is_template?: boolean | null
+          metadata?: Json | null
+          mime_type?: string | null
+          owner_id?: string
+          owner_type?: string
+          parent_document_id?: string | null
+          size_bytes?: number | null
+          tags?: string[] | null
+          template_name?: string | null
+          tenant_id?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents_expiring_soon"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -2392,6 +2599,56 @@ export type Database = {
           },
         ]
       }
+      documents_expiring_soon: {
+        Row: {
+          category: string | null
+          client_email: string | null
+          client_name: string | null
+          created_at: string | null
+          created_by: string | null
+          days_before: number | null
+          doc_kind: string | null
+          expires_at: string | null
+          file_key: string | null
+          file_name: string | null
+          id: string | null
+          is_template: boolean | null
+          metadata: Json | null
+          mime_type: string | null
+          owner_id: string | null
+          owner_type: string | null
+          parent_document_id: string | null
+          reminder_date: string | null
+          size_bytes: number | null
+          tags: string[] | null
+          template_name: string | null
+          tenant_id: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_parent_document_id_fkey"
+            columns: ["parent_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents_expiring_soon"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_policy_commission: {
@@ -2436,6 +2693,17 @@ export type Database = {
           contact_id: string
           label: string
           value: string
+        }[]
+      }
+      get_document_versions: {
+        Args: { p_document_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          file_name: string
+          id: string
+          size_bytes: number
+          version: number
         }[]
       }
       get_partner_policies: {
