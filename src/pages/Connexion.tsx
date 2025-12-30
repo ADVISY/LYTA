@@ -10,6 +10,7 @@ import advisyLogo from "@/assets/advisy-logo.svg";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useTenant } from "@/contexts/TenantContext";
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
 
@@ -153,12 +154,13 @@ interface ChoiceScreenProps {
   onClientClick: () => void;
   onTeamClick: () => void;
   onSuperAdminClick: () => void;
+  tenantName?: string;
 }
 
-const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantName }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
-      <h2 className="text-xl font-bold text-foreground mb-2">Bienvenue sur Advisy</h2>
+      <h2 className="text-xl font-bold text-foreground mb-2">Bienvenue sur {tenantName || 'LYTA'}</h2>
       <p className="text-sm text-muted-foreground">Sélectionnez votre espace</p>
     </div>
 
@@ -308,6 +310,7 @@ const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack }: Reset
 );
 
 const Connexion = () => {
+  const { tenant, isLoading: tenantLoading } = useTenant();
   const [view, setView] = useState<View>("choice");
   const [loginType, setLoginType] = useState<"client" | "team" | "king">("client");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -320,6 +323,10 @@ const Connexion = () => {
   const { toast } = useToast();
   const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
+  
+  // Get tenant display name and logo
+  const displayName = tenant?.branding?.display_name || tenant?.name || 'LYTA';
+  const logoUrl = tenant?.branding?.logo_url || (tenant ? advisyLogo : lytaLogo);
 
   // Redirect based on loginType choice (not role) if already logged in
   useEffect(() => {
@@ -695,10 +702,20 @@ const Connexion = () => {
             onClientClick={() => { resetForm(); setLoginType("client"); setView("client"); }}
             onTeamClick={() => { resetForm(); setLoginType("team"); setView("team"); }}
             onSuperAdminClick={() => { resetForm(); setLoginType("king"); setView("king"); }}
+            tenantName={displayName}
           />
         );
     }
   };
+
+  // Show loading while tenant is loading
+  if (tenantLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-muted border-t-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -712,8 +729,8 @@ const Connexion = () => {
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           <img 
-            src={view === "client" ? advisyLogo : lytaLogo} 
-            alt={view === "client" ? "Advisy" : "LYTA"} 
+            src={logoUrl} 
+            alt={displayName} 
             className="h-24 sm:h-32 mx-auto"
           />
         </div>
