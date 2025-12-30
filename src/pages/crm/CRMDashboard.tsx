@@ -97,22 +97,34 @@ export default function CRMDashboard() {
 
   const loading = clientsLoading || policiesLoading || commissionsLoading || performanceLoading || partsLoading || permissionsLoading;
 
-  // Period date range
+  // Period date range - with proper time boundaries
   const periodRange = useMemo(() => {
     const now = new Date();
     switch (periodFilter) {
       case 'week':
-        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+        weekEnd.setHours(23, 59, 59, 999);
+        return { start: weekStart, end: weekEnd };
       case 'month':
-        return { start: startOfMonth(now), end: endOfMonth(now) };
+        const monthStart = startOfMonth(now);
+        const monthEnd = endOfMonth(now);
+        monthEnd.setHours(23, 59, 59, 999);
+        return { start: monthStart, end: monthEnd };
       case 'quarter':
         const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-        const quarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0);
+        const quarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0, 23, 59, 59, 999);
         return { start: quarterStart, end: quarterEnd };
       case 'year':
-        return { start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear(), 11, 31) };
+        return { 
+          start: new Date(now.getFullYear(), 0, 1), 
+          end: new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999) 
+        };
       default:
-        return { start: startOfMonth(now), end: endOfMonth(now) };
+        const defaultStart = startOfMonth(now);
+        const defaultEnd = endOfMonth(now);
+        defaultEnd.setHours(23, 59, 59, 999);
+        return { start: defaultStart, end: defaultEnd };
     }
   }, [periodFilter]);
 
