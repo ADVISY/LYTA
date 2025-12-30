@@ -708,6 +708,56 @@ export type Database = {
           },
         ]
       }
+      company_contacts: {
+        Row: {
+          channel: string
+          company_id: string
+          contact_type: string
+          created_at: string
+          id: string
+          is_primary: boolean | null
+          is_verified: boolean | null
+          label: string | null
+          notes: string | null
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          channel: string
+          company_id: string
+          contact_type: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          channel?: string
+          company_id?: string
+          contact_type?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          is_verified?: boolean | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           canceled_at: string | null
@@ -1014,22 +1064,46 @@ export type Database = {
       }
       insurance_companies: {
         Row: {
+          country: string | null
           created_at: string
           id: string
+          insurance_types: string[] | null
           logo_url: string | null
           name: string
+          notes: string | null
+          regions: string[] | null
+          sla_days: number | null
+          status: string | null
+          updated_at: string | null
+          website: string | null
         }
         Insert: {
+          country?: string | null
           created_at?: string
           id?: string
+          insurance_types?: string[] | null
           logo_url?: string | null
           name: string
+          notes?: string | null
+          regions?: string[] | null
+          sla_days?: number | null
+          status?: string | null
+          updated_at?: string | null
+          website?: string | null
         }
         Update: {
+          country?: string | null
           created_at?: string
           id?: string
+          insurance_types?: string[] | null
           logo_url?: string | null
           name?: string
+          notes?: string | null
+          regions?: string[] | null
+          sla_days?: number | null
+          status?: string | null
+          updated_at?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -2350,6 +2424,19 @@ export type Database = {
       create_cancellation_transaction: {
         Args: { p_reason?: string; p_transaction_id: string }
         Returns: string
+      }
+      get_company_contact: {
+        Args: {
+          p_channel?: string
+          p_company_id: string
+          p_contact_type: string
+        }
+        Returns: {
+          channel: string
+          contact_id: string
+          label: string
+          value: string
+        }[]
       }
       get_partner_policies: {
         Args: {

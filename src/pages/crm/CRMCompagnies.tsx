@@ -4,13 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2, Users, Globe, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
 
 type Product = {
   id: string;
@@ -233,34 +235,56 @@ export default function CRMCompagnies() {
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-4">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {company.products.map((product) => (
-                      <div
-                        key={product.id}
-                        className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-background">
-                            <Package className="h-4 w-4 text-primary" />
+                  <Tabs defaultValue="products" className="w-full">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="products" className="gap-1.5">
+                        <Package className="h-4 w-4" />
+                        Produits ({company.products.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="contacts" className="gap-1.5">
+                        <Users className="h-4 w-4" />
+                        Contacts
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="products">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {company.products.map((product) => (
+                          <div
+                            key={product.id}
+                            className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 rounded-lg bg-background">
+                                <Package className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{product.name}</p>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={cn("text-xs mt-1", categoryLabels[product.category]?.color)}
+                                >
+                                  {categoryLabels[product.category]?.label || product.category}
+                                </Badge>
+                                {product.description && (
+                                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                                    {product.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{product.name}</p>
-                            <Badge 
-                              variant="secondary" 
-                              className={cn("text-xs mt-1", categoryLabels[product.category]?.color)}
-                            >
-                              {categoryLabels[product.category]?.label || product.category}
-                            </Badge>
-                            {product.description && (
-                              <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                                {product.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </TabsContent>
+
+                    <TabsContent value="contacts">
+                      <CompanyContactsPanel 
+                        companyId={company.id} 
+                        companyName={company.name}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </CollapsibleContent>
             </Card>
