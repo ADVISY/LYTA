@@ -155,9 +155,10 @@ interface ChoiceScreenProps {
   onTeamClick: () => void;
   onSuperAdminClick: () => void;
   tenantName?: string;
+  showSuperAdmin?: boolean;
 }
 
-const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantName }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantName, showSuperAdmin = true }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
       <h2 className="text-xl font-bold text-foreground mb-2">Bienvenue sur {tenantName || 'LYTA'}</h2>
@@ -192,21 +193,23 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantNam
       </button>
     </div>
 
-    {/* Super Admin Button */}
-    <div className="pt-4 border-t">
-      <button
-        onClick={onSuperAdminClick}
-        className="w-full flex items-center justify-center gap-3 p-4 border-2 border-amber-500/30 rounded-xl hover:border-amber-500 hover:bg-amber-500/5 transition-all group"
-      >
-        <div className="p-2 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-          <Crown className="h-6 w-6" />
-        </div>
-        <div className="text-left">
-          <h3 className="text-sm font-bold text-amber-600">SUPER ADMIN</h3>
-          <p className="text-xs text-muted-foreground">Accès plateforme</p>
-        </div>
-      </button>
-    </div>
+    {/* Super Admin Button - Only show on main platform, not on tenant subdomains */}
+    {showSuperAdmin && (
+      <div className="pt-4 border-t">
+        <button
+          onClick={onSuperAdminClick}
+          className="w-full flex items-center justify-center gap-3 p-4 border-2 border-amber-500/30 rounded-xl hover:border-amber-500 hover:bg-amber-500/5 transition-all group"
+        >
+          <div className="p-2 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+            <Crown className="h-6 w-6" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-sm font-bold text-amber-600">SUPER ADMIN</h3>
+            <p className="text-xs text-muted-foreground">Accès plateforme</p>
+          </div>
+        </button>
+      </div>
+    )}
   </div>
 );
 
@@ -703,6 +706,7 @@ const Connexion = () => {
             onTeamClick={() => { resetForm(); setLoginType("team"); setView("team"); }}
             onSuperAdminClick={() => { resetForm(); setLoginType("king"); setView("king"); }}
             tenantName={displayName}
+            showSuperAdmin={!tenant}
           />
         );
     }
