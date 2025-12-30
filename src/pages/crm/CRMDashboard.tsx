@@ -186,19 +186,23 @@ export default function CRMDashboard() {
     return { total: totalAmount, paid: paidAmount, pending: pendingAmount, count: periodCommissions.length };
   }, [commissions, periodRange]);
 
-  // Calculate CA using specified rules: LCA * 16, VIE * 5%
+  // Calculate CA using real commissions from database
+  // LCA: monthly_premium * 16, VIE: use actual commission amounts from DB
   const calculateCA = useMemo(() => {
     let lcaTotal = 0;
     let vieTotal = 0;
 
     periodPolicies.forEach(p => {
       const type = (p.product_type || '').toLowerCase();
-      const yearlyPremium = p.premium_yearly || (p.premium_monthly || 0) * 12;
       const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
 
-      // VIE/Life products
+      // VIE/Life products - use real commission from commissions table
       if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
-        vieTotal += yearlyPremium * 0.05;
+        // Find the commission for this policy
+        const policyCommission = commissions.find(c => c.policy_id === p.id);
+        if (policyCommission) {
+          vieTotal += policyCommission.amount || 0;
+        }
       } else {
         // LCA/Health products (LAMal, health, multi, complémentaire)
         lcaTotal += monthlyPremium * 16;
@@ -206,9 +210,9 @@ export default function CRMDashboard() {
     });
 
     return { lca: lcaTotal, vie: vieTotal, total: lcaTotal + vieTotal };
-  }, [periodPolicies]);
+  }, [periodPolicies, commissions]);
 
-  // Calculate CA en vigueur (from active contracts only)
+  // Calculate CA en vigueur (from active contracts only) using real commissions
   const calculateCAEnVigueur = useMemo(() => {
     const activePolices = filteredPolicies.filter(p => p.status === 'active');
     let lcaTotal = 0;
@@ -216,18 +220,21 @@ export default function CRMDashboard() {
 
     activePolices.forEach(p => {
       const type = (p.product_type || '').toLowerCase();
-      const yearlyPremium = p.premium_yearly || (p.premium_monthly || 0) * 12;
       const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
 
       if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
-        vieTotal += yearlyPremium * 0.05;
+        // Find the commission for this policy
+        const policyCommission = commissions.find(c => c.policy_id === p.id);
+        if (policyCommission) {
+          vieTotal += policyCommission.amount || 0;
+        }
       } else {
         lcaTotal += monthlyPremium * 16;
       }
     });
 
     return { lca: lcaTotal, vie: vieTotal, total: lcaTotal + vieTotal };
-  }, [filteredPolicies]);
+  }, [filteredPolicies, commissions]);
 
   // Commissions by period (for display)
   const commissionsByPeriod = useMemo(() => {
@@ -384,13 +391,16 @@ export default function CRMDashboard() {
 
       monthPolicies.forEach(p => {
         const type = (p.product_type || '').toLowerCase();
-        const yearlyPremium = p.premium_yearly || (p.premium_monthly || 0) * 12;
         const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
 
-        // VIE/Life products
+        // VIE/Life products - use real commission from commissions table
         if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
           vie++;
-          caVie += yearlyPremium * 0.05;
+          // Find the commission for this policy
+          const policyCommission = commissions.find(c => c.policy_id === p.id);
+          if (policyCommission) {
+            caVie += policyCommission.amount || 0;
+          }
         } else {
           // LCA/Health products (LAMal, health, multi, complémentaire)
           lca++;
