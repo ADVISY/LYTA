@@ -295,8 +295,9 @@ export default function CRMLayout() {
               </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0">
               <div className="p-6 border-b border-border flex flex-col items-center">
-                <img src={advisyLogo} alt="Advisy" className="h-14 object-contain" />
-                <p className="text-xs text-muted-foreground capitalize mt-2">{role}</p>
+                <img src={tenantLogo} alt={tenantName} className="h-14 object-contain" />
+                <p className="text-sm font-medium mt-2">{tenantName}</p>
+                <p className="text-xs text-muted-foreground capitalize">{role}</p>
               </div>
               <nav className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
                 <NavItems onItemClick={() => setMobileMenuOpen(false)} />

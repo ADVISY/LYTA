@@ -187,7 +187,7 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantNam
         </div>
         <div className="text-center">
           <h3 className="text-lg font-bold text-foreground">TEAM</h3>
-          <p className="text-sm text-muted-foreground mt-1">Membres Advisy</p>
+          <p className="text-sm text-muted-foreground mt-1">Membres {tenantName || 'de l\'équipe'}</p>
         </div>
       </button>
     </div>
@@ -203,7 +203,7 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, tenantNam
         </div>
         <div className="text-left">
           <h3 className="text-sm font-bold text-amber-600">SUPER ADMIN</h3>
-          <p className="text-xs text-muted-foreground">Accès plateforme LYTA</p>
+          <p className="text-xs text-muted-foreground">Accès plateforme</p>
         </div>
       </button>
     </div>
@@ -679,7 +679,7 @@ const Connexion = () => {
         return (
           <LoginForm 
             title="SUPER ADMIN" 
-            subtitle="Connexion plateforme LYTA"
+            subtitle="Connexion plateforme"
             onBack={() => { resetForm(); setView("choice"); }}
             isSignUp={false}
             setIsSignUp={() => {}}
