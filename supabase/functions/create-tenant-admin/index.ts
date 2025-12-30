@@ -15,6 +15,123 @@ interface CreateTenantAdminRequest {
   language?: string;
 }
 
+// Default roles configuration for new tenants
+const DEFAULT_ROLES = [
+  {
+    name: 'Admin Cabinet',
+    description: 'Accès complet à toutes les fonctionnalités',
+    dashboard_scope: 'global',
+    is_system_role: true,
+    can_see_own_commissions: true,
+    can_see_team_commissions: true,
+    can_see_all_commissions: true,
+    permissions: [
+      { module: 'clients', action: 'view' },
+      { module: 'clients', action: 'create' },
+      { module: 'clients', action: 'update' },
+      { module: 'clients', action: 'delete' },
+      { module: 'clients', action: 'export' },
+      { module: 'contracts', action: 'view' },
+      { module: 'contracts', action: 'deposit' },
+      { module: 'contracts', action: 'update' },
+      { module: 'contracts', action: 'cancel' },
+      { module: 'contracts', action: 'export' },
+      { module: 'partners', action: 'view' },
+      { module: 'partners', action: 'create' },
+      { module: 'partners', action: 'update' },
+      { module: 'partners', action: 'delete' },
+      { module: 'products', action: 'view' },
+      { module: 'products', action: 'create' },
+      { module: 'products', action: 'update' },
+      { module: 'products', action: 'delete' },
+      { module: 'collaborators', action: 'view' },
+      { module: 'collaborators', action: 'create' },
+      { module: 'collaborators', action: 'update' },
+      { module: 'collaborators', action: 'delete' },
+      { module: 'collaborators', action: 'export' },
+      { module: 'commissions', action: 'view' },
+      { module: 'commissions', action: 'modify_rules' },
+      { module: 'commissions', action: 'export' },
+      { module: 'decomptes', action: 'view' },
+      { module: 'decomptes', action: 'generate' },
+      { module: 'decomptes', action: 'export' },
+      { module: 'payout', action: 'view' },
+      { module: 'payout', action: 'generate' },
+      { module: 'payout', action: 'validate' },
+      { module: 'payout', action: 'export' },
+      { module: 'dashboard', action: 'view' },
+      { module: 'settings', action: 'view' },
+      { module: 'settings', action: 'update' },
+    ],
+  },
+  {
+    name: 'Manager',
+    description: 'Accès équipe + clients personnels, dashboard équipe',
+    dashboard_scope: 'team',
+    is_system_role: true,
+    can_see_own_commissions: true,
+    can_see_team_commissions: true,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: 'clients', action: 'view' },
+      { module: 'clients', action: 'create' },
+      { module: 'clients', action: 'update' },
+      { module: 'clients', action: 'export' },
+      { module: 'contracts', action: 'view' },
+      { module: 'contracts', action: 'deposit' },
+      { module: 'contracts', action: 'update' },
+      { module: 'contracts', action: 'export' },
+      { module: 'collaborators', action: 'view' },
+      { module: 'commissions', action: 'view' },
+      { module: 'decomptes', action: 'view' },
+      { module: 'dashboard', action: 'view' },
+      { module: 'settings', action: 'view' },
+    ],
+  },
+  {
+    name: 'Agent',
+    description: 'Accès uniquement à ses clients et contrats',
+    dashboard_scope: 'personal',
+    is_system_role: true,
+    can_see_own_commissions: true,
+    can_see_team_commissions: false,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: 'clients', action: 'view' },
+      { module: 'clients', action: 'create' },
+      { module: 'clients', action: 'update' },
+      { module: 'contracts', action: 'view' },
+      { module: 'contracts', action: 'deposit' },
+      { module: 'commissions', action: 'view' },
+      { module: 'dashboard', action: 'view' },
+    ],
+  },
+  {
+    name: 'Back-office',
+    description: 'Voit tous les clients et contrats, aucun accès finance',
+    dashboard_scope: 'global',
+    is_system_role: true,
+    can_see_own_commissions: false,
+    can_see_team_commissions: false,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: 'clients', action: 'view' },
+      { module: 'clients', action: 'create' },
+      { module: 'clients', action: 'update' },
+      { module: 'clients', action: 'export' },
+      { module: 'contracts', action: 'view' },
+      { module: 'contracts', action: 'deposit' },
+      { module: 'contracts', action: 'update' },
+      { module: 'contracts', action: 'export' },
+      { module: 'partners', action: 'view' },
+      { module: 'products', action: 'view' },
+      { module: 'collaborators', action: 'view' },
+      { module: 'dashboard', action: 'view' },
+      { module: 'settings', action: 'view' },
+    ],
+  },
+];
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -76,7 +193,81 @@ serve(async (req) => {
       throw new Error("Tenant not found");
     }
 
-    // Check if user already exists
+    console.log("Processing tenant admin creation for:", tenant.name);
+
+    // ============================================
+    // STEP 1: Initialize default roles for tenant
+    // ============================================
+    const { data: existingRoles } = await supabaseAdmin
+      .from("tenant_roles")
+      .select("id, name")
+      .eq("tenant_id", tenant_id)
+      .limit(1);
+
+    let adminRoleId: string | null = null;
+
+    if (!existingRoles || existingRoles.length === 0) {
+      console.log("Initializing default roles for tenant:", tenant_id);
+      
+      for (const roleConfig of DEFAULT_ROLES) {
+        const { data: newRole, error: roleError } = await supabaseAdmin
+          .from("tenant_roles")
+          .insert({
+            tenant_id: tenant_id,
+            name: roleConfig.name,
+            description: roleConfig.description,
+            is_system_role: roleConfig.is_system_role,
+            dashboard_scope: roleConfig.dashboard_scope,
+            can_see_own_commissions: roleConfig.can_see_own_commissions,
+            can_see_team_commissions: roleConfig.can_see_team_commissions,
+            can_see_all_commissions: roleConfig.can_see_all_commissions,
+          })
+          .select()
+          .single();
+
+        if (roleError) {
+          console.error("Error creating role:", roleConfig.name, roleError);
+          continue;
+        }
+
+        console.log("Created role:", roleConfig.name, "with ID:", newRole.id);
+
+        // Store Admin Cabinet role ID for later
+        if (roleConfig.name === 'Admin Cabinet') {
+          adminRoleId = newRole.id;
+        }
+
+        // Create permissions for this role
+        for (const perm of roleConfig.permissions) {
+          await supabaseAdmin
+            .from("tenant_role_permissions")
+            .insert({
+              role_id: newRole.id,
+              module: perm.module,
+              action: perm.action,
+              allowed: true,
+            });
+        }
+      }
+      
+      console.log("Default roles initialized successfully");
+    } else {
+      // Get Admin Cabinet role ID from existing roles
+      const { data: adminRole } = await supabaseAdmin
+        .from("tenant_roles")
+        .select("id")
+        .eq("tenant_id", tenant_id)
+        .eq("name", "Admin Cabinet")
+        .single();
+      
+      if (adminRole) {
+        adminRoleId = adminRole.id;
+      }
+    }
+
+    // ============================================
+    // STEP 2: Create or link user
+    // ============================================
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
@@ -160,7 +351,7 @@ serve(async (req) => {
       // Assign 'admin' role to the new user
       await supabaseAdmin
         .from("user_roles")
-        .insert({
+        .upsert({
           user_id: userId,
           role: "admin",
         });
@@ -177,7 +368,7 @@ serve(async (req) => {
         });
 
       // Send password reset email so admin can set their own password
-      await supabaseAdmin.auth.admin.generateLink({
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
@@ -185,20 +376,52 @@ serve(async (req) => {
         },
       });
 
+      if (linkError) {
+        console.error("Error generating password reset link:", linkError);
+      } else {
+        console.log("Password reset link generated for:", email);
+      }
+
       console.log("New admin user created:", userId);
     }
 
-    // Create tenant assignment
+    // ============================================
+    // STEP 3: Create tenant assignment
+    // ============================================
     const { error: assignmentError } = await supabaseAdmin
       .from("user_tenant_assignments")
-      .insert({
+      .upsert({
         user_id: userId,
         tenant_id: tenant_id,
         is_platform_admin: false,
+      }, {
+        onConflict: 'user_id,tenant_id'
       });
 
     if (assignmentError) {
       console.error("Error creating tenant assignment:", assignmentError);
+    }
+
+    // ============================================
+    // STEP 4: Assign Admin Cabinet role to user
+    // ============================================
+    if (adminRoleId) {
+      const { error: roleAssignError } = await supabaseAdmin
+        .from("user_tenant_roles")
+        .upsert({
+          user_id: userId,
+          tenant_id: tenant_id,
+          role_id: adminRoleId,
+          assigned_by: callerUser.id,
+        }, {
+          onConflict: 'user_id,role_id,tenant_id'
+        });
+
+      if (roleAssignError) {
+        console.error("Error assigning Admin role to user:", roleAssignError);
+      } else {
+        console.log("Assigned Admin Cabinet role to user:", userId);
+      }
     }
 
     console.log("Admin user linked to tenant successfully:", {
@@ -207,6 +430,7 @@ serve(async (req) => {
       tenantId: tenant_id,
       tenantName: tenant.name,
       isNewUser,
+      adminRoleId,
     });
 
     return new Response(
@@ -216,9 +440,12 @@ serve(async (req) => {
         email,
         tenant_id,
         is_new_user: isNewUser,
+        roles_initialized: !existingRoles || existingRoles.length === 0,
+        admin_role_assigned: !!adminRoleId,
+        subdomain: `${tenant.slug}.lyta.ch`,
         message: isNewUser 
-          ? "Admin créé avec succès. Un email d'invitation a été envoyé."
-          : "Utilisateur existant lié au tenant avec succès.",
+          ? `Admin créé avec succès. Un email d'invitation a été envoyé à ${email}. Sous-domaine: ${tenant.slug}.lyta.ch`
+          : `Utilisateur existant lié au tenant ${tenant.name} avec succès.`,
       }),
       {
         status: 200,
