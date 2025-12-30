@@ -639,6 +639,153 @@ export type Database = {
           },
         ]
       }
+      commission_rules: {
+        Row: {
+          acquisition_rate: number | null
+          base_rate: number
+          calculation_basis: string | null
+          category: string | null
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          priority: number | null
+          product_id: string | null
+          renewal_rate: number | null
+          tenant_id: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          acquisition_rate?: number | null
+          base_rate?: number
+          calculation_basis?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          priority?: number | null
+          product_id?: string | null
+          renewal_rate?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          acquisition_rate?: number | null
+          base_rate?: number
+          calculation_basis?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          priority?: number | null
+          product_id?: string | null
+          renewal_rate?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_tiers: {
+        Row: {
+          bonus_amount: number | null
+          bonus_rate: number
+          bonus_type: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          max_contracts: number | null
+          max_premium: number | null
+          min_contracts: number | null
+          min_premium: number | null
+          name: string
+          period_type: string | null
+          priority: number | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          bonus_amount?: number | null
+          bonus_rate?: number
+          bonus_type?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_contracts?: number | null
+          max_premium?: number | null
+          min_contracts?: number | null
+          min_premium?: number | null
+          name: string
+          period_type?: string | null
+          priority?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bonus_amount?: number | null
+          bonus_rate?: number
+          bonus_type?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_contracts?: number | null
+          max_premium?: number | null
+          min_contracts?: number | null
+          min_premium?: number | null
+          name?: string
+          period_type?: string | null
+          priority?: number | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_tiers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commissions: {
         Row: {
           amount: number
@@ -1810,6 +1957,238 @@ export type Database = {
           },
         ]
       }
+      reserve_accounts: {
+        Row: {
+          agent_id: string
+          created_at: string
+          current_balance: number
+          id: string
+          reserve_rate: number
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          reserve_rate?: number
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          reserve_rate?: number
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reserve_accounts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_accounts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reserve_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          commission_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          reserve_account_id: string
+          retrocommission_id: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          commission_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reserve_account_id: string
+          retrocommission_id?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          commission_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reserve_account_id?: string
+          retrocommission_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reserve_transactions_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "commissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_transactions_reserve_account_id_fkey"
+            columns: ["reserve_account_id"]
+            isOneToOne: false
+            referencedRelation: "reserve_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_transactions_retrocommission_id_fkey"
+            columns: ["retrocommission_id"]
+            isOneToOne: false
+            referencedRelation: "retrocommissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retrocommissions: {
+        Row: {
+          agent_id: string | null
+          applied_at: string | null
+          clawback_amount: number
+          clawback_date: string
+          clawback_reason: string
+          commission_id: string | null
+          created_at: string
+          id: string
+          months_active: number | null
+          notes: string | null
+          original_amount: number
+          original_date: string
+          policy_id: string | null
+          proration_rate: number | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string
+          waived_at: string | null
+          waived_by: string | null
+          waived_reason: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          applied_at?: string | null
+          clawback_amount: number
+          clawback_date?: string
+          clawback_reason: string
+          commission_id?: string | null
+          created_at?: string
+          id?: string
+          months_active?: number | null
+          notes?: string | null
+          original_amount: number
+          original_date: string
+          policy_id?: string | null
+          proration_rate?: number | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          waived_at?: string | null
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          applied_at?: string | null
+          clawback_amount?: number
+          clawback_date?: string
+          clawback_reason?: string
+          commission_id?: string | null
+          created_at?: string
+          id?: string
+          months_active?: number | null
+          notes?: string | null
+          original_amount?: number
+          original_date?: string
+          policy_id?: string | null
+          proration_rate?: number | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          waived_at?: string | null
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retrocommissions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retrocommissions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retrocommissions_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "commissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retrocommissions_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retrocommissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retrocommissions_waived_by_fkey"
+            columns: ["waived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_emails: {
         Row: {
           created_at: string
@@ -2651,6 +3030,20 @@ export type Database = {
       }
     }
     Functions: {
+      apply_retrocommission: {
+        Args: { p_retrocommission_id: string }
+        Returns: boolean
+      }
+      calculate_commission_with_rules: {
+        Args: { p_is_renewal?: boolean; p_policy_id: string }
+        Returns: {
+          base_amount: number
+          commission_amount: number
+          rate: number
+          rule_id: string
+          rule_name: string
+        }[]
+      }
       calculate_policy_commission: {
         Args: { p_agent_id?: string; p_policy_id: string }
         Returns: {
