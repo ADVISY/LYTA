@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import advisyLogo from "@/assets/advisy-logo.svg";
 import { supabase } from "@/integrations/supabase/client";
-import { NotificationBell } from "@/components/crm/NotificationBell";
+
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
@@ -186,7 +186,6 @@ export default function CRMLayout() {
               <div className="flex items-center gap-1">
                 <SoundToggle />
                 <ThemeToggle />
-                <NotificationBell />
               </div>
             </div>
             {tenant && (
@@ -288,7 +287,6 @@ export default function CRMLayout() {
           <div className="flex items-center gap-1">
             <SoundToggle />
             <ThemeToggle />
-            <NotificationBell />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
