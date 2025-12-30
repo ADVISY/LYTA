@@ -689,7 +689,7 @@ export default function CRMDashboard() {
           )}
 
           <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
-            {/* Main Column */}
+            {/* Main Column - Chart */}
             <div className="space-y-6">
               {/* Combined Chart: Contracts + CA */}
               <Card className="border shadow-sm bg-card">
@@ -843,188 +843,8 @@ export default function CRMDashboard() {
               )}
             </div>
 
-            {/* Right Column - Gamification, Notifications & Activity */}
+            {/* Right Column - Notifications */}
             <div className="space-y-6">
-              {/* PODIUM - Enhanced Gamification */}
-              <Card className="border shadow-sm bg-card overflow-hidden">
-                <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="h-5 w-5 text-amber-500" />
-                      <CardTitle className="text-sm font-semibold">Podium du mois</CardTitle>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {format(new Date(), 'MMMM yyyy', { locale: fr })}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  {topPerformers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">
-                      Pas encore de données ce mois
-                    </p>
-                  ) : (
-                    <>
-                      {/* Podium visual */}
-                      <div className="flex justify-center items-end gap-2 mb-4 h-[120px]">
-                        {/* 2nd place */}
-                        {topPerformers[1] && (
-                          <div className="flex flex-col items-center">
-                            <Avatar className="w-12 h-12 border-2 border-gray-400 mb-1">
-                              {topPerformers[1].photoUrl ? (
-                                <AvatarImage src={topPerformers[1].photoUrl} />
-                              ) : null}
-                              <AvatarFallback className="bg-gray-100 text-gray-700 font-bold text-sm">
-                                {topPerformers[1].initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="w-16 h-16 bg-gradient-to-t from-gray-300 to-gray-200 rounded-t-lg flex items-center justify-center">
-                              <Medal className="h-6 w-6 text-gray-600" />
-                            </div>
-                            <span className="text-[10px] font-medium mt-1 truncate max-w-[60px]">
-                              {topPerformers[1].name.split(' ')[0]}
-                            </span>
-                            <Badge variant="secondary" className="text-[9px] mt-0.5">
-                              {topPerformers[1].monthContracts} contrats
-                            </Badge>
-                          </div>
-                        )}
-
-                        {/* 1st place */}
-                        {topPerformers[0] && (
-                          <div className="flex flex-col items-center -mt-4">
-                            <div className="relative">
-                              <Avatar className="w-14 h-14 border-3 border-amber-400 mb-1">
-                                {topPerformers[0].photoUrl ? (
-                                  <AvatarImage src={topPerformers[0].photoUrl} />
-                                ) : null}
-                                <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
-                                  {topPerformers[0].initials}
-                                </AvatarFallback>
-                              </Avatar>
-                              <Crown className="h-5 w-5 text-amber-500 absolute -top-3 left-1/2 -translate-x-1/2" />
-                            </div>
-                            <div className="w-16 h-24 bg-gradient-to-t from-amber-400 to-amber-300 rounded-t-lg flex items-center justify-center">
-                              <Trophy className="h-8 w-8 text-amber-700" />
-                            </div>
-                            <span className="text-xs font-semibold mt-1 truncate max-w-[70px]">
-                              {topPerformers[0].name.split(' ')[0]}
-                            </span>
-                            <Badge className="text-[9px] mt-0.5 bg-amber-500">
-                              {topPerformers[0].monthContracts} contrats
-                            </Badge>
-                          </div>
-                        )}
-
-                        {/* 3rd place */}
-                        {topPerformers[2] && (
-                          <div className="flex flex-col items-center">
-                            <Avatar className="w-11 h-11 border-2 border-orange-400 mb-1">
-                              {topPerformers[2].photoUrl ? (
-                                <AvatarImage src={topPerformers[2].photoUrl} />
-                              ) : null}
-                              <AvatarFallback className="bg-orange-100 text-orange-700 font-bold text-sm">
-                                {topPerformers[2].initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="w-16 h-12 bg-gradient-to-t from-orange-300 to-orange-200 rounded-t-lg flex items-center justify-center">
-                              <Medal className="h-5 w-5 text-orange-600" />
-                            </div>
-                            <span className="text-[10px] font-medium mt-1 truncate max-w-[60px]">
-                              {topPerformers[2].name.split(' ')[0]}
-                            </span>
-                            <Badge variant="secondary" className="text-[9px] mt-0.5">
-                              {topPerformers[2].monthContracts} contrats
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Remaining performers */}
-                      {topPerformers.slice(3).length > 0 && (
-                        <div className="space-y-1 pt-2 border-t">
-                          {topPerformers.slice(3).map((performer, i) => (
-                            <div 
-                              key={performer.id}
-                              className="flex items-center justify-between p-2 rounded-lg bg-muted/30"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-muted-foreground w-4">{i + 4}</span>
-                                <Avatar className="w-7 h-7">
-                                  {performer.photoUrl ? (
-                                    <AvatarImage src={performer.photoUrl} />
-                                  ) : null}
-                                  <AvatarFallback className="text-xs">
-                                    {performer.initials}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-sm truncate">{performer.name}</span>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {performer.monthContracts}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Employee & Manager of the Month */}
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="border shadow-sm bg-gradient-to-br from-amber-500/5 to-amber-500/10">
-                  <CardContent className="p-3 text-center">
-                    <Crown className="h-5 w-5 text-amber-500 mx-auto mb-2" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Employé du mois</p>
-                    {employeeOfMonth ? (
-                      <>
-                        <Avatar className="w-12 h-12 mx-auto my-2 border-2 border-amber-400">
-                          {employeeOfMonth.photoUrl ? (
-                            <AvatarImage src={employeeOfMonth.photoUrl} />
-                          ) : null}
-                          <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
-                            {employeeOfMonth.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <p className="text-xs font-medium truncate">{employeeOfMonth.name}</p>
-                        <p className="text-[10px] text-emerald-600 font-semibold">
-                          {employeeOfMonth.monthContracts} contrats
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-2">À déterminer</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border shadow-sm bg-gradient-to-br from-violet-500/5 to-violet-500/10">
-                  <CardContent className="p-3 text-center">
-                    <Award className="h-5 w-5 text-violet-500 mx-auto mb-2" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Manager du mois</p>
-                    {managerOfMonth ? (
-                      <>
-                        <Avatar className="w-12 h-12 mx-auto my-2 border-2 border-violet-400">
-                          {managerOfMonth.photoUrl ? (
-                            <AvatarImage src={managerOfMonth.photoUrl} />
-                          ) : null}
-                          <AvatarFallback className="bg-violet-100 text-violet-700 font-bold">
-                            {managerOfMonth.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <p className="text-xs font-medium truncate">{managerOfMonth.name}</p>
-                        <p className="text-[10px] text-emerald-600 font-semibold">
-                          {managerOfMonth.monthContracts} contrats (équipe)
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-2">À déterminer</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
               {/* Recent Notifications */}
               <Card className="border shadow-sm bg-card">
                 <CardHeader className="pb-2">
@@ -1046,7 +866,7 @@ export default function CRMDashboard() {
                       Aucune notification
                     </p>
                   ) : (
-                    <ScrollArea className="h-[180px]">
+                    <ScrollArea className="h-[300px]">
                       <div className="space-y-2">
                         {recentNotifications.map(notif => (
                           <div 
@@ -1122,6 +942,189 @@ export default function CRMDashboard() {
                   </CardContent>
                 </Card>
               )}
+            </div>
+          </div>
+
+          {/* Bottom Section - Podium and Employee/Manager of Month */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* PODIUM */}
+            <Card className="border shadow-sm bg-card overflow-hidden">
+              <CardHeader className="pb-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-amber-500" />
+                    <CardTitle className="text-sm font-semibold">Podium du mois</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {format(new Date(), 'MMMM yyyy', { locale: fr })}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                {topPerformers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Pas encore de données ce mois
+                  </p>
+                ) : (
+                  <>
+                    {/* Podium visual */}
+                    <div className="flex justify-center items-end gap-4 mb-4 h-[140px]">
+                      {/* 2nd place */}
+                      {topPerformers[1] && (
+                        <div className="flex flex-col items-center">
+                          <Avatar className="w-12 h-12 border-2 border-gray-400 mb-1">
+                            {topPerformers[1].photoUrl ? (
+                              <AvatarImage src={topPerformers[1].photoUrl} />
+                            ) : null}
+                            <AvatarFallback className="bg-gray-100 text-gray-700 font-bold text-sm">
+                              {topPerformers[1].initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="w-20 h-16 bg-gradient-to-t from-gray-300 to-gray-200 rounded-t-lg flex items-center justify-center">
+                            <Medal className="h-6 w-6 text-gray-600" />
+                          </div>
+                          <span className="text-xs font-medium mt-1 truncate max-w-[80px]">
+                            {topPerformers[1].name.split(' ')[0]}
+                          </span>
+                          <Badge variant="secondary" className="text-[10px] mt-0.5">
+                            {topPerformers[1].monthContracts} contrats
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* 1st place */}
+                      {topPerformers[0] && (
+                        <div className="flex flex-col items-center -mt-4">
+                          <div className="relative">
+                            <Avatar className="w-14 h-14 border-3 border-amber-400 mb-1">
+                              {topPerformers[0].photoUrl ? (
+                                <AvatarImage src={topPerformers[0].photoUrl} />
+                              ) : null}
+                              <AvatarFallback className="bg-amber-100 text-amber-700 font-bold">
+                                {topPerformers[0].initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <Crown className="h-5 w-5 text-amber-500 absolute -top-3 left-1/2 -translate-x-1/2" />
+                          </div>
+                          <div className="w-20 h-24 bg-gradient-to-t from-amber-400 to-amber-300 rounded-t-lg flex items-center justify-center">
+                            <Trophy className="h-8 w-8 text-amber-700" />
+                          </div>
+                          <span className="text-sm font-semibold mt-1 truncate max-w-[90px]">
+                            {topPerformers[0].name.split(' ')[0]}
+                          </span>
+                          <Badge className="text-[10px] mt-0.5 bg-amber-500">
+                            {topPerformers[0].monthContracts} contrats
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* 3rd place */}
+                      {topPerformers[2] && (
+                        <div className="flex flex-col items-center">
+                          <Avatar className="w-11 h-11 border-2 border-orange-400 mb-1">
+                            {topPerformers[2].photoUrl ? (
+                              <AvatarImage src={topPerformers[2].photoUrl} />
+                            ) : null}
+                            <AvatarFallback className="bg-orange-100 text-orange-700 font-bold text-sm">
+                              {topPerformers[2].initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="w-20 h-12 bg-gradient-to-t from-orange-300 to-orange-200 rounded-t-lg flex items-center justify-center">
+                            <Medal className="h-5 w-5 text-orange-600" />
+                          </div>
+                          <span className="text-xs font-medium mt-1 truncate max-w-[80px]">
+                            {topPerformers[2].name.split(' ')[0]}
+                          </span>
+                          <Badge variant="secondary" className="text-[10px] mt-0.5">
+                            {topPerformers[2].monthContracts} contrats
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Remaining performers */}
+                    {topPerformers.slice(3).length > 0 && (
+                      <div className="space-y-1 pt-2 border-t">
+                        {topPerformers.slice(3).map((performer, i) => (
+                          <div 
+                            key={performer.id}
+                            className="flex items-center justify-between p-2 rounded-lg bg-muted/30"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-muted-foreground w-4">{i + 4}</span>
+                              <Avatar className="w-7 h-7">
+                                {performer.photoUrl ? (
+                                  <AvatarImage src={performer.photoUrl} />
+                                ) : null}
+                                <AvatarFallback className="text-xs">
+                                  {performer.initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm truncate">{performer.name}</span>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {performer.monthContracts}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Employee & Manager of the Month */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="border shadow-sm bg-gradient-to-br from-amber-500/5 to-amber-500/10">
+                <CardContent className="p-4 text-center">
+                  <Crown className="h-6 w-6 text-amber-500 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Employé du mois</p>
+                  {employeeOfMonth ? (
+                    <>
+                      <Avatar className="w-16 h-16 mx-auto my-3 border-2 border-amber-400">
+                        {employeeOfMonth.photoUrl ? (
+                          <AvatarImage src={employeeOfMonth.photoUrl} />
+                        ) : null}
+                        <AvatarFallback className="bg-amber-100 text-amber-700 font-bold text-lg">
+                          {employeeOfMonth.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <p className="text-sm font-medium truncate">{employeeOfMonth.name}</p>
+                      <p className="text-xs text-emerald-600 font-semibold mt-1">
+                        {employeeOfMonth.monthContracts} contrats
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-4">À déterminer</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border shadow-sm bg-gradient-to-br from-violet-500/5 to-violet-500/10">
+                <CardContent className="p-4 text-center">
+                  <Award className="h-6 w-6 text-violet-500 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Manager du mois</p>
+                  {managerOfMonth ? (
+                    <>
+                      <Avatar className="w-16 h-16 mx-auto my-3 border-2 border-violet-400">
+                        {managerOfMonth.photoUrl ? (
+                          <AvatarImage src={managerOfMonth.photoUrl} />
+                        ) : null}
+                        <AvatarFallback className="bg-violet-100 text-violet-700 font-bold text-lg">
+                          {managerOfMonth.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <p className="text-sm font-medium truncate">{managerOfMonth.name}</p>
+                      <p className="text-xs text-emerald-600 font-semibold mt-1">
+                        {managerOfMonth.monthContracts} contrats (équipe)
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-4">À déterminer</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </>
