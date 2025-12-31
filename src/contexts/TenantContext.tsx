@@ -190,6 +190,23 @@ export function TenantProvider({ children }: TenantProviderProps) {
 
         setTenant(formattedTenant);
         
+        // Update favicon dynamically based on tenant logo
+        const faviconElement = document.getElementById('dynamic-favicon') as HTMLLinkElement;
+        if (faviconElement && formattedTenant.branding?.logo_url) {
+          faviconElement.href = formattedTenant.branding.logo_url;
+          // Detect type based on URL extension
+          const logoUrl = formattedTenant.branding.logo_url.toLowerCase();
+          if (logoUrl.includes('.png')) {
+            faviconElement.type = 'image/png';
+          } else if (logoUrl.includes('.svg')) {
+            faviconElement.type = 'image/svg+xml';
+          } else if (logoUrl.includes('.ico')) {
+            faviconElement.type = 'image/x-icon';
+          } else {
+            faviconElement.type = 'image/png'; // Default to PNG for most uploaded images
+          }
+        }
+        
         // Apply tenant branding to CSS variables (convert hex to HSL for Tailwind)
         if (formattedTenant.branding?.primary_color) {
           const primaryHsl = hexToHsl(formattedTenant.branding.primary_color);
