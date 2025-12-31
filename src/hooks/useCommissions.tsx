@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/contexts/TenantContext';
+import { translateError } from '@/lib/errorTranslations';
 
 export type Commission = {
   id: string;
@@ -84,7 +85,7 @@ export function useCommissions() {
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: translateError(error.message),
         variant: "destructive"
       });
     } finally {
@@ -122,7 +123,7 @@ export function useCommissions() {
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: translateError(error.message),
         variant: "destructive"
       });
       throw error;
@@ -147,7 +148,7 @@ export function useCommissions() {
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: translateError(error.message),
         variant: "destructive"
       });
       throw error;
@@ -175,7 +176,7 @@ export function useCommissions() {
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: translateError(error.message),
         variant: "destructive"
       });
       throw error;
@@ -200,7 +201,7 @@ export function useCommissions() {
     } catch (error: any) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: translateError(error.message),
         variant: "destructive"
       });
       throw error;
