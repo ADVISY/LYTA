@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export type Commission = {
   id: string;
@@ -18,12 +19,40 @@ export type Commission = {
   created_at: string;
   updated_at: string;
   policy?: any;
+  tenant_id?: string | null;
 };
 
 export function useCommissions() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTenantId, setUserTenantId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { tenantId: contextTenantId } = useTenant();
+
+  // Get user's tenant_id from their assignment
+  useEffect(() => {
+    const fetchUserTenant = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('user_tenant_assignments')
+        .select('tenant_id')
+        .eq('user_id', user.id)
+        .not('tenant_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (data?.tenant_id) {
+        setUserTenantId(data.tenant_id);
+      }
+    };
+
+    fetchUserTenant();
+  }, []);
+
+  // Use context tenant or user's assigned tenant
+  const effectiveTenantId = contextTenantId || userTenantId;
 
   const fetchCommissions = async () => {
     try {
@@ -65,9 +94,19 @@ export function useCommissions() {
 
   const createCommission = async (commissionData: any) => {
     try {
+      if (!effectiveTenantId) {
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
+      }
+
+      // Include tenant_id
+      const dataWithTenant = {
+        ...commissionData,
+        tenant_id: effectiveTenantId
+      };
+
       const { data, error } = await supabase
         .from('commissions')
-        .insert([commissionData])
+        .insert([dataWithTenant])
         .select()
         .single();
 
