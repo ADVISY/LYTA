@@ -392,15 +392,17 @@ export default function DeposerContrat() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("policies").insert({
-        client_id: null,
-        product_id: "00000000-0000-0000-0000-000000000001",
-        start_date: sanaForm.lamalDateEffet || new Date().toISOString().split("T")[0],
-        status: "pending",
-        notes: JSON.stringify({ formType: 'sana', ...sanaForm, agentEmail: partnerEmail }),
-        product_type: "sana",
+      const { data, error } = await supabase.functions.invoke('deposit-contract', {
+        body: {
+          partnerEmail: partnerEmail,
+          formType: 'sana',
+          formData: sanaForm,
+          startDate: sanaForm.lamalDateEffet || new Date().toISOString().split("T")[0],
+          productType: 'sana',
+        }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       await sendContractDepositEmail('sana', sanaForm, sanaDocuments);
       celebrate("contract_added");
       toast({ title: "Formulaire SANA envoyé !", description: "Votre demande a été soumise avec succès" });
@@ -425,16 +427,18 @@ export default function DeposerContrat() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("policies").insert({
-        client_id: null,
-        product_id: "00000000-0000-0000-0000-000000000002",
-        start_date: vitaForm.vitaDateEffet || new Date().toISOString().split("T")[0],
-        premium_monthly: parseFloat(vitaForm.vitaPrimeMensuelle) || 0,
-        status: "pending",
-        notes: JSON.stringify({ formType: 'vita', ...vitaForm, agentEmail: partnerEmail }),
-        product_type: "vita",
+      const { data, error } = await supabase.functions.invoke('deposit-contract', {
+        body: {
+          partnerEmail: partnerEmail,
+          formType: 'vita',
+          formData: vitaForm,
+          startDate: vitaForm.vitaDateEffet || new Date().toISOString().split("T")[0],
+          premiumMonthly: parseFloat(vitaForm.vitaPrimeMensuelle) || 0,
+          productType: 'vita',
+        }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       await sendContractDepositEmail('vita', vitaForm, vitaDocuments);
       celebrate("contract_added");
       toast({ title: "Formulaire VITA envoyé !", description: "Votre demande a été soumise avec succès" });
@@ -459,15 +463,17 @@ export default function DeposerContrat() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("policies").insert({
-        client_id: null,
-        product_id: "00000000-0000-0000-0000-000000000003",
-        start_date: medioForm.dateEffet || new Date().toISOString().split("T")[0],
-        status: "pending",
-        notes: JSON.stringify({ formType: 'medio', ...medioForm, agentEmail: partnerEmail }),
-        product_type: "medio",
+      const { data, error } = await supabase.functions.invoke('deposit-contract', {
+        body: {
+          partnerEmail: partnerEmail,
+          formType: 'medio',
+          formData: medioForm,
+          startDate: medioForm.dateEffet || new Date().toISOString().split("T")[0],
+          productType: 'medio',
+        }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       await sendContractDepositEmail('medio', medioForm, medioDocuments);
       celebrate("contract_added");
       toast({ title: "Formulaire MEDIO envoyé !", description: "Votre demande a été soumise avec succès" });
@@ -488,15 +494,17 @@ export default function DeposerContrat() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("policies").insert({
-        client_id: null,
-        product_id: "00000000-0000-0000-0000-000000000004",
-        start_date: businessForm.dateEffet || new Date().toISOString().split("T")[0],
-        status: "pending",
-        notes: JSON.stringify({ formType: 'business', ...businessForm, agentEmail: partnerEmail }),
-        product_type: "business",
+      const { data, error } = await supabase.functions.invoke('deposit-contract', {
+        body: {
+          partnerEmail: partnerEmail,
+          formType: 'business',
+          formData: businessForm,
+          startDate: businessForm.dateEffet || new Date().toISOString().split("T")[0],
+          productType: 'business',
+        }
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       await sendContractDepositEmail('business', businessForm, businessDocuments);
       celebrate("contract_added");
       toast({ title: "Formulaire BUSINESS envoyé !", description: "Votre demande a été soumise avec succès" });
