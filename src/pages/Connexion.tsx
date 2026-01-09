@@ -17,16 +17,10 @@ interface LoginFormProps {
   title: string;
   subtitle: string;
   onBack: () => void;
-  isSignUp: boolean;
-  setIsSignUp: (value: boolean) => void;
   email: string;
   setEmail: (value: string) => void;
   password: string;
   setPassword: (value: string) => void;
-  firstName: string;
-  setFirstName: (value: string) => void;
-  lastName: string;
-  setLastName: (value: string) => void;
   loading: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onResetPassword: () => void;
@@ -36,16 +30,10 @@ const LoginForm = ({
   title,
   subtitle,
   onBack,
-  isSignUp,
-  setIsSignUp,
   email,
   setEmail,
   password,
   setPassword,
-  firstName,
-  setFirstName,
-  lastName,
-  setLastName,
   loading,
   onSubmit,
   onResetPassword,
@@ -60,41 +48,12 @@ const LoginForm = ({
         <ChevronLeft className="h-5 w-5" />
       </button>
       <div>
-        <h2 className="text-xl font-bold text-foreground">
-          {isSignUp ? `Créer un compte ${title}` : title}
-        </h2>
+        <h2 className="text-xl font-bold text-foreground">{title}</h2>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
     </div>
 
     <form onSubmit={onSubmit} className="space-y-4">
-      {isSignUp && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">Prénom</Label>
-            <Input
-              id="firstName"
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Jean"
-              autoComplete="given-name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Nom</Label>
-            <Input
-              id="lastName"
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Dupont"
-              autoComplete="family-name"
-            />
-          </div>
-        </div>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -115,17 +74,15 @@ const LoginForm = ({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
-          autoComplete={isSignUp ? "new-password" : "current-password"}
+          autoComplete="current-password"
         />
-        {!isSignUp && (
-          <button
-            type="button"
-            className="text-xs text-primary hover:underline"
-            onClick={onResetPassword}
-          >
-            Mot de passe oublié ?
-          </button>
-        )}
+        <button
+          type="button"
+          className="text-xs text-primary hover:underline"
+          onClick={onResetPassword}
+        >
+          Mot de passe oublié ?
+        </button>
       </div>
 
       <Button 
@@ -133,18 +90,8 @@ const LoginForm = ({
         disabled={loading}
         className="w-full mt-6"
       >
-        {loading ? "Chargement..." : (isSignUp ? "Créer mon compte" : "Se connecter")}
+        {loading ? "Chargement..." : "Se connecter"}
       </Button>
-
-      <div className="text-center mt-4">
-        <button
-          type="button"
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="text-sm text-muted-foreground hover:text-primary"
-        >
-          {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
-        </button>
-      </div>
     </form>
   </div>
 );
@@ -315,15 +262,12 @@ const Connexion = () => {
   const { tenant, isLoading: tenantLoading } = useTenant();
   const [view, setView] = useState<View>("choice");
   const [loginType, setLoginType] = useState<"client" | "team" | "king">("client");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { signIn, signUp, resetPassword, user } = useAuth();
+  const { signIn, resetPassword, user } = useAuth();
   const navigate = useNavigate();
   
   // Get tenant display name and logo
@@ -543,59 +487,23 @@ const Connexion = () => {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        if (!firstName || !lastName) {
-          toast({
-            title: "Erreur",
-            description: "Veuillez entrer votre prénom et nom.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        const { error } = await signUp(email, password, firstName, lastName);
-        
-        if (error) {
-          if (error.message.includes("already registered")) {
-            toast({
-              title: "Erreur",
-              description: "Cet email est déjà enregistré. Veuillez vous connecter.",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Erreur",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
-        } else {
-          toast({
-            title: "Inscription réussie",
-            description: "Vous êtes maintenant connecté à votre espace.",
-          });
-          // Redirect will happen via useEffect
-        }
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast({
+          title: "Erreur de connexion",
+          description: "Email ou mot de passe incorrect.",
+          variant: "destructive",
+        });
       } else {
-        const { error } = await signIn(email, password);
+        // Store the login target in sessionStorage for redirect after auth state changes
+        sessionStorage.setItem('loginTarget', loginType);
         
-        if (error) {
-          toast({
-            title: "Erreur de connexion",
-            description: "Email ou mot de passe incorrect.",
-            variant: "destructive",
-          });
-        } else {
-          // Store the login target in sessionStorage for redirect after auth state changes
-          sessionStorage.setItem('loginTarget', loginType);
-          
-          toast({
-            title: "Connexion réussie",
-            description: `Bienvenue sur votre espace ${displayName}.`,
-          });
-          // Redirect will happen via useEffect based on loginType
-        }
+        toast({
+          title: "Connexion réussie",
+          description: `Bienvenue sur votre espace ${displayName}.`,
+        });
+        // Redirect will happen via useEffect based on loginType
       }
     } catch (error: any) {
       toast({
@@ -611,9 +519,6 @@ const Connexion = () => {
   const resetForm = () => {
     setEmail("");
     setPassword("");
-    setFirstName("");
-    setLastName("");
-    setIsSignUp(false);
     setIsResetPassword(false);
   };
 
@@ -637,16 +542,10 @@ const Connexion = () => {
             title="Espace Client" 
             subtitle="Connectez-vous à votre espace personnel"
             onBack={() => { resetForm(); setView("choice"); }}
-            isSignUp={isSignUp}
-            setIsSignUp={setIsSignUp}
             email={email}
             setEmail={setEmail}
             password={password}
             setPassword={setPassword}
-            firstName={firstName}
-            setFirstName={setFirstName}
-            lastName={lastName}
-            setLastName={setLastName}
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
@@ -665,16 +564,10 @@ const Connexion = () => {
             title="Connexion CRM" 
             subtitle="Accédez à votre espace de gestion"
             onBack={() => { resetForm(); setView("team"); }}
-            isSignUp={isSignUp}
-            setIsSignUp={setIsSignUp}
             email={email}
             setEmail={setEmail}
             password={password}
             setPassword={setPassword}
-            firstName={firstName}
-            setFirstName={setFirstName}
-            lastName={lastName}
-            setLastName={setLastName}
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
@@ -686,16 +579,10 @@ const Connexion = () => {
             title="SUPER ADMIN" 
             subtitle="Connexion plateforme"
             onBack={() => { resetForm(); setView("choice"); }}
-            isSignUp={false}
-            setIsSignUp={() => {}}
             email={email}
             setEmail={setEmail}
             password={password}
             setPassword={setPassword}
-            firstName={firstName}
-            setFirstName={setFirstName}
-            lastName={lastName}
-            setLastName={setLastName}
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
