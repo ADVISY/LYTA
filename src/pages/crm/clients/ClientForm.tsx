@@ -258,7 +258,7 @@ export default function ClientForm() {
                   name="type_adresse"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type d'adresse *</FormLabel>
+                      <FormLabel>{t('clientForm.addressType')} *</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
@@ -269,9 +269,9 @@ export default function ClientForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="client">Client</SelectItem>
-                          <SelectItem value="collaborateur">Collaborateur</SelectItem>
-                          <SelectItem value="partenaire">Partenaire</SelectItem>
+                          <SelectItem value="client">{t('clientForm.client')}</SelectItem>
+                          <SelectItem value="collaborateur">{t('clientForm.collaborator')}</SelectItem>
+                          <SelectItem value="partenaire">{t('clientForm.partner')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -285,7 +285,7 @@ export default function ClientForm() {
                     name="civil_status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>État civil</FormLabel>
+                        <FormLabel>{t('clientForm.civilStatus')}</FormLabel>
                         <Select
                           onValueChange={(value) =>
                             field.onChange(value === "none" ? null : value)
@@ -294,16 +294,16 @@ export default function ClientForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner" />
+                              <SelectValue placeholder={t('clientForm.notSpecified')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">Non renseigné</SelectItem>
-                            <SelectItem value="célibataire">Célibataire</SelectItem>
-                            <SelectItem value="marié">Marié(e)</SelectItem>
-                            <SelectItem value="divorcé">Divorcé(e)</SelectItem>
-                            <SelectItem value="séparé">Séparé(e)</SelectItem>
-                            <SelectItem value="veuf">Veuf(ve)</SelectItem>
+                            <SelectItem value="none">{t('clientForm.notSpecified')}</SelectItem>
+                            <SelectItem value="célibataire">{t('clientForm.single')}</SelectItem>
+                            <SelectItem value="marié">{t('clientForm.married')}</SelectItem>
+                            <SelectItem value="divorcé">{t('clientForm.divorced')}</SelectItem>
+                            <SelectItem value="séparé">{t('clientForm.separated')}</SelectItem>
+                            <SelectItem value="veuf">{t('clientForm.widowed')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -316,7 +316,7 @@ export default function ClientForm() {
                     name="gender"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Avatar</FormLabel>
+                        <FormLabel>{t('clientForm.avatar')}</FormLabel>
                         <Select
                           onValueChange={(value) =>
                             field.onChange(value === "none" ? null : value)
@@ -325,14 +325,14 @@ export default function ClientForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner" />
+                              <SelectValue placeholder={t('clientForm.notSpecified')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">Non renseigné</SelectItem>
-                            <SelectItem value="homme">Homme</SelectItem>
-                            <SelectItem value="femme">Femme</SelectItem>
-                            <SelectItem value="enfant">Enfant</SelectItem>
+                            <SelectItem value="none">{t('clientForm.notSpecified')}</SelectItem>
+                            <SelectItem value="homme">{t('clientForm.male')}</SelectItem>
+                            <SelectItem value="femme">{t('clientForm.female')}</SelectItem>
+                            <SelectItem value="enfant">{t('clientForm.child')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -345,7 +345,7 @@ export default function ClientForm() {
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Statut *</FormLabel>
+                        <FormLabel>{t('clientForm.status')} *</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
@@ -356,10 +356,10 @@ export default function ClientForm() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="prospect">Prospect</SelectItem>
-                            <SelectItem value="actif">Actif</SelectItem>
-                            <SelectItem value="résilié">Résilié</SelectItem>
-                            <SelectItem value="dormant">Dormant</SelectItem>
+                            <SelectItem value="prospect">{t('clientForm.prospect')}</SelectItem>
+                            <SelectItem value="actif">{t('clientForm.active')}</SelectItem>
+                            <SelectItem value="résilié">{t('clientForm.terminated')}</SelectItem>
+                            <SelectItem value="dormant">{t('clientForm.dormant')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -372,7 +372,7 @@ export default function ClientForm() {
                     name="first_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Prénom *</FormLabel>
+                        <FormLabel>{t('clientForm.firstName')} *</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -386,7 +386,7 @@ export default function ClientForm() {
                     name="last_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nom *</FormLabel>
+                        <FormLabel>{t('clientForm.lastName')} *</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -400,7 +400,7 @@ export default function ClientForm() {
                     name="birthdate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date de naissance</FormLabel>
+                        <FormLabel>{t('clientForm.birthdate')}</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} value={field.value || ""} />
                         </FormControl>
@@ -414,7 +414,7 @@ export default function ClientForm() {
                     name="permit_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Type de permis</FormLabel>
+                        <FormLabel>{t('clientForm.permitType')}</FormLabel>
                         <Select
                           onValueChange={(value) =>
                             field.onChange(value === "none" ? null : value)
@@ -423,16 +423,16 @@ export default function ClientForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner" />
+                              <SelectValue placeholder={t('clientForm.notSpecified')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">Aucun</SelectItem>
-                            <SelectItem value="B">Permis B</SelectItem>
-                            <SelectItem value="C">Permis C</SelectItem>
-                            <SelectItem value="G">Permis G</SelectItem>
-                            <SelectItem value="L">Permis L</SelectItem>
-                            <SelectItem value="Autre">Autre</SelectItem>
+                            <SelectItem value="none">{t('clientForm.none')}</SelectItem>
+                            <SelectItem value="B">{t('clientForm.permitB')}</SelectItem>
+                            <SelectItem value="C">{t('clientForm.permitC')}</SelectItem>
+                            <SelectItem value="G">{t('clientForm.permitG')}</SelectItem>
+                            <SelectItem value="L">{t('clientForm.permitL')}</SelectItem>
+                            <SelectItem value="Autre">{t('clientForm.other')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -445,7 +445,7 @@ export default function ClientForm() {
                     name="nationality"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nationalité</FormLabel>
+                        <FormLabel>{t('clientForm.nationality')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -459,7 +459,7 @@ export default function ClientForm() {
                     name="profession"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Profession</FormLabel>
+                        <FormLabel>{t('clientForm.profession')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -473,7 +473,7 @@ export default function ClientForm() {
                     name="employer"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Employeur</FormLabel>
+                        <FormLabel>{t('clientForm.employer')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -487,7 +487,7 @@ export default function ClientForm() {
                     name="company_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Entreprise</FormLabel>
+                        <FormLabel>{t('clients.companyName')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -509,7 +509,7 @@ export default function ClientForm() {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Adresse</FormLabel>
+                      <FormLabel>{t('clientForm.address')}</FormLabel>
                       <FormControl>
                         <Input {...field} value={field.value || ""} />
                       </FormControl>
@@ -524,7 +524,7 @@ export default function ClientForm() {
                     name="zip_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Code postal</FormLabel>
+                        <FormLabel>{t('clientForm.postalCode')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -538,7 +538,7 @@ export default function ClientForm() {
                     name="city"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Ville</FormLabel>
+                        <FormLabel>{t('clientForm.city')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -552,7 +552,7 @@ export default function ClientForm() {
                     name="country"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pays</FormLabel>
+                        <FormLabel>{t('clientForm.country')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -568,7 +568,7 @@ export default function ClientForm() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>{t('clientForm.email')}</FormLabel>
                         <FormControl>
                           <Input type="email" {...field} value={field.value || ""} />
                         </FormControl>
@@ -582,7 +582,7 @@ export default function ClientForm() {
                     name="mobile"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Mobile</FormLabel>
+                        <FormLabel>{t('clientForm.mobile')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -596,7 +596,7 @@ export default function ClientForm() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Téléphone fixe</FormLabel>
+                        <FormLabel>{t('clientForm.phone')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -619,7 +619,7 @@ export default function ClientForm() {
                     name="iban"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>IBAN</FormLabel>
+                        <FormLabel>{t('clientForm.iban')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} placeholder="CH93 0000 0000 0000 0000 0" />
                         </FormControl>
@@ -633,7 +633,7 @@ export default function ClientForm() {
                     name="bank_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nom de la banque</FormLabel>
+                        <FormLabel>{t('clientForm.bankName')}</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
                         </FormControl>
@@ -647,7 +647,7 @@ export default function ClientForm() {
               {/* Section Autres */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
-                  Autres informations
+                  {t('common.details')}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -656,7 +656,7 @@ export default function ClientForm() {
                     name="assigned_agent_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Agent assigné</FormLabel>
+                        <FormLabel>{t('clientForm.assignedAgent')}</FormLabel>
                         <Select
                           onValueChange={(value) => field.onChange(value === "none" ? null : value)}
                           value={field.value || "none"}
@@ -664,11 +664,11 @@ export default function ClientForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner un agent" />
+                              <SelectValue placeholder={t('clientForm.noAgent')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">Aucun</SelectItem>
+                            <SelectItem value="none">{t('clientForm.none')}</SelectItem>
                             {agents.map((agent) => (
                               <SelectItem key={agent.id} value={agent.id}>
                                 {agent.first_name && agent.last_name
@@ -685,7 +685,7 @@ export default function ClientForm() {
 
                   {/* Manager automatique */}
                   <div className="space-y-2">
-                    <FormLabel>Manager attitré</FormLabel>
+                    <FormLabel>{t('clientForm.manager')}</FormLabel>
                     <div className={`px-3 py-2 rounded-md border ${selectedManager ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800' : 'bg-muted'}`}>
                       {selectedManager ? (
                         <span className="text-amber-700 dark:text-amber-400 font-medium">
@@ -694,23 +694,23 @@ export default function ClientForm() {
                       ) : (
                         <span className="text-muted-foreground text-sm">
                           {watchedAgentId && watchedAgentId !== "none" 
-                            ? "Aucun manager pour cet agent" 
-                            : "Sélectionnez un agent"}
+                            ? t('clientForm.noAgent') 
+                            : t('clientForm.notSpecified')}
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Assigné automatiquement selon l'agent
+                      {t('clientForm.autoAssigned')}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <FormLabel>Tags (séparés par des virgules)</FormLabel>
+                  <FormLabel>{t('clientForm.tags')}</FormLabel>
                   <Input
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
-                    placeholder="VIP, Entreprise, Lead"
+                    placeholder={t('clientForm.tagsHelp')}
                   />
                 </div>
               </div>
