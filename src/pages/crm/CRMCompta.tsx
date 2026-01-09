@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2 } from "lucide-react";
+import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
@@ -19,6 +19,7 @@ import { format, startOfMonth, endOfMonth, getMonth, getYear } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import html2pdf from "html2pdf.js";
 
 interface DecompteCommission {
@@ -97,6 +98,10 @@ export default function CRMCompta() {
   const { createDocument } = useDocuments();
   const { toast } = useToast();
   const { tenant } = useTenant();
+  const { hasModule } = usePlanFeatures();
+  
+  // Check if payroll module is available
+  const hasPayrollAccess = hasModule('payroll');
   
   // Tenant branding for PDFs
   const tenantName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
@@ -846,15 +851,17 @@ export default function CRMCompta() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className={cn("grid w-full max-w-md", hasPayrollAccess ? "grid-cols-2" : "grid-cols-1")}>
           <TabsTrigger value="decomptes" className="gap-2">
             <FileText className="h-4 w-4" />
             Décomptes
           </TabsTrigger>
-          <TabsTrigger value="salaires" className="gap-2">
-            <DollarSign className="h-4 w-4" />
-            Fiches de salaire
-          </TabsTrigger>
+          {hasPayrollAccess && (
+            <TabsTrigger value="salaires" className="gap-2">
+              <DollarSign className="h-4 w-4" />
+              Fiches de salaire
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Décomptes Tab */}
@@ -949,7 +956,8 @@ export default function CRMCompta() {
           </Card>
         </TabsContent>
 
-        {/* Fiches de salaire Tab */}
+        {/* Fiches de salaire Tab - Only if payroll module enabled */}
+        {hasPayrollAccess && (
         <TabsContent value="salaires" className="space-y-6">
           <Card className="border-0 shadow-lg">
             <CardHeader>
@@ -1046,6 +1054,7 @@ export default function CRMCompta() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
 
       {/* Preview Decomptes Dialog */}
