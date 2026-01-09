@@ -489,35 +489,35 @@ export default function ClientDetail() {
                       <p className="font-medium capitalize">{client.civil_status || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Nationalité</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.nationality')}</p>
                       <p className="font-medium">{client.nationality || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Permis</p>
-                      <p className="font-medium">{client.permit_type ? `Permis ${client.permit_type}` : "-"}</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.permit')}</p>
+                      <p className="font-medium">{client.permit_type ? `${t('clientDetail.permit')} ${client.permit_type}` : "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Profession</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.profession')}</p>
                       <p className="font-medium">{client.profession || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Employeur</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.employer')}</p>
                       <p className="font-medium">{client.employer || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.email')}</p>
                       <p className="font-medium">{client.email || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Téléphone</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.phone')}</p>
                       <p className="font-medium">{client.phone || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Mobile</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.mobile')}</p>
                       <p className="font-medium">{client.mobile || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Date de naissance</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.birthdate')}</p>
                       <p className="font-medium">
                         {client.birthdate
                           ? format(new Date(client.birthdate), "dd MMMM yyyy", { locale: fr })
@@ -525,7 +525,7 @@ export default function ClientDetail() {
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Adresse</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.address')}</p>
                       <p className="font-medium">
                         {[
                           client.address,
@@ -537,16 +537,16 @@ export default function ClientDetail() {
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">IBAN</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.iban')}</p>
                       <p className="font-medium">{client.iban || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Banque</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.bank')}</p>
                       <p className="font-medium">{client.bank_name || "-"}</p>
                     </div>
                     {client.assigned_agent && (
                       <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Agent assigné</p>
+                        <p className="text-sm text-muted-foreground">{t('clientDetail.assignedAgent')}</p>
                         <p className="font-medium">
                           {client.assigned_agent.first_name && client.assigned_agent.last_name
                             ? `${client.assigned_agent.first_name} ${client.assigned_agent.last_name}`
@@ -555,7 +555,7 @@ export default function ClientDetail() {
                       </div>
                     )}
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Date de création</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.createdAt')}</p>
                       <p className="font-medium">
                         {format(new Date(client.created_at), "dd MMMM yyyy 'à' HH:mm", { locale: fr })}
                       </p>
@@ -567,23 +567,23 @@ export default function ClientDetail() {
                     <div className="mt-8 pt-6 border-t">
                       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Percent className="h-5 w-5 text-primary" />
-                        Rémunération et réserve
+                        {t('clientDetail.remunerationReserve')}
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="bg-blue-50 p-4 rounded-xl">
-                          <p className="text-sm text-muted-foreground">Taux LCA</p>
+                          <p className="text-sm text-muted-foreground">{t('clientDetail.lcaRate')}</p>
                           <p className="text-2xl font-bold text-blue-600">{client.commission_rate_lca || 0}%</p>
                         </div>
                         <div className="bg-purple-50 p-4 rounded-xl">
-                          <p className="text-sm text-muted-foreground">Taux Vie (3e pilier)</p>
+                          <p className="text-sm text-muted-foreground">{t('clientDetail.vieRate')}</p>
                           <p className="text-2xl font-bold text-purple-600">{client.commission_rate_vie || 0}%</p>
                         </div>
                         <div className="bg-orange-50 p-4 rounded-xl">
-                          <p className="text-sm text-muted-foreground">Taux de réserve</p>
+                          <p className="text-sm text-muted-foreground">{t('clientDetail.reserveRate')}</p>
                           <p className="text-2xl font-bold text-orange-600">{client.reserve_rate || 0}%</p>
                         </div>
                         <div className="bg-emerald-50 p-4 rounded-xl">
-                          <p className="text-sm text-muted-foreground">Salaire fixe</p>
+                          <p className="text-sm text-muted-foreground">{t('clientDetail.fixedSalary')}</p>
                           <p className="text-2xl font-bold text-emerald-600">
                             {client.fixed_salary 
                               ? new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(client.fixed_salary)
@@ -605,30 +605,30 @@ export default function ClientDetail() {
             <TabsContent value="family">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Membres de la famille</CardTitle>
+                  <CardTitle>{t('clientDetail.familyMembers')}</CardTitle>
                   <Button onClick={() => setFamilyFormOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un membre
+                    {t('clientDetail.addFamilyMember')}
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {familyLoading ? (
-                    <p className="text-muted-foreground text-center py-8">Chargement...</p>
+                    <p className="text-muted-foreground text-center py-8">{t('clientDetail.loading')}</p>
                   ) : familyMembers.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
-                      Aucun membre de la famille enregistré
+                      {t('clientDetail.noFamilyMembers')}
                     </p>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Prénom</TableHead>
-                          <TableHead>Nom</TableHead>
-                          <TableHead>Date de naissance</TableHead>
-                          <TableHead>Relation</TableHead>
-                          <TableHead>Permis</TableHead>
-                          <TableHead>Nationalité</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead>{t('clientDetail.firstName')}</TableHead>
+                          <TableHead>{t('clientDetail.lastName')}</TableHead>
+                          <TableHead>{t('clientDetail.birthdate')}</TableHead>
+                          <TableHead>{t('clientDetail.relation')}</TableHead>
+                          <TableHead>{t('clientDetail.permit')}</TableHead>
+                          <TableHead>{t('clientDetail.nationality')}</TableHead>
+                          <TableHead>{t('clientDetail.actions')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -645,7 +645,7 @@ export default function ClientDetail() {
                               {member.relation_type}
                               {member.is_reverse_relation && (
                                 <Badge variant="outline" className="ml-2 text-xs">
-                                  Famille
+                                  {t('clientDetail.family')}
                                 </Badge>
                               )}
                             </TableCell>
@@ -659,7 +659,7 @@ export default function ClientDetail() {
                                   onClick={() => navigate(`/crm/clients/${member.linked_client_id}`)}
                                 >
                                   <Eye className="h-4 w-4 mr-1" />
-                                  Voir
+                                  {t('clientDetail.view')}
                                 </Button>
                               ) : (
                                 <Button
@@ -677,14 +677,14 @@ export default function ClientDetail() {
                                       navigate(`/crm/clients/${data.id}`);
                                     } else {
                                       toast({
-                                        title: "Information",
-                                        description: "Aucune fiche client trouvée pour ce membre",
+                                        title: t('common.info'),
+                                        description: t('clientDetail.noFamilyMembers'),
                                       });
                                     }
                                   }}
                                 >
                                   <Eye className="h-4 w-4 mr-1" />
-                                  Voir
+                                  {t('clientDetail.view')}
                                 </Button>
                               )}
                             </TableCell>
@@ -700,22 +700,22 @@ export default function ClientDetail() {
             <TabsContent value="contracts">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Contrats ({clientPolicies.length})</CardTitle>
+                  <CardTitle>{t('clientDetail.contracts')} ({clientPolicies.length})</CardTitle>
                   <Button onClick={() => setContractFormOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Nouveau contrat
+                    {t('clientDetail.newContract')}
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {policiesLoading ? (
-                    <p className="text-muted-foreground text-center py-8">Chargement...</p>
+                    <p className="text-muted-foreground text-center py-8">{t('clientDetail.loading')}</p>
                   ) : clientPolicies.length === 0 ? (
                     <div className="text-center py-8">
                       <FileCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p className="text-muted-foreground">Aucun contrat pour ce client</p>
+                      <p className="text-muted-foreground">{t('clientDetail.noContractForClient')}</p>
                       <Button className="mt-4" onClick={() => setContractFormOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
-                        Ajouter un contrat
+                        {t('clientDetail.addFirstContract')}
                       </Button>
                     </div>
                   ) : (
@@ -753,8 +753,8 @@ export default function ClientDetail() {
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold">
                                     {hasMultipleProducts 
-                                      ? `Contrat multi-produits (${productsData.length})`
-                                      : (policy.product?.name || 'Produit inconnu')}
+                                      ? `${t('clientDetail.multiProductContract')} (${productsData.length})`
+                                      : (policy.product?.name || t('clientDetail.unknownProduct'))}
                                   </span>
                                   <Badge
                                     variant="outline"
@@ -764,12 +764,12 @@ export default function ClientDetail() {
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  {policy.product?.company?.name || policy.company_name || 'Compagnie inconnue'} • {policy.policy_number || 'Sans numéro'}
+                                  {policy.product?.company?.name || policy.company_name || t('clientDetail.unknownCompany')} • {policy.policy_number || t('clientDetail.noNumber')}
                                 </p>
                               </div>
                               <div className="flex items-start gap-4">
                                 <div className="text-right text-sm">
-                                  <p className="text-muted-foreground">Début</p>
+                                  <p className="text-muted-foreground">{t('clientDetail.startDate')}</p>
                                   <p className="font-medium">
                                     {policy.start_date ? format(new Date(policy.start_date), "dd.MM.yyyy") : "-"}
                                   </p>
@@ -804,7 +804,7 @@ export default function ClientDetail() {
                             {/* Multi-products display */}
                             {hasMultipleProducts && (
                               <div className="mt-3 p-3 bg-primary/5 rounded-lg">
-                                <h4 className="font-medium text-sm mb-2">Produits inclus</h4>
+                                <h4 className="font-medium text-sm mb-2">{t('clientDetail.productsIncluded')}</h4>
                                 <div className="space-y-2">
                                   {productsData.map((prod, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-sm p-2 bg-background rounded border">
