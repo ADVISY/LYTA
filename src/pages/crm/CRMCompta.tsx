@@ -131,20 +131,20 @@ export default function CRMCompta() {
   const [fichesPaie, setFichesPaie] = useState<FichePaie[]>([]);
   const printSalaireRef = useRef<HTMLDivElement>(null);
 
-  // Mois options
+  // Mois options - translated
   const moisOptions = [
-    { value: "0", label: "Janvier" },
-    { value: "1", label: "Février" },
-    { value: "2", label: "Mars" },
-    { value: "3", label: "Avril" },
-    { value: "4", label: "Mai" },
-    { value: "5", label: "Juin" },
-    { value: "6", label: "Juillet" },
-    { value: "7", label: "Août" },
-    { value: "8", label: "Septembre" },
-    { value: "9", label: "Octobre" },
-    { value: "10", label: "Novembre" },
-    { value: "11", label: "Décembre" },
+    { value: "0", label: t('accounting.january') },
+    { value: "1", label: t('accounting.february') },
+    { value: "2", label: t('accounting.march') },
+    { value: "3", label: t('accounting.april') },
+    { value: "4", label: t('accounting.may') },
+    { value: "5", label: t('accounting.june') },
+    { value: "6", label: t('accounting.july') },
+    { value: "7", label: t('accounting.august') },
+    { value: "8", label: t('accounting.september') },
+    { value: "9", label: t('accounting.october') },
+    { value: "10", label: t('accounting.november') },
+    { value: "11", label: t('accounting.december') },
   ];
 
   // Année options (last 3 years)
@@ -241,8 +241,8 @@ export default function CRMCompta() {
   const handleGenerateDecomptes = async () => {
     if (!dateDebut || !dateFin) {
       toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner une période",
+        title: t('common.error'),
+        description: t('accounting.errorPeriodRequired'),
         variant: "destructive"
       });
       return;
@@ -250,8 +250,8 @@ export default function CRMCompta() {
 
     if (selectedCollaborateurs.length === 0) {
       toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner au moins un collaborateur",
+        title: t('common.error'),
+        description: t('accounting.errorCollaboratorRequired'),
         variant: "destructive"
       });
       return;
@@ -294,8 +294,8 @@ export default function CRMCompta() {
       
       if (allCollabDecomptes.length === 0) {
         toast({
-          title: "Aucune commission",
-          description: "Aucune commission trouvée pour les collaborateurs sélectionnés sur cette période",
+          title: t('common.info'),
+          description: t('accounting.noCommissions'),
         });
         setGenerating(false);
         return;
@@ -306,8 +306,8 @@ export default function CRMCompta() {
     } catch (error) {
       console.error("Error generating decomptes:", error);
       toast({
-        title: "Erreur",
-        description: "Erreur lors de la génération des décomptes",
+        title: t('common.error'),
+        description: t('accounting.pdfError'),
         variant: "destructive"
       });
     } finally {
@@ -319,8 +319,8 @@ export default function CRMCompta() {
   const handleGenerateFichesPaie = async () => {
     if (!selectedMois || !selectedAnnee) {
       toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner un mois et une année",
+        title: t('common.error'),
+        description: t('accounting.errorMonthYearRequired'),
         variant: "destructive"
       });
       return;
@@ -328,8 +328,8 @@ export default function CRMCompta() {
 
     if (selectedCollabsSalaire.length === 0) {
       toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner au moins un collaborateur",
+        title: t('common.error'),
+        description: t('accounting.errorCollaboratorRequired'),
         variant: "destructive"
       });
       return;
@@ -412,8 +412,8 @@ export default function CRMCompta() {
       
       if (fiches.length === 0) {
         toast({
-          title: "Information",
-          description: "Aucune donnée trouvée pour les collaborateurs sélectionnés",
+          title: t('common.info'),
+          description: t('accounting.noDataFound'),
         });
         setGeneratingSalaire(false);
         return;
@@ -424,8 +424,8 @@ export default function CRMCompta() {
     } catch (error) {
       console.error("Error generating fiches de paie:", error);
       toast({
-        title: "Erreur",
-        description: "Erreur lors de la génération des fiches de paie",
+        title: t('common.error'),
+        description: t('accounting.pdfError'),
         variant: "destructive"
       });
     } finally {
@@ -503,11 +503,11 @@ export default function CRMCompta() {
     try {
       await html2pdf().set(opt).from(printContent).save();
       toast({
-        title: "PDF téléchargé",
-        description: `${allDecomptes.length} décompte(s) téléchargé(s)`,
+        title: t('accounting.pdfDownloaded'),
+        description: t('accounting.statementsDownloaded', { count: allDecomptes.length }),
       });
     } catch (error) {
-      toast({ title: "Erreur", description: "Erreur lors de la génération du PDF", variant: "destructive" });
+      toast({ title: t('common.error'), description: t('accounting.pdfError'), variant: "destructive" });
     }
   };
 
@@ -533,11 +533,11 @@ export default function CRMCompta() {
     try {
       await html2pdf().set(opt).from(printContent).save();
       toast({
-        title: "PDF téléchargé",
-        description: `${fichesPaie.length} fiche(s) de paie téléchargée(s)`,
+        title: t('accounting.pdfDownloaded'),
+        description: t('accounting.payslipsDownloaded', { count: fichesPaie.length }),
       });
     } catch (error) {
-      toast({ title: "Erreur", description: "Erreur lors de la génération du PDF", variant: "destructive" });
+      toast({ title: t('common.error'), description: t('accounting.pdfError'), variant: "destructive" });
     }
   };
 
@@ -561,50 +561,50 @@ export default function CRMCompta() {
             </div>
           )}
           <div className="text-right">
-            <h1 className="text-xl font-bold text-primary">Décompte de Commissions</h1>
+            <h1 className="text-xl font-bold text-primary">{t('accounting.statementTitle')}</h1>
             <p className="text-muted-foreground text-sm">
-              Période: {dateDebut && format(new Date(dateDebut), 'dd/MM/yyyy')} - {dateFin && format(new Date(dateFin), 'dd/MM/yyyy')}
+              {t('accounting.period')}: {dateDebut && format(new Date(dateDebut), 'dd/MM/yyyy')} - {dateFin && format(new Date(dateFin), 'dd/MM/yyyy')}
             </p>
             <p className="text-xs text-muted-foreground">
-              Généré le: {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}
+              {t('accounting.generatedOn')}: {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}
             </p>
           </div>
         </div>
 
         <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 rounded-lg mb-5">
-          <h2 className="text-sm font-semibold text-primary mb-1">Collaborateur</h2>
+          <h2 className="text-sm font-semibold text-primary mb-1">{t('accounting.collaborator')}</h2>
           <p className="font-medium">{getCollaborateurName(collaborateur)}</p>
           <p className="text-muted-foreground text-sm">{collaborateur.email}</p>
           {totals.reserveRate > 0 && (
-            <p className="text-orange-600 text-xs mt-1">Compte de réserve: {totals.reserveRate}%</p>
+            <p className="text-orange-600 text-xs mt-1">{t('accounting.reserveAccount')}: {totals.reserveRate}%</p>
           )}
         </div>
 
         <div className={`grid gap-3 mb-5 ${totals.reserveRate > 0 ? 'grid-cols-4' : 'grid-cols-2'}`}>
           <div className="bg-muted/50 p-3 rounded-lg text-center">
             <p className="text-xl font-bold text-primary">{totals.commissionsCount}</p>
-            <p className="text-xs text-muted-foreground">Commissions</p>
+            <p className="text-xs text-muted-foreground">{t('commissions.title')}</p>
           </div>
           <div className="bg-blue-50 p-3 rounded-lg text-center">
             <p className="text-xl font-bold text-blue-600">{formatCurrency(totals.totalAgentAmount)}</p>
-            <p className="text-xs text-muted-foreground">Total brut</p>
+            <p className="text-xs text-muted-foreground">{t('accounting.totalBrut')}</p>
           </div>
           {totals.reserveRate > 0 && (
             <>
               <div className="bg-orange-50 p-3 rounded-lg text-center">
                 <p className="text-xl font-bold text-orange-600">-{formatCurrency(totals.reserveAmount)}</p>
-                <p className="text-xs text-muted-foreground">Réserve ({totals.reserveRate}%)</p>
+                <p className="text-xs text-muted-foreground">{t('accounting.reserve')} ({totals.reserveRate}%)</p>
               </div>
               <div className="bg-emerald-50 p-3 rounded-lg text-center">
                 <p className="text-xl font-bold text-emerald-600">{formatCurrency(totals.netAmount)}</p>
-                <p className="text-xs text-muted-foreground">Net à percevoir</p>
+                <p className="text-xs text-muted-foreground">{t('accounting.netToReceive')}</p>
               </div>
             </>
           )}
           {totals.reserveRate === 0 && (
             <div className="bg-emerald-50 p-3 rounded-lg text-center">
               <p className="text-xl font-bold text-emerald-600">{formatCurrency(totals.totalAgentAmount)}</p>
-              <p className="text-xs text-muted-foreground">Total à percevoir</p>
+              <p className="text-xs text-muted-foreground">{t('accounting.totalToReceive')}</p>
             </div>
           )}
         </div>
@@ -612,11 +612,11 @@ export default function CRMCompta() {
         <Table>
           <TableHeader>
             <TableRow className="bg-primary">
-              <TableHead className="text-white text-xs py-2">Date</TableHead>
-              <TableHead className="text-white text-xs py-2">Client</TableHead>
-              <TableHead className="text-white text-xs py-2">Produit</TableHead>
-              <TableHead className="text-white text-xs py-2">N° Police</TableHead>
-              <TableHead className="text-white text-xs py-2 text-right">Montant</TableHead>
+              <TableHead className="text-white text-xs py-2">{t('accounting.date')}</TableHead>
+              <TableHead className="text-white text-xs py-2">{t('accounting.client')}</TableHead>
+              <TableHead className="text-white text-xs py-2">{t('accounting.product')}</TableHead>
+              <TableHead className="text-white text-xs py-2">{t('accounting.policyNumber')}</TableHead>
+              <TableHead className="text-white text-xs py-2 text-right">{t('accounting.amount')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -632,7 +632,7 @@ export default function CRMCompta() {
                     {clientName || '-'}
                     {isDecommission && (
                       <Badge variant="destructive" className="ml-2 text-[10px] px-1 py-0">
-                        Décommission
+                        {t('accounting.decommission')}
                       </Badge>
                     )}
                   </TableCell>
@@ -651,8 +651,8 @@ export default function CRMCompta() {
         </Table>
 
         <div className="mt-6 pt-4 border-t text-center text-xs text-muted-foreground">
-          <p>{tenantName} • Conseil en assurances</p>
-          <p>Ce document est généré automatiquement et fait foi de décompte de commissions.</p>
+          <p>{tenantName} • {t('accounting.insuranceAdvice')}</p>
+          <p>{t('accounting.documentAutoGenerated')}</p>
         </div>
       </div>
     );
@@ -676,10 +676,10 @@ export default function CRMCompta() {
             </div>
           )}
           <div className="text-right">
-            <h1 className="text-xl font-bold text-primary">Fiche de Paie</h1>
+            <h1 className="text-xl font-bold text-primary">{t('accounting.payslipTitle')}</h1>
             <p className="text-muted-foreground text-sm">{fiche.mois} {fiche.annee}</p>
             <p className="text-xs text-muted-foreground">
-              Généré le: {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}
+              {t('accounting.generatedOn')}: {format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}
             </p>
           </div>
         </div>
@@ -687,15 +687,15 @@ export default function CRMCompta() {
         {/* Informations employé */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 rounded-lg">
-            <h2 className="text-sm font-semibold text-primary mb-2">Employeur</h2>
+            <h2 className="text-sm font-semibold text-primary mb-2">{t('accounting.employer')}</h2>
             <p className="font-medium">{tenantName}</p>
-            <p className="text-sm text-muted-foreground">Conseil en assurances</p>
+            <p className="text-sm text-muted-foreground">{t('accounting.insuranceAdvice')}</p>
             <p className="text-sm text-muted-foreground">Suisse</p>
           </div>
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 rounded-lg">
-            <h2 className="text-sm font-semibold text-primary mb-2">Collaborateur</h2>
+            <h2 className="text-sm font-semibold text-primary mb-2">{t('accounting.collaborator')}</h2>
             <p className="font-medium">{getCollaborateurName(fiche.collaborateur)}</p>
-            <p className="text-sm text-muted-foreground">{fiche.collaborateur.profession || 'Conseiller'}</p>
+            <p className="text-sm text-muted-foreground">{fiche.collaborateur.profession || t('accounting.adviser')}</p>
             {fiche.collaborateur.address && (
               <p className="text-sm text-muted-foreground">
                 {fiche.collaborateur.address}, {fiche.collaborateur.postal_code} {fiche.collaborateur.city}
@@ -823,8 +823,8 @@ export default function CRMCompta() {
 
         {/* Footer */}
         <div className="mt-6 pt-4 border-t text-center text-xs text-muted-foreground">
-          <p>{tenantName} • Conseil en assurances</p>
-          <p>Cette fiche de paie est générée automatiquement. Les taux de cotisations sont indicatifs.</p>
+          <p>{tenantName} • {t('accounting.insuranceAdvice')}</p>
+          <p>{t('accounting.payslipAutoGenerated')}</p>
         </div>
       </div>
     );
@@ -899,7 +899,7 @@ export default function CRMCompta() {
                 {loadingCollaborateurs ? (
                   <div className="p-4 text-center text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                    Chargement...
+                    {t('accounting.loading')}
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg max-h-64 overflow-y-auto">
@@ -927,7 +927,7 @@ export default function CRMCompta() {
                 )}
                 
                 {selectedCollaborateurs.length > 0 && (
-                  <Badge variant="secondary">{selectedCollaborateurs.length} collaborateur(s) sélectionné(s)</Badge>
+                  <Badge variant="secondary">{t('accounting.collaboratorsSelected', { count: selectedCollaborateurs.length })}</Badge>
                 )}
               </div>
 
@@ -965,16 +965,16 @@ export default function CRMCompta() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-primary" />
-                Générer des fiches de paie
+                {t('accounting.generatePayslips')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Mois</Label>
+                  <Label>{t('accounting.month')}</Label>
                   <Select value={selectedMois} onValueChange={setSelectedMois}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un mois" />
+                      <SelectValue placeholder={t('accounting.selectAMonth')} />
                     </SelectTrigger>
                     <SelectContent>
                       {moisOptions.map(m => (
@@ -984,10 +984,10 @@ export default function CRMCompta() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Année</Label>
+                  <Label>{t('accounting.year')}</Label>
                   <Select value={selectedAnnee} onValueChange={setSelectedAnnee}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une année" />
+                      <SelectValue placeholder={t('accounting.selectAYear')} />
                     </SelectTrigger>
                     <SelectContent>
                       {anneeOptions.map(a => (
@@ -1000,17 +1000,17 @@ export default function CRMCompta() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Sélectionner les collaborateurs</Label>
+                  <Label>{t('accounting.selectCollaborators')}</Label>
                   <Button variant="outline" size="sm" onClick={selectAllCollabsSalaire} className="gap-2">
                     <CheckSquare className="h-4 w-4" />
-                    {selectedCollabsSalaire.length === collaborateurs.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    {selectedCollabsSalaire.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
                   </Button>
                 </div>
                 
                 {loadingCollaborateurs ? (
                   <div className="p-4 text-center text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                    Chargement...
+                    {t('accounting.loading')}
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg max-h-64 overflow-y-auto">
@@ -1031,9 +1031,9 @@ export default function CRMCompta() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{getCollaborateurName(collab)}</p>
                           {collab.fixed_salary ? (
-                            <p className="text-xs text-emerald-600 truncate">Fixe: {formatCurrency(collab.fixed_salary)}</p>
+                            <p className="text-xs text-emerald-600 truncate">{t('accounting.fixedSalary')}: {formatCurrency(collab.fixed_salary)}</p>
                           ) : (
-                            <p className="text-xs text-muted-foreground truncate">Pas de salaire fixe</p>
+                            <p className="text-xs text-muted-foreground truncate">{t('accounting.noFixedSalary')}</p>
                           )}
                         </div>
                       </label>
@@ -1042,7 +1042,7 @@ export default function CRMCompta() {
                 )}
                 
                 {selectedCollabsSalaire.length > 0 && (
-                  <Badge variant="secondary">{selectedCollabsSalaire.length} collaborateur(s) sélectionné(s)</Badge>
+                  <Badge variant="secondary">{t('accounting.collaboratorsSelected', { count: selectedCollabsSalaire.length })}</Badge>
                 )}
               </div>
 
