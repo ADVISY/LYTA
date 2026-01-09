@@ -294,6 +294,11 @@ const Connexion = () => {
   // Redirect based on loginType choice (not role) if already logged in
   useEffect(() => {
     const checkAndRedirect = async () => {
+      // Don't redirect if SMS verification is pending
+      if (showSmsVerification || smsVerificationData) {
+        return;
+      }
+      
       if (user) {
         // Check if user came from a specific login flow
         const targetSpace = sessionStorage.getItem('loginTarget');
@@ -355,7 +360,7 @@ const Connexion = () => {
     };
     
     checkAndRedirect();
-  }, [user, navigate, toast]);
+  }, [user, navigate, toast, showSmsVerification, smsVerificationData]);
 
   // Function to check if subdomain is reachable
   const checkSubdomainReachable = async (url: string): Promise<boolean> => {
