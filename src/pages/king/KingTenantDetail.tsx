@@ -458,16 +458,15 @@ export default function KingTenantDetail() {
                         size="icon"
                         onClick={async () => {
                           const newEmails = tenantData.contract_notification_emails.filter((_, i) => i !== index);
-                          setTenantData({
-                            ...tenantData,
-                            contract_notification_emails: newEmails
-                          });
-                          // Auto-save
                           const { error } = await supabase
                             .from('tenants')
                             .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
                             .eq('id', tenantId);
-                          if (!error) {
+                          if (error) {
+                            console.error('Error removing email:', error);
+                            toast({ title: "Erreur", description: "Impossible de supprimer l'email: " + error.message, variant: "destructive" });
+                          } else {
+                            setTenantData({ ...tenantData, contract_notification_emails: newEmails });
                             toast({ title: "Email supprimé", description: "La liste a été mise à jour." });
                             queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
                           }
@@ -487,19 +486,19 @@ export default function KingTenantDetail() {
                       onKeyDown={async (e) => {
                         if (e.key === 'Enter' && newNotificationEmail && newNotificationEmail.includes('@')) {
                           e.preventDefault();
-                          const newEmails = [...tenantData.contract_notification_emails, newNotificationEmail.trim().toLowerCase()];
-                          setTenantData({
-                            ...tenantData,
-                            contract_notification_emails: newEmails
-                          });
-                          setNewNotificationEmail('');
-                          // Auto-save
+                          const emailToAdd = newNotificationEmail.trim().toLowerCase();
+                          const newEmails = [...tenantData.contract_notification_emails, emailToAdd];
                           const { error } = await supabase
                             .from('tenants')
                             .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
                             .eq('id', tenantId);
-                          if (!error) {
-                            toast({ title: "Email ajouté", description: "La liste a été mise à jour." });
+                          if (error) {
+                            console.error('Error adding email:', error);
+                            toast({ title: "Erreur", description: "Impossible d'ajouter l'email: " + error.message, variant: "destructive" });
+                          } else {
+                            setTenantData({ ...tenantData, contract_notification_emails: newEmails });
+                            setNewNotificationEmail('');
+                            toast({ title: "Email ajouté", description: `${emailToAdd} a été ajouté à la liste.` });
                             queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
                           }
                         }
@@ -511,19 +510,19 @@ export default function KingTenantDetail() {
                       size="icon"
                       onClick={async () => {
                         if (newNotificationEmail && newNotificationEmail.includes('@')) {
-                          const newEmails = [...tenantData.contract_notification_emails, newNotificationEmail.trim().toLowerCase()];
-                          setTenantData({
-                            ...tenantData,
-                            contract_notification_emails: newEmails
-                          });
-                          setNewNotificationEmail('');
-                          // Auto-save
+                          const emailToAdd = newNotificationEmail.trim().toLowerCase();
+                          const newEmails = [...tenantData.contract_notification_emails, emailToAdd];
                           const { error } = await supabase
                             .from('tenants')
                             .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
                             .eq('id', tenantId);
-                          if (!error) {
-                            toast({ title: "Email ajouté", description: "La liste a été mise à jour." });
+                          if (error) {
+                            console.error('Error adding email:', error);
+                            toast({ title: "Erreur", description: "Impossible d'ajouter l'email: " + error.message, variant: "destructive" });
+                          } else {
+                            setTenantData({ ...tenantData, contract_notification_emails: newEmails });
+                            setNewNotificationEmail('');
+                            toast({ title: "Email ajouté", description: `${emailToAdd} a été ajouté à la liste.` });
                             queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
                           }
                         }
