@@ -81,13 +81,32 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Format phone number for Switzerland if needed
-    let formattedPhone = phoneNumber.replace(/\s/g, "");
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "+41" + formattedPhone.substring(1);
-    }
-    if (!formattedPhone.startsWith("+")) {
-      formattedPhone = "+41" + formattedPhone;
+    // Normalize phone numbers (Switzerland default) and prevent invalid Twilio sends
+    const normalizePhone = (value: string) => {
+      let v = (value || "").replace(/\s/g, "");
+      if (!v) return v;
+      if (v.startsWith("0")) v = "+41" + v.substring(1);
+      if (!v.startsWith("+")) v = "+41" + v;
+      return v;
+    };
+
+    const formattedPhone = normalizePhone(phoneNumber);
+    const formattedFrom = normalizePhone(TWILIO_PHONE_NUMBER);
+
+    // Twilio refuses To === From (error 21266). Fall back to simulation to unblock testing.
+    if (formattedPhone && formattedFrom && formattedPhone === formattedFrom) {
+      console.warn("Twilio misconfigured: To and From are the same", { formattedPhone });
+      console.log(`Code de vérification pour ${formattedPhone}: ${code}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          simulated: true,
+          message: "Envoi SMS impossible (numéro expéditeur identique au destinataire). Code fourni en mode simulation.",
+          testCode: code,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const message = verificationType === "login" 
@@ -104,7 +123,7 @@ serve(async (req: Request): Promise<Response> => {
         },
         body: new URLSearchParams({
           To: formattedPhone,
-          From: TWILIO_PHONE_NUMBER,
+          From: formattedFrom,
           Body: message,
         }),
       }
