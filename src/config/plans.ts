@@ -22,6 +22,11 @@ export interface PlanConfig {
   displayName: string;
   modules: PlanModule[];
   description: string;
+  monthlyPrice: number;
+  seatsIncluded: number;
+  extraSeatPrice: number;
+  stripeProductId: string;
+  stripePriceId: string;
 }
 
 /**
@@ -33,24 +38,44 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     displayName: 'Start',
     description: 'Essentiel pour démarrer',
     modules: ['clients', 'contracts', 'commissions', 'statements', 'membership'],
+    monthlyPrice: 149,
+    seatsIncluded: 1,
+    extraSeatPrice: 20,
+    stripeProductId: 'prod_TjgUGx2FNdlhas',
+    stripePriceId: 'price_1SmDBeF7ZITS358AgETS41f5',
   },
   pro: {
     name: 'pro',
     displayName: 'Pro',
     description: 'Pour les équipes en croissance',
     modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing'],
+    monthlyPrice: 299,
+    seatsIncluded: 3,
+    extraSeatPrice: 20,
+    stripeProductId: 'prod_TjgmLXohud7WAb',
+    stripePriceId: 'price_1SmDSmF7ZITS358AmnGzuosw',
   },
   prime: {
     name: 'prime',
     displayName: 'Prime',
     description: 'Automatisation complète',
     modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal'],
+    monthlyPrice: 499,
+    seatsIncluded: 5,
+    extraSeatPrice: 20,
+    stripeProductId: 'prod_TjgrBLxInrbnSd',
+    stripePriceId: 'price_1SmDU7F7ZITS358ARd44a4sb',
   },
   founder: {
     name: 'founder',
     displayName: 'Founder',
     description: 'Accès complet - Early adopter',
     modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal'],
+    monthlyPrice: 0,
+    seatsIncluded: 10,
+    extraSeatPrice: 0,
+    stripeProductId: 'prod_Tk0TPGFCuYQu3Q',
+    stripePriceId: 'price_1SmWSCF7ZITS358Au8LylsBw',
   },
 };
 
