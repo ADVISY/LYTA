@@ -144,17 +144,17 @@ export default function KingTenantDetail() {
 
   // Update tenant mutation
   const updateTenant = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: typeof tenantData) => {
       const { error } = await supabase
         .from('tenants')
         .update({
-          name: tenantData.name,
-          legal_name: tenantData.legal_name,
-          email: tenantData.email,
-          phone: tenantData.phone,
-          address: tenantData.address,
-          status: tenantData.status,
-          contract_notification_emails: tenantData.contract_notification_emails,
+          name: payload.name,
+          legal_name: payload.legal_name,
+          email: payload.email,
+          phone: payload.phone,
+          address: payload.address,
+          status: payload.status,
+          contract_notification_emails: payload.contract_notification_emails,
           updated_at: new Date().toISOString(),
         })
         .eq('id', tenantId);
@@ -537,7 +537,18 @@ export default function KingTenantDetail() {
 
               <div className="flex justify-end">
                 <Button 
-                  onClick={() => updateTenant.mutate()}
+                  onClick={() => {
+                    const pending = newNotificationEmail.trim().toLowerCase();
+                    const nextEmails =
+                      pending && pending.includes("@") && !tenantData.contract_notification_emails.includes(pending)
+                        ? [...tenantData.contract_notification_emails, pending]
+                        : tenantData.contract_notification_emails;
+
+                    const payload = { ...tenantData, contract_notification_emails: nextEmails };
+                    setTenantData(payload);
+                    if (pending && pending.includes("@")) setNewNotificationEmail("");
+                    updateTenant.mutate(payload);
+                  }}
                   disabled={updateTenant.isPending}
                 >
                   <Save className="h-4 w-4 mr-2" />
