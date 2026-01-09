@@ -56,6 +56,52 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get the requesting user's tenant
+    const { data: tenantAssignment } = await supabaseAdmin
+      .from("user_tenant_assignments")
+      .select("tenant_id")
+      .eq("user_id", requestingUser.id)
+      .single();
+
+    if (!tenantAssignment) {
+      return new Response(
+        JSON.stringify({ error: "Utilisateur non assigné à un tenant" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const tenantId = tenantAssignment.tenant_id;
+
+    // Get tenant seat information
+    const { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("seats_included, extra_users")
+      .eq("id", tenantId)
+      .single();
+
+    if (!tenant) {
+      return new Response(
+        JSON.stringify({ error: "Tenant non trouvé" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Count current active users in tenant
+    const { count: activeUsersCount } = await supabaseAdmin
+      .from("user_tenant_assignments")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId);
+
+    const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+    const availableSeats = totalSeats - (activeUsersCount || 0);
+
+    if (availableSeats <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Parse request body
     const { email, password, role, collaborateurId, clientId, firstName, lastName } = await req.json();
 
@@ -154,6 +200,16 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Compte créé mais erreur lors de la liaison" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Assign user to the same tenant
+    const { error: assignmentError } = await supabaseAdmin
+      .from("user_tenant_assignments")
+      .insert({ user_id: userId, tenant_id: tenantId });
+
+    if (assignmentError) {
+      console.error("Error assigning user to tenant:", assignmentError);
+      // This is not critical, continue
     }
 
     console.log(`User account created successfully: ${email} with role ${role}`);

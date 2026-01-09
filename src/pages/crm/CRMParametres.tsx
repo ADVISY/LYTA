@@ -12,17 +12,19 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
-  Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail
+  Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
+import { useTenantSeats } from "@/hooks/useTenantSeats";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
+import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
 
 // Couleurs disponibles pour le thème
 const themeColors = [
@@ -59,7 +61,9 @@ const roleBadgeColors: Record<string, string> = {
 export default function CRMParametres() {
   const { user, session } = useAuth();
   const { tenantId } = useUserTenant();
+  const tenantSeats = useTenantSeats();
   const [activeTab, setActiveTab] = useState("profil");
+  const [showUnlockSeatDialog, setShowUnlockSeatDialog] = useState(false);
   
   // Profil
   const [profile, setProfile] = useState({
@@ -115,6 +119,24 @@ export default function CRMParametres() {
     collaborateurId: "",
   });
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Handler pour cliquer sur "Créer un compte"
+  const handleAddUserClick = () => {
+    if (!tenantSeats.canAddUser) {
+      // Pas de siège disponible - afficher le dialog de déblocage
+      setShowUnlockSeatDialog(true);
+    } else {
+      // Siège disponible - ouvrir le formulaire de création
+      setIsAddingAccount(true);
+    }
+  };
+
+  // Handler après ajout de siège réussi
+  const handleSeatAdded = () => {
+    tenantSeats.refresh();
+    // Maintenant ouvrir le formulaire de création
+    setIsAddingAccount(true);
+  };
 
   // Charger les données
   useEffect(() => {
@@ -666,6 +688,52 @@ export default function CRMParametres() {
 
         {/* GESTION DES COMPTES */}
         <TabsContent value="comptes" className="space-y-6 mt-6">
+          {/* Infos sur les sièges utilisateurs */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">Utilisateurs actifs</p>
+                      <p className="text-2xl font-bold">{tenantSeats.activeUsers}</p>
+                    </div>
+                  </div>
+                  <div className="border-l pl-6">
+                    <p className="text-sm text-muted-foreground">Inclus dans l'offre</p>
+                    <p className="text-xl font-semibold">{tenantSeats.seatsIncluded}</p>
+                  </div>
+                  {tenantSeats.extraUsers > 0 && (
+                    <div className="border-l pl-6">
+                      <p className="text-sm text-muted-foreground">Sièges supplémentaires</p>
+                      <p className="text-xl font-semibold text-amber-600">+{tenantSeats.extraUsers}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Places disponibles</p>
+                  <p className={cn(
+                    "text-xl font-bold",
+                    tenantSeats.availableSeats > 0 ? "text-green-600" : "text-red-600"
+                  )}>
+                    {tenantSeats.availableSeats}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Alerte si quota dépassé ou atteint */}
+          {!tenantSeats.canAddUser && (
+            <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+              <Lock className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <strong>Quota atteint.</strong> Pour ajouter un nouvel utilisateur, vous devez débloquer un siège supplémentaire (+{tenantSeats.seatPrice} CHF/mois).
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -682,9 +750,18 @@ export default function CRMParametres() {
                   <UserCheck className="h-5 w-5" />
                   Comptes utilisateurs
                 </CardTitle>
-                <Button size="sm" onClick={() => setIsAddingAccount(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Créer un compte
+                <Button size="sm" onClick={handleAddUserClick}>
+                  {tenantSeats.canAddUser ? (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Créer un compte
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Débloquer un utilisateur
+                    </>
+                  )}
                 </Button>
               </div>
             </CardHeader>
@@ -1309,6 +1386,16 @@ export default function CRMParametres() {
           <EmailAutomationSettings />
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de déblocage de siège utilisateur */}
+      <AddUserSeatDialog
+        open={showUnlockSeatDialog}
+        onOpenChange={setShowUnlockSeatDialog}
+        seatsIncluded={tenantSeats.seatsIncluded}
+        activeUsers={tenantSeats.activeUsers}
+        seatPrice={tenantSeats.seatPrice}
+        onSuccess={handleSeatAdded}
+      />
     </div>
   );
 }
