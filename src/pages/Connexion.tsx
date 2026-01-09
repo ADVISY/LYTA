@@ -549,10 +549,14 @@ const Connexion = () => {
   const handleSmsVerified = async () => {
     if (!smsVerificationData) return;
     
+    // Clear SMS verification state FIRST so useEffect can trigger redirect
+    setSmsVerificationData(null);
+    setShowSmsVerification(false);
+    
     // Re-login now that SMS is verified
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -563,19 +567,39 @@ const Connexion = () => {
           description: "Erreur lors de la connexion après vérification.",
           variant: "destructive",
         });
-      } else {
-        sessionStorage.setItem('loginTarget', loginType);
-        toast({
-          title: "Connexion réussie",
-          description: `Bienvenue sur votre espace ${displayName}.`,
-        });
+        return;
+      }
+      
+      // Set login target for redirect
+      sessionStorage.setItem('loginTarget', loginType);
+      
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue sur votre espace ${displayName}.`,
+      });
+      
+      // Force redirect based on role after successful re-auth
+      if (data.user) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        
+        const role = roleData?.role || 'client';
+        
+        if (role === 'king') {
+          navigate("/king");
+        } else if (loginType === 'client') {
+          navigate("/espace-client");
+        } else {
+          await redirectToTenantSubdomain(data.user.id);
+        }
       }
     } catch (error) {
       console.error("Error re-authenticating after SMS:", error);
     } finally {
       setLoading(false);
-      setSmsVerificationData(null);
-      setShowSmsVerification(false);
     }
   };
 
