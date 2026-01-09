@@ -1,16 +1,19 @@
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Send, FileClock, FileCheck, FileX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const statsCards = [
-  { label: "Brouillons", value: "3", icon: FileClock, color: "from-slate-500 to-gray-600" },
-  { label: "Envoyées", value: "12", icon: Send, color: "from-blue-500 to-indigo-600" },
-  { label: "Acceptées", value: "8", icon: FileCheck, color: "from-emerald-500 to-teal-600" },
-  { label: "Refusées", value: "2", icon: FileX, color: "from-red-500 to-rose-600" },
-];
-
 export default function CRMPropositions() {
+  const { t } = useTranslation();
+
+  const statsCards = [
+    { label: t('propositions.drafts'), value: "3", icon: FileClock, color: "from-slate-500 to-gray-600" },
+    { label: t('propositions.sent'), value: "12", icon: Send, color: "from-blue-500 to-indigo-600" },
+    { label: t('propositions.accepted'), value: "8", icon: FileCheck, color: "from-emerald-500 to-teal-600" },
+    { label: t('propositions.rejected'), value: "2", icon: FileX, color: "from-red-500 to-rose-600" },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header with decorative background */}
@@ -26,14 +29,14 @@ export default function CRMPropositions() {
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Propositions
+                {t('propositions.title')}
               </h1>
-              <p className="text-muted-foreground">Gérez vos propositions commerciales</p>
+              <p className="text-muted-foreground">{t('propositions.subtitle')}</p>
             </div>
           </div>
           <Button className="group bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90 shadow-xl shadow-primary/20 rounded-xl">
             <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90 duration-300" />
-            Nouvelle proposition
+            {t('propositions.newProposition')}
           </Button>
         </div>
       </div>
@@ -80,10 +83,10 @@ export default function CRMPropositions() {
             </div>
           </div>
           <p className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-            Module en construction
+            {t('propositions.moduleInConstruction')}
           </p>
           <p className="text-sm text-muted-foreground mt-2 text-center max-w-md">
-            La création et le suivi des propositions commerciales seront bientôt disponibles
+            {t('propositions.comingSoonDesc')}
           </p>
         </CardContent>
       </Card>

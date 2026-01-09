@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTenant } from "@/contexts/TenantContext";
 import { SmsVerificationDialog } from "@/components/auth/SmsVerificationDialog";
+import { useTranslation } from "react-i18next";
+import { LanguageSelector } from "@/components/ui/language-selector";
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
 
@@ -798,7 +800,8 @@ const Connexion = () => {
     <div className="min-h-screen bg-background relative">
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
-      <div className="absolute top-4 right-4 z-20">
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <LanguageSelector />
         <ThemeToggle />
       </div>
 
