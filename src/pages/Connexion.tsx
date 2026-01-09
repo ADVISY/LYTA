@@ -291,17 +291,38 @@ const Connexion = () => {
   // Only show platform logo (lytaLogo) if no tenant is detected at all
   const showPlatformLogo = !tenant && !logoUrl;
 
+  // Track if we're actively in a login flow requiring SMS
+  const [waitingForSmsFlow, setWaitingForSmsFlow] = useState(false);
+
   // Redirect based on loginType choice (not role) if already logged in
   useEffect(() => {
     const checkAndRedirect = async () => {
-      // Don't redirect if SMS verification is pending
-      if (showSmsVerification || smsVerificationData) {
+      // Don't redirect if SMS verification is pending or we're waiting for the SMS flow to complete
+      if (showSmsVerification || smsVerificationData || waitingForSmsFlow || pendingSmsVerification) {
+        console.log("[Connexion] Blocking redirect - SMS flow active");
         return;
       }
 
       if (user) {
         // Check if user came from a specific login flow
         const targetSpace = sessionStorage.getItem('loginTarget');
+
+        // If no target space, user might have just loaded the page while already logged in
+        // In this case, check if they need SMS verification before redirecting
+        if (!targetSpace) {
+          // Check if this user requires SMS verification
+          const { data: requiresVerification } = await supabase.rpc(
+            "requires_sms_verification",
+            { p_user_id: user.id }
+          );
+          
+          if (requiresVerification) {
+            // User is logged in but hasn't completed SMS verification for this session
+            // Don't auto-redirect, let them stay on login page
+            console.log("[Connexion] User requires SMS verification, not auto-redirecting");
+            return;
+          }
+        }
 
         // Get user role first
         const { data: roleData } = await supabase
@@ -360,7 +381,7 @@ const Connexion = () => {
     };
 
     checkAndRedirect();
-  }, [user, navigate, toast, showSmsVerification, smsVerificationData]);
+  }, [user, navigate, toast, showSmsVerification, smsVerificationData, waitingForSmsFlow, pendingSmsVerification]);
 
   // Safety: if we have SMS verification data but the dialog got closed (e.g. Escape), reopen it.
   useEffect(() => {
@@ -513,16 +534,20 @@ const Connexion = () => {
     setLoading(true);
 
     try {
+      // Mark that we're in the middle of a login flow (blocks auto-redirect)
+      setWaitingForSmsFlow(true);
+      
       const result = await signIn(email, password);
       
       if (result.error) {
+        setWaitingForSmsFlow(false);
         toast({
           title: "Erreur de connexion",
           description: result.error.message || "Email ou mot de passe incorrect.",
           variant: "destructive",
         });
       } else if (result.requiresSmsVerification && result.userId && result.phoneNumber) {
-        // SMS verification required for king/admin
+        // SMS verification required for king/admin - keep waitingForSmsFlow true
         setSmsVerificationData({
           userId: result.userId,
           phoneNumber: result.phoneNumber,
@@ -533,6 +558,8 @@ const Connexion = () => {
           description: "Un code de vérification va être envoyé par SMS.",
         });
       } else {
+        // No SMS required - clear the waiting flag and proceed
+        setWaitingForSmsFlow(false);
         // Store the login target in sessionStorage for redirect after auth state changes
         sessionStorage.setItem('loginTarget', loginType);
         
@@ -560,6 +587,7 @@ const Connexion = () => {
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
+    setWaitingForSmsFlow(false);
     
     // Session is already active - just redirect
     setLoading(true);
@@ -610,6 +638,7 @@ const Connexion = () => {
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
+    setWaitingForSmsFlow(false);
     setPassword("");
     // Sign out the session since SMS verification was cancelled
     await supabase.auth.signOut();
