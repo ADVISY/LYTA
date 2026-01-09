@@ -74,14 +74,10 @@ export default function ClientLayout() {
         .eq('user_id', session.user.id)
         .maybeSingle();
       
-      // If user is admin/team but has no client record, they shouldn't be here
+      // If user is admin/team but has no client record, silently redirect to CRM
+      // (No toast - they might have been redirected here accidentally)
       if (role !== 'client' && !clientRecord) {
-        toast({
-          title: "Espace non disponible",
-          description: "Vous n'avez pas de compte client associé.",
-          variant: "destructive",
-        });
-        navigate("/crm");
+        navigate("/crm", { replace: true });
         return;
       }
       
