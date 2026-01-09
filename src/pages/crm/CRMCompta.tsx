@@ -706,41 +706,41 @@ export default function CRMCompta() {
 
         {/* Détail des revenus */}
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-primary mb-3 pb-2 border-b">Détail des revenus</h3>
+          <h3 className="text-sm font-semibold text-primary mb-3 pb-2 border-b">{t('accounting.revenueDetails')}</h3>
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="text-xs py-2">Désignation</TableHead>
-                <TableHead className="text-xs py-2 text-right">Montant</TableHead>
+                <TableHead className="text-xs py-2">{t('accounting.designation')}</TableHead>
+                <TableHead className="text-xs py-2 text-right">{t('accounting.amount')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell className="text-xs py-2 font-medium">Salaire fixe</TableCell>
+                <TableCell className="text-xs py-2 font-medium">{t('accounting.fixedSalary')}</TableCell>
                 <TableCell className="text-xs py-2 text-right">{formatCurrency(fiche.salaireBrut)}</TableCell>
               </TableRow>
               
               <TableRow>
-                <TableCell className="text-xs py-2 font-medium">Commissions brutes</TableCell>
+                <TableCell className="text-xs py-2 font-medium">{t('accounting.commissionsGross')}</TableCell>
                 <TableCell className="text-xs py-2 text-right">{formatCurrency(fiche.commissionsBrut)}</TableCell>
               </TableRow>
               
               {fiche.reserveRate > 0 && (
                 <TableRow className="bg-orange-50">
-                  <TableCell className="text-xs py-2">Retenue compte de réserve ({fiche.reserveRate}%)</TableCell>
+                  <TableCell className="text-xs py-2">{t('accounting.reserveWithholding')} ({fiche.reserveRate}%)</TableCell>
                   <TableCell className="text-xs py-2 text-right text-orange-600">-{formatCurrency(fiche.reserveAmount)}</TableCell>
                 </TableRow>
               )}
               
               <TableRow className="bg-blue-50">
-                <TableCell className="text-xs py-2 font-semibold">Commissions nettes</TableCell>
+                <TableCell className="text-xs py-2 font-semibold">{t('accounting.commissionsNet')}</TableCell>
                 <TableCell className="text-xs py-2 text-right font-semibold text-blue-600">
                   {formatCurrency(fiche.commissionsNet)}
                 </TableCell>
               </TableRow>
               
               <TableRow className="bg-primary/10">
-                <TableCell className="text-sm py-3 font-bold">TOTAL BRUT</TableCell>
+                <TableCell className="text-sm py-3 font-bold">{t('accounting.totalGross').toUpperCase()}</TableCell>
                 <TableCell className="text-sm py-3 text-right font-bold text-primary">
                   {formatCurrency(fiche.totalBrut)}
                 </TableCell>
@@ -751,39 +751,39 @@ export default function CRMCompta() {
 
         {/* Déductions */}
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-primary mb-3 pb-2 border-b">Déductions</h3>
+          <h3 className="text-sm font-semibold text-primary mb-3 pb-2 border-b">{t('accounting.deductions')}</h3>
           <Table>
             <TableBody>
               {/* Charges sociales */}
               <TableRow className="bg-muted/30">
-                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>Cotisations sociales</TableCell>
+                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>{t('accounting.socialContributions')}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2 pl-4">AVS/AI/APG (5.3%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">{t('accounting.avs')} (5.3%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
                   -{formatCurrency(fiche.avs)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2 pl-4">AC (1.1%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">{t('accounting.ac')} (1.1%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
                   -{formatCurrency(fiche.ac)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2 pl-4">LPP - 2e pilier (~7%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">{t('accounting.lpp')} (~7%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
                   -{formatCurrency(fiche.lpp)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="text-xs py-2 pl-4">AANP (1.6%)</TableCell>
+                <TableCell className="text-xs py-2 pl-4">{t('accounting.aanp')} (1.6%)</TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
                   -{formatCurrency(fiche.aanp)}
                 </TableCell>
               </TableRow>
               <TableRow className="bg-red-50/50">
-                <TableCell className="text-xs py-2 font-medium">Sous-total cotisations (~15%)</TableCell>
+                <TableCell className="text-xs py-2 font-medium">{t('accounting.subTotalContributions')} (~15%)</TableCell>
                 <TableCell className="text-xs py-2 text-right font-medium text-red-600">
                   -{formatCurrency(fiche.totalChargesSociales)}
                 </TableCell>
@@ -791,11 +791,11 @@ export default function CRMCompta() {
               
               {/* Impôt à la source */}
               <TableRow className="bg-muted/30">
-                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>Impôt à la source</TableCell>
+                <TableCell className="text-xs py-2 font-semibold" colSpan={2}>{t('accounting.withholdingTax')}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="text-xs py-2 pl-4">
-                  Canton {fiche.canton} ({(fiche.tauxImpotSource * 100).toFixed(1)}%)
+                  {t('accounting.canton')} {fiche.canton} ({(fiche.tauxImpotSource * 100).toFixed(1)}%)
                 </TableCell>
                 <TableCell className="text-xs py-2 text-right text-red-600">
                   -{formatCurrency(fiche.impotSource)}
@@ -804,7 +804,7 @@ export default function CRMCompta() {
               
               {/* Total déductions */}
               <TableRow className="bg-red-100">
-                <TableCell className="text-xs py-2 font-bold">TOTAL DÉDUCTIONS</TableCell>
+                <TableCell className="text-xs py-2 font-bold">{t('accounting.totalDeductions').toUpperCase()}</TableCell>
                 <TableCell className="text-xs py-2 text-right font-bold text-red-600">
                   -{formatCurrency(fiche.totalDeductions)}
                 </TableCell>
@@ -816,7 +816,7 @@ export default function CRMCompta() {
         {/* Net à payer */}
         <div className="bg-emerald-50 p-4 rounded-lg mb-6">
           <div className="flex justify-between items-center">
-            <span className="text-lg font-bold">NET À PAYER</span>
+            <span className="text-lg font-bold">{t('accounting.netToPay').toUpperCase()}</span>
             <span className="text-2xl font-bold text-emerald-600">{formatCurrency(fiche.netAPayer)}</span>
           </div>
         </div>
@@ -952,7 +952,7 @@ export default function CRMCompta() {
                 disabled={generating || !dateDebut || !dateFin || selectedCollaborateurs.length === 0}
                 className="gap-2"
               >
-                {generating ? <><Loader2 className="h-4 w-4 animate-spin" /> Génération...</> : <><Eye className="h-4 w-4" /> Générer {selectedCollaborateurs.length > 1 ? `${selectedCollaborateurs.length} décomptes` : 'et prévisualiser'}</>}
+                {generating ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('accounting.generating')}</> : <><Eye className="h-4 w-4" /> {selectedCollaborateurs.length > 1 ? t('accounting.generateStatementCount', { count: selectedCollaborateurs.length }) : t('accounting.generateAndPreview')}</>}
               </Button>
             </CardContent>
           </Card>
@@ -1051,7 +1051,7 @@ export default function CRMCompta() {
                 disabled={generatingSalaire || !selectedMois || !selectedAnnee || selectedCollabsSalaire.length === 0}
                 className="gap-2"
               >
-                {generatingSalaire ? <><Loader2 className="h-4 w-4 animate-spin" /> Génération...</> : <><Eye className="h-4 w-4" /> Générer {selectedCollabsSalaire.length > 1 ? `${selectedCollabsSalaire.length} fiches` : 'et prévisualiser'}</>}
+                {generatingSalaire ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('accounting.generating')}</> : <><Eye className="h-4 w-4" /> {selectedCollabsSalaire.length > 1 ? t('accounting.generatePayslipsCount', { count: selectedCollabsSalaire.length }) : t('accounting.generateAndPreview')}</>}
               </Button>
             </CardContent>
           </Card>
@@ -1064,13 +1064,13 @@ export default function CRMCompta() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Prévisualisation - {allDecomptes.length} décompte(s)</span>
+              <span>{t('accounting.previewTitle', { count: allDecomptes.length })}</span>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-2">
-                  <FileDown className="h-4 w-4" /> Télécharger PDF
+                  <FileDown className="h-4 w-4" /> {t('accounting.downloadPdf')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-                  <Printer className="h-4 w-4" /> Imprimer
+                  <Printer className="h-4 w-4" /> {t('accounting.print')}
                 </Button>
               </div>
             </DialogTitle>
@@ -1088,13 +1088,13 @@ export default function CRMCompta() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Prévisualisation - {fichesPaie.length} fiche(s) de paie</span>
+              <span>{t('accounting.previewPayslipsTitle', { count: fichesPaie.length })}</span>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handleDownloadSalairePDF} className="gap-2">
-                  <FileDown className="h-4 w-4" /> Télécharger PDF
+                  <FileDown className="h-4 w-4" /> {t('accounting.downloadPdf')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={handlePrintSalaire} className="gap-2">
-                  <Printer className="h-4 w-4" /> Imprimer
+                  <Printer className="h-4 w-4" /> {t('accounting.print')}
                 </Button>
               </div>
             </DialogTitle>
