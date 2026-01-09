@@ -456,11 +456,21 @@ export default function KingTenantDetail() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
+                        onClick={async () => {
+                          const newEmails = tenantData.contract_notification_emails.filter((_, i) => i !== index);
                           setTenantData({
                             ...tenantData,
-                            contract_notification_emails: tenantData.contract_notification_emails.filter((_, i) => i !== index)
+                            contract_notification_emails: newEmails
                           });
+                          // Auto-save
+                          const { error } = await supabase
+                            .from('tenants')
+                            .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
+                            .eq('id', tenantId);
+                          if (!error) {
+                            toast({ title: "Email supprimé", description: "La liste a été mise à jour." });
+                            queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+                          }
                         }}
                       >
                         <X className="h-4 w-4" />
@@ -474,14 +484,24 @@ export default function KingTenantDetail() {
                       placeholder="email@exemple.com"
                       value={newNotificationEmail}
                       onChange={(e) => setNewNotificationEmail(e.target.value)}
-                      onKeyDown={(e) => {
+                      onKeyDown={async (e) => {
                         if (e.key === 'Enter' && newNotificationEmail && newNotificationEmail.includes('@')) {
                           e.preventDefault();
+                          const newEmails = [...tenantData.contract_notification_emails, newNotificationEmail.trim().toLowerCase()];
                           setTenantData({
                             ...tenantData,
-                            contract_notification_emails: [...tenantData.contract_notification_emails, newNotificationEmail]
+                            contract_notification_emails: newEmails
                           });
                           setNewNotificationEmail('');
+                          // Auto-save
+                          const { error } = await supabase
+                            .from('tenants')
+                            .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
+                            .eq('id', tenantId);
+                          if (!error) {
+                            toast({ title: "Email ajouté", description: "La liste a été mise à jour." });
+                            queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+                          }
                         }
                       }}
                     />
@@ -489,13 +509,23 @@ export default function KingTenantDetail() {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => {
+                      onClick={async () => {
                         if (newNotificationEmail && newNotificationEmail.includes('@')) {
+                          const newEmails = [...tenantData.contract_notification_emails, newNotificationEmail.trim().toLowerCase()];
                           setTenantData({
                             ...tenantData,
-                            contract_notification_emails: [...tenantData.contract_notification_emails, newNotificationEmail]
+                            contract_notification_emails: newEmails
                           });
                           setNewNotificationEmail('');
+                          // Auto-save
+                          const { error } = await supabase
+                            .from('tenants')
+                            .update({ contract_notification_emails: newEmails, updated_at: new Date().toISOString() })
+                            .eq('id', tenantId);
+                          if (!error) {
+                            toast({ title: "Email ajouté", description: "La liste a été mise à jour." });
+                            queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+                          }
                         }
                       }}
                       disabled={!newNotificationEmail || !newNotificationEmail.includes('@')}
