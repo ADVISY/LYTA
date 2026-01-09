@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
-import { Loader2, Phone, RefreshCw, ShieldCheck } from "lucide-react";
+import { Loader2, Phone, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -122,26 +121,37 @@ export function SmsVerificationDialog({
 
   const maskedPhone = phoneNumber.replace(/(\d{2})(\d+)(\d{2})/, "$1****$3");
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-md"
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            Vérification SMS
-          </DialogTitle>
-          <DialogDescription>
-            {verificationType === "login"
-              ? "Pour sécuriser votre connexion, entrez le code envoyé par SMS."
-              : "Pour valider le dépôt de contrat, entrez le code envoyé par SMS."}
-          </DialogDescription>
-        </DialogHeader>
+  if (!open) return null;
 
-        <div className="space-y-6 py-4">
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-lg border bg-card shadow-lg">
+        <div className="flex items-start justify-between gap-4 border-b p-6">
+          <div className="space-y-1">
+            <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Vérification SMS
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {verificationType === "login"
+                ? "Pour sécuriser votre connexion, entrez le code envoyé par SMS."
+                : "Pour valider le dépôt de contrat, entrez le code envoyé par SMS."}
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleCancel}
+            aria-label="Fermer"
+            className="shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6 p-6">
           {/* Phone display */}
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
             <Phone className="h-4 w-4" />
@@ -150,8 +160,8 @@ export function SmsVerificationDialog({
 
           {/* Test code display (simulation mode) */}
           {testCode && (
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center">
-              <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+            <div className="rounded-lg border bg-muted p-3 text-center">
+              <p className="text-sm font-medium">
                 Mode test - Code: <span className="font-mono text-lg">{testCode}</span>
               </p>
             </div>
@@ -159,12 +169,7 @@ export function SmsVerificationDialog({
 
           {/* OTP Input */}
           <div className="flex justify-center">
-            <InputOTP
-              value={code}
-              onChange={setCode}
-              maxLength={6}
-              disabled={loading}
-            >
+            <InputOTP value={code} onChange={setCode} maxLength={6} disabled={loading}>
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
                 <InputOTPSlot index={1} />
@@ -178,12 +183,7 @@ export function SmsVerificationDialog({
 
           {/* Resend button */}
           <div className="text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={sendCode}
-              disabled={sending || countdown > 0}
-            >
+            <Button variant="ghost" size="sm" onClick={sendCode} disabled={sending || countdown > 0}>
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
@@ -195,25 +195,16 @@ export function SmsVerificationDialog({
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleCancel}
-              disabled={loading}
-            >
+            <Button variant="outline" className="flex-1" onClick={handleCancel} disabled={loading}>
               Annuler
             </Button>
-            <Button
-              className="flex-1"
-              onClick={verifyCode}
-              disabled={loading || code.length !== 6}
-            >
+            <Button className="flex-1" onClick={verifyCode} disabled={loading || code.length !== 6}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Vérifier
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
