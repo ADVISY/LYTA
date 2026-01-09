@@ -2,6 +2,8 @@ import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/contexts/TenantContext";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { PlanModule } from "@/config/plans";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
@@ -19,8 +21,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Mail,
+  Zap,
+  Globe,
+  LucideIcon,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -31,13 +36,22 @@ import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import { SoundToggle } from "@/components/crm/SoundToggle";
 
-const menuItems = [
+interface MenuItem {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  end?: boolean;
+  color: string;
+  requiredModule?: PlanModule;
+}
+
+const allMenuItems: MenuItem[] = [
   { to: "/crm", icon: LayoutDashboard, label: "Drive", end: true, color: "from-blue-500 to-indigo-500" },
-  { to: "/crm/clients", icon: Users, label: "Adresses", color: "from-emerald-500 to-teal-500" },
-  { to: "/crm/contrats", icon: FileCheck, label: "Contrats", color: "from-violet-500 to-purple-500" },
-  { to: "/crm/commissions", icon: DollarSign, label: "Payout", color: "from-green-500 to-emerald-500" },
-  { to: "/crm/compta", icon: FileText, label: "Finance", color: "from-amber-500 to-orange-500" },
-  { to: "/crm/publicite", icon: Mail, label: "Publicité", color: "from-cyan-500 to-blue-500" },
+  { to: "/crm/clients", icon: Users, label: "Adresses", color: "from-emerald-500 to-teal-500", requiredModule: "clients" },
+  { to: "/crm/contrats", icon: FileCheck, label: "Contrats", color: "from-violet-500 to-purple-500", requiredModule: "contracts" },
+  { to: "/crm/commissions", icon: DollarSign, label: "Payout", color: "from-green-500 to-emerald-500", requiredModule: "commissions" },
+  { to: "/crm/compta", icon: FileText, label: "Finance", color: "from-amber-500 to-orange-500", requiredModule: "statements" },
+  { to: "/crm/publicite", icon: Mail, label: "Publicité", color: "from-cyan-500 to-blue-500", requiredModule: "emailing" },
   { to: "/crm/compagnies", icon: Building2, label: "Partners", color: "from-red-500 to-orange-500" },
   { to: "/crm/collaborateurs", icon: UserCog, label: "Team", color: "from-pink-500 to-rose-500" },
   { to: "/crm/rapports", icon: BarChart3, label: "Rapports", color: "from-indigo-500 to-violet-500" },
@@ -48,10 +62,21 @@ export default function CRMLayout() {
   const { user, signOut } = useAuth();
   const { role, loading } = useUserRole();
   const { tenant } = useTenant();
+  const { hasModule, loading: planLoading } = usePlanFeatures();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  // Filter menu items based on plan
+  const menuItems = useMemo(() => {
+    return allMenuItems.filter((item) => {
+      // Items without requiredModule are always visible
+      if (!item.requiredModule) return true;
+      // Check if the module is enabled in the current plan
+      return hasModule(item.requiredModule);
+    });
+  }, [hasModule]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {
@@ -97,7 +122,7 @@ export default function CRMLayout() {
     return user?.email?.charAt(0).toUpperCase() || 'U';
   };
 
-  if (loading) {
+  if (loading || planLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-muted border-t-primary" />

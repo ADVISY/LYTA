@@ -29,6 +29,7 @@ import CRMParametres from "./pages/crm/CRMParametres";
 import CRMCompagnies from "./pages/crm/CRMCompagnies";
 import CRMCompta from "./pages/crm/CRMCompta";
 import CRMPublicite from "./pages/crm/CRMPublicite";
+import CRMAbonnement from "./pages/crm/CRMAbonnement";
 
 // Client Portal
 import ClientLayout from "./pages/client/ClientLayout";
@@ -88,6 +89,7 @@ const App = () => (
                 <Route path="compagnies" element={<CRMCompagnies />} />
                 <Route path="compta" element={<CRMCompta />} />
                 <Route path="publicite" element={<CRMPublicite />} />
+                <Route path="abonnement" element={<CRMAbonnement />} />
               </Route>
               
               {/* KING Platform Routes */}

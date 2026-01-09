@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { TenantPlan } from "@/config/plans";
 
 interface Tenant {
   id: string;
@@ -7,6 +8,11 @@ interface Tenant {
   slug: string;
   email: string;
   status: string;
+  plan?: TenantPlan;
+  planStatus?: 'active' | 'suspended';
+  billingStatus?: 'paid' | 'trial' | 'past_due' | 'canceled';
+  seatsIncluded?: number;
+  seatsPrice?: number;
   branding?: {
     logo_url: string | null;
     primary_color: string | null;

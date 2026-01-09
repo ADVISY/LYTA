@@ -2657,6 +2657,7 @@ export type Database = {
           address: string | null
           admin_email: string | null
           backoffice_email: string | null
+          billing_status: Database["public"]["Enums"]["billing_status"] | null
           contact_name: string | null
           contract_notification_emails: string[] | null
           created_at: string
@@ -2666,9 +2667,13 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          plan: Database["public"]["Enums"]["tenant_plan"] | null
           plan_id: string | null
+          plan_status: Database["public"]["Enums"]["plan_status"] | null
           processed_at: string | null
           processed_by: string | null
+          seats_included: number | null
+          seats_price: number | null
           slug: string
           status: string
           stripe_session_id: string | null
@@ -2678,6 +2683,7 @@ export type Database = {
           address?: string | null
           admin_email?: string | null
           backoffice_email?: string | null
+          billing_status?: Database["public"]["Enums"]["billing_status"] | null
           contact_name?: string | null
           contract_notification_emails?: string[] | null
           created_at?: string
@@ -2687,9 +2693,13 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          plan?: Database["public"]["Enums"]["tenant_plan"] | null
           plan_id?: string | null
+          plan_status?: Database["public"]["Enums"]["plan_status"] | null
           processed_at?: string | null
           processed_by?: string | null
+          seats_included?: number | null
+          seats_price?: number | null
           slug: string
           status?: string
           stripe_session_id?: string | null
@@ -2699,6 +2709,7 @@ export type Database = {
           address?: string | null
           admin_email?: string | null
           backoffice_email?: string | null
+          billing_status?: Database["public"]["Enums"]["billing_status"] | null
           contact_name?: string | null
           contract_notification_emails?: string[] | null
           created_at?: string
@@ -2708,9 +2719,13 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          plan?: Database["public"]["Enums"]["tenant_plan"] | null
           plan_id?: string | null
+          plan_status?: Database["public"]["Enums"]["plan_status"] | null
           processed_at?: string | null
           processed_by?: string | null
+          seats_included?: number | null
+          seats_price?: number | null
           slug?: string
           status?: string
           stripe_session_id?: string | null
@@ -3560,6 +3575,7 @@ export type Database = {
         | "backoffice"
         | "compta"
         | "king"
+      billing_status: "paid" | "trial" | "past_due" | "canceled"
       commission_status: "estimated" | "confirmed" | "cancelled"
       dashboard_scope: "personal" | "team" | "global"
       decompte_status: "draft" | "validated" | "paid" | "cancelled"
@@ -3586,6 +3602,8 @@ export type Database = {
         | "payout"
         | "dashboard"
         | "settings"
+      plan_status: "active" | "suspended"
+      tenant_plan: "start" | "pro" | "prime" | "founder"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3723,6 +3741,7 @@ export const Constants = {
         "compta",
         "king",
       ],
+      billing_status: ["paid", "trial", "past_due", "canceled"],
       commission_status: ["estimated", "confirmed", "cancelled"],
       dashboard_scope: ["personal", "team", "global"],
       decompte_status: ["draft", "validated", "paid", "cancelled"],
@@ -3751,6 +3770,8 @@ export const Constants = {
         "dashboard",
         "settings",
       ],
+      plan_status: ["active", "suspended"],
+      tenant_plan: ["start", "pro", "prime", "founder"],
     },
   },
 } as const

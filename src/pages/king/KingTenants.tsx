@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { PLAN_CONFIGS, TenantPlan } from "@/config/plans";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +27,29 @@ interface TenantStats {
   collaborateurs: number;
   policies: number;
   commissions_total: number;
+  active_users: number;
 }
+
+const PLAN_COLORS: Record<TenantPlan, string> = {
+  start: 'bg-slate-500/10 text-slate-600',
+  pro: 'bg-blue-500/10 text-blue-600',
+  prime: 'bg-purple-500/10 text-purple-600',
+  founder: 'bg-amber-500/10 text-amber-600',
+};
+
+const BILLING_COLORS: Record<string, string> = {
+  paid: 'bg-emerald-500/10 text-emerald-600',
+  trial: 'bg-blue-500/10 text-blue-600',
+  past_due: 'bg-red-500/10 text-red-600',
+  canceled: 'bg-slate-500/10 text-slate-600',
+};
+
+const BILLING_LABELS: Record<string, string> = {
+  paid: 'Payé',
+  trial: 'Essai',
+  past_due: 'Impayé',
+  canceled: 'Annulé',
+};
 
 export default function KingTenants() {
   const navigate = useNavigate();
@@ -76,7 +100,7 @@ export default function KingTenants() {
       clientsData?.forEach(client => {
         const tenantId = client.tenant_id || 'no-tenant';
         if (!stats[tenantId]) {
-          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0 };
+          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0, active_users: 0 };
         }
         
         // collaborateur and partenaire are considered as collaborateurs
@@ -91,7 +115,7 @@ export default function KingTenants() {
       policiesData?.forEach(policy => {
         const tenantId = policy.tenant_id || 'no-tenant';
         if (!stats[tenantId]) {
-          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0 };
+          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0, active_users: 0 };
         }
         stats[tenantId].policies++;
       });
@@ -100,7 +124,7 @@ export default function KingTenants() {
       commissionsData?.forEach(commission => {
         const tenantId = commission.tenant_id || 'no-tenant';
         if (!stats[tenantId]) {
-          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0 };
+          stats[tenantId] = { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0, active_users: 0 };
         }
         stats[tenantId].commissions_total += Number(commission.amount) || 0;
       });
