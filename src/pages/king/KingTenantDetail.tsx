@@ -67,6 +67,8 @@ export default function KingTenantDetail() {
     primary_color: "#0066FF",
     secondary_color: "#1a1a2e",
     display_name: "",
+    email_sender_name: "",
+    email_sender_address: "",
   });
 
   // Fetch tenant data
@@ -137,6 +139,8 @@ export default function KingTenantDetail() {
           primary_color: tenant.tenant_branding[0].primary_color || "#0066FF",
           secondary_color: tenant.tenant_branding[0].secondary_color || "#1a1a2e",
           display_name: tenant.tenant_branding[0].display_name || "",
+          email_sender_name: tenant.tenant_branding[0].email_sender_name || "",
+          email_sender_address: tenant.tenant_branding[0].email_sender_address || "",
         });
       }
     }
@@ -188,6 +192,8 @@ export default function KingTenantDetail() {
           primary_color: brandingData.primary_color,
           secondary_color: brandingData.secondary_color,
           display_name: brandingData.display_name || null,
+          email_sender_name: brandingData.email_sender_name || null,
+          email_sender_address: brandingData.email_sender_address || null,
           updated_at: new Date().toISOString(),
         })
         .eq('tenant_id', tenantId);
@@ -587,6 +593,36 @@ export default function KingTenantDetail() {
                       value={brandingData.display_name}
                       onChange={(e) => setBrandingData({ ...brandingData, display_name: e.target.value })}
                     />
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div>
+                      <Label className="text-base">Expéditeur des emails</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Pour ne plus afficher <span className="font-mono">@resend.dev</span>, utilisez une adresse sur un domaine email validé.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email_sender_name">Nom expéditeur</Label>
+                      <Input
+                        id="email_sender_name"
+                        placeholder="Ex: Advisy"
+                        value={brandingData.email_sender_name}
+                        onChange={(e) => setBrandingData({ ...brandingData, email_sender_name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email_sender_address">Adresse expéditeur</Label>
+                      <Input
+                        id="email_sender_address"
+                        type="email"
+                        placeholder="Ex: no-reply@votre-domaine.ch"
+                        value={brandingData.email_sender_address}
+                        onChange={(e) => setBrandingData({ ...brandingData, email_sender_address: e.target.value })}
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
