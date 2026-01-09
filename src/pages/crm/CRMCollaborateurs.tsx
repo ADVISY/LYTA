@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const professionLabels: Record<string, string> = {
   agent: "Agent",
@@ -36,9 +37,10 @@ const professionLabels: Record<string, string> = {
 };
 
 export default function CRMCollaborateurs() {
+  const { t } = useTranslation();
   const { collaborateurs, loading, stats, addCollaborateur, updateCollaborateur, deleteCollaborateur } = useCollaborateurs();
   const { tenant } = useTenant();
-  const tenantName = tenant?.branding?.display_name || tenant?.name || "l'équipe";
+  const tenantName = tenant?.branding?.display_name || tenant?.name || t('collaborators.team');
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingCollaborateur, setEditingCollaborateur] = useState<Collaborateur | null>(null);

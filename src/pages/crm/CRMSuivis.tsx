@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { useSuivis, suiviTypeLabels, suiviStatusLabels, suiviStatusColors, SuiviType, SuiviStatus } from "@/hooks/useSuivis";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const statsCards = [
   { key: "ouverts", label: "Ouverts", icon: Clock, color: "from-blue-500 to-indigo-600" },
@@ -52,6 +53,7 @@ const statsCards = [
 ];
 
 export default function CRMSuivis() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { suivis, loading, stats, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis();
   const [searchQuery, setSearchQuery] = useState("");

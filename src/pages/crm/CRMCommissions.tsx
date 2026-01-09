@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CommissionForm from "@/components/crm/CommissionForm";
 import DecommissionForm from "@/components/crm/DecommissionForm";
+import { useTranslation } from "react-i18next";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   due: { label: "À payer", color: "bg-amber-100 text-amber-800", icon: Clock },
@@ -36,6 +37,7 @@ const typeConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function CRMCommissions() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { commissions, loading, fetchCommissions, markAsPaid, deleteCommission, updateCommission } = useCommissions();
   const { fetchCommissionParts, addCommissionPart, updateCommissionPart, deleteCommissionPart } = useCommissionParts();

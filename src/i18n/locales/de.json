@@ -40,7 +40,14 @@
     "success": "Erfolg",
     "error": "Fehler",
     "warning": "Warnung",
-    "info": "Information"
+    "info": "Information",
+    "online": "online",
+    "noResults": "Keine Ergebnisse gefunden",
+    "noName": "Kein Name",
+    "tryFilters": "Versuchen Sie, Ihre Filter anzupassen",
+    "tryDifferentFilters": "Versuchen Sie, Ihre Filter anzupassen",
+    "allStatuses": "Alle Status",
+    "allTypes": "Alle Typen"
   },
   "auth": {
     "login": "Anmeldung",
