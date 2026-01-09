@@ -64,7 +64,7 @@ serve(async (req) => {
       partnerId = partnerRecord?.id || null
       tenantId = collaborateur.tenant_id
     } else {
-      // Check if user is an admin/agent via profiles + user_roles
+      // Check if user is an admin/agent via profiles + user_tenant_assignments
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -76,23 +76,30 @@ serve(async (req) => {
       }
 
       if (profile) {
-        // NOTE: user can have multiple roles rows → do NOT use maybeSingle()
-        const { data: rolesRows, error: rolesError } = await supabaseAdmin
-          .from('user_roles')
-          .select('role, tenant_id')
+        // Get tenant via user_tenant_assignments
+        const { data: assignment, error: assignmentError } = await supabaseAdmin
+          .from('user_tenant_assignments')
+          .select('tenant_id')
           .eq('user_id', profile.id)
-          .in('role', ['admin', 'manager', 'agent', 'partner'])
+          .maybeSingle()
 
-        if (rolesError) {
-          console.error('Database error (roles):', rolesError)
+        if (assignmentError) {
+          console.error('Database error (assignment):', assignmentError)
         }
 
-        const roleRow = Array.isArray(rolesRows)
-          ? (rolesRows.find((r) => r?.tenant_id) ?? rolesRows[0])
-          : null
+        if (assignment?.tenant_id) {
+          tenantId = assignment.tenant_id
 
-        if (roleRow?.tenant_id) {
-          tenantId = roleRow.tenant_id
+          // Check if this user has admin/partner role
+          const { data: rolesRows, error: rolesError } = await supabaseAdmin
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profile.id)
+            .in('role', ['admin', 'manager', 'agent', 'partner'])
+
+          if (rolesError) {
+            console.error('Database error (roles):', rolesError)
+          }
 
           // Check if this user has a partner record
           const { data: partnerRecord, error: partnerError } = await supabaseAdmin
