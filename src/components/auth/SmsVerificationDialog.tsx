@@ -95,9 +95,12 @@ export function SmsVerificationDialog({
       if (error) throw error;
 
       if (data.success) {
-        toast.success("Vérification réussie");
-        onVerified();
+        toast.success("Vérification réussie !");
         onOpenChange(false);
+        // Small delay to ensure dialog closes before calling onVerified
+        setTimeout(() => {
+          onVerified();
+        }, 100);
       } else {
         toast.error(data.error || "Code incorrect");
         setCode("");

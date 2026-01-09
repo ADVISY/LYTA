@@ -552,6 +552,7 @@ const Connexion = () => {
     // Clear SMS verification state FIRST so useEffect can trigger redirect
     setSmsVerificationData(null);
     setShowSmsVerification(false);
+    clearPendingVerification();
     
     // Re-login now that SMS is verified
     setLoading(true);
