@@ -15,7 +15,9 @@ export type PlanModule =
   | 'emailing'
   | 'automation'
   | 'mandate_automation'
-  | 'client_portal';
+  | 'client_portal'
+  | 'advanced_dashboard'
+  | 'advanced_settings';
 
 export interface PlanConfig {
   name: string;
@@ -37,7 +39,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'start',
     displayName: 'Start',
     description: 'Pour démarrer',
-    modules: ['clients', 'contracts', 'commissions', 'client_portal', 'emailing'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership'],
     monthlyPrice: 69,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -48,7 +50,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'pro',
     displayName: 'Pro',
     description: 'Pour les cabinets établis',
-    modules: ['clients', 'contracts', 'commissions', 'client_portal', 'emailing', 'automation', 'statements', 'payroll'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'advanced_dashboard'],
     monthlyPrice: 150,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -59,7 +61,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'prime',
     displayName: 'Prime',
     description: 'L\'expérience complète',
-    modules: ['clients', 'contracts', 'commissions', 'client_portal', 'emailing', 'automation', 'statements', 'payroll', 'mandate_automation', 'membership'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings'],
     monthlyPrice: 250,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -70,7 +72,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'founder',
     displayName: 'Prime Founder',
     description: 'Offre de lancement 6 mois',
-    modules: ['clients', 'contracts', 'commissions', 'client_portal', 'emailing', 'automation', 'statements', 'payroll', 'mandate_automation', 'membership'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings'],
     monthlyPrice: 150,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -86,13 +88,15 @@ export const MODULE_DISPLAY_NAMES: Record<PlanModule, string> = {
   clients: 'Gestion des clients',
   contracts: 'Gestion des contrats',
   commissions: 'Commissions',
-  statements: 'Relevés & Décomptes',
+  statements: 'Décomptes',
   membership: 'Adhésions',
   payroll: 'Masse salariale',
   emailing: 'Emailing & Campagnes',
   automation: 'Automatisations',
   mandate_automation: 'Automation mandats',
-  client_portal: 'Portail client',
+  client_portal: 'Espace client',
+  advanced_dashboard: 'Dashboard avancé',
+  advanced_settings: 'Paramètres avancés',
 };
 
 /**
@@ -109,6 +113,8 @@ export const MODULE_ICONS: Record<PlanModule, string> = {
   automation: 'Zap',
   mandate_automation: 'FileSignature',
   client_portal: 'Globe',
+  advanced_dashboard: 'LayoutDashboard',
+  advanced_settings: 'Settings',
 };
 
 /**
