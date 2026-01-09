@@ -21,108 +21,108 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Sources de données disponibles
-const dataSources = [
-  { id: "adresses", label: "Adresses", icon: Users, required: true },
-  { id: "contrats", label: "Contrats", icon: FileCheck, required: false },
-  { id: "suivis", label: "Suivis", icon: MessageSquare, required: false },
+// Sources de données disponibles - will be translated in component
+const getDataSources = (t: any) => [
+  { id: "adresses", label: t('reports.addresses'), icon: Users, required: true },
+  { id: "contrats", label: t('reports.contracts'), icon: FileCheck, required: false },
+  { id: "suivis", label: t('reports.followups'), icon: MessageSquare, required: false },
 ];
 
-// Champs disponibles par source
-const fieldsBySource: Record<string, { id: string; label: string; type: string; dbField: string; isJoined?: boolean }[]> = {
+// Champs disponibles par source - will be translated in component
+const getFieldsBySource = (t: any): Record<string, { id: string; label: string; type: string; dbField: string; isJoined?: boolean }[]> => ({
   adresses: [
-    { id: "adr_type_adresse", label: "Type d'adresse", type: "select", dbField: "type_adresse" },
-    { id: "adr_first_name", label: "Prénom", type: "text", dbField: "first_name" },
-    { id: "adr_last_name", label: "Nom", type: "text", dbField: "last_name" },
-    { id: "adr_email", label: "Email", type: "text", dbField: "email" },
-    { id: "adr_phone", label: "Téléphone", type: "text", dbField: "phone" },
-    { id: "adr_mobile", label: "Mobile", type: "text", dbField: "mobile" },
-    { id: "adr_address", label: "Adresse", type: "text", dbField: "address" },
-    { id: "adr_zip_code", label: "Code postal", type: "text", dbField: "zip_code" },
-    { id: "adr_city", label: "Ville", type: "text", dbField: "city" },
-    { id: "adr_canton", label: "Canton", type: "text", dbField: "canton" },
-    { id: "adr_country", label: "Pays", type: "text", dbField: "country" },
-    { id: "adr_birthdate", label: "Date de naissance", type: "date", dbField: "birthdate" },
-    { id: "adr_nationality", label: "Nationalité", type: "text", dbField: "nationality" },
-    { id: "adr_civil_status", label: "État civil", type: "select", dbField: "civil_status" },
-    { id: "adr_permit_type", label: "Permis", type: "select", dbField: "permit_type" },
-    { id: "adr_profession", label: "Profession", type: "text", dbField: "profession" },
-    { id: "adr_employer", label: "Employeur", type: "text", dbField: "employer" },
-    { id: "adr_status", label: "Statut client", type: "select", dbField: "status" },
-    { id: "adr_created_at", label: "Date création adresse", type: "date", dbField: "created_at" },
-    { id: "adr_agent_id", label: "Agent (ID)", type: "agent", dbField: "assigned_agent_id" },
-    { id: "adr_agent_name", label: "Nom Agent", type: "text", dbField: "agent_name", isJoined: true },
-    { id: "adr_manager_id", label: "Manager (ID)", type: "agent", dbField: "manager_id" },
-    { id: "adr_manager_name", label: "Nom Manager", type: "text", dbField: "manager_name", isJoined: true },
+    { id: "adr_type_adresse", label: t('clientForm.addressType'), type: "select", dbField: "type_adresse" },
+    { id: "adr_first_name", label: t('clients.firstName'), type: "text", dbField: "first_name" },
+    { id: "adr_last_name", label: t('clients.lastName'), type: "text", dbField: "last_name" },
+    { id: "adr_email", label: t('common.email'), type: "text", dbField: "email" },
+    { id: "adr_phone", label: t('common.phone'), type: "text", dbField: "phone" },
+    { id: "adr_mobile", label: t('clients.mobile'), type: "text", dbField: "mobile" },
+    { id: "adr_address", label: t('common.address'), type: "text", dbField: "address" },
+    { id: "adr_zip_code", label: t('clients.postalCode'), type: "text", dbField: "zip_code" },
+    { id: "adr_city", label: t('clients.city'), type: "text", dbField: "city" },
+    { id: "adr_canton", label: t('clients.canton'), type: "text", dbField: "canton" },
+    { id: "adr_country", label: t('clients.country'), type: "text", dbField: "country" },
+    { id: "adr_birthdate", label: t('clients.birthdate'), type: "date", dbField: "birthdate" },
+    { id: "adr_nationality", label: t('clients.nationality'), type: "text", dbField: "nationality" },
+    { id: "adr_civil_status", label: t('clients.civilStatus'), type: "select", dbField: "civil_status" },
+    { id: "adr_permit_type", label: t('clientForm.permitType'), type: "select", dbField: "permit_type" },
+    { id: "adr_profession", label: t('clients.profession'), type: "text", dbField: "profession" },
+    { id: "adr_employer", label: t('clients.employer'), type: "text", dbField: "employer" },
+    { id: "adr_status", label: t('clients.status'), type: "select", dbField: "status" },
+    { id: "adr_created_at", label: t('settings.createdAt'), type: "date", dbField: "created_at" },
+    { id: "adr_agent_id", label: t('clientForm.assignedAgentId'), type: "agent", dbField: "assigned_agent_id" },
+    { id: "adr_agent_name", label: t('clientForm.agentName'), type: "text", dbField: "agent_name", isJoined: true },
+    { id: "adr_manager_id", label: t('clientForm.managerId'), type: "agent", dbField: "manager_id" },
+    { id: "adr_manager_name", label: t('clientForm.managerName'), type: "text", dbField: "manager_name", isJoined: true },
   ],
   contrats: [
-    { id: "ctr_policy_number", label: "N° Police", type: "text", dbField: "policy_number" },
-    { id: "ctr_company_name", label: "Compagnie", type: "text", dbField: "company_name" },
-    { id: "ctr_product_type", label: "Type produit", type: "select", dbField: "product_type" },
-    { id: "ctr_status", label: "Statut contrat", type: "select", dbField: "status" },
-    { id: "ctr_start_date", label: "Date début", type: "date", dbField: "start_date" },
-    { id: "ctr_end_date", label: "Date fin", type: "date", dbField: "end_date" },
-    { id: "ctr_premium_monthly", label: "Prime mensuelle", type: "number", dbField: "premium_monthly" },
-    { id: "ctr_premium_yearly", label: "Prime annuelle", type: "number", dbField: "premium_yearly" },
-    { id: "ctr_deductible", label: "Franchise", type: "number", dbField: "deductible" },
-    { id: "ctr_notes", label: "Notes contrat", type: "text", dbField: "notes" },
-    { id: "ctr_created_at", label: "Date création contrat", type: "date", dbField: "created_at" },
+    { id: "ctr_policy_number", label: t('contracts.policyNumber'), type: "text", dbField: "policy_number" },
+    { id: "ctr_company_name", label: t('contracts.company'), type: "text", dbField: "company_name" },
+    { id: "ctr_product_type", label: t('contracts.product'), type: "select", dbField: "product_type" },
+    { id: "ctr_status", label: t('contracts.status'), type: "select", dbField: "status" },
+    { id: "ctr_start_date", label: t('contracts.startDate'), type: "date", dbField: "start_date" },
+    { id: "ctr_end_date", label: t('contracts.endDate'), type: "date", dbField: "end_date" },
+    { id: "ctr_premium_monthly", label: t('contracts.monthlyPremium'), type: "number", dbField: "premium_monthly" },
+    { id: "ctr_premium_yearly", label: t('contracts.yearlyPremium'), type: "number", dbField: "premium_yearly" },
+    { id: "ctr_deductible", label: t('contracts.deductible'), type: "number", dbField: "deductible" },
+    { id: "ctr_notes", label: t('common.notes'), type: "text", dbField: "notes" },
+    { id: "ctr_created_at", label: t('settings.createdAt'), type: "date", dbField: "created_at" },
   ],
   suivis: [
-    { id: "suv_title", label: "Titre suivi", type: "text", dbField: "title" },
-    { id: "suv_type", label: "Type suivi", type: "select", dbField: "type" },
-    { id: "suv_status", label: "Statut suivi", type: "select", dbField: "status" },
-    { id: "suv_description", label: "Description", type: "text", dbField: "description" },
-    { id: "suv_reminder_date", label: "Date rappel", type: "date", dbField: "reminder_date" },
-    { id: "suv_created_at", label: "Date création suivi", type: "date", dbField: "created_at" },
-    { id: "suv_updated_at", label: "Mise à jour suivi", type: "date", dbField: "updated_at" },
-    { id: "suv_agent_id", label: "Agent suivi (ID)", type: "agent", dbField: "assigned_agent_id" },
-    { id: "suv_agent_name", label: "Agent suivi", type: "text", dbField: "agent_name", isJoined: true },
+    { id: "suv_title", label: t('followups.title_field'), type: "text", dbField: "title" },
+    { id: "suv_type", label: t('followups.type'), type: "select", dbField: "type" },
+    { id: "suv_status", label: t('followups.status'), type: "select", dbField: "status" },
+    { id: "suv_description", label: t('common.description'), type: "text", dbField: "description" },
+    { id: "suv_reminder_date", label: t('followups.reminderDate'), type: "date", dbField: "reminder_date" },
+    { id: "suv_created_at", label: t('settings.createdAt'), type: "date", dbField: "created_at" },
+    { id: "suv_updated_at", label: t('reports.lastModified'), type: "date", dbField: "updated_at" },
+    { id: "suv_agent_id", label: t('clientForm.assignedAgentId'), type: "agent", dbField: "assigned_agent_id" },
+    { id: "suv_agent_name", label: t('followups.assignedTo'), type: "text", dbField: "agent_name", isJoined: true },
   ],
-};
+});
 
-// Opérateurs par type de champ
-const operatorsByFieldType: Record<string, { id: string; label: string }[]> = {
+// Opérateurs par type de champ - will be translated in component
+const getOperatorsByFieldType = (t: any): Record<string, { id: string; label: string }[]> => ({
   text: [
-    { id: "equals", label: "Égal à" },
-    { id: "contains", label: "Contient" },
-    { id: "starts_with", label: "Commence par" },
-    { id: "ends_with", label: "Termine par" },
-    { id: "not_equals", label: "Différent de" },
-    { id: "is_empty", label: "Est vide" },
-    { id: "is_not_empty", label: "N'est pas vide" },
+    { id: "equals", label: t('reports.equals') },
+    { id: "contains", label: t('reports.contains') },
+    { id: "starts_with", label: t('reports.startsWith') },
+    { id: "ends_with", label: t('reports.endsWith') },
+    { id: "not_equals", label: t('reports.notEquals') },
+    { id: "is_empty", label: t('reports.isEmpty') },
+    { id: "is_not_empty", label: t('reports.isNotEmpty') },
   ],
   number: [
-    { id: "equals", label: "Égal à" },
-    { id: "greater_than", label: "Supérieur à" },
-    { id: "less_than", label: "Inférieur à" },
-    { id: "between", label: "Entre" },
+    { id: "equals", label: t('reports.equals') },
+    { id: "greater_than", label: t('reports.greaterThan') },
+    { id: "less_than", label: t('reports.lessThan') },
+    { id: "between", label: t('reports.between') },
   ],
   date: [
-    { id: "equals", label: "Égal à" },
-    { id: "before", label: "Avant" },
-    { id: "after", label: "Après" },
-    { id: "between", label: "Entre" },
+    { id: "equals", label: t('reports.equals') },
+    { id: "before", label: t('reports.before') },
+    { id: "after", label: t('reports.after') },
+    { id: "between", label: t('reports.between') },
   ],
   select: [
-    { id: "equals", label: "Égal à" },
-    { id: "not_equals", label: "Différent de" },
-    { id: "in", label: "Parmi" },
+    { id: "equals", label: t('reports.equals') },
+    { id: "not_equals", label: t('reports.notEquals') },
+    { id: "in", label: t('reports.between') },
   ],
   agent: [
-    { id: "equals", label: "Est" },
-    { id: "not_equals", label: "N'est pas" },
-    { id: "is_empty", label: "Non assigné" },
-    { id: "is_not_empty", label: "Est assigné" },
+    { id: "equals", label: t('reports.equals') },
+    { id: "not_equals", label: t('reports.notEquals') },
+    { id: "is_empty", label: t('reports.isEmpty') },
+    { id: "is_not_empty", label: t('reports.isNotEmpty') },
   ],
-};
+});
 
-// Conditions de jointure
-const joinConditions = [
-  { id: "has_contract", label: "Doit avoir un contrat", source: "contrats" },
-  { id: "no_contract", label: "Ne doit pas avoir de contrat", source: "contrats" },
-  { id: "has_suivi", label: "Doit avoir un suivi", source: "suivis" },
-  { id: "no_suivi", label: "Ne doit pas avoir de suivi", source: "suivis" },
+// Conditions de jointure - will be translated in component
+const getJoinConditions = (t: any) => [
+  { id: "has_contract", label: t('reports.hasContract'), source: "contrats" },
+  { id: "no_contract", label: t('reports.noContract'), source: "contrats" },
+  { id: "has_suivi", label: t('reports.hasSuivi'), source: "suivis" },
+  { id: "no_suivi", label: t('reports.noSuivi'), source: "suivis" },
 ];
 
 interface SavedReport {
@@ -158,6 +158,12 @@ export default function CRMRapports() {
   const [activeTab, setActiveTab] = useState("adresses");
   const [collaborateurs, setCollaborateurs] = useState<any[]>([]);
 
+  // Translated lookup tables
+  const dataSources = getDataSources(t);
+  const fieldsBySource = getFieldsBySource(t);
+  const operatorsByFieldType = getOperatorsByFieldType(t);
+  const joinConditions = getJoinConditions(t);
+
   // État du nouveau rapport
   const [reportName, setReportName] = useState("");
   const [selectedSources, setSelectedSources] = useState<string[]>(["adresses"]);
@@ -191,11 +197,11 @@ export default function CRMRapports() {
 
   const handleCreateReport = () => {
     if (!reportName.trim()) {
-      toast.error("Veuillez entrer un nom pour le rapport");
+      toast.error(t('reports.reportNameRequired'));
       return;
     }
     if (selectedFields.length === 0) {
-      toast.error("Veuillez sélectionner au moins un champ");
+      toast.error(t('reports.selectFieldsRequired'));
       return;
     }
 
@@ -206,7 +212,7 @@ export default function CRMRapports() {
       selectedFields,
       filters,
       joinConditions: conditions,
-      createdBy: user?.email || "Utilisateur",
+      createdBy: user?.email || t('common.unknown'),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -214,7 +220,7 @@ export default function CRMRapports() {
     saveReportsToStorage([...savedReports, newReport]);
     resetForm();
     setIsNewReportOpen(false);
-    toast.success("Rapport créé avec succès");
+    toast.success(t('reports.reportCreated'));
   };
 
   const handleUpdateReport = () => {
@@ -229,13 +235,13 @@ export default function CRMRapports() {
     setSelectedReport(null);
     resetForm();
     setIsNewReportOpen(false);
-    toast.success("Rapport mis à jour");
+    toast.success(t('reports.reportUpdated'));
   };
 
   const handleDeleteReport = (id: string) => {
     const updated = savedReports.filter(r => r.id !== id);
     saveReportsToStorage(updated);
-    toast.success("Rapport supprimé");
+    toast.success(t('reports.reportDeleted'));
   };
 
   const resetForm = () => {
@@ -470,10 +476,10 @@ export default function CRMRapports() {
       }
       
       setReportResults(results);
-      toast.success(`${results.length} résultats trouvés`);
+      toast.success(t('reports.resultsFound', { count: results.length }));
     } catch (error: any) {
-      console.error("Erreur lors de l'exécution du rapport:", error);
-      toast.error("Erreur lors de l'exécution du rapport");
+      console.error("Error executing report:", error);
+      toast.error(t('reports.errorExecuting'));
       setReportResults([]);
     } finally {
       setIsExecuting(false);
@@ -496,7 +502,7 @@ export default function CRMRapports() {
       .from(element)
       .save();
     
-    toast.success("Export PDF généré");
+    toast.success(t('reports.pdfGenerated'));
   };
 
   const exportToExcel = () => {
@@ -516,7 +522,7 @@ export default function CRMRapports() {
     link.download = `rapport_${format(new Date(), "yyyy-MM-dd")}.csv`;
     link.click();
     
-    toast.success("Export Excel (CSV) généré");
+    toast.success(t('reports.excelGenerated'));
   };
 
   const openEditReport = (report: SavedReport) => {
@@ -593,13 +599,13 @@ export default function CRMRapports() {
                 <Input 
                   value={reportName} 
                   onChange={(e) => setReportName(e.target.value)}
-                  placeholder="Ex: Clients avec contrats santé 2025"
+                  placeholder={t('reports.reportNamePlaceholder')}
                 />
               </div>
 
               {/* Sélection des sources */}
               <div className="space-y-2">
-                <Label>Sources de données</Label>
+                <Label>{t('reports.dataSources')}</Label>
                 <div className="flex gap-2">
                   {dataSources.map(source => (
                     <Badge 
@@ -613,7 +619,7 @@ export default function CRMRapports() {
                     >
                       <source.icon className="h-4 w-4" />
                       {source.label}
-                      {source.required && <span className="text-xs opacity-70">(requis)</span>}
+                      {source.required && <span className="text-xs opacity-70">{t('reports.required')}</span>}
                     </Badge>
                   ))}
                 </div>
@@ -621,7 +627,7 @@ export default function CRMRapports() {
 
               {/* Conditions de jointure */}
               <div className="space-y-2">
-                <Label>Conditions</Label>
+                <Label>{t('reports.conditions')}</Label>
                 <div className="flex flex-wrap gap-2">
                   {joinConditions.map(cond => (
                     <Badge 
@@ -654,7 +660,7 @@ export default function CRMRapports() {
                   <TabsContent key={sourceId} value={sourceId} className="space-y-4 mt-4">
                     {/* Champs disponibles */}
                     <div className="space-y-2">
-                      <Label>Champs à afficher</Label>
+                      <Label>{t('reports.fieldsToDisplay')}</Label>
                       <div className="grid grid-cols-3 gap-2 p-4 border rounded-lg bg-muted/30 max-h-40 overflow-y-auto">
                         {fieldsBySource[sourceId]?.map(field => (
                           <div key={field.id} className="flex items-center space-x-2">
@@ -677,10 +683,10 @@ export default function CRMRapports() {
                     {/* Filtres pour cette source */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Filtres</Label>
+                        <Label>{t('reports.filters')}</Label>
                         <Button variant="outline" size="sm" onClick={() => addFilter(sourceId)}>
                           <Plus className="h-4 w-4 mr-1" />
-                          Ajouter un filtre
+                          {t('reports.addFilter')}
                         </Button>
                       </div>
                       
@@ -741,7 +747,7 @@ export default function CRMRapports() {
                                     <Input 
                                       value={filter.value}
                                       onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-                                      placeholder="Valeur..."
+                                      placeholder={t('reports.value')}
                                       className="flex-1"
                                     />
                                   )
@@ -760,7 +766,7 @@ export default function CRMRapports() {
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground p-3 border rounded-lg bg-muted/30 text-center">
-                          Aucun filtre pour cette source
+                          {t('reports.noResults')}
                         </p>
                       )}
                     </div>
@@ -771,7 +777,7 @@ export default function CRMRapports() {
               {/* Aperçu des champs sélectionnés */}
               {selectedFields.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Champs sélectionnés ({selectedFields.length})</Label>
+                  <Label>{t('reports.selectFields')} ({selectedFields.length})</Label>
                   <div className="flex flex-wrap gap-1">
                     {selectedFields.map(fieldId => (
                       <Badge key={fieldId} variant="secondary" className="gap-1">
@@ -789,11 +795,11 @@ export default function CRMRapports() {
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsNewReportOpen(false)}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={selectedReport ? handleUpdateReport : handleCreateReport}>
                   <Save className="h-4 w-4 mr-2" />
-                  {selectedReport ? "Mettre à jour" : "Enregistrer"}
+                  {selectedReport ? t('common.save') : t('common.save')}
                 </Button>
               </div>
             </div>
@@ -804,18 +810,18 @@ export default function CRMRapports() {
       {/* Liste des rapports */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Liste des rapports</CardTitle>
+          <CardTitle className="text-lg">{t('reports.savedReports')}</CardTitle>
         </CardHeader>
         <CardContent>
           {savedReports.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Sources</TableHead>
-                  <TableHead>Créé par</TableHead>
-                  <TableHead>Mise à jour</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('reports.dataSources')}</TableHead>
+                  <TableHead>{t('reports.createdBy')}</TableHead>
+                  <TableHead>{t('reports.lastModified')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -849,7 +855,7 @@ export default function CRMRapports() {
                           size="icon"
                           onClick={() => executeReport(report)}
                           disabled={isExecuting}
-                          title="Exécuter"
+                          title={t('reports.execute')}
                         >
                           <Play className="h-4 w-4" />
                         </Button>
@@ -857,7 +863,7 @@ export default function CRMRapports() {
                           variant="ghost" 
                           size="icon"
                           onClick={() => openEditReport(report)}
-                          title="Modifier"
+                          title={t('common.edit')}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -865,7 +871,7 @@ export default function CRMRapports() {
                           variant="ghost" 
                           size="icon"
                           onClick={() => handleDeleteReport(report.id)}
-                          title="Supprimer"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -878,9 +884,9 @@ export default function CRMRapports() {
           ) : (
             <div className="text-center py-12">
               <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Aucun rapport créé</p>
+              <p className="text-muted-foreground">{t('reports.noReports')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Cliquez sur "Nouveau rapport" pour créer votre premier rapport
+                {t('reports.noReportsDesc')}
               </p>
             </div>
           )}
