@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -57,6 +58,7 @@ const clientSchema = z.object({
 type ClientFormData = z.infer<typeof clientSchema>;
 
 export default function ClientForm() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { createClient, updateClient, getClientById } = useClients();
@@ -233,14 +235,14 @@ export default function ClientForm() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">
-            {id ? "Modifier l'adresse" : "Nouvelle adresse"}
+            {id ? t('clientForm.editAddress') : t('clientForm.newAddress')}
           </h1>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Informations de l'adresse</CardTitle>
+          <CardTitle>{t('clientForm.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -248,7 +250,7 @@ export default function ClientForm() {
               {/* Section Informations personnelles */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
-                  Informations personnelles
+                  {t('clientForm.personalInfo')}
                 </h3>
 
                 <FormField
@@ -499,7 +501,7 @@ export default function ClientForm() {
               {/* Section Coordonnées */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
-                  Coordonnées
+                  {t('clientForm.contactInfo')}
                 </h3>
 
                 <FormField
@@ -608,7 +610,7 @@ export default function ClientForm() {
               {/* Section Informations bancaires */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
-                  Informations bancaires
+                  {t('clientForm.bankInfo')}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -715,14 +717,14 @@ export default function ClientForm() {
 
               <div className="flex gap-4">
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Enregistrement..." : "Enregistrer"}
+                  {loading ? t('clientForm.saving') : t('clientForm.save')}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate("/crm/clients")}
                 >
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>

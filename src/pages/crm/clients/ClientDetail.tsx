@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useClients, Client } from "@/hooks/useClients";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 import { usePolicies, Policy } from "@/hooks/usePolicies";
@@ -88,6 +89,7 @@ const policyStatusLabels: Record<string, string> = {
 };
 
 export default function ClientDetail() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "info";
@@ -384,13 +386,13 @@ export default function ClientDetail() {
               className="gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              Créer espace client
+              {t('clientDetail.createClientSpace')}
             </Button>
           )}
           {hasClientPortal && client.user_id && client.type_adresse === 'client' && (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Espace client actif
+              {t('clientDetail.clientSpaceActive')}
             </Badge>
           )}
           <SendEmailDialog
@@ -400,7 +402,7 @@ export default function ClientDetail() {
           />
           <Button onClick={() => navigate(`/crm/clients/${id}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
-            Modifier
+            {t('common.edit')}
           </Button>
         </div>
       </div>
@@ -448,25 +450,25 @@ export default function ClientDetail() {
         <div>
           <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="flex-wrap h-auto gap-1">
-              <TabsTrigger value="info">Informations</TabsTrigger>
+              <TabsTrigger value="info">{t('clientDetail.personalInfo')}</TabsTrigger>
               <TabsTrigger value="family">
                 <Users className="h-4 w-4 mr-2" />
-                Famille ({familyMembers.length})
+                {t('clientDetail.family')} ({familyMembers.length})
               </TabsTrigger>
-              <TabsTrigger value="contracts">Contrats ({clientPolicies.length})</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="contracts">{t('clientDetail.contracts')} ({clientPolicies.length})</TabsTrigger>
+              <TabsTrigger value="documents">{t('clientDetail.documents')}</TabsTrigger>
               <TabsTrigger value="suivis">
                 <ClipboardList className="h-4 w-4 mr-2" />
-                Suivis
+                {t('clientDetail.followups')}
               </TabsTrigger>
               <TabsTrigger value="commissions">
                 <DollarSign className="h-4 w-4 mr-2" />
-                Commissions ({clientCommissions.length})
+                {t('clientDetail.commissions')} ({clientCommissions.length})
               </TabsTrigger>
               {hasMandateAutomation && (
                 <TabsTrigger value="mandat">
                   <FileSignature className="h-4 w-4 mr-2" />
-                  Mandat
+                  {t('clientDetail.mandate')}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -474,16 +476,16 @@ export default function ClientDetail() {
             <TabsContent value="info">
               <Card>
                 <CardHeader>
-                  <CardTitle>Informations personnelles</CardTitle>
+                  <CardTitle>{t('clientDetail.personalInfo')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Type</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.type')}</p>
                       <p className="font-medium capitalize">{client.type_adresse || "-"}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">État civil</p>
+                      <p className="text-sm text-muted-foreground">{t('clientDetail.civilStatus')}</p>
                       <p className="font-medium capitalize">{client.civil_status || "-"}</p>
                     </div>
                     <div className="space-y-2">
