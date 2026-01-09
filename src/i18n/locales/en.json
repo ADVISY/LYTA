@@ -177,6 +177,7 @@
     "canton": "Canton",
     "country": "Country",
     "company": "Company",
+    "companyName": "Company",
     "isCompany": "Business client",
     "assignedAgent": "Assigned agent",
     "tags": "Tags",
