@@ -112,16 +112,28 @@ const generateEmailHtml = (data: ContractData, branding: TenantBranding | null):
   const companyWebsite = branding?.company_website || '';
   const companyEmail = branding?.company_email || '';
 
+  // Generate download links for documents
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || '';
   const documentsHtml = data.documents && data.documents.length > 0 
     ? `
       <div style="margin-top: 24px;">
         <h3 style="color: ${secondaryColor}; margin-bottom: 12px;">📎 Documents joints (${data.documents.length})</h3>
         <ul style="list-style: none; padding: 0; margin: 0;">
-          ${data.documents.map(doc => `
-            <li style="padding: 8px 12px; background: #f8f9fa; margin-bottom: 4px; border-radius: 4px;">
-              📄 ${doc.file_name} <span style="color: #666; font-size: 12px;">(${doc.doc_kind || 'Document'})</span>
+          ${data.documents.map(doc => {
+            const downloadUrl = `${supabaseUrl}/storage/v1/object/public/documents/${doc.file_key}`;
+            return `
+            <li style="padding: 12px 16px; background: #f8f9fa; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid ${primaryColor};">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <strong style="color: #333;">📄 ${doc.file_name}</strong>
+                  <span style="color: #666; font-size: 12px; display: block;">${doc.doc_kind || 'Document'}</span>
+                </div>
+                <a href="${downloadUrl}" target="_blank" style="display: inline-block; padding: 8px 16px; background: ${primaryColor}; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500;">
+                  ⬇️ Télécharger
+                </a>
+              </div>
             </li>
-          `).join('')}
+          `}).join('')}
         </ul>
       </div>
     `
