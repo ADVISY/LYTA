@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +93,7 @@ const getTauxImpotSource = (canton: string | null, civilStatus: string | null): 
 };
 
 export default function CRMCompta() {
+  const { t } = useTranslation();
   const { commissions, loading: loadingCommissions } = useCommissions();
   const { fetchCommissionParts } = useCommissionParts();
   const { collaborateurs, loading: loadingCollaborateurs } = useCollaborateursCommission();
@@ -842,9 +844,9 @@ export default function CRMCompta() {
           </div>
           <div className="flex-1">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Comptabilité
+              {t('accounting.title')}
             </h1>
-            <p className="text-muted-foreground">Décomptes de commissions et fiches de salaire</p>
+            <p className="text-muted-foreground">{t('accounting.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -854,12 +856,12 @@ export default function CRMCompta() {
         <TabsList className={cn("grid w-full max-w-md", hasPayrollAccess ? "grid-cols-2" : "grid-cols-1")}>
           <TabsTrigger value="decomptes" className="gap-2">
             <FileText className="h-4 w-4" />
-            Décomptes
+            {t('accounting.statements')}
           </TabsTrigger>
           {hasPayrollAccess && (
             <TabsTrigger value="salaires" className="gap-2">
               <DollarSign className="h-4 w-4" />
-              Fiches de salaire
+              {t('accounting.payslips')}
             </TabsTrigger>
           )}
         </TabsList>
@@ -870,27 +872,27 @@ export default function CRMCompta() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Générer des décomptes de commissions
+                {t('accounting.generateStatements')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Date de début</Label>
+                  <Label>{t('accounting.periodStart')}</Label>
                   <Input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Date de fin</Label>
+                  <Label>{t('accounting.periodEnd')}</Label>
                   <Input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} />
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Sélectionner les collaborateurs</Label>
+                  <Label>{t('accounting.selectCollaborators')}</Label>
                   <Button variant="outline" size="sm" onClick={selectAllCollaborateurs} className="gap-2">
                     <CheckSquare className="h-4 w-4" />
-                    {selectedCollaborateurs.length === collaborateurs.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    {selectedCollaborateurs.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
                   </Button>
                 </div>
                 

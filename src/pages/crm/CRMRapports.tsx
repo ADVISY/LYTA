@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +147,7 @@ interface ReportFilter {
 }
 
 export default function CRMRapports() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [isNewReportOpen, setIsNewReportOpen] = useState(false);
@@ -559,8 +561,8 @@ export default function CRMRapports() {
             <BarChart3 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Rapports</h1>
-            <p className="text-muted-foreground text-sm">Créez et gérez vos rapports personnalisés</p>
+            <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
+            <p className="text-muted-foreground text-sm">{t('reports.subtitle')}</p>
           </div>
         </div>
         
@@ -574,20 +576,20 @@ export default function CRMRapports() {
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Nouveau rapport
+              {t('reports.newReport')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {selectedReport ? "Modifier le rapport" : "Nouveau rapport"}
+                {selectedReport ? t('reports.editReport') : t('reports.newReport')}
               </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-6 py-4">
               {/* Nom du rapport */}
               <div className="space-y-2">
-                <Label>Nom du rapport</Label>
+                <Label>{t('reports.reportName')}</Label>
                 <Input 
                   value={reportName} 
                   onChange={(e) => setReportName(e.target.value)}

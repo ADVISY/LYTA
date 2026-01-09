@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,7 @@ const roleBadgeColors: Record<string, string> = {
 };
 
 export default function CRMParametres() {
+  const { t } = useTranslation();
   const { user, session } = useAuth();
   const { tenantId } = useUserTenant();
   const tenantSeats = useTenantSeats();
@@ -521,8 +523,8 @@ export default function CRMParametres() {
           <Settings className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Paramètres</h1>
-          <p className="text-muted-foreground text-sm">Configurez votre CRM</p>
+          <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('nav.settings')}</p>
         </div>
       </div>
 
@@ -530,39 +532,39 @@ export default function CRMParametres() {
         <TabsList className="flex flex-wrap gap-1 h-auto w-full max-w-4xl">
           <TabsTrigger value="profil" className="gap-2">
             <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profil</span>
+            <span className="hidden sm:inline">{t('settings.profile')}</span>
           </TabsTrigger>
           <TabsTrigger value="comptes" className="gap-2">
             <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Comptes</span>
+            <span className="hidden sm:inline">{t('settings.accounts')}</span>
           </TabsTrigger>
           <TabsTrigger value="roles" className="gap-2">
             <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Rôles</span>
+            <span className="hidden sm:inline">{t('settings.roles')}</span>
           </TabsTrigger>
           <TabsTrigger value="utilisateurs" className="gap-2">
             <KeyRound className="h-4 w-4" />
-            <span className="hidden sm:inline">Permissions</span>
+            <span className="hidden sm:inline">{t('collaborators.permissions')}</span>
           </TabsTrigger>
           <TabsTrigger value="compagnies" className="gap-2">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Compagnies</span>
+            <span className="hidden sm:inline">{t('settings.companies')}</span>
           </TabsTrigger>
           <TabsTrigger value="produits" className="gap-2">
             <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Produits</span>
+            <span className="hidden sm:inline">{t('settings.products')}</span>
           </TabsTrigger>
           <TabsTrigger value="commissions" className="gap-2">
             <Percent className="h-4 w-4" />
-            <span className="hidden sm:inline">Commissions</span>
+            <span className="hidden sm:inline">{t('nav.commissions')}</span>
           </TabsTrigger>
           <TabsTrigger value="apparence" className="gap-2">
             <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Apparence</span>
+            <span className="hidden sm:inline">{t('settings.appearance')}</span>
           </TabsTrigger>
           <TabsTrigger value="emails" className="gap-2">
             <Mail className="h-4 w-4" />
-            <span className="hidden sm:inline">Emails</span>
+            <span className="hidden sm:inline">{t('emails.title')}</span>
           </TabsTrigger>
         </TabsList>
 
