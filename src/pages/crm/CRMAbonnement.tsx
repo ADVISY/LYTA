@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { usePlanFeatures, useTenantSeats } from '@/hooks/usePlanFeatures';
 import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, getPlansInOrder, PlanModule } from '@/config/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ const PLAN_ICONS: Record<string, typeof Crown> = {
 };
 
 export default function CRMAbonnement() {
+  const { t } = useTranslation();
   const { 
     plan, 
     planDisplayName, 
@@ -61,21 +63,30 @@ export default function CRMAbonnement() {
 
   const PlanIcon = PLAN_ICONS[plan] || Zap;
 
+  const getBillingStatusLabel = () => {
+    switch (billingStatus) {
+      case 'paid': return t('subscription.paid');
+      case 'trial': return t('subscription.trial');
+      case 'past_due': return t('subscription.pastDue');
+      default: return t('subscription.cancelled');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Abonnement</h1>
-        <p className="text-muted-foreground">Gérez votre abonnement et vos utilisateurs</p>
+        <h1 className="text-2xl font-bold">{t('subscription.title')}</h1>
+        <p className="text-muted-foreground">{t('subscription.subtitle')}</p>
       </div>
 
       {/* Alerts */}
       {billingStatus === 'past_due' && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Paiement en retard</AlertTitle>
+          <AlertTitle>{t('subscription.paymentOverdue')}</AlertTitle>
           <AlertDescription>
-            Votre paiement est en retard. Veuillez régulariser votre situation pour éviter une suspension.
+            {t('subscription.paymentOverdueDesc')}
           </AlertDescription>
         </Alert>
       )}
@@ -83,9 +94,9 @@ export default function CRMAbonnement() {
       {billingStatus === 'trial' && (
         <Alert>
           <Zap className="h-4 w-4" />
-          <AlertTitle>Période d'essai</AlertTitle>
+          <AlertTitle>{t('subscription.trialPeriod')}</AlertTitle>
           <AlertDescription>
-            Vous êtes actuellement en période d'essai. Profitez de toutes les fonctionnalités !
+            {t('subscription.trialPeriodDesc')}
           </AlertDescription>
         </Alert>
       )}
@@ -93,10 +104,10 @@ export default function CRMAbonnement() {
       {extraUsers > 0 && (
         <Alert>
           <Users className="h-4 w-4" />
-          <AlertTitle>Utilisateurs supplémentaires</AlertTitle>
+          <AlertTitle>{t('subscription.extra')}</AlertTitle>
           <AlertDescription>
-            Vous avez {extraUsers} utilisateur(s) supplémentaire(s) au-delà de votre quota inclus.
-            Coût estimé : <strong>{estimatedCost} CHF/mois</strong>
+            {t('subscription.extraUsersAlert', { count: extraUsers })}
+            {' '}{t('subscription.estimatedExtraCost')}: <strong>{estimatedCost} CHF/{t('common.month')}</strong>
           </AlertDescription>
         </Alert>
       )}
@@ -107,33 +118,31 @@ export default function CRMAbonnement() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlanIcon className="h-5 w-5 text-primary" />
-              Votre offre
+              {t('subscription.yourPlan')}
             </CardTitle>
-            <CardDescription>Détails de votre abonnement actuel</CardDescription>
+            <CardDescription>{t('subscription.currentPlanDetails')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Plan</span>
+              <span className="text-muted-foreground">{t('subscription.plan')}</span>
               <Badge variant="default" className="text-sm">
                 {planDisplayName}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Statut</span>
+              <span className="text-muted-foreground">{t('subscription.status')}</span>
               <Badge variant={planStatus === 'active' ? 'default' : 'destructive'}>
-                {planStatus === 'active' ? 'Actif' : 'Suspendu'}
+                {planStatus === 'active' ? t('subscription.active') : t('subscription.suspended')}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Facturation</span>
+              <span className="text-muted-foreground">{t('subscription.billing')}</span>
               <Badge variant={
                 billingStatus === 'paid' ? 'default' : 
                 billingStatus === 'trial' ? 'secondary' : 
                 'destructive'
               }>
-                {billingStatus === 'paid' ? 'Payé' : 
-                 billingStatus === 'trial' ? 'Essai' : 
-                 billingStatus === 'past_due' ? 'En retard' : 'Annulé'}
+                {getBillingStatusLabel()}
               </Badge>
             </div>
             <div className="pt-4 border-t">
@@ -142,7 +151,7 @@ export default function CRMAbonnement() {
               </p>
               <Button variant="outline" className="w-full gap-2">
                 <ArrowUpRight className="h-4 w-4" />
-                Voir les autres offres
+                {t('subscription.viewOtherPlans')}
               </Button>
             </div>
           </CardContent>
@@ -153,33 +162,33 @@ export default function CRMAbonnement() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Utilisateurs
+              {t('subscription.users')}
             </CardTitle>
-            <CardDescription>Gestion des sièges utilisateurs</CardDescription>
+            <CardDescription>{t('subscription.usersManagement')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Utilisateurs actifs</span>
+              <span className="text-muted-foreground">{t('subscription.activeUsers')}</span>
               <span className="font-semibold">{activeUsers}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Inclus dans l'offre</span>
+              <span className="text-muted-foreground">{t('subscription.includedInPlan')}</span>
               <span className="font-semibold">{seatsIncluded}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Supplémentaires</span>
+              <span className="text-muted-foreground">{t('subscription.extra')}</span>
               <span className={extraUsers > 0 ? 'font-semibold text-amber-600' : 'font-semibold'}>
                 {extraUsers}
               </span>
             </div>
             <div className="flex items-center justify-between pt-4 border-t">
-              <span className="text-muted-foreground">Prix par utilisateur sup.</span>
-              <span className="font-semibold">{seatsPrice} CHF/mois</span>
+              <span className="text-muted-foreground">{t('subscription.pricePerExtraUser')}</span>
+              <span className="font-semibold">{seatsPrice} CHF/{t('common.month')}</span>
             </div>
             {extraUsers > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Coût supplémentaire estimé</span>
-                <span className="font-bold text-amber-600">{estimatedCost} CHF/mois</span>
+                <span className="text-muted-foreground">{t('subscription.estimatedExtraCost')}</span>
+                <span className="font-bold text-amber-600">{estimatedCost} CHF/{t('common.month')}</span>
               </div>
             )}
           </CardContent>
@@ -189,9 +198,9 @@ export default function CRMAbonnement() {
       {/* Modules */}
       <Card>
         <CardHeader>
-          <CardTitle>Modules inclus</CardTitle>
+          <CardTitle>{t('subscription.includedModules')}</CardTitle>
           <CardDescription>
-            Fonctionnalités disponibles avec votre offre {planDisplayName}
+            {t('subscription.modulesDescription', { plan: planDisplayName })}
           </CardDescription>
         </CardHeader>
         <CardContent>
