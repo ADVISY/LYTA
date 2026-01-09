@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserTenant } from "@/hooks/useUserTenant";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
@@ -57,6 +58,7 @@ const roleBadgeColors: Record<string, string> = {
 
 export default function CRMParametres() {
   const { user, session } = useAuth();
+  const { tenantId } = useUserTenant();
   const [activeTab, setActiveTab] = useState("profil");
   
   // Profil
@@ -120,9 +122,11 @@ export default function CRMParametres() {
     loadCompanies();
     loadProducts();
     loadSettings();
-    loadUserAccounts();
-    loadCollaborateurs();
-  }, [user]);
+    if (tenantId) {
+      loadUserAccounts();
+      loadCollaborateurs();
+    }
+  }, [user, tenantId]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -170,7 +174,27 @@ export default function CRMParametres() {
   };
 
   const loadUserAccounts = async () => {
-    // Get all user accounts with their roles and linked collaborateurs
+    if (!tenantId) return;
+
+    // Get user IDs assigned to this tenant
+    const { data: tenantUsers, error: tenantError } = await supabase
+      .from("user_tenant_assignments")
+      .select("user_id")
+      .eq("tenant_id", tenantId);
+
+    if (tenantError) {
+      console.error("Error loading tenant users:", tenantError);
+      return;
+    }
+
+    const tenantUserIds = tenantUsers?.map(tu => tu.user_id) || [];
+    
+    if (tenantUserIds.length === 0) {
+      setUserAccounts([]);
+      return;
+    }
+
+    // Get user accounts with their roles filtered by tenant users
     const { data: roles, error } = await supabase
       .from("user_roles")
       .select(`
@@ -185,6 +209,7 @@ export default function CRMParametres() {
           last_name
         )
       `)
+      .in("user_id", tenantUserIds)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -192,11 +217,12 @@ export default function CRMParametres() {
       return;
     }
 
-    // Get linked collaborateurs
+    // Get linked collaborateurs for this tenant
     const { data: linkedCollabs } = await supabase
       .from("clients")
       .select("id, user_id, first_name, last_name")
       .eq("type_adresse", "collaborateur")
+      .eq("tenant_id", tenantId)
       .not("user_id", "is", null);
 
     const collabMap = new Map();
@@ -213,11 +239,14 @@ export default function CRMParametres() {
   };
 
   const loadCollaborateurs = async () => {
-    // Get collaborateurs without linked user accounts
+    if (!tenantId) return;
+    
+    // Get collaborateurs without linked user accounts for this tenant
     const { data } = await supabase
       .from("clients")
       .select("id, first_name, last_name, email")
       .eq("type_adresse", "collaborateur")
+      .eq("tenant_id", tenantId)
       .is("user_id", null)
       .order("last_name");
     
