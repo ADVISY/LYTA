@@ -64,31 +64,47 @@ serve(async (req) => {
       partnerId = partnerRecord?.id || null
       tenantId = collaborateur.tenant_id
     } else {
-      // Check if user is an admin via profiles + user_roles
-      const { data: profile } = await supabaseAdmin
+      // Check if user is an admin/agent via profiles + user_roles
+      const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('email', normalizedEmail)
         .maybeSingle()
 
+      if (profileError) {
+        console.error('Database error (profile):', profileError)
+      }
+
       if (profile) {
-        const { data: roles } = await supabaseAdmin
+        // NOTE: user can have multiple roles rows → do NOT use maybeSingle()
+        const { data: rolesRows, error: rolesError } = await supabaseAdmin
           .from('user_roles')
           .select('role, tenant_id')
           .eq('user_id', profile.id)
           .in('role', ['admin', 'manager', 'agent', 'partner'])
-          .maybeSingle()
 
-        if (roles) {
-          tenantId = roles.tenant_id
+        if (rolesError) {
+          console.error('Database error (roles):', rolesError)
+        }
+
+        const roleRow = Array.isArray(rolesRows)
+          ? (rolesRows.find((r) => r?.tenant_id) ?? rolesRows[0])
+          : null
+
+        if (roleRow?.tenant_id) {
+          tenantId = roleRow.tenant_id
 
           // Check if this user has a partner record
-          const { data: partnerRecord } = await supabaseAdmin
+          const { data: partnerRecord, error: partnerError } = await supabaseAdmin
             .from('partners')
             .select('id')
             .eq('user_id', profile.id)
             .maybeSingle()
-          
+
+          if (partnerError) {
+            console.error('Database error (partner):', partnerError)
+          }
+
           partnerId = partnerRecord?.id || null
         }
       }

@@ -283,7 +283,9 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch tenant info and branding
-    let emails = notificationEmails || [];
+    let emails = (notificationEmails || [])
+      .map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
+      .filter((e) => e);
     let branding: TenantBranding | null = null;
     let tenantName = 'LYTA';
     
@@ -317,7 +319,10 @@ const handler = async (req: Request): Promise<Response> => {
       } else if (tenant) {
         tenantName = tenant.name;
         if (tenant.contract_notification_emails) {
-          emails = tenant.contract_notification_emails.filter((e: string) => e && e.trim());
+          const tenantEmails = tenant.contract_notification_emails
+            .map((e: string) => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
+            .filter((e: string) => e);
+          emails = Array.from(new Set([...emails, ...tenantEmails]));
         }
         if (tenant.tenant_branding && tenant.tenant_branding.length > 0) {
           branding = tenant.tenant_branding[0];

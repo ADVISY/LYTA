@@ -360,7 +360,7 @@ export default function DeposerContrat() {
 
   const sendContractDepositEmail = async (formType: string, formData: any, documents: any[]) => {
     try {
-      await supabase.functions.invoke('send-contract-deposit-email', {
+      const { data, error } = await supabase.functions.invoke('send-contract-deposit-email', {
         body: {
           contractData: {
             formType,
@@ -372,12 +372,22 @@ export default function DeposerContrat() {
             agentEmail: partnerEmail,
             formData,
             documents: documents.map(d => ({ file_name: d.file_name, doc_kind: d.doc_kind, file_key: d.file_key })),
-            tenantSlug: 'lyta',
-          }
+            tenantSlug: tenant?.slug,
+          },
+          // Always notify the submitting collaborator as a minimum
+          notificationEmails: [partnerEmail.trim().toLowerCase()].filter(Boolean),
         }
       });
-    } catch (error) {
+
+      if (error) {
+        console.error('Error sending contract deposit email:', error);
+        return { ok: false, error: error.message };
+      }
+
+      return { ok: true, data };
+    } catch (error: any) {
       console.error('Error sending contract deposit email:', error);
+      return { ok: false, error: error?.message || 'Unknown error' };
     }
   };
 
