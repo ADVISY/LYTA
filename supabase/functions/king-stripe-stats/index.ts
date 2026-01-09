@@ -23,29 +23,48 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
   try {
-    // Verify King role
+    // Verify King role using the token from the request
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      throw new Error("No authorization header");
+    }
     
     const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await supabaseClient.auth.getUser(token);
-    if (claimsError || !data?.user) throw new Error(`Auth error: ${claimsError?.message || 'User not found'}`);
+    console.log("Token received, verifying user...");
+    
+    // Create Supabase client with service role for admin operations
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+    
+    const { data, error: claimsError } = await supabaseAdmin.auth.getUser(token);
+    if (claimsError) {
+      console.error("Auth error:", claimsError);
+      throw new Error(`Auth error: ${claimsError.message}`);
+    }
+    if (!data?.user) {
+      console.error("User not found from token");
+      throw new Error("Auth error: User not found");
+    }
     
     const user = data.user;
+    console.log("User verified:", user.id);
     
     // Check if user is King
-    const { data: roleData } = await supabaseClient
+    const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'king')
       .single();
+    
+    if (roleError) {
+      console.error("Role check error:", roleError);
+    }
     
     if (!roleData) throw new Error("Unauthorized: King role required");
 

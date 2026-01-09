@@ -2661,7 +2661,9 @@ export type Database = {
           contact_name: string | null
           contract_notification_emails: string[] | null
           created_at: string
+          current_period_end: string | null
           email: string | null
+          extra_users: number | null
           id: string
           legal_name: string | null
           name: string
@@ -2676,7 +2678,9 @@ export type Database = {
           seats_price: number | null
           slug: string
           status: string
+          stripe_customer_id: string | null
           stripe_session_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2687,7 +2691,9 @@ export type Database = {
           contact_name?: string | null
           contract_notification_emails?: string[] | null
           created_at?: string
+          current_period_end?: string | null
           email?: string | null
+          extra_users?: number | null
           id?: string
           legal_name?: string | null
           name: string
@@ -2702,7 +2708,9 @@ export type Database = {
           seats_price?: number | null
           slug: string
           status?: string
+          stripe_customer_id?: string | null
           stripe_session_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2713,7 +2721,9 @@ export type Database = {
           contact_name?: string | null
           contract_notification_emails?: string[] | null
           created_at?: string
+          current_period_end?: string | null
           email?: string | null
+          extra_users?: number | null
           id?: string
           legal_name?: string | null
           name?: string
@@ -2728,7 +2738,9 @@ export type Database = {
           seats_price?: number | null
           slug?: string
           status?: string
+          stripe_customer_id?: string | null
           stripe_session_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Relationships: []

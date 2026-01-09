@@ -18,11 +18,14 @@ import {
   AlertCircle,
   Plus,
   X,
-  Mail
+  Mail,
+  CreditCard,
+  Calendar
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { TenantPlan, PLAN_CONFIGS } from "@/config/plans";
 import {
   Select,
   SelectContent,
@@ -42,6 +45,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 export default function KingTenantDetail() {
   const { tenantId } = useParams();
@@ -69,6 +74,15 @@ export default function KingTenantDetail() {
     display_name: "",
     email_sender_name: "",
     email_sender_address: "",
+  });
+
+  const [subscriptionData, setSubscriptionData] = useState({
+    plan: "start" as TenantPlan,
+    extra_users: 0,
+    billing_status: "pending",
+    stripe_customer_id: "",
+    stripe_subscription_id: "",
+    current_period_end: null as string | null,
   });
 
   // Fetch tenant data
@@ -143,6 +157,16 @@ export default function KingTenantDetail() {
           email_sender_address: tenant.tenant_branding[0].email_sender_address || "",
         });
       }
+
+      // Set subscription data
+      setSubscriptionData({
+        plan: (tenant.plan as TenantPlan) || "start",
+        extra_users: tenant.extra_users || 0,
+        billing_status: tenant.billing_status || "pending",
+        stripe_customer_id: tenant.stripe_customer_id || "",
+        stripe_subscription_id: tenant.stripe_subscription_id || "",
+        current_period_end: tenant.current_period_end || null,
+      });
     }
   }, [tenant]);
 
@@ -211,6 +235,41 @@ export default function KingTenantDetail() {
       toast({
         title: "Erreur",
         description: "Impossible de mettre à jour le branding.",
+        variant: "destructive",
+      });
+      console.error(error);
+    },
+  });
+
+  // Update subscription mutation
+  const updateSubscription = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('tenants')
+        .update({
+          plan: subscriptionData.plan,
+          extra_users: subscriptionData.extra_users,
+          billing_status: subscriptionData.billing_status as "canceled" | "paid" | "past_due" | "trial",
+          stripe_customer_id: subscriptionData.stripe_customer_id || null,
+          stripe_subscription_id: subscriptionData.stripe_subscription_id || null,
+          current_period_end: subscriptionData.current_period_end || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenantId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+      toast({
+        title: "Abonnement mis à jour",
+        description: "Les informations d'abonnement ont été enregistrées.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour l'abonnement.",
         variant: "destructive",
       });
       console.error(error);
@@ -345,6 +404,10 @@ export default function KingTenantDetail() {
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Général
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Abonnement
           </TabsTrigger>
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
@@ -559,6 +622,177 @@ export default function KingTenantDetail() {
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {updateTenant.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Subscription Tab */}
+        <TabsContent value="subscription">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-amber-500" />
+                Abonnement Stripe
+              </CardTitle>
+              <CardDescription>
+                Plan, facturation et identifiants Stripe
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Current Plan Summary */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="p-4 rounded-lg border bg-gradient-to-br from-amber-500/10 to-amber-500/5">
+                  <p className="text-sm text-muted-foreground">Plan actuel</p>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {PLAN_CONFIGS[subscriptionData.plan]?.displayName || subscriptionData.plan}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    CHF {PLAN_CONFIGS[subscriptionData.plan]?.monthlyPrice || 0}/mois
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Utilisateurs supp.</p>
+                  <p className="text-2xl font-bold">{subscriptionData.extra_users}</p>
+                  <p className="text-sm text-muted-foreground">
+                    +CHF {subscriptionData.extra_users * (PLAN_CONFIGS[subscriptionData.plan]?.extraSeatPrice || 20)}/mois
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Total mensuel</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    CHF {(PLAN_CONFIGS[subscriptionData.plan]?.monthlyPrice || 0) + 
+                         (subscriptionData.extra_users * (PLAN_CONFIGS[subscriptionData.plan]?.extraSeatPrice || 20))}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {subscriptionData.billing_status === 'paid' ? '✓ Payé' : 
+                     subscriptionData.billing_status === 'trial' ? '⏱ Essai' :
+                     subscriptionData.billing_status === 'past_due' ? '⚠️ En retard' :
+                     subscriptionData.billing_status === 'canceled' ? '✕ Annulé' : '⏳ En attente'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Subscription Details */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="plan">Plan</Label>
+                  <Select 
+                    value={subscriptionData.plan} 
+                    onValueChange={(value: TenantPlan) => setSubscriptionData({ ...subscriptionData, plan: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PLAN_CONFIGS).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>
+                          {config.displayName} - CHF {config.monthlyPrice}/mois
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="extra_users">Utilisateurs supplémentaires</Label>
+                  <Input
+                    id="extra_users"
+                    type="number"
+                    min="0"
+                    value={subscriptionData.extra_users}
+                    onChange={(e) => setSubscriptionData({ ...subscriptionData, extra_users: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="billing_status">Statut facturation</Label>
+                  <Select 
+                    value={subscriptionData.billing_status} 
+                    onValueChange={(value) => setSubscriptionData({ ...subscriptionData, billing_status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="trial">Essai</SelectItem>
+                      <SelectItem value="paid">Payé</SelectItem>
+                      <SelectItem value="past_due">En retard</SelectItem>
+                      <SelectItem value="canceled">Annulé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="current_period_end">Fin de période</Label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="current_period_end"
+                      type="date"
+                      value={subscriptionData.current_period_end ? subscriptionData.current_period_end.split('T')[0] : ''}
+                      onChange={(e) => setSubscriptionData({ 
+                        ...subscriptionData, 
+                        current_period_end: e.target.value ? new Date(e.target.value).toISOString() : null 
+                      })}
+                    />
+                  </div>
+                  {subscriptionData.current_period_end && (
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(subscriptionData.current_period_end), "d MMMM yyyy", { locale: fr })}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Stripe IDs */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-semibold">Identifiants Stripe</Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="stripe_customer_id">Customer ID</Label>
+                    <Input
+                      id="stripe_customer_id"
+                      placeholder="cus_..."
+                      value={subscriptionData.stripe_customer_id}
+                      onChange={(e) => setSubscriptionData({ ...subscriptionData, stripe_customer_id: e.target.value })}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stripe_subscription_id">Subscription ID</Label>
+                    <Input
+                      id="stripe_subscription_id"
+                      placeholder="sub_..."
+                      value={subscriptionData.stripe_subscription_id}
+                      onChange={(e) => setSubscriptionData({ ...subscriptionData, stripe_subscription_id: e.target.value })}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+                {subscriptionData.stripe_customer_id && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a 
+                      href={`https://dashboard.stripe.com/customers/${subscriptionData.stripe_customer_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Voir sur Stripe
+                    </a>
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button 
+                  onClick={() => updateSubscription.mutate()}
+                  disabled={updateSubscription.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {updateSubscription.isPending ? "Enregistrement..." : "Enregistrer l'abonnement"}
                 </Button>
               </div>
             </CardContent>
