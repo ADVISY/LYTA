@@ -63,24 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.user) {
-      // Check if user requires SMS verification (king or admin)
-      const { data: requiresVerification } = await supabase.rpc(
-        "requires_sms_verification",
-        { p_user_id: data.user.id }
-      );
+      // OPTIMIZATION: Check SMS verification and get phone in PARALLEL
+      const [smsCheck, profileCheck] = await Promise.all([
+        supabase.rpc("requires_sms_verification", { p_user_id: data.user.id }),
+        supabase.from("profiles").select("phone").eq("id", data.user.id).maybeSingle()
+      ]);
 
-      if (requiresVerification) {
-        // Get user phone number from profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("phone")
-          .eq("id", data.user.id)
-          .single();
-
-        const phoneNumber = profile?.phone || data.user.phone;
+      if (smsCheck.data) {
+        const phoneNumber = profileCheck.data?.phone || data.user.phone;
 
         if (!phoneNumber) {
-          // No phone number, can't verify - sign out and return error
           await supabase.auth.signOut();
           return { 
             error: { 
@@ -89,8 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        // DON'T sign out - keep session alive for SMS verification
-        // Store pending verification
         setPendingSmsVerification({
           userId: data.user.id,
           phoneNumber,

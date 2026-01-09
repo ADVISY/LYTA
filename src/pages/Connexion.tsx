@@ -408,40 +408,21 @@ const Connexion = () => {
     }
   }, [smsVerificationData, showSmsVerification]);
 
-  const checkSubdomainReachable = async (url: string): Promise<boolean> => {
-    try {
-      const controller = new AbortController();
-      // Reduced timeout from 3s to 1s for faster fallback
-      const timeoutId = setTimeout(() => controller.abort(), 1000);
-      await fetch(`${url}/cdn-cgi/trace`, { method: 'HEAD', mode: 'no-cors', signal: controller.signal });
-      clearTimeout(timeoutId);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  // Removed checkSubdomainReachable - was causing unnecessary delay
 
   const redirectToTenantSubdomain = async (userId: string) => {
     try {
+      // OPTIMIZATION: Get assignment with tenant slug in ONE query using join
       const { data: assignment } = await supabase
         .from('user_tenant_assignments')
-        .select('tenant_id')
+        .select('tenant_id, tenants(slug)')
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (!assignment?.tenant_id) {
-        navigate("/crm");
-        return;
-      }
-
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('slug')
-        .eq('id', assignment.tenant_id)
-        .maybeSingle();
-
-      if (!tenantData?.slug) {
-        navigate("/crm");
+      const tenantSlug = (assignment?.tenants as any)?.slug;
+      
+      if (!tenantSlug) {
+        navigate("/crm", { replace: true });
         return;
       }
 
@@ -449,22 +430,16 @@ const Connexion = () => {
       const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
       
       if (isLocalhost) {
-        navigate(`/crm?tenant=${tenantData.slug}`);
+        navigate(`/crm?tenant=${tenantSlug}`, { replace: true });
       } else {
+        // Skip subdomain check for faster redirect - just go directly
         const protocol = window.location.protocol;
         const baseDomain = hostname.split('.').slice(-2).join('.');
-        const tenantUrl = `${protocol}//${tenantData.slug}.${baseDomain}`;
-        const isReachable = await checkSubdomainReachable(tenantUrl);
-        
-        if (isReachable) {
-          window.location.href = `${tenantUrl}/crm`;
-        } else {
-          navigate(`/crm?tenant=${tenantData.slug}`);
-        }
+        window.location.href = `${protocol}//${tenantSlug}.${baseDomain}/crm`;
       }
     } catch (error) {
       console.error('Error redirecting to tenant:', error);
-      navigate("/crm");
+      navigate("/crm", { replace: true });
     }
   };
 
