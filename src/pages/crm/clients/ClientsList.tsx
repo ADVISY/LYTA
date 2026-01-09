@@ -33,21 +33,11 @@ import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircl
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
+import { useTranslation } from "react-i18next";
 
-const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  prospect: { label: "Prospect", color: "text-blue-700", bgColor: "bg-blue-100" },
-  actif: { label: "Actif", color: "text-emerald-700", bgColor: "bg-emerald-100" },
-  résilié: { label: "Résilié", color: "text-slate-700", bgColor: "bg-slate-100" },
-  dormant: { label: "Dormant", color: "text-amber-700", bgColor: "bg-amber-100" },
-};
-
-const typeConfig = [
-  { value: "client", label: "Clients", icon: Users, color: "from-blue-500 to-blue-600" },
-  { value: "collaborateur", label: "Collaborateurs", icon: Briefcase, color: "from-emerald-500 to-emerald-600" },
-  { value: "partenaire", label: "Partenaires", icon: Building2, color: "from-violet-500 to-purple-600" },
-];
 
 export default function ClientsList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { clients, loading, deleteClient, fetchClients } = useClients();
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +45,19 @@ export default function ClientsList() {
   const [typeFilter, setTypeFilter] = useState<string>("client");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+
+  const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+    prospect: { label: t('clients.prospect'), color: "text-blue-700", bgColor: "bg-blue-100" },
+    actif: { label: t('clients.active'), color: "text-emerald-700", bgColor: "bg-emerald-100" },
+    résilié: { label: t('clients.terminated'), color: "text-slate-700", bgColor: "bg-slate-100" },
+    dormant: { label: t('clients.dormant'), color: "text-amber-700", bgColor: "bg-amber-100" },
+  };
+
+  const typeConfig = [
+    { value: "client", label: t('clients.clients'), icon: Users, color: "from-blue-500 to-blue-600" },
+    { value: "collaborateur", label: t('collaborators.title'), icon: Briefcase, color: "from-emerald-500 to-emerald-600" },
+    { value: "partenaire", label: t('clients.partners'), icon: Building2, color: "from-violet-500 to-purple-600" },
+  ];
 
   useEffect(() => {
     fetchClients(typeFilter);
@@ -89,7 +92,7 @@ export default function ClientsList() {
     }
     return client.profile?.first_name && client.profile?.last_name
       ? `${client.profile.first_name} ${client.profile.last_name}`
-      : "Sans nom";
+      : t('common.noName');
   };
 
   const currentType = typeConfig.find(t => t.value === typeFilter) || typeConfig[0];
@@ -114,7 +117,7 @@ export default function ClientsList() {
             <currentType.icon className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Adresses</h1>
+            <h1 className="text-3xl font-bold">{t('clients.addresses')}</h1>
             <p className="text-muted-foreground">
               {filteredClients.length} {currentType.label.toLowerCase()}
             </p>
@@ -125,7 +128,7 @@ export default function ClientsList() {
           className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20"
         >
           <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
-          Nouvelle adresse
+          {t('clients.newAddress')}
         </Button>
       </div>
 
@@ -156,7 +159,7 @@ export default function ClientsList() {
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par nom, prénom, email..."
+                placeholder={t('common.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-11 h-11 bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/20"
@@ -164,14 +167,14 @@ export default function ClientsList() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[200px] h-11 bg-muted/50 border-0">
-                <SelectValue placeholder="Statut" />
+                <SelectValue placeholder={t('common.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="prospect">Prospect</SelectItem>
-                <SelectItem value="actif">Actif</SelectItem>
-                <SelectItem value="résilié">Résilié</SelectItem>
-                <SelectItem value="dormant">Dormant</SelectItem>
+                <SelectItem value="all">{t('common.allStatuses')}</SelectItem>
+                <SelectItem value="prospect">{t('clients.prospect')}</SelectItem>
+                <SelectItem value="actif">{t('clients.active')}</SelectItem>
+                <SelectItem value="résilié">{t('clients.terminated')}</SelectItem>
+                <SelectItem value="dormant">{t('clients.dormant')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -184,12 +187,12 @@ export default function ClientsList() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="font-semibold">Nom / Entreprise</TableHead>
-                <TableHead className="font-semibold">Email</TableHead>
-                <TableHead className="font-semibold">Ville</TableHead>
-                <TableHead className="font-semibold">Statut</TableHead>
-                <TableHead className="font-semibold">Agent assigné</TableHead>
-                <TableHead className="text-right font-semibold">Actions</TableHead>
+                <TableHead className="font-semibold">{t('clients.nameCompany')}</TableHead>
+                <TableHead className="font-semibold">{t('common.email')}</TableHead>
+                <TableHead className="font-semibold">{t('clients.city')}</TableHead>
+                <TableHead className="font-semibold">{t('common.status')}</TableHead>
+                <TableHead className="font-semibold">{t('clients.assignedAgent')}</TableHead>
+                <TableHead className="text-right font-semibold">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -197,8 +200,8 @@ export default function ClientsList() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-16">
                     <UserCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/20" />
-                    <p className="text-lg font-medium text-muted-foreground">Aucun résultat trouvé</p>
-                    <p className="text-sm text-muted-foreground">Essayez de modifier vos filtres</p>
+                    <p className="text-lg font-medium text-muted-foreground">{t('common.noResults')}</p>
+                    <p className="text-sm text-muted-foreground">{t('common.tryFilters')}</p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -285,16 +288,15 @@ export default function ClientsList() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="border-0 shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette adresse ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('clients.deleteAddress')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. L'adresse et toutes ses données
-              associées seront supprimées.
+              {t('clients.deleteAddressConfirm')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              Supprimer
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

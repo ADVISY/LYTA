@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 import {
   BarChart,
   Bar,
@@ -39,6 +40,7 @@ import {
 type PeriodFilter = 'week' | 'month' | 'quarter' | 'year';
 
 export default function CRMDashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { role, isAdmin, isManager, isAgent, isPartner, isClient } = useUserRole();
   const { can, dashboardScope, commissionScope, isLoading: permissionsLoading } = usePermissions();

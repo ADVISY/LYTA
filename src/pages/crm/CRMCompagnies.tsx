@@ -13,6 +13,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
+import { useTranslation } from "react-i18next";
 
 type Product = {
   id: string;
@@ -37,6 +38,7 @@ const categoryLabels: Record<string, { label: string; color: string }> = {
 };
 
 export default function CRMCompagnies() {
+  const { t } = useTranslation();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
