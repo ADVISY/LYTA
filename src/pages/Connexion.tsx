@@ -97,19 +97,40 @@ const LoginForm = ({
 );
 
 interface ChoiceScreenProps {
+  onClientClick: () => void;
   onTeamClick: () => void;
   onSuperAdminClick: () => void;
   showSuperAdmin?: boolean;
+  isTenantMode?: boolean;
 }
 
-const ChoiceScreen = ({ onTeamClick, onSuperAdminClick, showSuperAdmin = true }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuperAdmin = true, isTenantMode = false }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
-      <h2 className="text-xl font-bold text-foreground mb-2">Bienvenue sur LYTA</h2>
+      <h2 className="text-xl font-bold text-foreground mb-2">
+        {isTenantMode ? "Bienvenue" : "Bienvenue sur LYTA"}
+      </h2>
       <p className="text-sm text-muted-foreground">Sélectionnez votre espace</p>
     </div>
 
     <div className="space-y-4">
+      {/* Client Access - Only for tenants */}
+      {isTenantMode && (
+        <button
+          onClick={onClientClick}
+          className="w-full flex items-center gap-4 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
+        >
+          <div className="p-4 rounded-full bg-blue-500/10 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+            <User className="h-8 w-8" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-bold text-foreground">ESPACE CLIENT</h3>
+            <p className="text-sm text-muted-foreground">Accédez à votre espace personnel</p>
+          </div>
+        </button>
+      )}
+
+      {/* Team Access */}
       <button
         onClick={onTeamClick}
         className="w-full flex items-center gap-4 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
@@ -118,12 +139,16 @@ const ChoiceScreen = ({ onTeamClick, onSuperAdminClick, showSuperAdmin = true }:
           <Users className="h-8 w-8" />
         </div>
         <div className="text-left">
-          <h3 className="text-lg font-bold text-foreground">MEMBRE LYTA</h3>
-          <p className="text-sm text-muted-foreground">Support & Développement</p>
+          <h3 className="text-lg font-bold text-foreground">
+            {isTenantMode ? "ESPACE TEAM" : "MEMBRE LYTA"}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {isTenantMode ? "CRM & Gestion des contrats" : "Support & Développement"}
+          </p>
         </div>
       </button>
 
-      {/* Super Admin Button */}
+      {/* Super Admin Button - Only on main platform */}
       {showSuperAdmin && (
         <button
           onClick={onSuperAdminClick}
@@ -574,9 +599,11 @@ const Connexion = () => {
       default:
         return (
           <ChoiceScreen
+            onClientClick={() => { resetForm(); setLoginType("client"); setView("client"); }}
             onTeamClick={() => { resetForm(); setLoginType("team"); setView("team"); }}
             onSuperAdminClick={() => { resetForm(); setLoginType("king"); setView("king"); }}
             showSuperAdmin={!tenant}
+            isTenantMode={!!tenant}
           />
         );
     }
