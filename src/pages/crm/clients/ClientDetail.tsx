@@ -58,7 +58,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 const statusColors: Record<string, string> = {
   prospect: "bg-blue-500",
   actif: "bg-green-500",
@@ -100,6 +100,12 @@ export default function ClientDetail() {
   const { suivis, loading: suivisLoading, stats: suiviStats, fetchSuivis, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis(id);
   const { commissions, loading: commissionsLoading, fetchCommissions, markAsPaid, deleteCommission } = useCommissions();
   const { fetchCommissionParts, deleteCommissionPart } = useCommissionParts();
+  const { hasModule } = usePlanFeatures();
+  
+  // Check plan modules
+  const hasClientPortal = hasModule('client_portal');
+  const hasMandateAutomation = hasModule('mandate_automation');
+  
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
@@ -370,8 +376,8 @@ export default function ClientDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Bouton créer compte client - uniquement si pas de user_id et type client */}
-          {client.type_adresse === 'client' && !client.user_id && client.email && (
+          {/* Bouton créer compte client - uniquement si pas de user_id, type client, et module client_portal actif */}
+          {hasClientPortal && client.type_adresse === 'client' && !client.user_id && client.email && (
             <Button 
               variant="outline" 
               onClick={() => setClientAccountDialogOpen(true)}
@@ -381,7 +387,7 @@ export default function ClientDetail() {
               Créer espace client
             </Button>
           )}
-          {client.user_id && client.type_adresse === 'client' && (
+          {hasClientPortal && client.user_id && client.type_adresse === 'client' && (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Espace client actif
@@ -457,10 +463,12 @@ export default function ClientDetail() {
                 <DollarSign className="h-4 w-4 mr-2" />
                 Commissions ({clientCommissions.length})
               </TabsTrigger>
-              <TabsTrigger value="mandat">
-                <FileSignature className="h-4 w-4 mr-2" />
-                Mandat
-              </TabsTrigger>
+              {hasMandateAutomation && (
+                <TabsTrigger value="mandat">
+                  <FileSignature className="h-4 w-4 mr-2" />
+                  Mandat
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="info">
@@ -1473,9 +1481,11 @@ export default function ClientDetail() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="mandat">
-              <MandatGestionForm client={client} />
-            </TabsContent>
+            {hasMandateAutomation && (
+              <TabsContent value="mandat">
+                <MandatGestionForm client={client} />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
