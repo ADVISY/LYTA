@@ -283,7 +283,7 @@ export default function CRMParametres() {
       themeColor: selectedColor,
       defaultRates,
     }));
-    toast.success("Paramètres enregistrés");
+    toast.success(t('settings.saved'));
   };
 
   const handleUpdateProfile = async () => {
@@ -299,20 +299,20 @@ export default function CRMParametres() {
       .eq("id", user.id);
 
     if (error) {
-      toast.error("Erreur lors de la mise à jour du profil");
+      toast.error(t('settings.profileUpdateError'));
     } else {
-      toast.success("Profil mis à jour");
+      toast.success(t('settings.profileUpdated'));
       setIsEditingProfile(false);
     }
   };
 
   const handleChangePassword = async () => {
     if (passwords.new !== passwords.confirm) {
-      toast.error("Les mots de passe ne correspondent pas");
+      toast.error(t('settings.passwordMismatch'));
       return;
     }
     if (passwords.new.length < 8) {
-      toast.error("Le mot de passe doit contenir au moins 8 caractères");
+      toast.error(t('settings.passwordTooShort'));
       return;
     }
 
@@ -321,9 +321,9 @@ export default function CRMParametres() {
     });
 
     if (error) {
-      toast.error("Erreur lors du changement de mot de passe");
+      toast.error(t('settings.passwordChangeError'));
     } else {
-      toast.success("Mot de passe modifié avec succès");
+      toast.success(t('settings.passwordChanged'));
       setShowPasswordChange(false);
       setPasswords({ current: "", new: "", confirm: "" });
     }
@@ -334,9 +334,9 @@ export default function CRMParametres() {
     
     const { error } = await supabase.auth.resetPasswordForEmail(profile.email);
     if (error) {
-      toast.error("Erreur lors de l'envoi de l'email");
+      toast.error(t('settings.resetEmailError'));
     } else {
-      toast.success("Email de réinitialisation envoyé");
+      toast.success(t('settings.resetEmailSent'));
     }
   };
 
@@ -354,14 +354,14 @@ export default function CRMParametres() {
   // CRUD Compagnies
   const handleAddCompany = async () => {
     if (!newCompany.name.trim()) {
-      toast.error("Le nom est requis");
+      toast.error(t('settings.companyNameRequired'));
       return;
     }
     const { error } = await supabase.from("insurance_companies").insert(newCompany);
     if (error) {
-      toast.error("Erreur lors de l'ajout");
+      toast.error(t('common.error'));
     } else {
-      toast.success("Compagnie ajoutée");
+      toast.success(t('settings.companyAdded'));
       setNewCompany({ name: "", logo_url: "" });
       setIsAddingCompany(false);
       loadCompanies();
@@ -375,9 +375,9 @@ export default function CRMParametres() {
       .update({ name: editingCompany.name, logo_url: editingCompany.logo_url })
       .eq("id", editingCompany.id);
     if (error) {
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(t('common.error'));
     } else {
-      toast.success("Compagnie mise à jour");
+      toast.success(t('settings.companyUpdated'));
       setEditingCompany(null);
       loadCompanies();
     }
@@ -386,9 +386,9 @@ export default function CRMParametres() {
   const handleDeleteCompany = async (id: string) => {
     const { error } = await supabase.from("insurance_companies").delete().eq("id", id);
     if (error) {
-      toast.error("Erreur: cette compagnie a des produits associés");
+      toast.error(t('settings.companyDeleteError'));
     } else {
-      toast.success("Compagnie supprimée");
+      toast.success(t('settings.companyDeleted'));
       loadCompanies();
     }
   };
@@ -396,14 +396,14 @@ export default function CRMParametres() {
   // CRUD Produits
   const handleAddProduct = async () => {
     if (!newProduct.name.trim() || !newProduct.company_id || !newProduct.category) {
-      toast.error("Tous les champs sont requis");
+      toast.error(t('settings.productRequired'));
       return;
     }
     const { error } = await supabase.from("insurance_products").insert(newProduct);
     if (error) {
-      toast.error("Erreur lors de l'ajout");
+      toast.error(t('common.error'));
     } else {
-      toast.success("Produit ajouté");
+      toast.success(t('settings.productAdded'));
       setNewProduct({ name: "", category: "", company_id: "", description: "" });
       setIsAddingProduct(false);
       loadProducts();
@@ -422,9 +422,9 @@ export default function CRMParametres() {
       })
       .eq("id", editingProduct.id);
     if (error) {
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(t('common.error'));
     } else {
-      toast.success("Produit mis à jour");
+      toast.success(t('settings.productUpdated'));
       setEditingProduct(null);
       loadProducts();
     }
@@ -433,13 +433,12 @@ export default function CRMParametres() {
   const handleDeleteProduct = async (id: string) => {
     const { error } = await supabase.from("insurance_products").delete().eq("id", id);
     if (error) {
-      toast.error("Erreur: ce produit est utilisé dans des contrats");
+      toast.error(t('settings.productDeleteError'));
     } else {
-      toast.success("Produit supprimé");
+      toast.success(t('settings.productDeleted'));
       loadProducts();
     }
   };
-
   // Créer un compte utilisateur
   const handleCreateAccount = async () => {
     // Validations
@@ -573,11 +572,11 @@ export default function CRMParametres() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Informations personnelles</CardTitle>
+                <CardTitle className="text-lg">{t('settings.personalInfo')}</CardTitle>
                 {!isEditingProfile && (
                   <Button variant="outline" size="sm" onClick={() => setIsEditingProfile(true)}>
                     <Pencil className="h-4 w-4 mr-2" />
-                    Modifier
+                    {t('common.edit')}
                   </Button>
                 )}
               </div>
@@ -585,7 +584,7 @@ export default function CRMParametres() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Prénom</Label>
+                  <Label>{t('settings.firstName')}</Label>
                   <Input 
                     value={profile.firstName}
                     onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
@@ -593,7 +592,7 @@ export default function CRMParametres() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Nom</Label>
+                  <Label>{t('settings.lastName')}</Label>
                   <Input 
                     value={profile.lastName}
                     onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
@@ -603,11 +602,11 @@ export default function CRMParametres() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t('settings.email')}</Label>
                   <Input value={profile.email} disabled />
                 </div>
                 <div className="space-y-2">
-                  <Label>Téléphone</Label>
+                  <Label>{t('settings.phone')}</Label>
                   <Input 
                     value={profile.phone}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
@@ -619,10 +618,10 @@ export default function CRMParametres() {
                 <div className="flex gap-2 pt-4">
                   <Button onClick={handleUpdateProfile}>
                     <Save className="h-4 w-4 mr-2" />
-                    Enregistrer
+                    {t('common.save')}
                   </Button>
                   <Button variant="outline" onClick={() => setIsEditingProfile(false)}>
-                    Annuler
+                    {t('common.cancel')}
                   </Button>
                 </div>
               )}
@@ -633,23 +632,23 @@ export default function CRMParametres() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Sécurité
+                {t('settings.security')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!showPasswordChange ? (
                 <div className="flex gap-4">
                   <Button variant="outline" onClick={() => setShowPasswordChange(true)}>
-                    Modifier le mot de passe
+                    {t('settings.changePassword')}
                   </Button>
                   <Button variant="ghost" onClick={handleResetPassword}>
-                    Demander un nouveau mot de passe par email
+                    {t('settings.requestNewPassword')}
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-4 max-w-md">
                   <div className="space-y-2">
-                    <Label>Nouveau mot de passe</Label>
+                    <Label>{t('settings.newPassword')}</Label>
                     <div className="relative">
                       <Input 
                         type={showPasswords ? "text" : "password"}
@@ -667,7 +666,7 @@ export default function CRMParametres() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Confirmer le mot de passe</Label>
+                    <Label>{t('settings.confirmPassword')}</Label>
                     <Input 
                       type={showPasswords ? "text" : "password"}
                       value={passwords.confirm}
@@ -676,10 +675,10 @@ export default function CRMParametres() {
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={handleChangePassword}>
-                      Changer le mot de passe
+                      {t('settings.changePassword')}
                     </Button>
                     <Button variant="outline" onClick={() => setShowPasswordChange(false)}>
-                      Annuler
+                      {t('common.cancel')}
                     </Button>
                   </div>
                 </div>
@@ -698,23 +697,23 @@ export default function CRMParametres() {
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="text-sm font-medium">Utilisateurs actifs</p>
+                      <p className="text-sm font-medium">{t('subscription.activeUsers')}</p>
                       <p className="text-2xl font-bold">{tenantSeats.activeUsers}</p>
                     </div>
                   </div>
                   <div className="border-l pl-6">
-                    <p className="text-sm text-muted-foreground">Inclus dans l'offre</p>
+                    <p className="text-sm text-muted-foreground">{t('subscription.includedInPlan')}</p>
                     <p className="text-xl font-semibold">{tenantSeats.seatsIncluded}</p>
                   </div>
                   {tenantSeats.extraUsers > 0 && (
                     <div className="border-l pl-6">
-                      <p className="text-sm text-muted-foreground">Sièges supplémentaires</p>
+                      <p className="text-sm text-muted-foreground">{t('subscription.extra')}</p>
                       <p className="text-xl font-semibold text-amber-600">+{tenantSeats.extraUsers}</p>
                     </div>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Places disponibles</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.availableSeats')}</p>
                   <p className={cn(
                     "text-xl font-bold",
                     tenantSeats.availableSeats > 0 ? "text-green-600" : "text-red-600"
@@ -731,7 +730,7 @@ export default function CRMParametres() {
             <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
               <Lock className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-800 dark:text-amber-200">
-                <strong>Quota atteint.</strong> Pour ajouter un nouvel utilisateur, vous devez débloquer un siège supplémentaire (+{tenantSeats.seatPrice} CHF/mois).
+                <strong>{t('settings.noSeatsAvailable')}.</strong> {t('settings.unlockSeat')} (+{tenantSeats.seatPrice} CHF/{t('common.month')}).
               </AlertDescription>
             </Alert>
           )}
@@ -739,9 +738,9 @@ export default function CRMParametres() {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Workflow de création d'un compte :</strong><br />
-              1. Créez d'abord la fiche du collaborateur dans <strong>Collaborateurs</strong><br />
-              2. Revenez ici pour créer le compte utilisateur en le liant au collaborateur
+              <strong>Workflow:</strong><br />
+              1. {t('collaborators.addCollaborator')} dans <strong>{t('nav.collaborators')}</strong><br />
+              2. {t('settings.createAccount')}
             </AlertDescription>
           </Alert>
 
@@ -750,18 +749,18 @@ export default function CRMParametres() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <UserCheck className="h-5 w-5" />
-                  Comptes utilisateurs
+                  {t('settings.userAccounts')}
                 </CardTitle>
                 <Button size="sm" onClick={handleAddUserClick}>
                   {tenantSeats.canAddUser ? (
                     <>
                       <Plus className="h-4 w-4 mr-2" />
-                      Créer un compte
+                      {t('settings.createAccount')}
                     </>
                   ) : (
                     <>
                       <Lock className="h-4 w-4 mr-2" />
-                      Débloquer un utilisateur
+                      {t('settings.unlockSeat')}
                     </>
                   )}
                 </Button>
@@ -771,11 +770,11 @@ export default function CRMParametres() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Utilisateur</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rôle</TableHead>
-                    <TableHead>Collaborateur lié</TableHead>
-                    <TableHead>Créé le</TableHead>
+                    <TableHead>{t('settings.users')}</TableHead>
+                    <TableHead>{t('common.email')}</TableHead>
+                    <TableHead>{t('collaborators.role')}</TableHead>
+                    <TableHead>{t('settings.linkedCollaborator')}</TableHead>
+                    <TableHead>{t('settings.createdAt')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -791,7 +790,7 @@ export default function CRMParametres() {
                       </TableCell>
                       <TableCell>
                         <Badge className={cn("text-white", roleBadgeColors[account.role] || "bg-gray-500")}>
-                          {roleLabels[account.role] || account.role}
+                          {t(`settings.${account.role}`) || account.role}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -811,7 +810,7 @@ export default function CRMParametres() {
                   {userAccounts.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        Aucun compte utilisateur
+                        {t('settings.noCollaboratorsAvailable')}
                       </TableCell>
                     </TableRow>
                   )}
