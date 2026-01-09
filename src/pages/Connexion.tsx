@@ -349,10 +349,10 @@ const Connexion = () => {
         return;
       }
 
-      // KING users always go to /king
+      // KING users always go to /king/wizard
       if (role === 'king') {
         sessionStorage.removeItem('loginTarget');
-        navigate("/king");
+        navigate("/king/wizard");
         return;
       }
 
@@ -367,6 +367,14 @@ const Connexion = () => {
             description: "Vous n'avez pas accès à l'espace Team.",
             variant: "destructive",
           });
+          navigate("/espace-client");
+        } else {
+          await redirectToTenantSubdomain(user.id);
+        }
+      } else if (!targetSpace) {
+        // User is already logged in but navigated to /connexion
+        // Redirect based on role
+        if (role === 'client') {
           navigate("/espace-client");
         } else {
           await redirectToTenantSubdomain(user.id);
@@ -533,9 +541,10 @@ const Connexion = () => {
           description: "Un code de vérification va être envoyé par SMS.",
         });
       } else {
-        // No SMS required - clear flag and proceed
-        smsFlowActive.current = false;
+        // No SMS required - set target FIRST, then clear flag
+        // This ensures the redirect useEffect sees the correct target
         sessionStorage.setItem('loginTarget', loginType);
+        smsFlowActive.current = false;
         toast({
           title: "Connexion réussie",
           description: `Bienvenue sur votre espace ${displayName}.`,
@@ -593,10 +602,14 @@ const Connexion = () => {
       smsFlowActive.current = false;
       
       if (role === 'king') {
-        navigate("/king");
+        navigate("/king/wizard");
       } else if (loginType === 'client') {
         navigate("/espace-client");
+      } else if (role === 'admin') {
+        // Admin users go to CRM with tenant
+        await redirectToTenantSubdomain(currentUser.id);
       } else {
+        // Team members also go to CRM
         await redirectToTenantSubdomain(currentUser.id);
       }
     } catch (error) {
