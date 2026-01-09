@@ -298,20 +298,20 @@ const Connexion = () => {
       if (showSmsVerification || smsVerificationData) {
         return;
       }
-      
+
       if (user) {
         // Check if user came from a specific login flow
         const targetSpace = sessionStorage.getItem('loginTarget');
-        
+
         // Get user role first
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         const role = roleData?.role || 'client';
-        
+
         // KING login flow
         if (targetSpace === 'king') {
           sessionStorage.removeItem('loginTarget');
@@ -328,20 +328,20 @@ const Connexion = () => {
           }
           return;
         }
-        
+
         // KING users always go to /king
         if (role === 'king') {
           sessionStorage.removeItem('loginTarget');
           navigate("/king");
           return;
         }
-        
+
         if (targetSpace === 'client') {
           sessionStorage.removeItem('loginTarget');
           navigate("/espace-client");
         } else if (targetSpace === 'team') {
           sessionStorage.removeItem('loginTarget');
-          
+
           if (role === 'client') {
             // User tried to access Team but only has client role
             toast({
@@ -358,9 +358,16 @@ const Connexion = () => {
         // If no target space in session, don't auto-redirect (user just loaded page while logged in)
       }
     };
-    
+
     checkAndRedirect();
   }, [user, navigate, toast, showSmsVerification, smsVerificationData]);
+
+  // Safety: if we have SMS verification data but the dialog got closed (e.g. Escape), reopen it.
+  useEffect(() => {
+    if (smsVerificationData && !showSmsVerification) {
+      setShowSmsVerification(true);
+    }
+  }, [smsVerificationData, showSmsVerification]);
 
   // Function to check if subdomain is reachable
   const checkSubdomainReachable = async (url: string): Promise<boolean> => {
