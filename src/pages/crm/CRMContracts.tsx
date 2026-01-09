@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { usePolicies } from "@/hooks/usePolicies";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,24 +9,23 @@ import { Plus, FileCheck, Eye, ChevronRight, Building2, Calendar, Search } from 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  pending: { label: "En attente", color: "text-amber-700", bgColor: "bg-amber-100" },
-  active: { label: "Actif", color: "text-emerald-700", bgColor: "bg-emerald-100" },
-  expired: { label: "Expiré", color: "text-slate-700", bgColor: "bg-slate-100" },
-  cancelled: { label: "Annulé", color: "text-red-700", bgColor: "bg-red-100" },
-};
-
 export default function CRMContracts() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { policies, loading, fetchPolicies } = usePolicies();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Rafraîchir les données à chaque montage du composant
+  const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+    pending: { label: t('contracts.pending'), color: "text-amber-700", bgColor: "bg-amber-100" },
+    active: { label: t('contracts.active'), color: "text-emerald-700", bgColor: "bg-emerald-100" },
+    expired: { label: t('contracts.expired'), color: "text-slate-700", bgColor: "bg-slate-100" },
+    cancelled: { label: t('contracts.cancelled'), color: "text-red-700", bgColor: "bg-red-100" },
+  };
+
   useEffect(() => {
     fetchPolicies();
   }, []);
 
-  // Filter policies based on search query
   const filteredPolicies = policies.filter(policy => {
     if (!searchQuery.trim()) return true;
     const search = searchQuery.toLowerCase();
@@ -63,23 +63,23 @@ export default function CRMContracts() {
             <FileCheck className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Contrats</h1>
-            <p className="text-muted-foreground">Gérez vos contrats d'assurance</p>
+            <h1 className="text-3xl font-bold">{t('contracts.title')}</h1>
+            <p className="text-muted-foreground">{t('contracts.subtitle')}</p>
           </div>
         </div>
         <Button className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20">
           <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
-          Nouveau contrat
+          {t('contracts.newContract')}
         </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total", value: policies.length, color: "from-blue-500 to-blue-600" },
-          { label: "Actifs", value: policies.filter(p => p.status === 'active').length, color: "from-emerald-500 to-emerald-600" },
-          { label: "En attente", value: policies.filter(p => p.status === 'pending').length, color: "from-amber-500 to-orange-500" },
-          { label: "Expirés", value: policies.filter(p => p.status === 'expired').length, color: "from-slate-400 to-slate-500" },
+          { label: t('contracts.total'), value: policies.length, color: "from-blue-500 to-blue-600" },
+          { label: t('contracts.activeCount'), value: policies.filter(p => p.status === 'active').length, color: "from-emerald-500 to-emerald-600" },
+          { label: t('contracts.pendingCount'), value: policies.filter(p => p.status === 'pending').length, color: "from-amber-500 to-orange-500" },
+          { label: t('contracts.expiredCount'), value: policies.filter(p => p.status === 'expired').length, color: "from-slate-400 to-slate-500" },
         ].map((stat) => (
           <Card key={stat.label} className="border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-card/80 backdrop-blur">
             <CardContent className="p-4">
@@ -97,13 +97,13 @@ export default function CRMContracts() {
         <CardHeader className="border-b bg-muted/30">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle className="flex items-center gap-2">
-              <span>Liste des contrats</span>
+              <span>{t('contracts.contractsList')}</span>
               <Badge variant="secondary" className="ml-2">{filteredPolicies.length}</Badge>
             </CardTitle>
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un contrat..."
+                placeholder={t('contracts.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -116,10 +116,10 @@ export default function CRMContracts() {
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <FileCheck className="h-16 w-16 mb-4 opacity-20" />
               <p className="text-lg font-medium">
-                {searchQuery ? "Aucun contrat trouvé" : "Aucun contrat pour le moment"}
+                {searchQuery ? t('common.noResults') : t('contracts.noContracts')}
               </p>
               <p className="text-sm">
-                {searchQuery ? "Essayez une autre recherche" : "Créez votre premier contrat pour commencer"}
+                {searchQuery ? t('contracts.tryDifferentSearch') : t('contracts.noContractsDesc')}
               </p>
             </div>
           ) : (
