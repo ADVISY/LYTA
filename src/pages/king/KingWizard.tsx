@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { TenantPlan, PLAN_CONFIGS } from "@/config/plans";
 import { 
   Building2, 
   Palette, 
@@ -16,6 +17,7 @@ import {
   CheckCircle2, 
   ChevronRight, 
   ChevronLeft,
+  CreditCard,
   Wand2,
   Crown,
   Mail,
@@ -42,6 +44,8 @@ interface TenantFormData {
   slug: string;
   status: "test" | "active" | "suspended";
   contract_notification_emails: string[];
+  plan: TenantPlan;
+  extra_users: number;
   
   // Step 2 - Branding
   logo_url: string;
@@ -74,6 +78,8 @@ const initialFormData: TenantFormData = {
   slug: "",
   status: "test",
   contract_notification_emails: [],
+  plan: "start",
+  extra_users: 0,
   logo_url: "",
   primary_color: "#0066FF",
   secondary_color: "#1a1a2e",
@@ -477,6 +483,76 @@ export default function KingWizard() {
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un email
                   </Button>
+                </div>
+              </div>
+
+              {/* Plan & Pricing Section */}
+              <div className="space-y-4 md:col-span-2 border-t pt-6">
+                <Label className="flex items-center gap-2 text-lg font-semibold">
+                  <CreditCard className="h-5 w-5 text-amber-500" />
+                  Abonnement Stripe
+                </Label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plan">Plan actuel</Label>
+                    <Select 
+                      value={formData.plan} 
+                      onValueChange={(value: TenantPlan) => updateFormData("plan", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PLAN_CONFIGS).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            <span className="flex items-center gap-2">
+                              {config.displayName} - CHF {config.monthlyPrice}/mois
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="extra_users">Utilisateurs supplémentaires</Label>
+                    <Input
+                      id="extra_users"
+                      type="number"
+                      min="0"
+                      value={formData.extra_users}
+                      onChange={(e) => updateFormData("extra_users", parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      +CHF {PLAN_CONFIGS[formData.plan].extraSeatPrice}/mois par utilisateur
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pricing Summary */}
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Plan {PLAN_CONFIGS[formData.plan].displayName}</span>
+                    <span>CHF {PLAN_CONFIGS[formData.plan].monthlyPrice}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>{PLAN_CONFIGS[formData.plan].seatsIncluded} siège inclus</span>
+                    <span className="text-muted-foreground">—</span>
+                  </div>
+                  {formData.extra_users > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>{formData.extra_users} utilisateur{formData.extra_users > 1 ? 's' : ''} supp.</span>
+                      <span>CHF {formData.extra_users * PLAN_CONFIGS[formData.plan].extraSeatPrice}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 flex justify-between font-semibold">
+                    <span>Total mensuel</span>
+                    <span className="text-amber-600">
+                      CHF {PLAN_CONFIGS[formData.plan].monthlyPrice + (formData.extra_users * PLAN_CONFIGS[formData.plan].extraSeatPrice)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
