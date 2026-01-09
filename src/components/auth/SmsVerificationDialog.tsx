@@ -115,13 +115,17 @@ export function SmsVerificationDialog({
   };
 
   const handleCancel = () => {
-    onCancel?.();
+    if (onCancel) {
+      onCancel();
+    }
     onOpenChange(false);
   };
 
   const maskedPhone = phoneNumber.replace(/(\d{2})(\d+)(\d{2})/, "$1****$3");
 
-  if (!open) return null;
+  // Always render if we have user/phone data, regardless of open state
+  // This prevents the dialog from disappearing unexpectedly
+  if (!open && !userId) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">

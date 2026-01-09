@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown, Building2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
@@ -281,160 +281,141 @@ const Connexion = () => {
     phoneNumber: string;
   } | null>(null);
   const { toast } = useToast();
-  const { signIn, resetPassword, user, pendingSmsVerification, clearPendingVerification } = useAuth();
+  const { signIn, resetPassword, user, clearPendingVerification } = useAuth();
   const navigate = useNavigate();
   
+  // Flag to completely block redirects during SMS flow
+  const smsFlowActive = useRef(false);
+  
   // Get tenant display name and logo
-  // If tenant exists, use tenant branding; otherwise show "LYTA" for the main platform
   const displayName = tenant ? (tenant.branding?.display_name || tenant.name) : 'LYTA';
   const logoUrl = tenant?.branding?.logo_url;
-  // Only show platform logo (lytaLogo) if no tenant is detected at all
   const showPlatformLogo = !tenant && !logoUrl;
 
-  // Track if we're actively in a login flow requiring SMS
-  const [waitingForSmsFlow, setWaitingForSmsFlow] = useState(false);
-
-  // Redirect based on loginType choice (not role) if already logged in
+  // Handle redirect after successful login (only when NOT in SMS flow)
   useEffect(() => {
-    const checkAndRedirect = async () => {
-      // Don't redirect if SMS verification is pending or we're waiting for the SMS flow to complete
-      if (showSmsVerification || smsVerificationData || waitingForSmsFlow || pendingSmsVerification) {
-        console.log("[Connexion] Blocking redirect - SMS flow active");
+    const handleRedirect = async () => {
+      // CRITICAL: Never redirect during SMS verification flow
+      if (smsFlowActive.current) {
+        console.log("[Connexion] SMS flow active - blocking redirect");
+        return;
+      }
+      
+      if (showSmsVerification || smsVerificationData) {
+        console.log("[Connexion] SMS verification UI active - blocking redirect");
         return;
       }
 
-      if (user) {
-        // Check if user came from a specific login flow
-        const targetSpace = sessionStorage.getItem('loginTarget');
+      if (!user) return;
 
-        // If no target space, user might have just loaded the page while already logged in
-        // In this case, check if they need SMS verification before redirecting
-        if (!targetSpace) {
-          // Check if this user requires SMS verification
-          const { data: requiresVerification } = await supabase.rpc(
-            "requires_sms_verification",
-            { p_user_id: user.id }
-          );
-          
-          if (requiresVerification) {
-            // User is logged in but hasn't completed SMS verification for this session
-            // Don't auto-redirect, let them stay on login page
-            console.log("[Connexion] User requires SMS verification, not auto-redirecting");
-            return;
-          }
-        }
-
-        // Get user role first
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        const role = roleData?.role || 'client';
-
-        // KING login flow
-        if (targetSpace === 'king') {
-          sessionStorage.removeItem('loginTarget');
-          if (role === 'king') {
-            navigate("/king/wizard");
-          } else {
-            toast({
-              title: "Accès refusé",
-              description: "Vous n'avez pas les droits SUPER ADMIN pour accéder à cette section.",
-              variant: "destructive",
-            });
-            // Sign out the user since they don't have KING access
-            await supabase.auth.signOut();
-          }
+      const targetSpace = sessionStorage.getItem('loginTarget');
+      
+      // If no target space set, user just loaded page while logged in
+      // Check if they need SMS verification
+      if (!targetSpace) {
+        const { data: requiresVerification } = await supabase.rpc(
+          "requires_sms_verification",
+          { p_user_id: user.id }
+        );
+        
+        if (requiresVerification) {
+          console.log("[Connexion] User requires SMS verification - not auto-redirecting");
           return;
         }
+      }
 
-        // KING users always go to /king
+      // Get user role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const role = roleData?.role || 'client';
+
+      // Handle KING login
+      if (targetSpace === 'king') {
+        sessionStorage.removeItem('loginTarget');
         if (role === 'king') {
-          sessionStorage.removeItem('loginTarget');
-          navigate("/king");
-          return;
+          navigate("/king/wizard");
+        } else {
+          toast({
+            title: "Accès refusé",
+            description: "Vous n'avez pas les droits SUPER ADMIN.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
         }
+        return;
+      }
 
-        if (targetSpace === 'client') {
-          sessionStorage.removeItem('loginTarget');
+      // KING users always go to /king
+      if (role === 'king') {
+        sessionStorage.removeItem('loginTarget');
+        navigate("/king");
+        return;
+      }
+
+      if (targetSpace === 'client') {
+        sessionStorage.removeItem('loginTarget');
+        navigate("/espace-client");
+      } else if (targetSpace === 'team') {
+        sessionStorage.removeItem('loginTarget');
+        if (role === 'client') {
+          toast({
+            title: "Accès refusé",
+            description: "Vous n'avez pas accès à l'espace Team.",
+            variant: "destructive",
+          });
           navigate("/espace-client");
-        } else if (targetSpace === 'team') {
-          sessionStorage.removeItem('loginTarget');
-
-          if (role === 'client') {
-            // User tried to access Team but only has client role
-            toast({
-              title: "Accès refusé",
-              description: "Vous n'avez pas accès à l'espace Team. Redirection vers l'espace client.",
-              variant: "destructive",
-            });
-            navigate("/espace-client");
-          } else {
-            // Redirect to tenant subdomain if available
-            await redirectToTenantSubdomain(user.id);
-          }
+        } else {
+          await redirectToTenantSubdomain(user.id);
         }
-        // If no target space in session, don't auto-redirect (user just loaded page while logged in)
       }
     };
 
-    checkAndRedirect();
-  }, [user, navigate, toast, showSmsVerification, smsVerificationData, waitingForSmsFlow, pendingSmsVerification]);
+    handleRedirect();
+  }, [user, navigate, toast, showSmsVerification, smsVerificationData]);
 
-  // Safety: if we have SMS verification data but the dialog got closed (e.g. Escape), reopen it.
+  // Ensure SMS dialog stays open if data exists
   useEffect(() => {
     if (smsVerificationData && !showSmsVerification) {
       setShowSmsVerification(true);
     }
   }, [smsVerificationData, showSmsVerification]);
 
-  // Function to check if subdomain is reachable
   const checkSubdomainReachable = async (url: string): Promise<boolean> => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-      
-      const response = await fetch(`${url}/cdn-cgi/trace`, {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal
-      });
-      
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      await fetch(`${url}/cdn-cgi/trace`, { method: 'HEAD', mode: 'no-cors', signal: controller.signal });
       clearTimeout(timeoutId);
-      return true; // If no error, assume reachable
-    } catch (error) {
-      console.log('Subdomain not reachable, using fallback:', error);
+      return true;
+    } catch {
       return false;
     }
   };
 
-  // Function to redirect user to their tenant subdomain (with fallback)
   const redirectToTenantSubdomain = async (userId: string) => {
     try {
-      // Get user's tenant assignment
-      const { data: assignment, error: assignmentError } = await supabase
+      const { data: assignment } = await supabase
         .from('user_tenant_assignments')
         .select('tenant_id')
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (assignmentError || !assignment?.tenant_id) {
-        // No tenant assignment, just go to CRM
+      if (!assignment?.tenant_id) {
         navigate("/crm");
         return;
       }
 
-      // Get tenant slug
-      const { data: tenant, error: tenantError } = await supabase
+      const { data: tenantData } = await supabase
         .from('tenants')
         .select('slug')
         .eq('id', assignment.tenant_id)
         .maybeSingle();
 
-      if (tenantError || !tenant?.slug) {
-        // Can't find tenant, just go to CRM
+      if (!tenantData?.slug) {
         navigate("/crm");
         return;
       }
@@ -443,24 +424,17 @@ const Connexion = () => {
       const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
       
       if (isLocalhost) {
-        // In dev mode, always use query param
-        navigate(`/crm?tenant=${tenant.slug}`);
+        navigate(`/crm?tenant=${tenantData.slug}`);
       } else {
-        // In production, try subdomain first, fallback to query param
         const protocol = window.location.protocol;
-        const baseDomain = hostname.split('.').slice(-2).join('.'); // Get base domain like lyta.ch
-        const tenantUrl = `${protocol}//${tenant.slug}.${baseDomain}`;
-        
-        // Check if subdomain is reachable
+        const baseDomain = hostname.split('.').slice(-2).join('.');
+        const tenantUrl = `${protocol}//${tenantData.slug}.${baseDomain}`;
         const isReachable = await checkSubdomainReachable(tenantUrl);
         
         if (isReachable) {
-          // Subdomain works, redirect there
           window.location.href = `${tenantUrl}/crm`;
         } else {
-          // Subdomain not ready, use fallback with query param
-          console.log(`Subdomain ${tenant.slug}.${baseDomain} not ready, using fallback`);
-          navigate(`/crm?tenant=${tenant.slug}`);
+          navigate(`/crm?tenant=${tenantData.slug}`);
         }
       }
     } catch (error) {
@@ -532,22 +506,23 @@ const Connexion = () => {
     }
 
     setLoading(true);
+    // CRITICAL: Set flag BEFORE signIn to prevent any redirect
+    smsFlowActive.current = true;
+    console.log("[Connexion] Starting login, SMS flow flag set to true");
 
     try {
-      // Mark that we're in the middle of a login flow (blocks auto-redirect)
-      setWaitingForSmsFlow(true);
-      
       const result = await signIn(email, password);
       
       if (result.error) {
-        setWaitingForSmsFlow(false);
+        smsFlowActive.current = false;
         toast({
           title: "Erreur de connexion",
           description: result.error.message || "Email ou mot de passe incorrect.",
           variant: "destructive",
         });
       } else if (result.requiresSmsVerification && result.userId && result.phoneNumber) {
-        // SMS verification required for king/admin - keep waitingForSmsFlow true
+        // SMS verification required - keep flag active and show dialog
+        console.log("[Connexion] SMS verification required for user:", result.userId);
         setSmsVerificationData({
           userId: result.userId,
           phoneNumber: result.phoneNumber,
@@ -558,18 +533,16 @@ const Connexion = () => {
           description: "Un code de vérification va être envoyé par SMS.",
         });
       } else {
-        // No SMS required - clear the waiting flag and proceed
-        setWaitingForSmsFlow(false);
-        // Store the login target in sessionStorage for redirect after auth state changes
+        // No SMS required - clear flag and proceed
+        smsFlowActive.current = false;
         sessionStorage.setItem('loginTarget', loginType);
-        
         toast({
           title: "Connexion réussie",
           description: `Bienvenue sur votre espace ${displayName}.`,
         });
-        // Redirect will happen via useEffect based on loginType
       }
     } catch (error: any) {
+      smsFlowActive.current = false;
       toast({
         title: "Erreur",
         description: error.message || "Une erreur est survenue.",
@@ -581,20 +554,19 @@ const Connexion = () => {
   };
 
   const handleSmsVerified = async () => {
-    if (!smsVerificationData) return;
+    console.log("[Connexion] SMS verified successfully");
     
-    // Clear SMS verification state
+    // Clear SMS state
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
-    setWaitingForSmsFlow(false);
     
-    // Session is already active - just redirect
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       
-      if (!user) {
+      if (!currentUser) {
+        smsFlowActive.current = false;
         toast({
           title: "Erreur",
           description: "Session expirée. Veuillez vous reconnecter.",
@@ -603,44 +575,45 @@ const Connexion = () => {
         return;
       }
       
-      // Set login target for redirect
-      sessionStorage.setItem('loginTarget', loginType);
+      // Get user role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      const role = roleData?.role || 'client';
       
       toast({
         title: "Connexion réussie",
         description: `Bienvenue sur votre espace ${displayName}.`,
       });
       
-      // Redirect based on role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      const role = roleData?.role || 'client';
+      // Now we can clear the flag and redirect
+      smsFlowActive.current = false;
       
       if (role === 'king') {
         navigate("/king");
       } else if (loginType === 'client') {
         navigate("/espace-client");
       } else {
-        await redirectToTenantSubdomain(user.id);
+        await redirectToTenantSubdomain(currentUser.id);
       }
     } catch (error) {
       console.error("Error after SMS verification:", error);
+      smsFlowActive.current = false;
     } finally {
       setLoading(false);
     }
   };
 
   const handleSmsCancelled = async () => {
+    console.log("[Connexion] SMS verification cancelled");
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
-    setWaitingForSmsFlow(false);
+    smsFlowActive.current = false;
     setPassword("");
-    // Sign out the session since SMS verification was cancelled
     await supabase.auth.signOut();
   };
 
@@ -729,7 +702,6 @@ const Connexion = () => {
     }
   };
 
-  // Show loading while tenant is loading
   if (tenantLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -742,7 +714,6 @@ const Connexion = () => {
     <div className="min-h-screen bg-background relative">
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
-      {/* Theme Toggle Button */}
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
@@ -750,17 +721,9 @@ const Connexion = () => {
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           {showPlatformLogo ? (
-            <img 
-              src={lytaLogo} 
-              alt="Platform" 
-              className="h-24 sm:h-32 mx-auto"
-            />
+            <img src={lytaLogo} alt="Platform" className="h-24 sm:h-32 mx-auto" />
           ) : logoUrl ? (
-            <img 
-              src={logoUrl} 
-              alt={displayName} 
-              className="h-24 sm:h-32 mx-auto"
-            />
+            <img src={logoUrl} alt={displayName} className="h-24 sm:h-32 mx-auto" />
           ) : (
             <div className="flex items-center justify-center gap-3">
               <Building2 className="h-16 w-16 text-primary" />
@@ -774,11 +737,17 @@ const Connexion = () => {
         </div>
       </main>
 
-      {/* SMS Verification Dialog */}
+      {/* SMS Verification Dialog - Always render when data exists */}
       {smsVerificationData && (
         <SmsVerificationDialog
           open={showSmsVerification}
-          onOpenChange={setShowSmsVerification}
+          onOpenChange={(open) => {
+            if (!open) {
+              // Don't allow closing by clicking outside
+              return;
+            }
+            setShowSmsVerification(open);
+          }}
           userId={smsVerificationData.userId}
           phoneNumber={smsVerificationData.phoneNumber}
           verificationType="login"
