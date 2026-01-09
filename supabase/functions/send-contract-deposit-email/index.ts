@@ -93,7 +93,7 @@ const formatFormData = (formType: string, formData: Record<string, any>): string
   return lines.join('\n');
 };
 
-const generateEmailHtml = (data: ContractData, branding: TenantBranding | null): string => {
+const generateEmailHtml = (data: ContractData, branding: TenantBranding | null, signedUrls: Record<string, string>): string => {
   const formTypeLabel = formTypeLabels[data.formType] || data.formType.toUpperCase();
   const formattedData = formatFormData(data.formType, data.formData);
   const timestamp = new Date().toLocaleString('fr-CH', { 
@@ -112,15 +112,16 @@ const generateEmailHtml = (data: ContractData, branding: TenantBranding | null):
   const companyWebsite = branding?.company_website || '';
   const companyEmail = branding?.company_email || '';
 
-  // Generate download links for documents
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || '';
+  // Generate download links for documents using signed URLs
   const documentsHtml = data.documents && data.documents.length > 0 
     ? `
       <div style="margin-top: 24px;">
         <h3 style="color: ${secondaryColor}; margin-bottom: 12px;">📎 Documents joints (${data.documents.length})</h3>
+        <p style="color: #666; font-size: 12px; margin-bottom: 12px;">⚠️ Les liens de téléchargement expirent dans 7 jours</p>
         <ul style="list-style: none; padding: 0; margin: 0;">
           ${data.documents.map(doc => {
-            const downloadUrl = `${supabaseUrl}/storage/v1/object/public/documents/${doc.file_key}`;
+            const downloadUrl = signedUrls[doc.file_key] || '#';
+            const hasValidUrl = signedUrls[doc.file_key] ? true : false;
             return `
             <li style="padding: 12px 16px; background: #f8f9fa; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid ${primaryColor};">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
@@ -128,9 +129,13 @@ const generateEmailHtml = (data: ContractData, branding: TenantBranding | null):
                   <strong style="color: #333;">📄 ${doc.file_name}</strong>
                   <span style="color: #666; font-size: 12px; display: block;">${doc.doc_kind || 'Document'}</span>
                 </div>
+                ${hasValidUrl ? `
                 <a href="${downloadUrl}" target="_blank" style="display: inline-block; padding: 8px 16px; background: ${primaryColor}; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500;">
                   ⬇️ Télécharger
                 </a>
+                ` : `
+                <span style="color: #999; font-size: 12px;">Lien non disponible</span>
+                `}
               </div>
             </li>
           `}).join('')}
@@ -355,8 +360,29 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Generate signed URLs for all documents (valid for 7 days)
+    const signedUrls: Record<string, string> = {};
+    if (contractData.documents && contractData.documents.length > 0) {
+      console.log(`Generating signed URLs for ${contractData.documents.length} documents`);
+      for (const doc of contractData.documents) {
+        if (doc.file_key) {
+          const { data: signedUrlData, error: signedUrlError } = await supabase
+            .storage
+            .from('documents')
+            .createSignedUrl(doc.file_key, 60 * 60 * 24 * 7); // 7 days
+
+          if (signedUrlError) {
+            console.error(`Error generating signed URL for ${doc.file_key}:`, signedUrlError);
+          } else if (signedUrlData?.signedUrl) {
+            signedUrls[doc.file_key] = signedUrlData.signedUrl;
+            console.log(`Signed URL generated for ${doc.file_name}`);
+          }
+        }
+      }
+    }
+
     const formTypeLabel = formTypeLabels[contractData.formType] || contractData.formType.toUpperCase();
-    const html = generateEmailHtml(contractData, branding);
+    const html = generateEmailHtml(contractData, branding, signedUrls);
     const senderName = branding?.email_sender_name || branding?.display_name || tenantName;
     const subject = `🆕 Nouveau dépôt ${formTypeLabel} - ${contractData.clientPrenom} ${contractData.clientName}`;
 
