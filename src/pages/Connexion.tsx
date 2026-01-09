@@ -298,91 +298,129 @@ const Connexion = () => {
   // Handle redirect after successful login (only when NOT in SMS flow)
   useEffect(() => {
     const handleRedirect = async () => {
+      // Wait for the login submit to finish (prevents “redirect missed” race)
+      if (loading) return;
+
       // CRITICAL: Never redirect during SMS verification flow
       if (smsFlowActive.current) {
         return;
       }
-      
+
       if (showSmsVerification || smsVerificationData) {
         return;
       }
 
       if (!user) return;
-      
+
       // Prevent duplicate redirect calls
       if (redirectInProgress.current) {
         return;
       }
 
-      const targetSpace = sessionStorage.getItem('loginTarget');
-      
-      // If no target space set and user is already logged in, they just navigated here
-      // Only check SMS requirement for new logins (when targetSpace exists)
-      if (!targetSpace) {
-        // User navigated to /connexion while logged in - quick redirect based on cached role
-        redirectInProgress.current = true;
-        
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        const role = roleData?.role || 'client';
-        
-        if (role === 'king') {
-          navigate("/king/wizard", { replace: true });
-        } else if (role === 'client') {
-          navigate("/espace-client", { replace: true });
-        } else {
-          await redirectToTenantSubdomain(user.id);
-        }
-        redirectInProgress.current = false;
-        return;
-      }
-
-      // New login flow - targetSpace is set
       redirectInProgress.current = true;
+      try {
+        const targetSpace = sessionStorage.getItem('loginTarget');
 
-      // Get user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        const fetchRole = () =>
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-      const role = roleData?.role || 'client';
+        const fetchTenantSlug = () =>
+          supabase
+            .from('user_tenant_assignments')
+            .select('tenant_id, tenants(slug)')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-      // Handle KING login
-      if (targetSpace === 'king') {
-        sessionStorage.removeItem('loginTarget');
-        if (role === 'king') {
-          navigate("/king/wizard", { replace: true });
-        } else {
-          toast({
-            title: "Accès refusé",
-            description: "Vous n'avez pas les droits SUPER ADMIN.",
-            variant: "destructive",
-          });
-          await supabase.auth.signOut();
+        const goToTenantCrm = (tenantSlug: string) => {
+          const hostname = window.location.hostname;
+          const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
+
+          if (isLocalhost) {
+            navigate(`/crm?tenant=${tenantSlug}`, { replace: true });
+            return;
+          }
+
+          const protocol = window.location.protocol;
+          const baseDomain = hostname.split('.').slice(-2).join('.');
+          window.location.href = `${protocol}//${tenantSlug}.${baseDomain}/crm`;
+        };
+
+        // If no target space set and user is already logged in, they just navigated here
+        if (!targetSpace) {
+          const [roleRes, assignmentRes] = await Promise.all([fetchRole(), fetchTenantSlug()]);
+          const role = roleRes.data?.role || 'client';
+
+          if (role === 'king') {
+            navigate("/king/wizard", { replace: true });
+            return;
+          }
+
+          if (role === 'client') {
+            navigate("/espace-client", { replace: true });
+            return;
+          }
+
+          const tenantSlug = (assignmentRes.data?.tenants as any)?.slug as string | undefined;
+          if (tenantSlug) {
+            goToTenantCrm(tenantSlug);
+          } else {
+            navigate("/crm", { replace: true });
+          }
+          return;
         }
-        redirectInProgress.current = false;
-        return;
-      }
 
-      // KING users always go to /king/wizard
-      if (role === 'king') {
-        sessionStorage.removeItem('loginTarget');
-        navigate("/king/wizard", { replace: true });
-        redirectInProgress.current = false;
-        return;
-      }
+        // New login flow - targetSpace is set
+        if (targetSpace === 'king') {
+          const { data: roleData } = await fetchRole();
+          const role = roleData?.role || 'client';
 
-      if (targetSpace === 'client') {
+          sessionStorage.removeItem('loginTarget');
+          if (role === 'king') {
+            navigate("/king/wizard", { replace: true });
+          } else {
+            toast({
+              title: "Accès refusé",
+              description: "Vous n'avez pas les droits SUPER ADMIN.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+          }
+          return;
+        }
+
+        if (targetSpace === 'client') {
+          const { data: roleData } = await fetchRole();
+          const role = roleData?.role || 'client';
+
+          // KING users always go to /king/wizard
+          if (role === 'king') {
+            sessionStorage.removeItem('loginTarget');
+            navigate("/king/wizard", { replace: true });
+            return;
+          }
+
+          sessionStorage.removeItem('loginTarget');
+          navigate("/espace-client", { replace: true });
+          return;
+        }
+
+        // targetSpace === 'team'
+        const [roleRes, assignmentRes] = await Promise.all([fetchRole(), fetchTenantSlug()]);
+        const role = roleRes.data?.role || 'client';
+
+        // KING users always go to /king/wizard
+        if (role === 'king') {
+          sessionStorage.removeItem('loginTarget');
+          navigate("/king/wizard", { replace: true });
+          return;
+        }
+
         sessionStorage.removeItem('loginTarget');
-        navigate("/espace-client", { replace: true });
-      } else if (targetSpace === 'team') {
-        sessionStorage.removeItem('loginTarget');
+
         if (role === 'client') {
           toast({
             title: "Accès refusé",
@@ -390,16 +428,22 @@ const Connexion = () => {
             variant: "destructive",
           });
           navigate("/espace-client", { replace: true });
-        } else {
-          await redirectToTenantSubdomain(user.id);
+          return;
         }
+
+        const tenantSlug = (assignmentRes.data?.tenants as any)?.slug as string | undefined;
+        if (tenantSlug) {
+          goToTenantCrm(tenantSlug);
+        } else {
+          navigate("/crm", { replace: true });
+        }
+      } finally {
+        redirectInProgress.current = false;
       }
-      
-      redirectInProgress.current = false;
     };
 
     handleRedirect();
-  }, [user, showSmsVerification, smsVerificationData]);
+  }, [user, loading, showSmsVerification, smsVerificationData]);
 
   // Ensure SMS dialog stays open if data exists
   useEffect(() => {
@@ -412,15 +456,14 @@ const Connexion = () => {
 
   const redirectToTenantSubdomain = async (userId: string) => {
     try {
-      // OPTIMIZATION: Get assignment with tenant slug in ONE query using join
       const { data: assignment } = await supabase
         .from('user_tenant_assignments')
         .select('tenant_id, tenants(slug)')
         .eq('user_id', userId)
         .maybeSingle();
 
-      const tenantSlug = (assignment?.tenants as any)?.slug;
-      
+      const tenantSlug = (assignment?.tenants as any)?.slug as string | undefined;
+
       if (!tenantSlug) {
         navigate("/crm", { replace: true });
         return;
@@ -428,11 +471,10 @@ const Connexion = () => {
 
       const hostname = window.location.hostname;
       const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
-      
+
       if (isLocalhost) {
         navigate(`/crm?tenant=${tenantSlug}`, { replace: true });
       } else {
-        // Skip subdomain check for faster redirect - just go directly
         const protocol = window.location.protocol;
         const baseDomain = hostname.split('.').slice(-2).join('.');
         window.location.href = `${protocol}//${tenantSlug}.${baseDomain}/crm`;
@@ -486,7 +528,7 @@ const Connexion = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: "Erreur",
@@ -505,6 +547,9 @@ const Connexion = () => {
       return;
     }
 
+    // IMPORTANT: set target BEFORE sign-in to avoid redirect race
+    sessionStorage.setItem('loginTarget', loginType);
+
     setLoading(true);
     // CRITICAL: Set flag BEFORE signIn to prevent any redirect
     smsFlowActive.current = true;
@@ -512,8 +557,10 @@ const Connexion = () => {
 
     try {
       const result = await signIn(email, password);
-      
+
       if (result.error) {
+        // Remove target when login fails
+        sessionStorage.removeItem('loginTarget');
         smsFlowActive.current = false;
         toast({
           title: "Erreur de connexion",
@@ -533,9 +580,7 @@ const Connexion = () => {
           description: "Un code de vérification va être envoyé par SMS.",
         });
       } else {
-        // No SMS required - set target FIRST, then clear flag
-        // This ensures the redirect useEffect sees the correct target
-        sessionStorage.setItem('loginTarget', loginType);
+        // No SMS required - clear flag and let redirect effect run
         smsFlowActive.current = false;
         toast({
           title: "Connexion réussie",
@@ -543,6 +588,7 @@ const Connexion = () => {
         });
       }
     } catch (error: any) {
+      sessionStorage.removeItem('loginTarget');
       smsFlowActive.current = false;
       toast({
         title: "Erreur",
@@ -556,16 +602,19 @@ const Connexion = () => {
 
   const handleSmsVerified = async () => {
     console.log("[Connexion] SMS verified successfully");
-    
+
+    // IMPORTANT: target was set before sign-in; clear it once SMS flow completes
+    sessionStorage.removeItem('loginTarget');
+
     // Clear SMS state
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
-    
+
     setLoading(true);
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
+
       if (!currentUser) {
         smsFlowActive.current = false;
         toast({
@@ -575,24 +624,24 @@ const Connexion = () => {
         });
         return;
       }
-      
+
       // Get user role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', currentUser.id)
         .maybeSingle();
-      
+
       const role = roleData?.role || 'client';
-      
+
       toast({
         title: "Connexion réussie",
         description: `Bienvenue sur votre espace ${displayName}.`,
       });
-      
+
       // Now we can clear the flag and redirect
       smsFlowActive.current = false;
-      
+
       if (role === 'king') {
         navigate("/king/wizard");
       } else if (loginType === 'client') {
@@ -614,6 +663,7 @@ const Connexion = () => {
 
   const handleSmsCancelled = async () => {
     console.log("[Connexion] SMS verification cancelled");
+    sessionStorage.removeItem('loginTarget');
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();
