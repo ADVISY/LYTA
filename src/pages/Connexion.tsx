@@ -29,6 +29,14 @@ interface LoginFormProps {
   onResetPassword: () => void;
 }
 
+interface LoginFormTranslations {
+  email: string;
+  password: string;
+  forgotPassword: string;
+  loading: string;
+  loginButton: string;
+}
+
 const LoginForm = ({
   title,
   subtitle,
@@ -40,7 +48,8 @@ const LoginForm = ({
   loading,
   onSubmit,
   onResetPassword,
-}: LoginFormProps) => (
+  translations,
+}: LoginFormProps & { translations: LoginFormTranslations }) => (
   <div className="space-y-0">
     <div className="flex items-center gap-2 mb-6">
       <button
@@ -58,7 +67,7 @@ const LoginForm = ({
 
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{translations.email}</Label>
         <Input
           id="email"
           type="email"
@@ -70,7 +79,7 @@ const LoginForm = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Mot de passe</Label>
+        <Label htmlFor="password">{translations.password}</Label>
         <Input
           id="password"
           type="password"
@@ -84,7 +93,7 @@ const LoginForm = ({
           className="text-xs text-primary hover:underline"
           onClick={onResetPassword}
         >
-          Mot de passe oublié ?
+          {translations.forgotPassword}
         </button>
       </div>
 
@@ -93,7 +102,7 @@ const LoginForm = ({
         disabled={loading}
         className="w-full mt-6"
       >
-        {loading ? "Chargement..." : "Se connecter"}
+        {loading ? translations.loading : translations.loginButton}
       </Button>
     </form>
   </div>
@@ -105,15 +114,28 @@ interface ChoiceScreenProps {
   onSuperAdminClick: () => void;
   showSuperAdmin?: boolean;
   isTenantMode?: boolean;
+  translations: {
+    welcome: string;
+    welcomePlatform: string;
+    selectSpace: string;
+    clientSpace: string;
+    clientSpaceDesc: string;
+    teamSpace: string;
+    teamSpaceDesc: string;
+    lytaMember: string;
+    lytaMemberDesc: string;
+    superAdmin: string;
+    superAdminDesc: string;
+  };
 }
 
-const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuperAdmin = true, isTenantMode = false }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuperAdmin = true, isTenantMode = false, translations }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
       <h2 className="text-xl font-bold text-foreground mb-2">
-        {isTenantMode ? "Bienvenue" : "Bienvenue sur LYTA"}
+        {isTenantMode ? translations.welcome : translations.welcomePlatform}
       </h2>
-      <p className="text-sm text-muted-foreground">Sélectionnez votre espace</p>
+      <p className="text-sm text-muted-foreground">{translations.selectSpace}</p>
     </div>
 
     <div className="space-y-4">
@@ -127,8 +149,8 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
             <User className="h-8 w-8" />
           </div>
           <div className="text-left">
-            <h3 className="text-lg font-bold text-foreground">ESPACE CLIENT</h3>
-            <p className="text-sm text-muted-foreground">Accédez à votre espace personnel</p>
+            <h3 className="text-lg font-bold text-foreground">{translations.clientSpace}</h3>
+            <p className="text-sm text-muted-foreground">{translations.clientSpaceDesc}</p>
           </div>
         </button>
       )}
@@ -143,10 +165,10 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
         </div>
         <div className="text-left">
           <h3 className="text-lg font-bold text-foreground">
-            {isTenantMode ? "ESPACE TEAM" : "MEMBRE LYTA"}
+            {isTenantMode ? translations.teamSpace : translations.lytaMember}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {isTenantMode ? "CRM & Gestion des contrats" : "Support & Développement"}
+            {isTenantMode ? translations.teamSpaceDesc : translations.lytaMemberDesc}
           </p>
         </div>
       </button>
@@ -161,8 +183,8 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
             <Crown className="h-8 w-8" />
           </div>
           <div className="text-left">
-            <h3 className="text-lg font-bold text-amber-600">SUPER ADMIN</h3>
-            <p className="text-sm text-muted-foreground">Accès plateforme</p>
+            <h3 className="text-lg font-bold text-amber-600">{translations.superAdmin}</h3>
+            <p className="text-sm text-muted-foreground">{translations.superAdminDesc}</p>
           </div>
         </button>
       )}
@@ -173,9 +195,17 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
 interface TeamChoiceScreenProps {
   onBack: () => void;
   onCRMLogin: () => void;
+  translations: {
+    teamSpace: string;
+    whatToDo: string;
+    connectCRM: string;
+    connectCRMDesc: string;
+    depositContract: string;
+    depositContractDesc: string;
+  };
 }
 
-const TeamChoiceScreen = ({ onBack, onCRMLogin }: TeamChoiceScreenProps) => (
+const TeamChoiceScreen = ({ onBack, onCRMLogin, translations }: TeamChoiceScreenProps) => (
   <div className="space-y-6">
     <div className="flex items-center gap-2 mb-4">
       <button
@@ -186,8 +216,8 @@ const TeamChoiceScreen = ({ onBack, onCRMLogin }: TeamChoiceScreenProps) => (
         <ChevronLeft className="h-5 w-5" />
       </button>
       <div>
-        <h2 className="text-xl font-bold text-foreground">Espace Team</h2>
-        <p className="text-sm text-muted-foreground">Que souhaitez-vous faire ?</p>
+        <h2 className="text-xl font-bold text-foreground">{translations.teamSpace}</h2>
+        <p className="text-sm text-muted-foreground">{translations.whatToDo}</p>
       </div>
     </div>
 
@@ -200,8 +230,8 @@ const TeamChoiceScreen = ({ onBack, onCRMLogin }: TeamChoiceScreenProps) => (
           <LayoutDashboard className="h-7 w-7" />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground text-lg">Se connecter au CRM</h3>
-          <p className="text-sm text-muted-foreground">Accédez à votre espace de gestion</p>
+          <h3 className="font-semibold text-foreground text-lg">{translations.connectCRM}</h3>
+          <p className="text-sm text-muted-foreground">{translations.connectCRMDesc}</p>
         </div>
       </button>
 
@@ -213,8 +243,8 @@ const TeamChoiceScreen = ({ onBack, onCRMLogin }: TeamChoiceScreenProps) => (
           <FileUp className="h-7 w-7" />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground text-lg">Déposer un contrat</h3>
-          <p className="text-sm text-muted-foreground">Soumettez rapidement un nouveau contrat</p>
+          <h3 className="font-semibold text-foreground text-lg">{translations.depositContract}</h3>
+          <p className="text-sm text-muted-foreground">{translations.depositContractDesc}</p>
         </div>
       </Link>
     </div>
@@ -227,9 +257,16 @@ interface ResetPasswordFormProps {
   loading: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onBack: () => void;
+  translations: {
+    resetPassword: string;
+    resetPasswordDesc: string;
+    email: string;
+    sending: string;
+    sendLink: string;
+  };
 }
 
-const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack }: ResetPasswordFormProps) => (
+const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack, translations }: ResetPasswordFormProps) => (
   <div className="space-y-0">
     <div className="flex items-center gap-2 mb-6">
       <button
@@ -240,14 +277,14 @@ const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack }: Reset
         <ChevronLeft className="h-5 w-5" />
       </button>
       <div>
-        <h2 className="text-xl font-bold text-foreground">Réinitialiser le mot de passe</h2>
-        <p className="text-sm text-muted-foreground">Entrez votre email pour recevoir un lien</p>
+        <h2 className="text-xl font-bold text-foreground">{translations.resetPassword}</h2>
+        <p className="text-sm text-muted-foreground">{translations.resetPasswordDesc}</p>
       </div>
     </div>
 
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="reset-email">Email</Label>
+        <Label htmlFor="reset-email">{translations.email}</Label>
         <Input
           id="reset-email"
           type="email"
@@ -263,13 +300,14 @@ const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack }: Reset
         disabled={loading}
         className="w-full mt-6"
       >
-        {loading ? "Envoi en cours..." : "Envoyer le lien"}
+        {loading ? translations.sending : translations.sendLink}
       </Button>
     </form>
   </div>
 );
 
 const Connexion = () => {
+  const { t } = useTranslation();
   const { tenant, isLoading: tenantLoading } = useTenant();
   const [view, setView] = useState<View>("choice");
   const [loginType, setLoginType] = useState<"client" | "team" | "king">("client");
@@ -296,6 +334,46 @@ const Connexion = () => {
 
   // Track if redirect is in progress to prevent duplicate calls
   const redirectInProgress = useRef(false);
+
+  // Translation objects for sub-components
+  const loginTranslations = {
+    email: t('auth.email'),
+    password: t('auth.password'),
+    forgotPassword: t('auth.forgotPassword'),
+    loading: t('auth.loggingIn'),
+    loginButton: t('auth.loginButton'),
+  };
+
+  const choiceTranslations = {
+    welcome: t('auth.welcome'),
+    welcomePlatform: t('auth.welcomePlatform', 'Bienvenue sur LYTA'),
+    selectSpace: t('auth.selectSpace'),
+    clientSpace: t('auth.clientSpace'),
+    clientSpaceDesc: t('auth.clientSpaceDesc'),
+    teamSpace: t('auth.teamSpace'),
+    teamSpaceDesc: t('auth.teamSpaceDesc'),
+    lytaMember: t('auth.lytaMember', 'MEMBRE LYTA'),
+    lytaMemberDesc: t('auth.lytaMemberDesc', 'Support & Développement'),
+    superAdmin: t('auth.superAdmin'),
+    superAdminDesc: t('auth.superAdminDesc'),
+  };
+
+  const teamChoiceTranslations = {
+    teamSpace: t('auth.teamSpace'),
+    whatToDo: t('auth.whatToDo', 'Que souhaitez-vous faire ?'),
+    connectCRM: t('auth.connectCRM', 'Se connecter au CRM'),
+    connectCRMDesc: t('auth.connectCRMDesc', 'Accédez à votre espace de gestion'),
+    depositContract: t('auth.depositContract', 'Déposer un contrat'),
+    depositContractDesc: t('auth.depositContractDesc', 'Soumettez rapidement un nouveau contrat'),
+  };
+
+  const resetPasswordTranslations = {
+    resetPassword: t('auth.resetPassword'),
+    resetPasswordDesc: t('auth.resetPasswordDesc', 'Entrez votre email pour recevoir un lien'),
+    email: t('auth.email'),
+    sending: t('auth.sending', 'Envoi en cours...'),
+    sendLink: t('auth.sendLink', 'Envoyer le lien'),
+  };
 
   // Handle redirect after successful login (only when NOT in SMS flow)
   useEffect(() => {
@@ -718,6 +796,7 @@ const Connexion = () => {
           loading={loading}
           onSubmit={handleResetPassword}
           onBack={() => setIsResetPassword(false)}
+          translations={resetPasswordTranslations}
         />
       );
     }
@@ -726,8 +805,8 @@ const Connexion = () => {
       case "client":
         return (
           <LoginForm 
-            title="Espace Client" 
-            subtitle="Connectez-vous à votre espace personnel"
+            title={t('auth.clientSpace')} 
+            subtitle={t('auth.clientSpaceDesc')}
             onBack={() => { resetForm(); setView("choice"); }}
             email={email}
             setEmail={setEmail}
@@ -736,6 +815,7 @@ const Connexion = () => {
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
+            translations={loginTranslations}
           />
         );
       case "team":
@@ -743,13 +823,14 @@ const Connexion = () => {
           <TeamChoiceScreen
             onBack={() => setView("choice")}
             onCRMLogin={() => { setLoginType("team"); setView("team-login"); }}
+            translations={teamChoiceTranslations}
           />
         );
       case "team-login":
         return (
           <LoginForm 
-            title="Connexion CRM" 
-            subtitle="Accédez à votre espace de gestion"
+            title={t('auth.crmLogin', 'Connexion CRM')} 
+            subtitle={t('auth.crmLoginDesc', 'Accédez à votre espace de gestion')}
             onBack={() => { resetForm(); setView("team"); }}
             email={email}
             setEmail={setEmail}
@@ -758,13 +839,14 @@ const Connexion = () => {
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
+            translations={loginTranslations}
           />
         );
       case "king":
         return (
           <LoginForm 
-            title="SUPER ADMIN" 
-            subtitle="Connexion plateforme"
+            title={t('auth.superAdmin')} 
+            subtitle={t('auth.superAdminDesc')}
             onBack={() => { resetForm(); setView("choice"); }}
             email={email}
             setEmail={setEmail}
@@ -773,6 +855,7 @@ const Connexion = () => {
             loading={loading}
             onSubmit={handleSubmit}
             onResetPassword={() => setIsResetPassword(true)}
+            translations={loginTranslations}
           />
         );
       default:
@@ -783,6 +866,7 @@ const Connexion = () => {
             onSuperAdminClick={() => { resetForm(); setLoginType("king"); setView("king"); }}
             showSuperAdmin={!tenant}
             isTenantMode={!!tenant}
+            translations={choiceTranslations}
           />
         );
     }
