@@ -78,16 +78,58 @@ serve(async (req: Request): Promise<Response> => {
       .update({ attempts: verification.attempts + 1 })
       .eq("id", verification.id);
 
-    // Verify code
-    if (verification.code !== code) {
-      const remainingAttempts = verification.max_attempts - verification.attempts - 1;
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Code incorrect. ${remainingAttempts} tentative(s) restante(s).` 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // Check if using Twilio Verify API
+    const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const TWILIO_VERIFY_SERVICE_SID = Deno.env.get("TWILIO_VERIFY_SERVICE_SID");
+
+    const useTwilioVerify = verification.code === "TWILIO_VERIFY" && 
+      TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_VERIFY_SERVICE_SID;
+
+    if (useTwilioVerify) {
+      // Use Twilio Verify API to check code
+      const twilioResponse = await fetch(
+        `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/VerificationCheck`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            To: verification.phone_number,
+            Code: code,
+          }),
+        }
       );
+
+      const twilioData = await twilioResponse.json();
+
+      if (!twilioResponse.ok || twilioData.status !== "approved") {
+        console.error("Twilio Verify check failed:", twilioData);
+        const remainingAttempts = verification.max_attempts - verification.attempts - 1;
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Code incorrect. ${remainingAttempts} tentative(s) restante(s).` 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`Twilio Verify check approved for ${verification.phone_number}`);
+    } else {
+      // Fallback: verify code stored in database (simulation mode)
+      if (verification.code !== code) {
+        const remainingAttempts = verification.max_attempts - verification.attempts - 1;
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Code incorrect. ${remainingAttempts} tentative(s) restante(s).` 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Mark as verified

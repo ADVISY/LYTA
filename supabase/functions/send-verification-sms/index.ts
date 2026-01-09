@@ -29,11 +29,18 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("userId et phoneNumber sont requis");
     }
 
-    // Generate a 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Expires in 5 minutes
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    // Normalize phone number to E.164 format
+    const normalizePhone = (value: string) => {
+      let v = (value || "").trim().replace(/[^\d+]/g, "");
+      if (!v) return v;
+      if (v.startsWith("00")) v = "+" + v.slice(2);
+      if (v.startsWith("+")) return v;
+      if (v.startsWith("41") && v.length >= 11) return "+" + v;
+      if (v.startsWith("0")) return "+41" + v.slice(1);
+      return "+41" + v;
+    };
+
+    const formattedPhone = normalizePhone(phoneNumber);
 
     // Delete any existing pending verifications for this user/type
     await supabase
@@ -43,93 +50,49 @@ serve(async (req: Request): Promise<Response> => {
       .eq("verification_type", verificationType)
       .is("verified_at", null);
 
-    // Insert new verification record
-    const { error: insertError } = await supabase
-      .from("sms_verifications")
-      .insert({
-        user_id: userId,
-        phone_number: phoneNumber,
-        code,
-        verification_type: verificationType,
-        expires_at: expiresAt,
-        metadata: metadata || null,
-      });
-
-    if (insertError) {
-      console.error("Error inserting verification:", insertError);
-      throw new Error("Erreur lors de la création du code de vérification");
-    }
-
-    // Send SMS via Twilio
+    // Check Twilio Verify credentials
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-    const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
+    const TWILIO_VERIFY_SERVICE_SID = Deno.env.get("TWILIO_VERIFY_SERVICE_SID");
 
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.log("SMS simulation mode - Twilio non configuré");
-      console.log(`Code de vérification pour ${phoneNumber}: ${code}`);
-      
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_VERIFY_SERVICE_SID) {
+      // Simulation mode - generate a local code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+      console.log("SMS simulation mode - Twilio Verify non configuré");
+      console.log(`Code de vérification pour ${formattedPhone}: ${code}`);
+
+      const { error: insertError } = await supabase
+        .from("sms_verifications")
+        .insert({
+          user_id: userId,
+          phone_number: formattedPhone,
+          code,
+          verification_type: verificationType,
+          expires_at: expiresAt,
+          metadata: metadata || null,
+        });
+
+      if (insertError) {
+        console.error("Error inserting verification:", insertError);
+        throw new Error("Erreur lors de la création du code de vérification");
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           simulated: true,
           message: "Code envoyé (simulation)",
-          // Only return code in simulation mode for testing
           testCode: code,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Normalize phone numbers (Switzerland default) and prevent invalid Twilio sends
-    const normalizePhone = (value: string) => {
-      let v = (value || "").trim();
-      if (!v) return v;
-
-      // Keep only digits and a possible leading '+'
-      v = v.replace(/[^\d+]/g, "");
-
-      // Convert international prefix 00 -> +
-      if (v.startsWith("00")) v = "+" + v.slice(2);
-
-      // If already E.164, keep it
-      if (v.startsWith("+")) return v;
-
-      // If number already contains country code (e.g. 41XXXXXXXXX), just prefix '+'
-      if (v.startsWith("41") && v.length >= 11) return "+" + v;
-
-      // Swiss local format (0XXXXXXXXX)
-      if (v.startsWith("0")) return "+41" + v.slice(1);
-
-      // Default: assume Switzerland
-      return "+41" + v;
-    };
-
-    const formattedPhone = normalizePhone(phoneNumber);
-    const formattedFrom = normalizePhone(TWILIO_PHONE_NUMBER);
-
-    // Twilio refuses To === From (error 21266). Fall back to simulation to unblock testing.
-    if (formattedPhone && formattedFrom && formattedPhone === formattedFrom) {
-      console.warn("Twilio misconfigured: To and From are the same", { formattedPhone });
-      console.log(`Code de vérification pour ${formattedPhone}: ${code}`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          simulated: true,
-          message: "Envoi SMS impossible (numéro expéditeur identique au destinataire). Code fourni en mode simulation.",
-          testCode: code,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const message = verificationType === "login" 
-      ? `Votre code de connexion LYTA: ${code}. Valide 5 minutes.`
-      : `Votre code de vérification pour le dépôt de contrat: ${code}. Valide 5 minutes.`;
-
+    // Use Twilio Verify API to send verification code
     const twilioResponse = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/Verifications`,
       {
         method: "POST",
         headers: {
@@ -138,8 +101,7 @@ serve(async (req: Request): Promise<Response> => {
         },
         body: new URLSearchParams({
           To: formattedPhone,
-          From: formattedFrom,
-          Body: message,
+          Channel: "sms",
         }),
       }
     );
@@ -147,11 +109,30 @@ serve(async (req: Request): Promise<Response> => {
     const twilioData = await twilioResponse.json();
 
     if (!twilioResponse.ok) {
-      console.error("Twilio error:", twilioData);
-      throw new Error("Erreur lors de l'envoi du SMS");
+      console.error("Twilio Verify error:", twilioData);
+      throw new Error(twilioData.message || "Erreur lors de l'envoi du SMS");
     }
 
-    console.log(`SMS sent to ${formattedPhone}, SID: ${twilioData.sid}`);
+    console.log(`Twilio Verify SMS sent to ${formattedPhone}, SID: ${twilioData.sid}`);
+
+    // Store verification record (code managed by Twilio, we just track the attempt)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // Twilio Verify codes last 10 min
+    
+    const { error: insertError } = await supabase
+      .from("sms_verifications")
+      .insert({
+        user_id: userId,
+        phone_number: formattedPhone,
+        code: "TWILIO_VERIFY", // Placeholder - Twilio manages the actual code
+        verification_type: verificationType,
+        expires_at: expiresAt,
+        metadata: { ...metadata, twilio_sid: twilioData.sid },
+      });
+
+    if (insertError) {
+      console.error("Error inserting verification record:", insertError);
+      // Don't fail - the SMS was already sent
+    }
 
     return new Response(
       JSON.stringify({
