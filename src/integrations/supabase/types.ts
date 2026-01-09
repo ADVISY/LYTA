@@ -2325,6 +2325,48 @@ export type Database = {
           },
         ]
       }
+      sms_verifications: {
+        Row: {
+          attempts: number | null
+          code: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          max_attempts: number | null
+          metadata: Json | null
+          phone_number: string
+          user_id: string | null
+          verification_type: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          code: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          phone_number: string
+          user_id?: string | null
+          verification_type?: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          code?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          max_attempts?: number | null
+          metadata?: Json | null
+          phone_number?: string
+          user_id?: string | null
+          verification_type?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       suivis: {
         Row: {
           assigned_agent_id: string | null
@@ -3460,6 +3502,7 @@ export type Database = {
       can_access_client: { Args: { client_id: string }; Returns: boolean }
       can_see_commissions_scope: { Args: never; Returns: string }
       can_view_financial_data: { Args: never; Returns: boolean }
+      cleanup_expired_verifications: { Args: never; Returns: undefined }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       create_audit_log: {
         Args: {
@@ -3487,6 +3530,7 @@ export type Database = {
         }
         Returns: string
       }
+      generate_verification_code: { Args: never; Returns: string }
       get_company_contact: {
         Args: {
           p_channel?: string
@@ -3570,6 +3614,10 @@ export type Database = {
         Returns: boolean
       }
       is_king: { Args: never; Returns: boolean }
+      requires_sms_verification: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       schedule_follow_up_reminders: { Args: never; Returns: undefined }
       schedule_renewal_reminders: { Args: never; Returns: undefined }
       trigger_workflows_for_event: {

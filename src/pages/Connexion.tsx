@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTenant } from "@/contexts/TenantContext";
+import { SmsVerificationDialog } from "@/components/auth/SmsVerificationDialog";
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
 
@@ -274,8 +275,13 @@ const Connexion = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSmsVerification, setShowSmsVerification] = useState(false);
+  const [smsVerificationData, setSmsVerificationData] = useState<{
+    userId: string;
+    phoneNumber: string;
+  } | null>(null);
   const { toast } = useToast();
-  const { signIn, resetPassword, user } = useAuth();
+  const { signIn, resetPassword, user, pendingSmsVerification, clearPendingVerification } = useAuth();
   const navigate = useNavigate();
   
   // Get tenant display name and logo
@@ -495,13 +501,24 @@ const Connexion = () => {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      const result = await signIn(email, password);
       
-      if (error) {
+      if (result.error) {
         toast({
           title: "Erreur de connexion",
-          description: "Email ou mot de passe incorrect.",
+          description: result.error.message || "Email ou mot de passe incorrect.",
           variant: "destructive",
+        });
+      } else if (result.requiresSmsVerification && result.userId && result.phoneNumber) {
+        // SMS verification required for king/admin
+        setSmsVerificationData({
+          userId: result.userId,
+          phoneNumber: result.phoneNumber,
+        });
+        setShowSmsVerification(true);
+        toast({
+          title: "Vérification requise",
+          description: "Un code de vérification va être envoyé par SMS.",
         });
       } else {
         // Store the login target in sessionStorage for redirect after auth state changes
@@ -522,6 +539,46 @@ const Connexion = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSmsVerified = async () => {
+    if (!smsVerificationData) return;
+    
+    // Re-login now that SMS is verified
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        toast({
+          title: "Erreur",
+          description: "Erreur lors de la connexion après vérification.",
+          variant: "destructive",
+        });
+      } else {
+        sessionStorage.setItem('loginTarget', loginType);
+        toast({
+          title: "Connexion réussie",
+          description: `Bienvenue sur votre espace ${displayName}.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error re-authenticating after SMS:", error);
+    } finally {
+      setLoading(false);
+      setSmsVerificationData(null);
+      setShowSmsVerification(false);
+    }
+  };
+
+  const handleSmsCancelled = () => {
+    setSmsVerificationData(null);
+    setShowSmsVerification(false);
+    clearPendingVerification();
+    setPassword("");
   };
 
   const resetForm = () => {
@@ -653,6 +710,19 @@ const Connexion = () => {
           {renderContent()}
         </div>
       </main>
+
+      {/* SMS Verification Dialog */}
+      {smsVerificationData && (
+        <SmsVerificationDialog
+          open={showSmsVerification}
+          onOpenChange={setShowSmsVerification}
+          userId={smsVerificationData.userId}
+          phoneNumber={smsVerificationData.phoneNumber}
+          verificationType="login"
+          onVerified={handleSmsVerified}
+          onCancel={handleSmsCancelled}
+        />
+      )}
     </div>
   );
 };
