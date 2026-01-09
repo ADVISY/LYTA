@@ -39,7 +39,18 @@ export function useStripeStats() {
     queryKey: ['king-stripe-stats'],
     queryFn: async (): Promise<StripeStats | null> => {
       try {
-        const { data, error } = await supabase.functions.invoke('king-stripe-stats');
+        // Get session to ensure we have the auth token
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          console.error('No active session');
+          return null;
+        }
+
+        const { data, error } = await supabase.functions.invoke('king-stripe-stats', {
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        });
         
         if (error) {
           console.error('Error fetching Stripe stats:', error);
