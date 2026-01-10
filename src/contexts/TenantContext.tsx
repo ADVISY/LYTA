@@ -200,11 +200,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
         setTenant(formattedTenant);
         
         // Update favicon dynamically based on tenant logo
-        // Force browser to refresh favicon by removing old and adding new link element
-        const existingFavicon = document.getElementById('dynamic-favicon');
-        if (existingFavicon) {
-          existingFavicon.remove();
-        }
+        // Force browser to refresh favicon by removing ALL existing favicons
+        const allFavicons = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+        allFavicons.forEach(favicon => favicon.remove());
         
         const newFavicon = document.createElement('link');
         newFavicon.id = 'dynamic-favicon';
@@ -229,12 +227,16 @@ export function TenantProvider({ children }: TenantProviderProps) {
         } else {
           // No tenant logo - use a generic favicon (first letter of tenant name)
           const initial = (displayName || 'L').charAt(0).toUpperCase();
-          const svgFavicon = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23${formattedTenant.branding?.primary_color?.replace('#', '') || '1a1a2e'}"/><text x="50" y="67" font-size="50" font-family="Arial,sans-serif" font-weight="bold" fill="white" text-anchor="middle">${initial}</text></svg>`;
+          const primaryColor = formattedTenant.branding?.primary_color?.replace('#', '') || '1a1a2e';
+          const svgFavicon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#${primaryColor}"/><text x="50" y="67" font-size="50" font-family="Arial,sans-serif" font-weight="bold" fill="white" text-anchor="middle">${initial}</text></svg>`)}`;
           newFavicon.href = svgFavicon;
           newFavicon.type = 'image/svg+xml';
         }
         
         document.head.appendChild(newFavicon);
+        
+        // Log for debugging
+        console.log('Favicon updated:', newFavicon.href.substring(0, 100));
         
         // Apply tenant branding to CSS variables (convert hex to HSL for Tailwind)
         if (formattedTenant.branding?.primary_color) {
