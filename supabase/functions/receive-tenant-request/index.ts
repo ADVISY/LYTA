@@ -84,6 +84,25 @@ serve(async (req) => {
       });
     }
 
+    // Create KING notification for the new tenant request
+    await supabase.from("king_notifications").insert({
+      kind: "tenant_request",
+      priority: "high",
+      title: `🎉 Nouvelle demande : ${companyName}`,
+      message: `${contactName || 'Nouveau client'} (${contactEmail}) a soumis une demande pour ${subdomain}.lyta.ch avec le plan ${planId || 'start'}.`,
+      tenant_id: tenant.id,
+      tenant_name: companyName,
+      action_label: "Gérer la demande",
+      action_url: `/king/tenants/${tenant.id}`,
+      metadata: {
+        plan_id: planId,
+        subdomain: subdomain,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
+        stripe_session_id: stripeSessionId,
+      }
+    });
+
     // Send notification email to admin
     await sendEmail(
       ["support@lyta.ch"],
@@ -110,9 +129,9 @@ serve(async (req) => {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="https://app.lyta.ch/king/tenants" 
+            <a href="https://app.lyta.ch/king/tenants/${tenant.id}" 
                style="background: #3B82F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              Gérer dans le dashboard
+              Gérer la demande
             </a>
           </div>
         </div>
