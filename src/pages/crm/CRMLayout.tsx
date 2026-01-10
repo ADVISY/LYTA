@@ -96,6 +96,11 @@ export default function CRMLayout() {
   const tenantLogo = tenant?.branding?.logo_url;
   const tenantName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
 
+  // Set page title for CRM/Team space
+  useEffect(() => {
+    document.title = `${tenantName} - Espace Team`;
+  }, [tenantName]);
+
   useEffect(() => {
     const fetchProfile = async () => {
       if (user?.id) {
