@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,7 @@ interface EmailTemplate {
 }
 
 export const EmailComposer = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const { sendEmail } = useCrmEmails();
   const [mode, setMode] = useState<"single" | "bulk">("single");

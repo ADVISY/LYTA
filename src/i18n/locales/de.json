@@ -353,7 +353,8 @@
     "totalCount": "Gesamt",
     "activeCount": "Aktiv",
     "inactiveCount": "Inaktiv",
-    "searchPlaceholder": "Suchen..."
+    "searchPlaceholder": "Suchen...",
+    "system": "System"
   },
   "companies": {
     "title": "Versicherungsgesellschaften",

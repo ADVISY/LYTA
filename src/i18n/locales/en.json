@@ -354,7 +354,8 @@
     "totalCount": "Total",
     "activeCount": "Active",
     "inactiveCount": "Inactive",
-    "searchPlaceholder": "Search..."
+    "searchPlaceholder": "Search...",
+    "system": "System"
   },
   "companies": {
     "title": "Insurance companies",

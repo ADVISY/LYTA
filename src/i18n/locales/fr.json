@@ -329,7 +329,7 @@
       "other": "Autre"
     }
   },
-  "collaborators": {
+"collaborators": {
     "title": "Collaborateurs",
     "newCollaborator": "Nouveau collaborateur",
     "role": "Rôle",
@@ -353,7 +353,8 @@
     "totalCount": "Total",
     "activeCount": "Actifs",
     "inactiveCount": "Inactifs",
-    "searchPlaceholder": "Rechercher..."
+    "searchPlaceholder": "Rechercher...",
+    "system": "Système"
   },
   "companies": {
     "title": "Compagnies d'assurance",

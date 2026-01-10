@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ interface RolesManagerProps {
 }
 
 export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
+  const { t } = useTranslation();
   const { roles, isLoading, createRole, updateRole, deleteRole, duplicateRole, initializeDefaultRoles, refresh } = useTenantRoles();
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -202,8 +204,16 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                       <div>
                         <p className="font-medium text-sm">{role.name}</p>
                         {role.is_system_role && (
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            Système
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-xs mt-1",
+                              selectedRoleId === role.id 
+                                ? "border-primary-foreground/50 text-primary-foreground" 
+                                : "border-primary/50 text-primary"
+                            )}
+                          >
+                            {t('collaborators.system')}
                           </Badge>
                         )}
                       </div>
@@ -230,7 +240,9 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                     <CardTitle className="text-base flex items-center gap-2">
                       {selectedRole.name}
                       {selectedRole.is_system_role && (
-                        <Badge variant="secondary">Système</Badge>
+                        <Badge variant="outline" className="border-primary/50 text-primary">
+                          {t('collaborators.system')}
+                        </Badge>
                       )}
                     </CardTitle>
                     {selectedRole.description && (

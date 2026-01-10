@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -143,6 +144,7 @@ const DEFAULT_TEMPLATES = {
 };
 
 export const EmailTemplatesList = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [templateType, setTemplateType] = useState<"email" | "sms">("email");
@@ -438,9 +440,9 @@ export const EmailTemplatesList = () => {
                     <CardTitle className="text-base line-clamp-1">{template.name}</CardTitle>
                   </div>
                   {template.is_system && (
-                    <Badge variant="secondary" className="gap-1 shrink-0">
+                    <Badge variant="outline" className="gap-1 shrink-0 border-primary/50 text-primary">
                       <Lock className="h-3 w-3" />
-                      Système
+                      {t('collaborators.system')}
                     </Badge>
                   )}
                 </div>
@@ -452,7 +454,7 @@ export const EmailTemplatesList = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Badge variant={template.is_active ? "default" : "secondary"}>
-                      {template.is_active ? "Actif" : "Inactif"}
+                      {template.is_active ? t('collaborators.activeCount') : t('collaborators.inactiveCount')}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-1">

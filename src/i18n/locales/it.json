@@ -353,7 +353,8 @@
     "totalCount": "Totale",
     "activeCount": "Attivi",
     "inactiveCount": "Inattivi",
-    "searchPlaceholder": "Cerca..."
+    "searchPlaceholder": "Cerca...",
+    "system": "Sistema"
   },
   "companies": {
     "title": "Compagnie assicurative",
