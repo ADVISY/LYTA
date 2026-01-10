@@ -50,6 +50,7 @@ import KingWizard from "./pages/king/KingWizard";
 import KingUsers from "./pages/king/KingUsers";
 import KingSecurity from "./pages/king/KingSecurity";
 import KingSettings from "./pages/king/KingSettings";
+import ComplianceReport from "./pages/king/ComplianceReport";
 
 const queryClient = new QueryClient();
 
@@ -101,6 +102,7 @@ const App = () => (
                 <Route path="users" element={<KingUsers />} />
                 <Route path="security" element={<KingSecurity />} />
                 <Route path="settings" element={<KingSettings />} />
+                <Route path="compliance" element={<ComplianceReport />} />
               </Route>
               
               {/* Client Portal Routes */}

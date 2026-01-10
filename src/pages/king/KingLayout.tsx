@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Users,
   Shield,
+  FileCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -28,6 +29,7 @@ const menuItems = [
   { to: "/king/wizard", icon: Wand2, label: "Nouveau Client" },
   { to: "/king/users", icon: Users, label: "Utilisateurs" },
   { to: "/king/security", icon: Shield, label: "Sécurité" },
+  { to: "/king/compliance", icon: FileCheck, label: "Conformité RGPD" },
   { to: "/king/settings", icon: Settings, label: "Paramètres" },
 ];
 
