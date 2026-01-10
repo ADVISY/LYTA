@@ -37,7 +37,7 @@ import {
   Line,
 } from "recharts";
 
-type PeriodFilter = 'week' | 'month' | 'quarter' | 'year';
+type PeriodFilter = 'all' | 'week' | 'month' | 'quarter' | 'year';
 
 export default function CRMDashboard() {
   const { t } = useTranslation();
@@ -51,7 +51,7 @@ export default function CRMDashboard() {
   const { fetchAllParts, fetchPartsForAgent } = useCommissionParts();
   const { notifications, unreadCount, markAsRead } = useNotifications();
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [allCommissionParts, setAllCommissionParts] = useState<any[]>([]);
@@ -103,6 +103,12 @@ export default function CRMDashboard() {
   const periodRange = useMemo(() => {
     const now = new Date();
     switch (periodFilter) {
+      case 'all':
+        // Very old date to now - includes everything
+        return { 
+          start: new Date(2000, 0, 1), 
+          end: new Date(2100, 11, 31, 23, 59, 59, 999) 
+        };
       case 'week':
         const weekStart = startOfWeek(now, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
@@ -442,6 +448,7 @@ export default function CRMDashboard() {
   const canSeeFinancials = dashboardScope === 'global' || isAdmin;
 
   const periodLabels: Record<PeriodFilter, string> = {
+    all: t('common.all'),
     week: t('dashboard.thisWeek'),
     month: t('dashboard.thisMonth'),
     quarter: t('dashboard.thisQuarter'),
@@ -491,6 +498,7 @@ export default function CRMDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">{t('common.all')}</SelectItem>
               <SelectItem value="week">{t('common.week')}</SelectItem>
               <SelectItem value="month">{t('common.month')}</SelectItem>
               <SelectItem value="quarter">{t('common.quarter')}</SelectItem>
