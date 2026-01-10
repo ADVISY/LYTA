@@ -250,6 +250,9 @@
   },
   "companies": {
     "title": "Versicherungsgesellschaften",
+    "subtitle": "Katalog der verfügbaren Versicherungen",
+    "companies": "Gesellschaften",
+    "searchPlaceholder": "Gesellschaft oder Produkt suchen...",
     "newCompany": "Neue Gesellschaft",
     "name": "Name",
     "website": "Webseite",

@@ -294,6 +294,9 @@
   },
   "companies": {
     "title": "Insurance companies",
+    "subtitle": "Available insurance catalog",
+    "companies": "Companies",
+    "searchPlaceholder": "Search for a company or product...",
     "newCompany": "New company",
     "name": "Name",
     "website": "Website",

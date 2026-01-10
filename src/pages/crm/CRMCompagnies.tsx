@@ -29,13 +29,13 @@ type Company = {
   products: Product[];
 };
 
-const categoryLabels: Record<string, { label: string; color: string }> = {
-  health: { label: "Santé", color: "bg-emerald-100 text-emerald-700" },
-  auto: { label: "Auto", color: "bg-blue-100 text-blue-700" },
-  home: { label: "Ménage", color: "bg-amber-100 text-amber-700" },
-  life: { label: "Vie/Prévoyance", color: "bg-violet-100 text-violet-700" },
-  legal: { label: "Juridique", color: "bg-slate-100 text-slate-700" },
-};
+const getCategoryLabels = (t: any): Record<string, { label: string; color: string }> => ({
+  health: { label: t('settings.categoryHealth'), color: "bg-emerald-100 text-emerald-700" },
+  auto: { label: t('settings.categoryAuto'), color: "bg-blue-100 text-blue-700" },
+  home: { label: t('settings.categoryProperty'), color: "bg-amber-100 text-amber-700" },
+  life: { label: t('settings.categoryLife'), color: "bg-violet-100 text-violet-700" },
+  legal: { label: t('settings.categoryLegal'), color: "bg-slate-100 text-slate-700" },
+});
 
 export default function CRMCompagnies() {
   const { t } = useTranslation();
@@ -43,6 +43,7 @@ export default function CRMCompagnies() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openCompanies, setOpenCompanies] = useState<Set<string>>(new Set());
+  const categoryLabels = getCategoryLabels(t);
 
   useEffect(() => {
     fetchCompanies();
@@ -121,8 +122,8 @@ export default function CRMCompagnies() {
             <Building2 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Compagnies & Produits</h1>
-            <p className="text-muted-foreground">Catalogue des assurances disponibles</p>
+            <h1 className="text-3xl font-bold">{t('companies.title')}</h1>
+            <p className="text-muted-foreground">{t('companies.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -131,7 +132,7 @@ export default function CRMCompagnies() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Compagnies</p>
+            <p className="text-sm text-muted-foreground">{t('companies.companies')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
               {companies.length}
             </p>
@@ -139,7 +140,7 @@ export default function CRMCompagnies() {
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Produits</p>
+            <p className="text-sm text-muted-foreground">{t('companies.products')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">
               {totalProducts}
             </p>
@@ -147,7 +148,7 @@ export default function CRMCompagnies() {
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Santé</p>
+            <p className="text-sm text-muted-foreground">{t('settings.categoryHealth')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-violet-500 to-violet-600 bg-clip-text text-transparent">
               {companies.reduce((sum, c) => sum + c.products.filter(p => p.category === 'health').length, 0)}
             </p>
@@ -155,7 +156,7 @@ export default function CRMCompagnies() {
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Auto/Ménage</p>
+            <p className="text-sm text-muted-foreground">{t('settings.categoryAuto')}/{t('settings.categoryProperty')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
               {companies.reduce((sum, c) => sum + c.products.filter(p => ['auto', 'home'].includes(p.category)).length, 0)}
             </p>
@@ -167,7 +168,7 @@ export default function CRMCompagnies() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Rechercher une compagnie ou un produit..."
+          placeholder={t('companies.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -204,7 +205,7 @@ export default function CRMCompagnies() {
                       <div>
                         <CardTitle className="text-lg">{company.name}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          {company.products.length} produit{company.products.length > 1 ? 's' : ''}
+                          {company.products.length} {t('companies.products').toLowerCase()}
                         </p>
                       </div>
                     </div>
@@ -241,11 +242,11 @@ export default function CRMCompagnies() {
                     <TabsList className="mb-4">
                       <TabsTrigger value="products" className="gap-1.5">
                         <Package className="h-4 w-4" />
-                        Produits ({company.products.length})
+                        {t('companies.products')} ({company.products.length})
                       </TabsTrigger>
                       <TabsTrigger value="contacts" className="gap-1.5">
                         <Users className="h-4 w-4" />
-                        Contacts
+                        {t('companies.contacts')}
                       </TabsTrigger>
                     </TabsList>
 

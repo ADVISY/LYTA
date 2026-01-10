@@ -27,27 +27,27 @@ import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
 
-// Couleurs disponibles pour le thème
-const themeColors = [
-  { id: "blue", label: "Bleu", color: "hsl(221, 83%, 53%)", class: "bg-blue-600" },
-  { id: "violet", label: "Violet", color: "hsl(262, 83%, 58%)", class: "bg-violet-600" },
-  { id: "green", label: "Vert", color: "hsl(142, 76%, 36%)", class: "bg-green-600" },
-  { id: "orange", label: "Orange", color: "hsl(24, 95%, 53%)", class: "bg-orange-500" },
-  { id: "red", label: "Rouge", color: "hsl(0, 84%, 60%)", class: "bg-red-500" },
-  { id: "pink", label: "Rose", color: "hsl(330, 81%, 60%)", class: "bg-pink-500" },
-  { id: "teal", label: "Sarcelle", color: "hsl(173, 80%, 40%)", class: "bg-teal-500" },
-  { id: "indigo", label: "Indigo", color: "hsl(239, 84%, 67%)", class: "bg-indigo-500" },
+// Couleurs disponibles pour le thème - needs to be inside component to use translations
+const getThemeColors = (t: any) => [
+  { id: "blue", label: t('settings.blue'), color: "hsl(221, 83%, 53%)", class: "bg-blue-600" },
+  { id: "violet", label: t('settings.violet'), color: "hsl(262, 83%, 58%)", class: "bg-violet-600" },
+  { id: "green", label: t('settings.green'), color: "hsl(142, 76%, 36%)", class: "bg-green-600" },
+  { id: "orange", label: t('settings.orange'), color: "hsl(24, 95%, 53%)", class: "bg-orange-500" },
+  { id: "red", label: t('settings.red'), color: "hsl(0, 84%, 60%)", class: "bg-red-500" },
+  { id: "pink", label: t('settings.pink'), color: "hsl(330, 81%, 60%)", class: "bg-pink-500" },
+  { id: "teal", label: t('settings.teal'), color: "hsl(173, 80%, 40%)", class: "bg-teal-500" },
+  { id: "indigo", label: t('settings.indigo'), color: "hsl(239, 84%, 67%)", class: "bg-indigo-500" },
 ];
 
-const roleLabels: Record<string, string> = {
-  admin: "Administrateur",
-  manager: "Manager",
-  agent: "Agent",
-  backoffice: "Backoffice",
-  compta: "Comptabilité",
-  client: "Client",
-  partner: "Partenaire",
-};
+const getRoleLabels = (t: any): Record<string, string> => ({
+  admin: t('settings.admin'),
+  manager: t('settings.manager'),
+  agent: t('settings.agent'),
+  backoffice: t('settings.backoffice'),
+  compta: t('settings.compta'),
+  client: t('settings.client'),
+  partner: t('settings.partner'),
+});
 
 const roleBadgeColors: Record<string, string> = {
   admin: "bg-red-500",
@@ -66,6 +66,9 @@ export default function CRMParametres() {
   const tenantSeats = useTenantSeats();
   const [activeTab, setActiveTab] = useState("profil");
   const [showUnlockSeatDialog, setShowUnlockSeatDialog] = useState(false);
+  
+  const themeColors = getThemeColors(t);
+  const roleLabels = getRoleLabels(t);
   
   // Profil
   const [profile, setProfile] = useState({
@@ -443,19 +446,19 @@ export default function CRMParametres() {
   const handleCreateAccount = async () => {
     // Validations
     if (!newAccount.email.trim()) {
-      toast.error("L'email est requis");
+      toast.error(t('errors.requiredField'));
       return;
     }
     if (!newAccount.password || newAccount.password.length < 8) {
-      toast.error("Le mot de passe doit contenir au moins 8 caractères");
+      toast.error(t('settings.passwordTooShort'));
       return;
     }
     if (newAccount.password !== newAccount.confirmPassword) {
-      toast.error("Les mots de passe ne correspondent pas");
+      toast.error(t('settings.passwordMismatch'));
       return;
     }
     if (!newAccount.collaborateurId) {
-      toast.error("Veuillez sélectionner un collaborateur");
+      toast.error(t('settings.selectCollaborator'));
       return;
     }
 
@@ -476,7 +479,7 @@ export default function CRMParametres() {
       });
 
       if (response.error) {
-        toast.error(response.error.message || "Erreur lors de la création du compte");
+        toast.error(response.error.message || t('settings.accountCreationError'));
         return;
       }
 
@@ -485,7 +488,7 @@ export default function CRMParametres() {
         return;
       }
 
-      toast.success("Compte créé avec succès");
+      toast.success(t('settings.accountCreated'));
       setIsAddingAccount(false);
       setNewAccount({
         email: "",
@@ -498,21 +501,23 @@ export default function CRMParametres() {
       loadCollaborateurs();
     } catch (error: any) {
       console.error("Error creating account:", error);
-      toast.error("Erreur lors de la création du compte");
+      toast.error(t('settings.accountCreationError'));
     } finally {
       setIsCreatingAccount(false);
     }
   };
 
-  const productCategories = [
-    { id: "health", label: "Santé" },
-    { id: "life", label: "Vie / 3e pilier" },
-    { id: "auto", label: "Auto" },
-    { id: "property", label: "Ménage / RC" },
-    { id: "legal", label: "Protection juridique" },
-    { id: "lpp", label: "LPP" },
-    { id: "other", label: "Autre" },
+  const getProductCategories = () => [
+    { id: "health", label: t('settings.categoryHealth') },
+    { id: "life", label: t('settings.categoryLife') },
+    { id: "auto", label: t('settings.categoryAuto') },
+    { id: "property", label: t('settings.categoryProperty') },
+    { id: "legal", label: t('settings.categoryLegal') },
+    { id: "lpp", label: t('settings.categoryLpp') },
+    { id: "other", label: t('settings.categoryOther') },
   ];
+  
+  const productCategories = getProductCategories();
 
   return (
     <div className="space-y-6">
