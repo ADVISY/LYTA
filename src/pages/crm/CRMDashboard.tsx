@@ -465,7 +465,7 @@ export default function CRMDashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Header with Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -690,9 +690,9 @@ export default function CRMDashboard() {
             </Card>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
+          <div className="grid gap-6 lg:grid-cols-3">
             {/* Main Column - Chart */}
-            <div className="space-y-6">
+            <div className="space-y-6 lg:col-span-2">
               {/* Combined Chart: Contracts + CA */}
               <Card className="border shadow-sm bg-card">
                 <CardHeader className="pb-3">
