@@ -364,13 +364,13 @@ export default function CRMLayout() {
       </div>
 
       {/* Main Content - Only this area scrolls */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0">
         <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1">
           <Outlet />
         </div>
         
-        {/* Footer with support email */}
-        <footer className="border-t border-border bg-muted/30 py-3 px-4 lg:px-6 flex-shrink-0">
+        {/* Footer with support email - sticky at bottom of scroll area */}
+        <footer className="border-t border-border bg-card py-3 px-4 lg:px-6 flex-shrink-0 mt-auto">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-4">
               <span>© {new Date().getFullYear()} LYTA</span>

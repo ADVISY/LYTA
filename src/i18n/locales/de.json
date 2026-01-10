@@ -1145,11 +1145,25 @@
       "createDecommission": "Rückprovision erstellen"
     },
     "email": {
+      "sendEmail": "E-Mail senden",
+      "sendTo": "Senden an {{name}} ({{email}})",
+      "chooseTemplate": "Vorlage wählen",
+      "selectTemplate": "Vorlage auswählen",
+      "sending": "Wird gesendet...",
+      "send": "Senden",
+      "templates": {
+        "welcome": "Willkommen",
+        "welcomeDescription": "Begrüssungs-E-Mail für neue Kunden",
+        "relationClient": "Kundenbeziehung",
+        "relationClientDescription": "Nachverfolgungs- und Kundenbindungs-E-Mail",
+        "specialOffer": "Sonderangebot",
+        "specialOfferDescription": "Werbe-E-Mail mit Rabatten und Angeboten"
+      },
       "welcomeMessage": "Willkommensnachricht",
       "welcomeDesc": "Begrüssungs-E-Mail für neue Kunden",
       "relationMessage": "Kundenbeziehungsnachricht",
       "relationDesc": "Nachverfolgungs- und Kundenbindungs-E-Mail",
-      "specialOffer": "Sonderangebotsnachricht",
+      "specialOfferMsg": "Sonderangebotsnachricht",
       "specialOfferDesc": "Werbe-E-Mail mit Rabatten und Angeboten"
     },
     "mandate": {

@@ -1145,11 +1145,25 @@
       "createDecommission": "Crea decommissione"
     },
     "email": {
+      "sendEmail": "Invia email",
+      "sendTo": "Invia a {{name}} ({{email}})",
+      "chooseTemplate": "Scegli un modello",
+      "selectTemplate": "Seleziona un modello",
+      "sending": "Invio in corso...",
+      "send": "Invia",
+      "templates": {
+        "welcome": "Benvenuto",
+        "welcomeDescription": "Email di benvenuto per nuovi clienti",
+        "relationClient": "Relazione cliente",
+        "relationClientDescription": "Email di follow-up e fidelizzazione",
+        "specialOffer": "Offerta speciale",
+        "specialOfferDescription": "Email promozionale con sconti e offerte"
+      },
       "welcomeMessage": "Messaggio di benvenuto",
       "welcomeDesc": "Email di benvenuto per nuovi clienti",
       "relationMessage": "Messaggio relazione cliente",
       "relationDesc": "Email di follow-up e fidelizzazione",
-      "specialOffer": "Messaggio offerta speciale",
+      "specialOfferMsg": "Messaggio offerta speciale",
       "specialOfferDesc": "Email promozionale con sconti e offerte"
     },
     "mandate": {

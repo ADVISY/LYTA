@@ -1155,11 +1155,25 @@
       "createDecommission": "Create decommission"
     },
     "email": {
+      "sendEmail": "Send email",
+      "sendTo": "Send to {{name}} ({{email}})",
+      "chooseTemplate": "Choose a template",
+      "selectTemplate": "Select a template",
+      "sending": "Sending...",
+      "send": "Send",
+      "templates": {
+        "welcome": "Welcome",
+        "welcomeDescription": "Welcome email for new clients",
+        "relationClient": "Client relationship",
+        "relationClientDescription": "Follow-up and client loyalty email",
+        "specialOffer": "Special offer",
+        "specialOfferDescription": "Promotional email with discounts and offers"
+      },
       "welcomeMessage": "Welcome message",
       "welcomeDesc": "Welcome email for new clients",
       "relationMessage": "Client relationship message",
       "relationDesc": "Follow-up and client loyalty email",
-      "specialOffer": "Special offer message",
+      "specialOfferMsg": "Special offer message",
       "specialOfferDesc": "Promotional email with discounts and offers"
     },
     "mandate": {
