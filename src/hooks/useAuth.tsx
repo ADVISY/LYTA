@@ -3,6 +3,46 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
+/**
+ * Check if a password has been exposed in known data breaches
+ * Uses HaveIBeenPwned API with k-anonymity
+ */
+async function checkPasswordCompromised(password: string): Promise<{ isCompromised: boolean; count: number }> {
+  try {
+    const buffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+    const prefix = hash.slice(0, 5);
+    const suffix = hash.slice(5);
+
+    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'Add-Padding': 'true' },
+    });
+
+    if (!response.ok) {
+      return { isCompromised: false, count: 0 };
+    }
+
+    const text = await response.text();
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      const [hashSuffix, countStr] = line.split(':');
+      if (hashSuffix?.trim().toUpperCase() === suffix) {
+        const count = parseInt(countStr?.trim() || '0', 10);
+        return { isCompromised: count > 0, count };
+      }
+    }
+
+    return { isCompromised: false, count: 0 };
+  } catch (err) {
+    console.error('Error checking password:', err);
+    return { isCompromised: false, count: 0 };
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -137,6 +177,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+    // Check if password has been compromised (HaveIBeenPwned)
+    try {
+      const result = await checkPasswordCompromised(password);
+      if (result.isCompromised) {
+        return { 
+          error: { 
+            message: `Ce mot de passe a été exposé dans ${result.count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.` 
+          } 
+        };
+      }
+    } catch (err) {
+      console.warn('Password check failed, proceeding with signup:', err);
+    }
+
     const redirectUrl = `${window.location.origin}/crm`;
     
     const { error } = await supabase.auth.signUp({
