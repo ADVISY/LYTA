@@ -1,9 +1,58 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.208.0/crypto/mod.ts";
+import { encodeHex } from "https://deno.land/std@0.208.0/encoding/hex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+/**
+ * Check if a password has been exposed in known data breaches
+ * Uses HaveIBeenPwned API with k-anonymity (only first 5 chars of SHA-1 sent)
+ */
+async function checkPasswordCompromised(password: string): Promise<{ isCompromised: boolean; count: number }> {
+  try {
+    // Hash the password with SHA-1
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+    const hash = encodeHex(new Uint8Array(hashBuffer)).toUpperCase();
+
+    // Use k-anonymity: send only first 5 characters
+    const prefix = hash.slice(0, 5);
+    const suffix = hash.slice(5);
+
+    // Query the HaveIBeenPwned API
+    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: {
+        "Add-Padding": "true",
+        "User-Agent": "Lovable-Security-Check",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn("HaveIBeenPwned API unavailable:", response.status);
+      return { isCompromised: false, count: 0 };
+    }
+
+    const text = await response.text();
+    const lines = text.split("\n");
+
+    for (const line of lines) {
+      const [hashSuffix, countStr] = line.split(":");
+      if (hashSuffix?.trim().toUpperCase() === suffix) {
+        const count = parseInt(countStr?.trim() || "0", 10);
+        return { isCompromised: count > 0, count };
+      }
+    }
+
+    return { isCompromised: false, count: 0 };
+  } catch (err) {
+    console.error("Error checking password:", err);
+    return { isCompromised: false, count: 0 };
+  }
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -122,6 +171,19 @@ Deno.serve(async (req) => {
     if (!validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ error: "Rôle invalide" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if password has been compromised (HaveIBeenPwned)
+    const { isCompromised, count } = await checkPasswordCompromised(password);
+    if (isCompromised) {
+      console.warn(`Password found in ${count} data breaches`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Ce mot de passe a été exposé dans ${count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.`,
+          code: "PASSWORD_COMPROMISED"
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
