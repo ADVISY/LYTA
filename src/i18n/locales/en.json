@@ -54,7 +54,14 @@
     "allTypes": "All types",
     "unknown": "Unknown",
     "unknownClient": "Unknown client",
-    "unknownProduct": "Unknown product"
+    "unknownProduct": "Unknown product",
+    "select": "Select",
+    "saving": "Saving...",
+    "update": "Update",
+    "month": "month",
+    "year": "year",
+    "week": "week",
+    "quarter": "quarter"
   },
   "auth": {
     "login": "Login",
@@ -899,34 +906,57 @@
       "contract": "Contract",
       "remuneration": "Remuneration"
     },
-    "collaborator": {
+    "collaborateur": {
+      "newTitle": "New collaborator",
+      "editTitle": "Edit collaborator",
+      "tabs": {
+        "info": "Information",
+        "contract": "Contract",
+        "remuneration": "Remuneration"
+      },
       "firstName": "First name",
       "lastName": "Last name",
       "email": "Email",
       "phone": "Phone",
       "function": "Function",
       "status": "Status",
-      "active": "Active",
-      "inactive": "Inactive",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
       "manager": "Assigned manager",
       "noManager": "No manager",
-      "managerHint": "The manager receives a commission on their team's deals",
+      "managerNote": "The manager receives a commission on their team's deals",
       "contractType": "Contract type",
-      "workPercentage": "Work percentage (%)",
+      "activityRate": "Work percentage (%)",
       "hireDate": "Hire date",
       "fixedSalary": "Monthly fixed salary (CHF)",
       "personalCommissions": "Personal commissions (Agent)",
-      "personalCommissionsHint": "Rates applied to this collaborator's personal deals",
-      "generalRate": "General commission (%)",
-      "lcaRate": "LCA commission (%)",
-      "vieRate": "VIE commission (%)",
+      "personalCommissionsNote": "Rates applied to this collaborator's personal deals",
+      "generalCommission": "General commission (%)",
+      "lcaCommission": "LCA commission (%)",
+      "vieCommission": "VIE commission (%)",
       "teamCommissions": "Team commissions (Manager)",
-      "teamLcaRate": "Team LCA commission (%)",
-      "teamVieRate": "Team VIE commission (%)",
-      "teamCommissionsHint": "Percentage automatically added to commissions when a team member signs a contract",
+      "teamLcaCommission": "Team LCA commission (%)",
+      "teamVieCommission": "Team VIE commission (%)",
+      "teamCommissionsNote": "Percentage automatically added to commissions when a team member signs a contract",
       "bonusRate": "Bonus rate (%)",
-      "reserveRate": "Reserve rate (%)",
-      "reserveHint": "Withholding on commissions for the reserve account"
+      "reserveAccount": "Reserve account",
+      "reserveNote": "Withholding on commissions for the reserve account",
+      "reserveOptions": {
+        "none": "No reserve (0%)",
+        "standard": "Standard (10%)",
+        "high": "High (20%)"
+      },
+      "preview": {
+        "title": "Preview",
+        "fixedSalary": "Fixed salary",
+        "generalCommission": "General commission",
+        "lcaCommission": "LCA commission",
+        "vieCommission": "VIE commission",
+        "teamLca": "Team LCA commission",
+        "teamVie": "Team VIE commission",
+        "bonus": "Bonus",
+        "reserve": "Reserve"
+      }
     },
     "professions": {
       "agent": "Agent",

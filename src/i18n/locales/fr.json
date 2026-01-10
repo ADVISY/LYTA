@@ -54,7 +54,10 @@
     "allTypes": "Tous les types",
     "unknown": "Inconnu",
     "unknownClient": "Client inconnu",
-    "unknownProduct": "Produit inconnu"
+    "unknownProduct": "Produit inconnu",
+    "select": "Sélectionner",
+    "saving": "Enregistrement...",
+    "update": "Mettre à jour"
   },
   "auth": {
     "login": "Connexion",
@@ -953,34 +956,57 @@
       "contract": "Contrat",
       "remuneration": "Rémunération"
     },
-    "collaborator": {
+    "collaborateur": {
+      "newTitle": "Nouveau collaborateur",
+      "editTitle": "Modifier le collaborateur",
+      "tabs": {
+        "info": "Informations",
+        "contract": "Contrat",
+        "remuneration": "Rémunération"
+      },
       "firstName": "Prénom",
       "lastName": "Nom",
       "email": "Email",
       "phone": "Téléphone",
       "function": "Fonction",
       "status": "Statut",
-      "active": "Actif",
-      "inactive": "Inactif",
+      "statusActive": "Actif",
+      "statusInactive": "Inactif",
       "manager": "Manager attitré",
       "noManager": "Aucun manager",
-      "managerHint": "Le manager reçoit une commission sur les affaires de son équipe",
+      "managerNote": "Le manager reçoit une commission sur les affaires de son équipe",
       "contractType": "Type de contrat",
-      "workPercentage": "Taux d'activité (%)",
+      "activityRate": "Taux d'activité (%)",
       "hireDate": "Date d'embauche",
       "fixedSalary": "Salaire fixe mensuel (CHF)",
       "personalCommissions": "Commissions personnelles (Agent)",
-      "personalCommissionsHint": "Taux appliqués sur les affaires personnelles de ce collaborateur",
-      "generalRate": "Commission générale (%)",
-      "lcaRate": "Commission LCA (%)",
-      "vieRate": "Commission VIE (%)",
+      "personalCommissionsNote": "Taux appliqués sur les affaires personnelles de ce collaborateur",
+      "generalCommission": "Commission générale (%)",
+      "lcaCommission": "Commission LCA (%)",
+      "vieCommission": "Commission VIE (%)",
       "teamCommissions": "Commissions équipe (Manager)",
-      "teamLcaRate": "Commission équipe LCA (%)",
-      "teamVieRate": "Commission équipe VIE (%)",
-      "teamCommissionsHint": "Pourcentage automatiquement ajouté aux commissions quand un membre de son équipe signe un contrat",
+      "teamLcaCommission": "Commission équipe LCA (%)",
+      "teamVieCommission": "Commission équipe VIE (%)",
+      "teamCommissionsNote": "Pourcentage automatiquement ajouté aux commissions quand un membre de son équipe signe un contrat",
       "bonusRate": "Taux de bonus (%)",
-      "reserveRate": "Taux de réserve (%)",
-      "reserveHint": "Retenue sur les commissions pour le compte de réserve"
+      "reserveAccount": "Compte de réserve",
+      "reserveNote": "Retenue sur les commissions pour le compte de réserve",
+      "reserveOptions": {
+        "none": "Pas de réserve (0%)",
+        "standard": "Standard (10%)",
+        "high": "Élevé (20%)"
+      },
+      "preview": {
+        "title": "Prévisualisation",
+        "fixedSalary": "Salaire fixe",
+        "generalCommission": "Commission générale",
+        "lcaCommission": "Commission LCA",
+        "vieCommission": "Commission VIE",
+        "teamLca": "Commission équipe LCA",
+        "teamVie": "Commission équipe VIE",
+        "bonus": "Bonus",
+        "reserve": "Réserve"
+      }
     },
     "professions": {
       "agent": "Agent",
