@@ -3597,6 +3597,7 @@ export type Database = {
           secondary_color: string
           tenant_id: string
           tenant_name: string
+          tenant_plan: string
           tenant_status: string
         }[]
       }

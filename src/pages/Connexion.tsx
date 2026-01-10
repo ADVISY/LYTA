@@ -114,6 +114,7 @@ interface ChoiceScreenProps {
   onSuperAdminClick: () => void;
   showSuperAdmin?: boolean;
   isTenantMode?: boolean;
+  hasClientPortal?: boolean;
   translations: {
     welcome: string;
     welcomePlatform: string;
@@ -129,7 +130,7 @@ interface ChoiceScreenProps {
   };
 }
 
-const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuperAdmin = true, isTenantMode = false, translations }: ChoiceScreenProps) => (
+const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuperAdmin = true, isTenantMode = false, hasClientPortal = false, translations }: ChoiceScreenProps) => (
   <div className="space-y-8">
     <div className="text-center">
       <h2 className="text-xl font-bold text-foreground mb-2">
@@ -139,8 +140,8 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
     </div>
 
     <div className="space-y-4">
-      {/* Client Access - Only for tenants */}
-      {isTenantMode && (
+      {/* Client Access - Only for tenants with client_portal module (Prime/Founder) */}
+      {isTenantMode && hasClientPortal && (
         <button
           onClick={onClientClick}
           className="w-full flex items-center gap-4 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
@@ -308,7 +309,7 @@ const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack, transla
 
 const Connexion = () => {
   const { t } = useTranslation();
-  const { tenant, isLoading: tenantLoading } = useTenant();
+  const { tenant, isLoading: tenantLoading, hasClientPortal } = useTenant();
   const [view, setView] = useState<View>("choice");
   const [loginType, setLoginType] = useState<"client" | "team" | "king">("client");
   const [isResetPassword, setIsResetPassword] = useState(false);
@@ -866,6 +867,7 @@ const Connexion = () => {
             onSuperAdminClick={() => { resetForm(); setLoginType("king"); setView("king"); }}
             showSuperAdmin={!tenant}
             isTenantMode={!!tenant}
+            hasClientPortal={hasClientPortal}
             translations={choiceTranslations}
           />
         );
