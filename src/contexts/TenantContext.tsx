@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { TenantPlan } from "@/config/plans";
+import { TenantPlan, isModuleEnabled } from "@/config/plans";
 
 interface Tenant {
   id: string;
@@ -30,6 +30,7 @@ interface TenantContextType {
   tenantId: string | null;
   isLoading: boolean;
   error: string | null;
+  hasClientPortal: boolean;
 }
 
 const TenantContext = createContext<TenantContextType>({
@@ -37,6 +38,7 @@ const TenantContext = createContext<TenantContextType>({
   tenantId: null,
   isLoading: true,
   error: null,
+  hasClientPortal: false,
 });
 
 export const useTenant = () => useContext(TenantContext);
@@ -178,6 +180,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
           slug: slug,
           email: '', // Not needed for branding display
           status: tenantBranding.tenant_status,
+          plan: (tenantBranding.tenant_plan as TenantPlan) || 'start',
           branding: {
             logo_url: tenantBranding.logo_url || null,
             primary_color: tenantBranding.primary_color || null,
@@ -240,12 +243,16 @@ export function TenantProvider({ children }: TenantProviderProps) {
     loadTenant();
   }, []);
 
+  // Check if tenant has client portal module
+  const hasClientPortal = tenant?.plan ? isModuleEnabled(tenant.plan, 'client_portal') : false;
+
   return (
     <TenantContext.Provider value={{ 
       tenant, 
       tenantId: tenant?.id || null, 
       isLoading, 
-      error 
+      error,
+      hasClientPortal
     }}>
       {children}
     </TenantContext.Provider>
