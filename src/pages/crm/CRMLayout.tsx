@@ -182,7 +182,7 @@ export default function CRMLayout() {
   );
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       {/* Welcome Message */}
       {showWelcome && (
         <WelcomeMessage
@@ -193,114 +193,112 @@ export default function CRMLayout() {
         />
       )}
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Fixed, no scroll */}
       <TooltipProvider>
-        <aside className="hidden lg:flex flex-col bg-card border-r border-border">
+        <aside className={cn(
+          "hidden lg:flex flex-col bg-card border-r border-border h-screen flex-shrink-0 transition-all duration-300",
+          sidebarCollapsed ? "w-20" : "w-72"
+        )}>
           {/* Logo Section */}
-          <div className="w-72 p-6 border-b border-border">
+          <div className="p-4 border-b border-border flex-shrink-0">
             <div className="flex items-center justify-between">
-              {tenantLogo ? (
+              {!sidebarCollapsed && tenantLogo ? (
                 <img 
                   src={tenantLogo} 
                   alt={tenantName} 
-                  className="h-14 object-contain"
+                  className="h-10 object-contain"
                 />
-              ) : (
+              ) : !sidebarCollapsed ? (
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-8 w-8 text-primary" />
-                  <span className="text-xl font-bold">{tenantName}</span>
+                  <Building2 className="h-6 w-6 text-primary" />
+                  <span className="text-lg font-bold truncate">{tenantName}</span>
+                </div>
+              ) : (
+                <Building2 className="h-6 w-6 text-primary mx-auto" />
+              )}
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-1">
+                  <LanguageSelector />
+                  <SoundToggle />
+                  <ThemeToggle />
                 </div>
               )}
-              <div className="flex items-center gap-1">
-                <LanguageSelector />
-                <SoundToggle />
-                <ThemeToggle />
-              </div>
             </div>
-            {tenant && (
-              <div className="mt-2 px-2 py-1 bg-primary/10 rounded text-xs text-primary font-medium text-center">
-                {tenantName}
+            {!sidebarCollapsed && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <p className="text-xs text-muted-foreground capitalize">
+                  {role} • en ligne
+                </p>
               </div>
             )}
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <p className="text-xs text-muted-foreground capitalize">
-                {role} • en ligne
-              </p>
-            </div>
           </div>
 
-          {/* Collapsible Navigation Section */}
-          <div className={cn(
-            "flex-1 flex flex-col transition-all duration-300",
-            sidebarCollapsed ? "w-20" : "w-72"
-          )}>
-            {/* Collapse Toggle Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="absolute -right-3 top-[140px] z-20 h-6 w-6 rounded-full border bg-white shadow-md hover:bg-primary hover:text-white transition-all"
-            >
-              {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-            </Button>
+          {/* Navigation - Takes remaining space but doesn't scroll */}
+          <nav className={cn("flex-1 overflow-y-auto", sidebarCollapsed ? "p-2" : "p-3")}>
+            <NavItems collapsed={sidebarCollapsed} />
+          </nav>
 
-            {/* Navigation */}
-            <nav className={cn("flex-1 overflow-y-auto relative", sidebarCollapsed ? "p-2" : "p-4")}>
-              <NavItems collapsed={sidebarCollapsed} />
-            </nav>
+          {/* Collapse Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="absolute -right-3 top-24 z-20 h-6 w-6 rounded-full border bg-background shadow-md hover:bg-primary hover:text-white transition-all"
+          >
+            {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+          </Button>
 
-            {/* User Section */}
-            <div className={cn("border-t border-border", sidebarCollapsed ? "p-2" : "p-4")}>
-              {sidebarCollapsed ? (
-                <div className="flex flex-col items-center gap-2">
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center cursor-pointer">
-                        <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{getUserDisplayName()}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 rounded-lg hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => signOut()}
-                      >
-                        <LogOut className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{t('auth.logout')}</TooltipContent>
-                  </Tooltip>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-muted">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
-                      </div>
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
+          {/* User Section - Fixed at bottom, always visible */}
+          <div className={cn("border-t border-border bg-card flex-shrink-0", sidebarCollapsed ? "p-2" : "p-3")}>
+            {sidebarCollapsed ? (
+              <div className="flex flex-col items-center gap-2">
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center cursor-pointer">
+                      <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{role}</p>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{getUserDisplayName()}</TooltipContent>
+                </Tooltip>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-lg hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => signOut()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('auth.logout')}</TooltipContent>
+                </Tooltip>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-muted">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <span className="text-sm font-bold text-primary">{getUserInitials()}</span>
                     </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
                   </div>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => signOut()}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {t('auth.logout')}
-                  </Button>
-                </>
-              )}
-            </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{role}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {t('auth.logout')}
+                </Button>
+              </>
+            )}
           </div>
         </aside>
       </TooltipProvider>
@@ -326,42 +324,42 @@ export default function CRMLayout() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
-              <div className="p-6 border-b border-border flex flex-col items-center">
-                {tenantLogo ? (
-                  <img src={tenantLogo} alt={tenantName} className="h-14 object-contain" />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-8 w-8 text-primary" />
-                    <span className="text-xl font-bold">{tenantName}</span>
-                  </div>
-                )}
-                <p className="text-sm font-medium mt-2">{tenantName}</p>
-                <p className="text-xs text-muted-foreground capitalize">{role}</p>
-              </div>
-              <nav className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
-                <NavItems onItemClick={() => setMobileMenuOpen(false)} />
-              </nav>
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-card">
-                <p className="text-sm font-medium mb-4 truncate px-2">{getUserDisplayName()}</p>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => signOut()}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {t('auth.logout')}
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+              <SheetContent side="left" className="w-80 p-0 flex flex-col">
+                <div className="p-6 border-b border-border flex flex-col items-center flex-shrink-0">
+                  {tenantLogo ? (
+                    <img src={tenantLogo} alt={tenantName} className="h-14 object-contain" />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-8 w-8 text-primary" />
+                      <span className="text-xl font-bold">{tenantName}</span>
+                    </div>
+                  )}
+                  <p className="text-sm font-medium mt-2">{tenantName}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{role}</p>
+                </div>
+                <nav className="flex-1 p-4 overflow-y-auto">
+                  <NavItems onItemClick={() => setMobileMenuOpen(false)} />
+                </nav>
+                <div className="p-4 border-t border-border bg-card flex-shrink-0">
+                  <p className="text-sm font-medium mb-4 truncate px-2">{getUserDisplayName()}</p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {t('auth.logout')}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
+      {/* Main Content - Only this area scrolls */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full">
           <Outlet />
         </div>
       </main>
