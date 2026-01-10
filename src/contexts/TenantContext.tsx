@@ -191,8 +191,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
         };
 
         // Update page title dynamically based on tenant
-        const tenantDisplayName = formattedTenant.branding?.display_name || formattedTenant.name;
-        document.title = `${tenantDisplayName} - Espace Client`;
+        // Note: The actual page title will be set by CRMLayout or ClientLayout based on context
 
         setTenant(formattedTenant);
         
