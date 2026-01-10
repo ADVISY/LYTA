@@ -810,7 +810,7 @@ const handler = async (req: Request): Promise<Response> => {
     const senderEmail = branding?.email_sender_address;
     const fromAddress = senderEmail && senderEmail.includes('@') 
       ? `${senderName} <${senderEmail}>`
-      : `${senderName} <onboarding@resend.dev>`;
+      : `${senderName} <support@lyta.ch>`;
 
     // Send email via Resend API
     const emailResponse = await fetch("https://api.resend.com/emails", {
