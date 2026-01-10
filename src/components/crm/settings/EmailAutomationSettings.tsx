@@ -6,8 +6,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEmailAutomation } from "@/hooks/useEmailAutomation";
 import { Mail, Bell, Calendar, Clock, Send, UserCheck, FileSignature, PartyPopper } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const EmailAutomationSettings = () => {
+  const { t } = useTranslation();
   const { settings, isLoading, updateSettings, isUpdating } = useEmailAutomation();
 
   if (isLoading) {
@@ -24,7 +26,7 @@ export const EmailAutomationSettings = () => {
       <Card>
         <CardContent className="pt-6">
           <p className="text-muted-foreground text-center">
-            Aucun paramètre d'automatisation trouvé pour ce tenant.
+            {t("emailAutomation.noSettings")}
           </p>
         </CardContent>
       </Card>
@@ -44,15 +46,15 @@ export const EmailAutomationSettings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Déclencheurs automatiques */}
+      {/* Triggered emails */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="h-5 w-5 text-primary" />
-            Emails déclenchés automatiquement
+            {t("emailAutomation.triggeredTitle")}
           </CardTitle>
           <CardDescription>
-            Ces emails sont envoyés automatiquement lors d'événements spécifiques
+            {t("emailAutomation.triggeredDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -60,9 +62,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="auto_welcome_email">Email de bienvenue</Label>
+                <Label htmlFor="auto_welcome_email">{t("emailAutomation.welcomeEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Envoyé lors de la création d'un nouveau client
+                  {t("emailAutomation.welcomeEmailDesc")}
                 </p>
               </div>
             </div>
@@ -80,9 +82,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <FileSignature className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="auto_contract_deposit_email">Notification dépôt contrat</Label>
+                <Label htmlFor="auto_contract_deposit_email">{t("emailAutomation.contractDepositEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Envoyé au tenant et au client lors d'un dépôt de contrat
+                  {t("emailAutomation.contractDepositEmailDesc")}
                 </p>
               </div>
             </div>
@@ -100,9 +102,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <FileSignature className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="auto_contract_signed_email">Confirmation signature contrat</Label>
+                <Label htmlFor="auto_contract_signed_email">{t("emailAutomation.contractSignedEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Envoyé au client après la signature d'un contrat
+                  {t("emailAutomation.contractSignedEmailDesc")}
                 </p>
               </div>
             </div>
@@ -120,9 +122,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <FileSignature className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="auto_mandat_signed_email">Email mandat signé</Label>
+                <Label htmlFor="auto_mandat_signed_email">{t("emailAutomation.mandatSignedEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Envoyé avec les identifiants après signature du mandat
+                  {t("emailAutomation.mandatSignedEmailDesc")}
                 </p>
               </div>
             </div>
@@ -140,9 +142,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <UserCheck className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="auto_account_created_email">Identifiants de connexion</Label>
+                <Label htmlFor="auto_account_created_email">{t("emailAutomation.accountCreatedEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Envoyé lors de la création d'un compte espace client
+                  {t("emailAutomation.accountCreatedEmailDesc")}
                 </p>
               </div>
             </div>
@@ -156,15 +158,15 @@ export const EmailAutomationSettings = () => {
         </CardContent>
       </Card>
 
-      {/* Emails programmés */}
+      {/* Scheduled emails */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
-            Emails programmés automatiquement
+            {t("emailAutomation.scheduledTitle")}
           </CardTitle>
           <CardDescription>
-            Ces emails sont programmés et envoyés selon un calendrier défini
+            {t("emailAutomation.scheduledDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -173,9 +175,9 @@ export const EmailAutomationSettings = () => {
               <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div className="space-y-0.5">
-                  <Label htmlFor="enable_renewal_reminder">Rappel renouvellement</Label>
+                  <Label htmlFor="enable_renewal_reminder">{t("emailAutomation.renewalReminder")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Rappel envoyé avant l'échéance d'un contrat
+                    {t("emailAutomation.renewalReminderDesc")}
                   </p>
                 </div>
               </div>
@@ -189,7 +191,7 @@ export const EmailAutomationSettings = () => {
             {settings.enable_renewal_reminder && (
               <div className="ml-7 flex items-center gap-2">
                 <Label htmlFor="renewal_reminder_days_before" className="text-sm text-muted-foreground whitespace-nowrap">
-                  Envoyer
+                  {t("emailAutomation.sendDaysBefore")}
                 </Label>
                 <Input
                   id="renewal_reminder_days_before"
@@ -201,7 +203,7 @@ export const EmailAutomationSettings = () => {
                   onChange={(e) => handleNumberChange("renewal_reminder_days_before", e.target.value)}
                   disabled={isUpdating}
                 />
-                <span className="text-sm text-muted-foreground">jours avant l'échéance</span>
+                <span className="text-sm text-muted-foreground">{t("emailAutomation.daysBeforeExpiry")}</span>
               </div>
             )}
           </div>
@@ -213,9 +215,9 @@ export const EmailAutomationSettings = () => {
               <div className="flex items-center gap-3">
                 <Bell className="h-4 w-4 text-muted-foreground" />
                 <div className="space-y-0.5">
-                  <Label htmlFor="enable_follow_up_reminder">Rappel suivi client</Label>
+                  <Label htmlFor="enable_follow_up_reminder">{t("emailAutomation.followUpReminder")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Rappel envoyé aux agents pour les suivis programmés
+                    {t("emailAutomation.followUpReminderDesc")}
                   </p>
                 </div>
               </div>
@@ -234,9 +236,9 @@ export const EmailAutomationSettings = () => {
             <div className="flex items-center gap-3">
               <PartyPopper className="h-4 w-4 text-muted-foreground" />
               <div className="space-y-0.5">
-                <Label htmlFor="enable_birthday_email">Email anniversaire</Label>
+                <Label htmlFor="enable_birthday_email">{t("emailAutomation.birthdayEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Email de vœux envoyé le jour de l'anniversaire du client
+                  {t("emailAutomation.birthdayEmailDesc")}
                 </p>
               </div>
             </div>

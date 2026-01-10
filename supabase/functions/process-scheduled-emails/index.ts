@@ -30,17 +30,192 @@ interface TenantBranding {
   company_website: string | null;
   company_email: string | null;
   email_footer_text: string | null;
+  default_language: string | null;
 }
 
-function generateEmailWrapper(content: string, branding: TenantBranding): string {
+type SupportedLanguage = 'fr' | 'de' | 'it' | 'en';
+
+// Translations for emails
+const translations: Record<SupportedLanguage, {
+  renewal: {
+    title: string;
+    greeting: (name: string) => string;
+    body: (product: string, date: string) => string;
+    cta: string;
+    contactUs: string;
+  };
+  followUp: {
+    title: string;
+    greeting: (name: string) => string;
+    body: (clientName: string) => string;
+    cta: string;
+  };
+  birthday: {
+    title: string;
+    greeting: (name: string) => string;
+    body: (company: string) => string;
+    thanks: string;
+    wish: string;
+  };
+  footer: (company: string, year: number) => string;
+}> = {
+  fr: {
+    renewal: {
+      title: "Rappel de renouvellement",
+      greeting: (name) => `Bonjour ${name},`,
+      body: (product, date) => `Nous vous informons que votre contrat <strong>${product}</strong> arrive à échéance le <strong>${date}</strong>.`,
+      cta: "Afin de vous assurer une continuité de couverture, nous vous invitons à prendre contact avec votre conseiller pour discuter du renouvellement de votre contrat.",
+      contactUs: "Nous contacter"
+    },
+    followUp: {
+      title: "Rappel de suivi",
+      greeting: (name) => `Bonjour ${name},`,
+      body: (clientName) => `Vous avez un suivi prévu aujourd'hui pour <strong>${clientName}</strong>.`,
+      cta: "N'oubliez pas de mettre à jour le statut du suivi une fois terminé."
+    },
+    birthday: {
+      title: "🎂 Joyeux anniversaire !",
+      greeting: (name) => `Cher(e) ${name},`,
+      body: (company) => `Toute l'équipe de ${company} vous souhaite un très joyeux anniversaire !`,
+      thanks: "Nous vous remercions pour votre confiance et restons à votre disposition pour toute question concernant vos assurances.",
+      wish: "Excellente journée ! 🎉"
+    },
+    footer: (company, year) => `© ${year} ${company}. Tous droits réservés.`
+  },
+  de: {
+    renewal: {
+      title: "Erneuerungserinnerung",
+      greeting: (name) => `Guten Tag ${name},`,
+      body: (product, date) => `Wir informieren Sie, dass Ihr Vertrag <strong>${product}</strong> am <strong>${date}</strong> abläuft.`,
+      cta: "Um eine Kontinuität des Versicherungsschutzes zu gewährleisten, kontaktieren Sie bitte Ihren Berater, um die Verlängerung Ihres Vertrags zu besprechen.",
+      contactUs: "Kontaktieren Sie uns"
+    },
+    followUp: {
+      title: "Nachverfolgungs-Erinnerung",
+      greeting: (name) => `Guten Tag ${name},`,
+      body: (clientName) => `Sie haben heute eine Nachverfolgung geplant für <strong>${clientName}</strong>.`,
+      cta: "Vergessen Sie nicht, den Nachverfolgungsstatus nach Abschluss zu aktualisieren."
+    },
+    birthday: {
+      title: "🎂 Herzlichen Glückwunsch zum Geburtstag!",
+      greeting: (name) => `Liebe(r) ${name},`,
+      body: (company) => `Das gesamte Team von ${company} wünscht Ihnen alles Gute zum Geburtstag!`,
+      thanks: "Wir danken Ihnen für Ihr Vertrauen und stehen Ihnen für alle Fragen zu Ihren Versicherungen zur Verfügung.",
+      wish: "Einen wunderschönen Tag! 🎉"
+    },
+    footer: (company, year) => `© ${year} ${company}. Alle Rechte vorbehalten.`
+  },
+  it: {
+    renewal: {
+      title: "Promemoria di rinnovo",
+      greeting: (name) => `Buongiorno ${name},`,
+      body: (product, date) => `La informiamo che il suo contratto <strong>${product}</strong> scade il <strong>${date}</strong>.`,
+      cta: "Per garantire la continuità della copertura, la invitiamo a contattare il suo consulente per discutere il rinnovo del contratto.",
+      contactUs: "Contattaci"
+    },
+    followUp: {
+      title: "Promemoria follow-up",
+      greeting: (name) => `Buongiorno ${name},`,
+      body: (clientName) => `Hai un follow-up programmato oggi per <strong>${clientName}</strong>.`,
+      cta: "Non dimenticare di aggiornare lo stato del follow-up una volta completato."
+    },
+    birthday: {
+      title: "🎂 Buon compleanno!",
+      greeting: (name) => `Caro/a ${name},`,
+      body: (company) => `Tutto il team di ${company} ti augura un felicissimo compleanno!`,
+      thanks: "Ti ringraziamo per la tua fiducia e restiamo a tua disposizione per qualsiasi domanda sulle tue assicurazioni.",
+      wish: "Ottima giornata! 🎉"
+    },
+    footer: (company, year) => `© ${year} ${company}. Tutti i diritti riservati.`
+  },
+  en: {
+    renewal: {
+      title: "Renewal reminder",
+      greeting: (name) => `Hello ${name},`,
+      body: (product, date) => `We inform you that your <strong>${product}</strong> contract expires on <strong>${date}</strong>.`,
+      cta: "To ensure continuity of coverage, please contact your advisor to discuss the renewal of your contract.",
+      contactUs: "Contact us"
+    },
+    followUp: {
+      title: "Follow-up reminder",
+      greeting: (name) => `Hello ${name},`,
+      body: (clientName) => `You have a follow-up scheduled today for <strong>${clientName}</strong>.`,
+      cta: "Don't forget to update the follow-up status once completed."
+    },
+    birthday: {
+      title: "🎂 Happy birthday!",
+      greeting: (name) => `Dear ${name},`,
+      body: (company) => `The entire team at ${company} wishes you a very happy birthday!`,
+      thanks: "We thank you for your trust and remain at your disposal for any questions regarding your insurance.",
+      wish: "Have a great day! 🎉"
+    },
+    footer: (company, year) => `© ${year} ${company}. All rights reserved.`
+  }
+};
+
+// Subject translations
+const subjectTranslations: Record<SupportedLanguage, {
+  renewal: (productName: string) => string;
+  followUp: (title: string) => string;
+  birthday: (clientName: string) => string;
+}> = {
+  fr: {
+    renewal: (productName) => `Rappel: Votre contrat ${productName} arrive à échéance`,
+    followUp: (title) => `Rappel: Suivi prévu - ${title}`,
+    birthday: (clientName) => `🎂 Joyeux anniversaire ${clientName} !`
+  },
+  de: {
+    renewal: (productName) => `Erinnerung: Ihr Vertrag ${productName} läuft ab`,
+    followUp: (title) => `Erinnerung: Geplante Nachverfolgung - ${title}`,
+    birthday: (clientName) => `🎂 Herzlichen Glückwunsch zum Geburtstag ${clientName}!`
+  },
+  it: {
+    renewal: (productName) => `Promemoria: Il tuo contratto ${productName} sta per scadere`,
+    followUp: (title) => `Promemoria: Follow-up programmato - ${title}`,
+    birthday: (clientName) => `🎂 Buon compleanno ${clientName}!`
+  },
+  en: {
+    renewal: (productName) => `Reminder: Your ${productName} contract is expiring`,
+    followUp: (title) => `Reminder: Scheduled follow-up - ${title}`,
+    birthday: (clientName) => `🎂 Happy birthday ${clientName}!`
+  }
+};
+
+function getLanguage(preferredLang: string | null, tenantDefault: string | null): SupportedLanguage {
+  const lang = preferredLang || tenantDefault || 'fr';
+  if (['fr', 'de', 'it', 'en'].includes(lang)) {
+    return lang as SupportedLanguage;
+  }
+  return 'fr';
+}
+
+function formatDate(dateString: string, lang: SupportedLanguage): string {
+  const date = new Date(dateString);
+  const locales: Record<SupportedLanguage, string> = {
+    fr: 'fr-CH',
+    de: 'de-CH',
+    it: 'it-CH',
+    en: 'en-GB'
+  };
+  return date.toLocaleDateString(locales[lang]);
+}
+
+function generateEmailWrapper(content: string, branding: TenantBranding, lang: SupportedLanguage): string {
   const primaryColor = branding.primary_color || '#0EA5E9';
   const companyName = branding.display_name || 'Lyta';
   const logoUrl = branding.logo_url || 'https://hjedkkpmfzhtdzotskiv.supabase.co/storage/v1/object/public/documents/lyta-logo.png';
-  const footerText = branding.email_footer_text || `© ${new Date().getFullYear()} ${companyName}. Tous droits réservés.`;
+  const footerText = branding.email_footer_text || translations[lang].footer(companyName, new Date().getFullYear());
+  
+  const langAttr: Record<SupportedLanguage, string> = {
+    fr: 'fr',
+    de: 'de',
+    it: 'it',
+    en: 'en'
+  };
   
   return `
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang="${langAttr[lang]}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -72,7 +247,7 @@ function generateEmailWrapper(content: string, branding: TenantBranding): string
                     ${footerText}
                   </p>
                   ${branding.company_address ? `<p style="margin: 0; color: #94a3b8; font-size: 12px;">${branding.company_address}</p>` : ''}
-                  ${branding.company_phone ? `<p style="margin: 5px 0 0 0; color: #94a3b8; font-size: 12px;">Tél: ${branding.company_phone}</p>` : ''}
+                  ${branding.company_phone ? `<p style="margin: 5px 0 0 0; color: #94a3b8; font-size: 12px;">Tel: ${branding.company_phone}</p>` : ''}
                 </td>
               </tr>
             </table>
@@ -84,28 +259,29 @@ function generateEmailWrapper(content: string, branding: TenantBranding): string
   `;
 }
 
-function generateRenewalReminderContent(policyData: any, branding: TenantBranding): string {
+function generateRenewalReminderContent(policyData: any, branding: TenantBranding, lang: SupportedLanguage): string {
   const primaryColor = branding.primary_color || '#0EA5E9';
-  const clientName = policyData.client_name || 'Cher(e) client(e)';
-  const endDate = new Date(policyData.end_date).toLocaleDateString('fr-CH');
-  const productName = policyData.product_name || 'votre assurance';
+  const clientName = policyData.client_name || translations[lang].birthday.greeting('').replace(/[,:]/, '').trim();
+  const endDate = formatDate(policyData.end_date, lang);
+  const productName = policyData.product_name || '';
+  const t = translations[lang].renewal;
   
   return `
-    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">Rappel de renouvellement</h1>
+    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">${t.title}</h1>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Bonjour ${clientName},
+      ${t.greeting(clientName)}
     </p>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Nous vous informons que votre contrat <strong>${productName}</strong> arrive à échéance le <strong>${endDate}</strong>.
+      ${t.body(productName, endDate)}
     </p>
     <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Afin de vous assurer une continuité de couverture, nous vous invitons à prendre contact avec votre conseiller pour discuter du renouvellement de votre contrat.
+      ${t.cta}
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
       <tr>
         <td style="background-color: ${primaryColor}; border-radius: 8px;">
           <a href="${branding.company_website || '#'}" style="display: inline-block; padding: 14px 30px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px;">
-            Nous contacter
+            ${t.contactUs}
           </a>
         </td>
       </tr>
@@ -113,49 +289,51 @@ function generateRenewalReminderContent(policyData: any, branding: TenantBrandin
   `;
 }
 
-function generateFollowUpReminderContent(suiviData: any, branding: TenantBranding): string {
+function generateFollowUpReminderContent(suiviData: any, branding: TenantBranding, lang: SupportedLanguage): string {
   const primaryColor = branding.primary_color || '#0EA5E9';
-  const agentName = suiviData.agent_name || 'Conseiller';
-  const clientName = suiviData.client_name || 'Client';
-  const title = suiviData.title || 'Suivi à effectuer';
+  const agentName = suiviData.agent_name || '';
+  const clientName = suiviData.client_name || '';
+  const title = suiviData.title || '';
   const description = suiviData.description || '';
+  const t = translations[lang].followUp;
   
   return `
-    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">Rappel de suivi</h1>
+    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">${t.title}</h1>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Bonjour ${agentName},
+      ${t.greeting(agentName)}
     </p>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Vous avez un suivi prévu aujourd'hui pour <strong>${clientName}</strong>.
+      ${t.body(clientName)}
     </p>
     <div style="background-color: #f8fafc; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
       <h3 style="margin: 0 0 10px 0; color: #1e293b; font-size: 18px;">${title}</h3>
       ${description ? `<p style="margin: 0; color: #64748b; font-size: 14px;">${description}</p>` : ''}
     </div>
     <p style="margin: 20px 0 0 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      N'oubliez pas de mettre à jour le statut du suivi une fois terminé.
+      ${t.cta}
     </p>
   `;
 }
 
-function generateBirthdayContent(clientData: any, branding: TenantBranding): string {
+function generateBirthdayContent(clientData: any, branding: TenantBranding, lang: SupportedLanguage): string {
   const primaryColor = branding.primary_color || '#0EA5E9';
-  const clientName = clientData.name || 'Cher(e) client(e)';
-  const companyName = branding.display_name || 'Notre équipe';
+  const clientName = clientData.name || '';
+  const companyName = branding.display_name || 'Lyta';
+  const t = translations[lang].birthday;
   
   return `
-    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">🎂 Joyeux anniversaire !</h1>
+    <h1 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">${t.title}</h1>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Cher(e) ${clientName},
+      ${t.greeting(clientName)}
     </p>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Toute l'équipe de ${companyName} vous souhaite un très joyeux anniversaire !
+      ${t.body(companyName)}
     </p>
     <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-      Nous vous remercions pour votre confiance et restons à votre disposition pour toute question concernant vos assurances.
+      ${t.thanks}
     </p>
     <p style="margin: 20px 0 0 0; color: ${primaryColor}; font-size: 18px; font-weight: 600; text-align: center;">
-      Excellente journée ! 🎉
+      ${t.wish}
     </p>
   `;
 }
@@ -208,6 +386,7 @@ serve(async (req) => {
         let subject = '';
         let recipientEmail = '';
         let recipientName = '';
+        let lang: SupportedLanguage = 'fr';
 
         if (email.email_type === 'renewal_reminder' && email.target_type === 'policy') {
           // Get policy data with client info
@@ -215,7 +394,7 @@ serve(async (req) => {
             .from('policies')
             .select(`
               *,
-              client:clients(first_name, last_name, email, company_name),
+              client:clients(first_name, last_name, email, company_name, user_id),
               product:insurance_products(name)
             `)
             .eq('id', email.target_id)
@@ -228,12 +407,25 @@ serve(async (req) => {
               `${clientData.first_name} ${clientData.last_name || ''}` : 
               clientData.company_name || '';
             
-            subject = `Rappel: Votre contrat ${(policy.product as any)?.name || ''} arrive à échéance`;
+            // Get user preferred language if exists
+            if (clientData.user_id) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('preferred_language')
+                .eq('id', clientData.user_id)
+                .single();
+              
+              lang = getLanguage(profile?.preferred_language, tenantBranding.default_language);
+            } else {
+              lang = getLanguage(null, tenantBranding.default_language);
+            }
+            
+            subject = subjectTranslations[lang].renewal((policy.product as any)?.name || '');
             emailContent = generateRenewalReminderContent({
               client_name: recipientName,
               end_date: policy.end_date,
               product_name: (policy.product as any)?.name
-            }, tenantBranding);
+            }, tenantBranding, lang);
           }
         } else if (email.email_type === 'follow_up' && email.target_type === 'suivi') {
           // Get suivi data with client and agent info
@@ -242,7 +434,7 @@ serve(async (req) => {
             .select(`
               *,
               client:clients(first_name, last_name, email),
-              agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email)
+              agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email, preferred_language)
             `)
             .eq('id', email.target_id)
             .single();
@@ -253,23 +445,26 @@ serve(async (req) => {
             recipientEmail = agentData.email;
             recipientName = `${agentData.first_name || ''} ${agentData.last_name || ''}`.trim();
             
+            // Use agent's preferred language
+            lang = getLanguage(agentData.preferred_language, tenantBranding.default_language);
+            
             const clientName = clientData ? 
               `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() : 
-              'Client';
+              '';
             
-            subject = `Rappel: Suivi prévu - ${suivi.title}`;
+            subject = subjectTranslations[lang].followUp(suivi.title);
             emailContent = generateFollowUpReminderContent({
               agent_name: recipientName,
               client_name: clientName,
               title: suivi.title,
               description: suivi.description
-            }, tenantBranding);
+            }, tenantBranding, lang);
           }
         } else if (email.email_type === 'birthday' && email.target_type === 'client') {
           // Get client data
           const { data: client } = await supabase
             .from('clients')
-            .select('first_name, last_name, email, company_name')
+            .select('first_name, last_name, email, company_name, user_id')
             .eq('id', email.target_id)
             .single();
 
@@ -279,10 +474,23 @@ serve(async (req) => {
               `${client.first_name} ${client.last_name || ''}` : 
               client.company_name || '';
             
-            subject = `🎂 Joyeux anniversaire ${recipientName} !`;
+            // Get user preferred language if exists
+            if (client.user_id) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('preferred_language')
+                .eq('id', client.user_id)
+                .single();
+              
+              lang = getLanguage(profile?.preferred_language, tenantBranding.default_language);
+            } else {
+              lang = getLanguage(null, tenantBranding.default_language);
+            }
+            
+            subject = subjectTranslations[lang].birthday(recipientName);
             emailContent = generateBirthdayContent({
               name: recipientName
-            }, tenantBranding);
+            }, tenantBranding, lang);
           }
         }
 
@@ -293,7 +501,7 @@ serve(async (req) => {
             ? `${senderName} <${senderEmail}>` 
             : `${senderName} <onboarding@resend.dev>`;
 
-          const html = generateEmailWrapper(emailContent, tenantBranding);
+          const html = generateEmailWrapper(emailContent, tenantBranding, lang);
 
           const { error: sendError } = await resend.emails.send({
             from: fromAddress,
@@ -312,7 +520,7 @@ serve(async (req) => {
               })
               .eq('id', email.id);
           } else {
-            console.log(`Email ${email.id} sent successfully to ${recipientEmail}`);
+            console.log(`Email ${email.id} sent successfully to ${recipientEmail} in ${lang}`);
             await supabase
               .from('scheduled_emails')
               .update({ 
@@ -322,7 +530,7 @@ serve(async (req) => {
               .eq('id', email.id);
           }
 
-          results.push({ id: email.id, status: sendError ? 'failed' : 'sent' });
+          results.push({ id: email.id, status: sendError ? 'failed' : 'sent', language: lang });
         } else {
           console.log(`Email ${email.id} skipped - no recipient or content`);
           await supabase
