@@ -1,14 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, FileCheck, TrendingUp, Crown, ArrowUpRight, ArrowDownRight, Activity, Zap, DollarSign, CreditCard, AlertTriangle, ChevronRight, Sparkles, Target, PieChart } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Building2, Users, FileCheck, TrendingUp, Crown, ArrowUpRight, ArrowDownRight, DollarSign, CreditCard, AlertTriangle, ChevronRight, Target, PieChart, Bell, Activity, TrendingDown, Percent } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart as RechartsPie, Pie } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell } from "recharts";
 import { useStripeStats } from "@/hooks/useStripeStats";
 import { PLAN_CONFIGS, TenantPlan } from "@/config/plans";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { KingNotificationsInbox } from "@/components/king/KingNotificationsInbox";
+import { useKingNotifications } from "@/hooks/useKingNotifications";
+import { formatDistanceToNow, subDays } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const PLAN_COLORS: Record<TenantPlan, string> = {
   start: '#64748b',
@@ -19,27 +22,35 @@ const PLAN_COLORS: Record<TenantPlan, string> = {
 
 export default function KingDashboard() {
   const navigate = useNavigate();
+  const { unreadCount } = useKingNotifications();
 
   // Stripe revenue stats
   const { data: stripeStats, isLoading: stripeLoading } = useStripeStats();
 
-  // Platform stats
+  // Platform stats with extended KPIs
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['king-dashboard-stats'],
+    queryKey: ['king-dashboard-stats-extended'],
     queryFn: async () => {
-      const [tenantsResult, usersResult, policiesResult, commissionsResult] = await Promise.all([
-        supabase.from('tenants').select('id, status, plan, billing_status, created_at'),
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const sevenDaysAgo = subDays(new Date(), 7);
+
+      const [tenantsResult, usersResult, policiesResult] = await Promise.all([
+        supabase.from('tenants').select('id, status, plan, billing_status, payment_status, tenant_status, mrr_amount, created_at, last_activity_at'),
         supabase.from('user_tenant_assignments').select('id', { count: 'exact' }),
         supabase.from('policies').select('id', { count: 'exact' }),
-        supabase.from('commissions').select('amount'),
       ]);
 
       const tenants = tenantsResult.data || [];
-      const activeCount = tenants.filter(t => t.status === 'active').length;
+      const activeCount = tenants.filter(t => t.status === 'active' || t.tenant_status === 'active').length;
       const testCount = tenants.filter(t => t.status === 'test').length;
-      const pendingCount = tenants.filter(t => t.status === 'pending').length;
-      const trialCount = tenants.filter(t => t.billing_status === 'trial').length;
+      const pendingCount = tenants.filter(t => t.status === 'pending' || t.tenant_status === 'pending_setup').length;
+      const suspendedCount = tenants.filter(t => t.status === 'suspended' || t.tenant_status === 'suspended').length;
       
+      // Payment status counts
+      const paidCount = tenants.filter(t => t.billing_status === 'paid' || t.payment_status === 'paid').length;
+      const pastDueCount = tenants.filter(t => t.billing_status === 'past_due' || t.payment_status === 'past_due').length;
+      const trialCount = tenants.filter(t => t.billing_status === 'trial' || t.payment_status === 'trialing').length;
+
       // Plan distribution
       const planDistribution = {
         start: tenants.filter(t => t.plan === 'start').length,
@@ -47,82 +58,57 @@ export default function KingDashboard() {
         prime: tenants.filter(t => t.plan === 'prime').length,
         founder: tenants.filter(t => t.plan === 'founder').length,
       };
-      
-      // Calculate total commissions
-      const totalCommissions = (commissionsResult.data || []).reduce(
-        (sum, c) => sum + (Number(c.amount) || 0), 0
-      );
 
       // Calculate this month's new tenants
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const newThisMonth = tenants.filter(t => new Date(t.created_at) >= startOfMonth).length;
+      const newLastMonth = tenants.filter(t => {
+        const created = new Date(t.created_at);
+        return created >= startOfLastMonth && created < startOfMonth;
+      }).length;
+
+      // Churn calculation (cancelled in last 30 days / active at start of period)
+      const cancelledRecently = tenants.filter(t => 
+        (t.status === 'suspended' || t.tenant_status === 'cancelled') && 
+        new Date(t.created_at) >= thirtyDaysAgo
+      ).length;
+      const churnRate = activeCount > 0 ? (cancelledRecently / (activeCount + cancelledRecently)) * 100 : 0;
+
+      // MRR at risk (past_due tenants)
+      const mrrAtRisk = tenants
+        .filter(t => t.billing_status === 'past_due' || t.payment_status === 'past_due')
+        .reduce((sum, t) => sum + (Number(t.mrr_amount) || 0), 0);
+
+      // Recent activity (tenants with activity in last 7 days)
+      const recentlyActive = tenants.filter(t => 
+        t.last_activity_at && new Date(t.last_activity_at) >= sevenDaysAgo
+      ).length;
 
       return {
-        totalTenants: tenantsResult.count || tenants.length,
+        totalTenants: tenants.length,
         activeTenants: activeCount,
         testTenants: testCount,
         pendingTenants: pendingCount,
+        suspendedTenants: suspendedCount,
+        paidTenants: paidCount,
+        pastDueTenants: pastDueCount,
         trialTenants: trialCount,
         planDistribution,
         totalUsers: usersResult.count || 0,
         totalPolicies: policiesResult.count || 0,
-        totalCommissions,
         newThisMonth,
+        newLastMonth,
+        churnRate,
+        mrrAtRisk,
+        recentlyActive,
       };
     },
+    refetchInterval: 60000,
   });
 
-  // Get monthly growth data for chart
-  const { data: growthData } = useQuery({
-    queryKey: ['king-growth-data'],
-    queryFn: async () => {
-      const { data: tenants } = await supabase
-        .from('tenants')
-        .select('created_at')
-        .order('created_at', { ascending: true });
-
-      // Group by month
-      const monthlyData: Record<string, number> = {};
-      const now = new Date();
-      
-      // Initialize last 6 months
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
-        monthlyData[key] = 0;
-      }
-
-      // Count tenants created each month
-      tenants?.forEach(t => {
-        const date = new Date(t.created_at);
-        const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
-        if (monthlyData.hasOwnProperty(key)) {
-          monthlyData[key]++;
-        }
-      });
-
-      // Calculate cumulative
-      let cumulative = 0;
-      const entries = Object.entries(monthlyData);
-      
-      // Count tenants before our range
-      if (entries.length > 0) {
-        const beforeRange = tenants?.filter(t => {
-          const date = new Date(t.created_at);
-          const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
-          return !monthlyData.hasOwnProperty(key);
-        }).length || 0;
-        cumulative = beforeRange;
-      }
-
-      return entries.map(([month, newTenants]) => {
-        cumulative += newTenants;
-        return { month, newTenants, total: cumulative };
-      });
-    },
-  });
-
+  // Recent tenants query
   const { data: recentTenants } = useQuery({
     queryKey: ['king-recent-tenants'],
     queryFn: async () => {
@@ -155,18 +141,10 @@ export default function KingDashboard() {
     }).format(amount);
   };
 
-  const formatTimeAgo = (date: string) => {
-    const now = new Date();
-    const past = new Date(date);
-    const diffMs = now.getTime() - past.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `Il y a ${diffMins} min`;
-    if (diffHours < 24) return `Il y a ${diffHours}h`;
-    return `Il y a ${diffDays}j`;
-  };
+  // Calculate ARPA (Average Revenue Per Account)
+  const arpa = stats?.activeTenants && stats.activeTenants > 0 
+    ? (stripeStats?.mrr || 0) / stats.activeTenants 
+    : 0;
 
   return (
     <div className="space-y-8">
@@ -186,6 +164,19 @@ export default function KingDashboard() {
           <div className="flex gap-3">
             <Button 
               variant="secondary"
+              className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm relative"
+              onClick={() => navigate('/king/tenants?filter=pending')}
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+              {unreadCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white h-5 w-5 p-0 flex items-center justify-center">
+                  {unreadCount}
+                </Badge>
+              )}
+            </Button>
+            <Button 
+              variant="secondary"
               className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
               onClick={() => navigate('/king/tenants')}
             >
@@ -196,21 +187,19 @@ export default function KingDashboard() {
               onClick={() => navigate('/king/wizard')}
               className="bg-white text-amber-600 hover:bg-white/90"
             >
-              <Zap className="h-4 w-4 mr-2" />
+              <TrendingUp className="h-4 w-4 mr-2" />
               Nouveau Client
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Revenue Stats - Top Row */}
+      {/* KPIs Row 1 - Revenue */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* MRR Card */}
         <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">
-              MRR
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-white/80">MRR Total</CardTitle>
             <DollarSign className="h-4 w-4 text-white/60" />
           </CardHeader>
           <CardContent>
@@ -224,125 +213,148 @@ export default function KingDashboard() {
           <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full" />
         </Card>
 
-        {/* Extra Users Revenue */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+        {/* MRR at Risk */}
+        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-red-500 to-red-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">
-              Revenu Utilisateurs Supp.
-            </CardTitle>
-            <Users className="h-4 w-4 text-white/60" />
+            <CardTitle className="text-sm font-medium text-white/80">MRR à risque</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-white/60" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stripeLoading ? '...' : formatCurrency(stripeStats?.extraUsersMRR || 0)}
+              {isLoading ? '...' : formatCurrency(stats?.mrrAtRisk || 0)}
             </div>
             <p className="text-xs text-white/70 mt-2">
-              +20 CHF/utilisateur/mois
+              {stats?.pastDueTenants || 0} tenant(s) en retard
             </p>
           </CardContent>
           <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full" />
         </Card>
 
-        {/* Active Subscriptions */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+        {/* ARPA */}
+        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">
-              Abonnements Actifs
-            </CardTitle>
-            <CreditCard className="h-4 w-4 text-white/60" />
+            <CardTitle className="text-sm font-medium text-white/80">ARPA</CardTitle>
+            <Target className="h-4 w-4 text-white/60" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stripeLoading ? '...' : stripeStats?.totalActiveSubscriptions || 0}
+              {formatCurrency(arpa)}
             </div>
-            {(stripeStats?.totalPastDueSubscriptions || 0) > 0 && (
-              <p className="text-xs text-orange-200 mt-2 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {stripeStats?.totalPastDueSubscriptions} impayé(s)
-              </p>
-            )}
-            {(stripeStats?.totalPastDueSubscriptions || 0) === 0 && (
-              <p className="text-xs text-white/70 mt-2">
-                Tous à jour
-              </p>
-            )}
+            <p className="text-xs text-white/70 mt-2">
+              Revenu moyen par compte
+            </p>
           </CardContent>
           <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full" />
         </Card>
 
-        {/* Clients SaaS */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-amber-500 to-amber-600 text-white">
+        {/* Churn Rate */}
+        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-violet-500 to-violet-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">
-              Clients SaaS
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-white/60" />
+            <CardTitle className="text-sm font-medium text-white/80">Churn (30j)</CardTitle>
+            <TrendingDown className="h-4 w-4 text-white/60" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{isLoading ? '...' : stats?.totalTenants}</div>
-            <div className="flex items-center gap-2 mt-2">
-              {(stats?.newThisMonth || 0) > 0 ? (
-                <span className="flex items-center text-xs text-white/80">
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                  +{stats?.newThisMonth} ce mois
-                </span>
-              ) : (
-                <span className="text-xs text-white/70">Aucun nouveau</span>
-              )}
+            <div className="text-3xl font-bold">
+              {isLoading ? '...' : `${(stats?.churnRate || 0).toFixed(1)}%`}
             </div>
+            <p className="text-xs text-white/70 mt-2">
+              Taux d'attrition mensuel
+            </p>
           </CardContent>
           <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full" />
         </Card>
       </div>
 
-      {/* Plan Revenue Breakdown */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {(['start', 'pro', 'prime', 'founder'] as TenantPlan[]).map((plan) => {
-          const planConfig = PLAN_CONFIGS[plan];
-          const planStats = stripeStats?.planStats?.[plan];
-          const count = planStats?.count || 0;
-          const mrr = planStats?.mrr || 0;
-          
-          return (
-            <Card key={plan} className="relative overflow-hidden">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Badge 
-                    className="text-xs" 
-                    style={{ 
-                      backgroundColor: `${PLAN_COLORS[plan]}20`,
-                      color: PLAN_COLORS[plan],
-                    }}
-                  >
-                    {planConfig.displayName}
-                  </Badge>
-                  <span className="text-2xl font-bold">{count}</span>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">MRR</span>
-                    <span className="font-medium">{formatCurrency(mrr)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Prix/mois</span>
-                    <span className="font-medium">{formatCurrency(planConfig.monthlyPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Sièges inclus</span>
-                    <span className="font-medium">{planConfig.seatsIncluded}</span>
-                  </div>
-                </div>
-                <div 
-                  className="absolute bottom-0 left-0 right-0 h-1"
-                  style={{ backgroundColor: PLAN_COLORS[plan] }}
-                />
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* KPIs Row 2 - Tenants */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Tenants actifs</p>
+                <p className="text-2xl font-bold">{stats?.activeTenants || 0}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-emerald-500/10">
+                <Building2 className="h-5 w-5 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Nouveaux (30j)</p>
+                <p className="text-2xl font-bold">
+                  {stats?.newThisMonth || 0}
+                  {stats?.newLastMonth !== undefined && stats.newLastMonth !== stats?.newThisMonth && (
+                    <span className={`text-sm ml-2 ${(stats?.newThisMonth || 0) >= (stats?.newLastMonth || 0) ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {(stats?.newThisMonth || 0) >= (stats?.newLastMonth || 0) ? <ArrowUpRight className="inline h-4 w-4" /> : <ArrowDownRight className="inline h-4 w-4" />}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-500/10">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">En attente</p>
+                <p className="text-2xl font-bold text-orange-600">{stats?.pendingTenants || 0}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-orange-500/10">
+                <Activity className="h-5 w-5 text-orange-600" />
+              </div>
+            </div>
+            {(stats?.pendingTenants || 0) > 0 && (
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-xs text-orange-600"
+                onClick={() => navigate('/king/tenants?filter=pending')}
+              >
+                Voir les demandes →
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Impayés (7j)</p>
+                <p className="text-2xl font-bold text-red-600">{stats?.pastDueTenants || 0}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-red-500/10">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Abonnements actifs</p>
+                <p className="text-2xl font-bold">{stripeStats?.totalActiveSubscriptions || 0}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-violet-500/10">
+                <CreditCard className="h-5 w-5 text-violet-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Charts Row */}
+      {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Revenue Chart */}
         <Card>
@@ -417,37 +429,24 @@ export default function KingDashboard() {
                       outerRadius={90}
                       paddingAngle={4}
                       dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
                     >
                       {planPieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
+                    <Tooltip />
                   </RechartsPie>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-muted-foreground text-center">
-                  <Building2 className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                  <p>Aucun tenant configuré</p>
-                </div>
+                <p className="text-muted-foreground">Aucune donnée</p>
               )}
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-4 mt-4">
-              {planPieData.map((plan) => (
-                <div key={plan.name} className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: plan.color }}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {plan.name}: <span className="font-medium text-foreground">{plan.value}</span>
-                  </span>
+            <div className="flex justify-center gap-4 mt-4">
+              {planPieData.map((entry) => (
+                <div key={entry.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                  <span className="text-sm">{entry.name}</span>
                 </div>
               ))}
             </div>
@@ -455,132 +454,80 @@ export default function KingDashboard() {
         </Card>
       </div>
 
-      {/* Bottom Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-500" />
-              Métriques clés
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Utilisateurs totaux</span>
-                <span className="font-medium">{stats?.totalUsers || 0}</span>
-              </div>
-              <Progress value={Math.min((stats?.totalUsers || 0) / 100 * 100, 100)} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Contrats gérés</span>
-                <span className="font-medium">{stats?.totalPolicies || 0}</span>
-              </div>
-              <Progress value={Math.min((stats?.totalPolicies || 0) / 1000 * 100, 100)} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Commissions totales</span>
-                <span className="font-medium">{formatCurrency(stats?.totalCommissions || 0)}</span>
-              </div>
-              <Progress value={Math.min((stats?.totalCommissions || 0) / 1000000 * 100, 100)} className="h-2" />
-            </div>
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-emerald-600">{stats?.activeTenants || 0}</p>
-                <p className="text-xs text-muted-foreground">Actifs</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">{stats?.trialTenants || 0}</p>
-                <p className="text-xs text-muted-foreground">En essai</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">{stats?.pendingTenants || 0}</p>
-                <p className="text-xs text-muted-foreground">En attente</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Notifications Section */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <KingNotificationsInbox />
+        </div>
 
         {/* Recent Tenants */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-500" />
+              <Building2 className="h-5 w-5" />
               Derniers clients
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/king/tenants')}>
-              Voir tous
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
           </CardHeader>
           <CardContent>
-            {recentTenants && recentTenants.length > 0 ? (
-              <div className="space-y-3">
-                {recentTenants.map((tenant: any) => (
-                  <div
-                    key={tenant.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/king/tenants/${tenant.id}`)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-10 h-10 rounded-lg flex items-center justify-center"
-                        style={{ 
-                          backgroundColor: tenant.tenant_branding?.[0]?.primary_color 
-                            ? `${tenant.tenant_branding[0].primary_color}20` 
-                            : 'hsl(var(--primary) / 0.1)' 
-                        }}
-                      >
-                        {tenant.tenant_branding?.[0]?.logo_url ? (
-                          <img 
-                            src={tenant.tenant_branding[0].logo_url} 
-                            alt={tenant.name}
-                            className="h-6 w-6 object-contain"
-                          />
-                        ) : (
-                          <Building2 className="h-5 w-5 text-primary" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{tenant.name}</p>
-                        <p className="text-xs text-muted-foreground">{tenant.slug}.lyta.ch</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs"
-                        style={{
-                          backgroundColor: `${PLAN_COLORS[tenant.plan as TenantPlan] || PLAN_COLORS.start}15`,
-                          borderColor: PLAN_COLORS[tenant.plan as TenantPlan] || PLAN_COLORS.start,
-                          color: PLAN_COLORS[tenant.plan as TenantPlan] || PLAN_COLORS.start,
-                        }}
-                      >
-                        {PLAN_CONFIGS[tenant.plan as TenantPlan]?.displayName || 'Start'}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTimeAgo(tenant.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-muted-foreground">
-                <Building2 className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                <p>Aucun client pour le moment</p>
-                <Button 
-                  variant="link" 
-                  className="mt-2"
-                  onClick={() => navigate('/king/wizard')}
+            <div className="space-y-4">
+              {recentTenants?.map((tenant) => (
+                <div
+                  key={tenant.id}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/king/tenants/${tenant.id}`)}
                 >
-                  Créer le premier client
-                </Button>
-              </div>
-            )}
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{
+                      backgroundColor: tenant.tenant_branding?.[0]?.primary_color
+                        ? `${tenant.tenant_branding[0].primary_color}20`
+                        : 'hsl(var(--primary) / 0.1)'
+                    }}
+                  >
+                    {tenant.tenant_branding?.[0]?.logo_url ? (
+                      <img
+                        src={tenant.tenant_branding[0].logo_url}
+                        alt={tenant.name}
+                        className="h-6 w-6 object-contain"
+                      />
+                    ) : (
+                      <Building2
+                        className="h-5 w-5"
+                        style={{
+                          color: tenant.tenant_branding?.[0]?.primary_color || 'hsl(var(--primary))'
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{tenant.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(tenant.created_at), { addSuffix: true, locale: fr })}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={
+                      tenant.status === 'active'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-0'
+                        : tenant.status === 'pending'
+                        ? 'bg-orange-500/10 text-orange-600 border-0'
+                        : 'bg-blue-500/10 text-blue-600 border-0'
+                    }
+                  >
+                    {tenant.status === 'active' ? 'Actif' : tenant.status === 'pending' ? 'En attente' : 'Test'}
+                  </Badge>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/king/tenants')}
+              >
+                Voir tous les clients
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
