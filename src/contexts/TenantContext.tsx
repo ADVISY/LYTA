@@ -225,12 +225,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
             newFavicon.type = 'image/png';
           }
         } else {
-          // No tenant logo - use a generic favicon (first letter of tenant name)
-          const initial = (displayName || 'L').charAt(0).toUpperCase();
-          const primaryColor = formattedTenant.branding?.primary_color?.replace('#', '') || '1a1a2e';
-          const svgFavicon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#${primaryColor}"/><text x="50" y="67" font-size="50" font-family="Arial,sans-serif" font-weight="bold" fill="white" text-anchor="middle">${initial}</text></svg>`)}`;
-          newFavicon.href = svgFavicon;
-          newFavicon.type = 'image/svg+xml';
+          // No tenant logo - use default LYTA favicon
+          newFavicon.href = `/favicon.png?v=${Date.now()}`;
+          newFavicon.type = 'image/png';
         }
         
         document.head.appendChild(newFavicon);
