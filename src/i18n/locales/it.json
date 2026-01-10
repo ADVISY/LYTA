@@ -250,6 +250,9 @@
   },
   "companies": {
     "title": "Compagnie assicurative",
+    "subtitle": "Catalogo delle assicurazioni disponibili",
+    "companies": "Compagnie",
+    "searchPlaceholder": "Cerca una compagnia o un prodotto...",
     "newCompany": "Nuova compagnia",
     "name": "Nome",
     "website": "Sito web",

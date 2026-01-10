@@ -45,11 +45,11 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 
-const statsCards = [
-  { key: "ouverts", label: "Ouverts", icon: Clock, color: "from-blue-500 to-indigo-600" },
-  { key: "en_cours", label: "En cours", icon: AlertCircle, color: "from-amber-500 to-orange-600" },
-  { key: "fermes", label: "Fermés", icon: CheckCircle2, color: "from-emerald-500 to-teal-600" },
-  { key: "total", label: "Total", icon: Calendar, color: "from-violet-500 to-purple-600" },
+const getStatsCards = (t: any) => [
+  { key: "ouverts", label: t('followups.openCount'), icon: Clock, color: "from-blue-500 to-indigo-600" },
+  { key: "en_cours", label: t('followups.inProgressCount'), icon: AlertCircle, color: "from-amber-500 to-orange-600" },
+  { key: "fermes", label: t('followups.closedCount'), icon: CheckCircle2, color: "from-emerald-500 to-teal-600" },
+  { key: "total", label: t('followups.totalCount'), icon: Calendar, color: "from-violet-500 to-purple-600" },
 ];
 
 export default function CRMSuivis() {
@@ -59,6 +59,8 @@ export default function CRMSuivis() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  
+  const statsCards = getStatsCards(t);
 
   const getClientName = (suivi: typeof suivis[0]) => {
     if (!suivi.client) return "—";
@@ -94,9 +96,9 @@ export default function CRMSuivis() {
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Suivis
+                {t('followups.title')}
               </h1>
-              <p className="text-muted-foreground">Gérez vos suivis et tâches</p>
+              <p className="text-muted-foreground">{t('followups.subtitle')}</p>
             </div>
           </div>
         </div>
@@ -139,7 +141,7 @@ export default function CRMSuivis() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par titre, description ou client..."
+                placeholder={t('followups.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -147,10 +149,10 @@ export default function CRMSuivis() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tous les statuts" />
+                <SelectValue placeholder={t('common.allStatuses')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="all">{t('common.allStatuses')}</SelectItem>
                 {(Object.keys(suiviStatusLabels) as SuiviStatus[]).map((status) => (
                   <SelectItem key={status} value={status}>
                     {suiviStatusLabels[status]}
@@ -160,10 +162,10 @@ export default function CRMSuivis() {
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tous les types" />
+                <SelectValue placeholder={t('common.allTypes')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="all">{t('common.allTypes')}</SelectItem>
                 {(Object.keys(suiviTypeLabels) as SuiviType[]).map((type) => (
                   <SelectItem key={type} value={type}>
                     {suiviTypeLabels[type]}
@@ -178,7 +180,7 @@ export default function CRMSuivis() {
       {/* Suivis Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Liste des suivis ({filteredSuivis.length})</CardTitle>
+          <CardTitle>{t('followups.followupsList')} ({filteredSuivis.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -190,21 +192,21 @@ export default function CRMSuivis() {
               <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p className="text-muted-foreground mb-2">
                 {searchQuery || statusFilter !== "all" || typeFilter !== "all"
-                  ? "Aucun suivi ne correspond aux critères"
-                  : "Aucun suivi enregistré"}
+                  ? t('followups.noMatchingFollowups')
+                  : t('followups.noFollowups')}
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Titre</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Date de rappel</TableHead>
-                  <TableHead>Créé le</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('followups.title_field')}</TableHead>
+                  <TableHead>{t('followups.client')}</TableHead>
+                  <TableHead>{t('followups.type')}</TableHead>
+                  <TableHead>{t('followups.status')}</TableHead>
+                  <TableHead>{t('followups.reminderDate')}</TableHead>
+                  <TableHead>{t('followups.createdAt')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -260,17 +262,17 @@ export default function CRMSuivis() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/crm/clients/${suivi.client_id}?tab=suivis`)}>
                             <Eye className="h-4 w-4 mr-2" />
-                            Voir le client
+                            {t('followups.viewClient')}
                           </DropdownMenuItem>
                           {suivi.status !== "ferme" ? (
                             <DropdownMenuItem onClick={() => closeSuivi(suivi.id)}>
                               <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Fermer le suivi
+                              {t('followups.closeFollowup')}
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem onClick={() => reopenSuivi(suivi.id)}>
                               <RotateCcw className="h-4 w-4 mr-2" />
-                              Réouvrir
+                              {t('followups.reopenFollowup')}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem 
@@ -278,7 +280,7 @@ export default function CRMSuivis() {
                             onClick={() => deleteSuivi(suivi.id)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Supprimer
+                            {t('followups.deleteFollowup')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

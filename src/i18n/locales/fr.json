@@ -344,6 +344,9 @@
   },
   "companies": {
     "title": "Compagnies d'assurance",
+    "subtitle": "Catalogue des assurances disponibles",
+    "companies": "Compagnies",
+    "searchPlaceholder": "Rechercher une compagnie ou un produit...",
     "newCompany": "Nouvelle compagnie",
     "name": "Nom",
     "website": "Site web",
