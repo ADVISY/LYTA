@@ -194,7 +194,8 @@ export function TenantProvider({ children }: TenantProviderProps) {
         };
 
         // Update page title dynamically based on tenant
-        // Note: The actual page title will be set by CRMLayout or ClientLayout based on context
+        const displayName = formattedTenant.branding?.display_name || formattedTenant.name;
+        document.title = `${displayName} - CRM Assurances`;
 
         setTenant(formattedTenant);
         
