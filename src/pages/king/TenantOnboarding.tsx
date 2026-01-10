@@ -150,10 +150,14 @@ export default function TenantOnboarding() {
           title: "4. Configurer les redirections",
           description: "S'assurer que les réponses arrivent au bon endroit",
           details: [
-            "Configurer l'adresse de réponse (reply-to)",
+            "Configurer l'adresse de réponse (reply-to) vers l'email du tenant",
+            "Pour le support technique, rediriger vers support@lyta.ch",
             "Mettre en place un alias email si nécessaire",
             "Configurer le forwarding vers l'équipe du tenant",
             "Tester le flux complet de réponse"
+          ],
+          commands: [
+            { label: "Email support LYTA", command: "support@lyta.ch" }
           ]
         }
       ]
@@ -260,7 +264,11 @@ export default function TenantOnboarding() {
             "Expliquer comment ajouter des utilisateurs",
             "Montrer la gestion des permissions",
             "Présenter les rapports d'activité",
-            "Fournir la documentation utilisateur"
+            "Fournir la documentation utilisateur",
+            "Communiquer l'email support technique : support@lyta.ch"
+          ],
+          commands: [
+            { label: "Email support", command: "support@lyta.ch" }
           ],
           links: [
             { label: "Guide utilisateur", url: "/docs/user-guide" }
@@ -315,10 +323,54 @@ export default function TenantOnboarding() {
             Checklist complète pour l'onboarding d'un nouveau tenant
           </p>
         </div>
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          {totalProgress.completed} / {totalProgress.total} étapes
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => copyToClipboard("support@lyta.ch")}
+            className="gap-2"
+          >
+            <Mail className="h-4 w-4" />
+            support@lyta.ch
+            <Copy className="h-3 w-3" />
+          </Button>
+          <Badge variant="outline" className="text-lg px-4 py-2">
+            {totalProgress.completed} / {totalProgress.total} étapes
+          </Badge>
+        </div>
       </div>
+
+      {/* Support Info Card */}
+      <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-amber-500/20">
+              <Mail className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-900 dark:text-amber-100">Support technique LYTA</h3>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Pour toute question technique, demande d'intégration ou problème, contactez : 
+                <button 
+                  onClick={() => copyToClipboard("support@lyta.ch")}
+                  className="ml-1 font-mono font-bold hover:underline"
+                >
+                  support@lyta.ch
+                </button>
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900"
+              onClick={() => window.open("mailto:support@lyta.ch?subject=Nouvelle intégration tenant", "_blank")}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Envoyer un email
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Progress Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
