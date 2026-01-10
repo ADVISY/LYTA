@@ -243,10 +243,10 @@ const sendEmail = async (
   senderEmail?: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Use verified sender or fallback to resend.dev
+    // Use tenant's verified sender or fallback to Lyta support
     const fromAddress = senderEmail && senderEmail.includes('@') 
       ? `${senderName} <${senderEmail}>`
-      : `${senderName} <onboarding@resend.dev>`;
+      : `${senderName} <support@lyta.ch>`;
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
