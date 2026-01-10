@@ -314,7 +314,15 @@
     "openCount": "Aperti",
     "inProgressCount": "In corso",
     "closedCount": "Chiusi",
-    "totalCount": "Totale"
+    "totalCount": "Totale",
+    "types": {
+      "activation": "Attivazione",
+      "cancellation": "Annullamento",
+      "return": "Ritorno",
+      "termination": "Rescissione",
+      "claim": "Sinistro",
+      "other": "Altro"
+    }
   },
   "collaborators": {
     "title": "Collaboratori",

@@ -49,6 +49,7 @@ export interface UpdateSuiviData {
   assigned_agent_id?: string;
 }
 
+// Note: These labels are kept as fallbacks. Use getSuiviTypeLabels(t) and getSuiviStatusLabels(t) in components
 export const suiviTypeLabels: Record<SuiviType, string> = {
   activation: "Activation",
   annulation: "Annulation",
@@ -69,6 +70,22 @@ export const suiviStatusColors: Record<SuiviStatus, string> = {
   en_cours: "bg-amber-500",
   ferme: "bg-emerald-500",
 };
+
+// Translated label getters
+export const getSuiviTypeLabels = (t: (key: string) => string): Record<SuiviType, string> => ({
+  activation: t('followups.types.activation'),
+  annulation: t('followups.types.cancellation'),
+  retour: t('followups.types.return'),
+  resiliation: t('followups.types.termination'),
+  sinistre: t('followups.types.claim'),
+  autre: t('followups.types.other'),
+});
+
+export const getSuiviStatusLabels = (t: (key: string) => string): Record<SuiviStatus, string> => ({
+  ouvert: t('followups.open'),
+  en_cours: t('followups.inProgress'),
+  ferme: t('followups.closed'),
+});
 
 export function useSuivis(clientId?: string) {
   const [suivis, setSuivis] = useState<Suivi[]>([]);
