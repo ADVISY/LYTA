@@ -40,7 +40,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSuivis, suiviTypeLabels, suiviStatusLabels, suiviStatusColors, SuiviType, SuiviStatus } from "@/hooks/useSuivis";
+import { useSuivis, suiviStatusColors, SuiviType, SuiviStatus, getSuiviTypeLabels, getSuiviStatusLabels } from "@/hooks/useSuivis";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
@@ -61,6 +61,8 @@ export default function CRMSuivis() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   
   const statsCards = getStatsCards(t);
+  const suiviTypeLabels = getSuiviTypeLabels(t);
+  const suiviStatusLabels = getSuiviStatusLabels(t);
 
   const getClientName = (suivi: typeof suivis[0]) => {
     if (!suivi.client) return "—";

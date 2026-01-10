@@ -315,7 +315,15 @@
     "openCount": "Open",
     "inProgressCount": "In progress",
     "closedCount": "Closed",
-    "totalCount": "Total"
+    "totalCount": "Total",
+    "types": {
+      "activation": "Activation",
+      "cancellation": "Cancellation",
+      "return": "Return",
+      "termination": "Termination",
+      "claim": "Claim",
+      "other": "Other"
+    }
   },
   "collaborators": {
     "title": "Collaborators",
