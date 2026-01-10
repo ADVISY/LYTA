@@ -51,7 +51,7 @@ export default function TenantOnboarding() {
         {
           id: "subdomain-1",
           title: "1. Choisir le nom du sous-domaine",
-          description: "Le sous-domaine sera au format: [nom-tenant].advisy.ch",
+          description: "Le sous-domaine sera au format: [nom-tenant].lyta.ch (ex: advisy.lyta.ch)",
           details: [
             "Vérifier que le nom est disponible",
             "Utiliser uniquement des caractères alphanumériques et tirets",
@@ -70,8 +70,8 @@ export default function TenantOnboarding() {
             "Vérifier avec un outil comme dnschecker.org"
           ],
           commands: [
-            { label: "Enregistrement A", command: "A    [tenant].advisy.ch    →    185.158.133.1" },
-            { label: "Enregistrement CNAME", command: "CNAME    www.[tenant].advisy.ch    →    [tenant].advisy.ch" }
+            { label: "Enregistrement A", command: "A    [tenant].lyta.ch    →    185.158.133.1" },
+            { label: "Enregistrement CNAME", command: "CNAME    www.[tenant].lyta.ch    →    [tenant].lyta.ch" }
           ]
         },
         {
