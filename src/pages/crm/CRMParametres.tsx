@@ -570,6 +570,10 @@ export default function CRMParametres() {
             <Mail className="h-4 w-4" />
             <span className="hidden sm:inline">{t('emails.title')}</span>
           </TabsTrigger>
+          <TabsTrigger value="support" className="gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">{t('common.support')}</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* PROFIL */}
@@ -1390,6 +1394,99 @@ export default function CRMParametres() {
         {/* EMAILS */}
         <TabsContent value="emails" className="space-y-6 mt-6">
           <EmailAutomationSettings />
+        </TabsContent>
+
+        {/* SUPPORT */}
+        <TabsContent value="support" className="space-y-6 mt-6">
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                {t('common.technicalSupport')} LYTA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Pour toute question, problème technique, bug, demande d'upgrade ou autre besoin, 
+                notre équipe support est à votre disposition.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 p-4 bg-background rounded-lg border">
+                  <h4 className="font-medium mb-2">Email de support</h4>
+                  <a 
+                    href="mailto:support@lyta.ch"
+                    className="text-lg font-mono text-primary hover:underline"
+                  >
+                    support@lyta.ch
+                  </a>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Réponse sous 24-48h ouvrées
+                  </p>
+                </div>
+                
+                <div className="flex-1 p-4 bg-background rounded-lg border">
+                  <h4 className="font-medium mb-2">Horaires</h4>
+                  <p className="text-sm">Lundi - Vendredi</p>
+                  <p className="text-lg font-medium">09:00 - 18:00</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Fuseau horaire: Europe/Zurich
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+                <Button 
+                  variant="default"
+                  onClick={() => window.open("mailto:support@lyta.ch?subject=Question technique", "_blank")}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Poser une question
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.open("mailto:support@lyta.ch?subject=Signaler un bug", "_blank")}
+                >
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Signaler un bug
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Types de demandes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <h4 className="font-medium text-sm mb-1">🐛 Bugs & Problèmes</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Dysfonctionnements, erreurs, comportements inattendus
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <h4 className="font-medium text-sm mb-1">❓ Questions</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Utilisation, fonctionnalités, bonnes pratiques
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <h4 className="font-medium text-sm mb-1">🚀 Demandes d'évolution</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Nouvelles fonctionnalités, améliorations
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <h4 className="font-medium text-sm mb-1">⬆️ Upgrades</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Changement de plan, ajout de sièges, options
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
