@@ -591,16 +591,16 @@ export default function CRMDashboard() {
               </CardContent>
             </Card>
 
-            {/* CA Estimated (visible according to scope) */}
+            {/* CA Estimated = Commissions en attente */}
             {(canSeeFinancials || commissionScope !== 'none') && (
               <Card className="border shadow-sm bg-gradient-to-br from-amber-500/10 to-amber-600/5">
                 <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">{t('dashboard.estimatedCA')}</p>
-                    <p className="text-3xl font-bold">{formatCurrency(kpiStats.caEstimated)}</p>
+                    <p className="text-3xl font-bold">{formatCurrency(realCommissions.pending)}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        {periodLabels[periodFilter]}
+                        {t('commissions.pending')}
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-amber-500/20">
@@ -611,16 +611,16 @@ export default function CRMDashboard() {
               </Card>
             )}
 
-            {/* CA en Vigueur (from active contracts) */}
+            {/* CA en Vigueur = Commissions payées */}
             {(canSeeFinancials || commissionScope !== 'none') && (
               <Card className="border shadow-sm bg-gradient-to-br from-teal-500/10 to-teal-600/5">
                 <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">{t('dashboard.currentCA')}</p>
-                    <p className="text-3xl font-bold">{formatCurrency(kpiStats.caEnVigueur)}</p>
+                    <p className="text-3xl font-bold">{formatCurrency(realCommissions.paid)}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t('dashboard.activeContracts')}
+                      {t('commissions.paid')}
                     </p>
                     </div>
                     <div className="p-3 rounded-xl bg-teal-500/20">

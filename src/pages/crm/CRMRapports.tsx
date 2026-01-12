@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -149,6 +150,7 @@ interface ReportFilter {
 export default function CRMRapports() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { tenant } = useTenant();
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [isNewReportOpen, setIsNewReportOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
@@ -491,15 +493,63 @@ export default function CRMRapports() {
     const element = document.getElementById("report-results");
     if (!element) return;
 
+    // Create a container with branding header
+    const container = document.createElement('div');
+    container.style.fontFamily = 'Arial, sans-serif';
+    
+    // Build header with tenant branding
+    const header = document.createElement('div');
+    header.style.marginBottom = '20px';
+    header.style.paddingBottom = '15px';
+    header.style.borderBottom = '2px solid #e5e7eb';
+    header.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          ${tenant?.branding?.logo_url ? `<img src="${tenant.branding.logo_url}" style="max-height: 50px; max-width: 150px; object-fit: contain;" />` : ''}
+          <div>
+            <h1 style="margin: 0; font-size: 20px; color: #1f2937;">${tenant?.branding?.display_name || tenant?.name || 'Rapport'}</h1>
+            ${tenant?.branding?.company_address ? `<p style="margin: 2px 0 0; font-size: 11px; color: #6b7280;">${tenant.branding.company_address}</p>` : ''}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <p style="margin: 0; font-size: 12px; color: #374151; font-weight: 600;">Rapport généré le</p>
+          <p style="margin: 0; font-size: 14px; color: #1f2937;">${format(new Date(), "dd/MM/yyyy à HH:mm", { locale: fr })}</p>
+          ${tenant?.branding?.company_email ? `<p style="margin: 4px 0 0; font-size: 10px; color: #6b7280;">${tenant.branding.company_email}</p>` : ''}
+        </div>
+      </div>
+    `;
+    
+    container.appendChild(header);
+    
+    // Clone and append the results table
+    const tableClone = element.cloneNode(true) as HTMLElement;
+    tableClone.style.fontSize = '10px';
+    container.appendChild(tableClone);
+
+    // Add footer
+    const footer = document.createElement('div');
+    footer.style.marginTop = '20px';
+    footer.style.paddingTop = '10px';
+    footer.style.borderTop = '1px solid #e5e7eb';
+    footer.style.textAlign = 'center';
+    footer.innerHTML = `
+      <p style="margin: 0; font-size: 9px; color: #9ca3af;">
+        ${tenant?.branding?.company_website ? tenant.branding.company_website : ''} 
+        ${tenant?.branding?.company_phone ? `| ${tenant.branding.company_phone}` : ''}
+      </p>
+      <p style="margin: 4px 0 0; font-size: 8px; color: #d1d5db;">Document généré automatiquement - ${reportResults.length} résultats</p>
+    `;
+    container.appendChild(footer);
+
     html2pdf()
       .set({
-        margin: 10,
-        filename: `rapport_${format(new Date(), "yyyy-MM-dd")}.pdf`,
+        margin: [10, 10, 15, 10],
+        filename: `rapport_${tenant?.name || 'export'}_${format(new Date(), "yyyy-MM-dd")}.pdf`,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
       })
-      .from(element)
+      .from(container)
       .save();
     
     toast.success(t('reports.pdfGenerated'));
