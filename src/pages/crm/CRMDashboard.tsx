@@ -194,13 +194,16 @@ export default function CRMDashboard() {
     return { total: totalAmount, paid: paidAmount, pending: pendingAmount, count: periodCommissions.length };
   }, [commissions, periodRange]);
 
-  // Calculate CA using real commissions from database
+  // Calculate CA using real commissions from database - ONLY ACTIVE CONTRACTS
   // LCA: monthly_premium * 16, VIE: use actual commission amounts from DB
   const calculateCA = useMemo(() => {
     let lcaTotal = 0;
     let vieTotal = 0;
 
-    periodPolicies.forEach(p => {
+    // Only include active contracts for CA calculation
+    const activePeriodPolicies = periodPolicies.filter(p => p.status === 'active');
+
+    activePeriodPolicies.forEach(p => {
       const type = (p.product_type || '').toLowerCase();
       const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
 
@@ -271,21 +274,23 @@ export default function CRMDashboard() {
     return { grouped, list: periodCommissions };
   }, [commissions, periodRange]);
 
-  // KPI Stats - Using real data
+  // KPI Stats - Using real data (only active contracts)
   const kpiStats = useMemo(() => {
     const activeContracts = filteredPolicies.filter(p => p.status === 'active').length;
-    const periodContracts = periodPolicies.length;
+    // Only count active contracts for period stats
+    const activePeriodPolicies = periodPolicies.filter(p => p.status === 'active');
+    const periodContracts = activePeriodPolicies.length;
     
-    // Count LCA contracts (LAMal, health, multi, complémentaire)
-    const lcaContracts = periodPolicies.filter(p => {
+    // Count LCA contracts (LAMal, health, multi, complémentaire) - only active
+    const lcaContracts = activePeriodPolicies.filter(p => {
       const type = (p.product_type || '').toLowerCase();
       return type.includes('lamal') || type.includes('lca') || type.includes('maladie') || 
              type.includes('complémentaire') || type.includes('complementaire') || 
              type.includes('health') || type.includes('multi');
     }).length;
     
-    // Count VIE contracts (life, pilier, 3a, 3b)
-    const vieContracts = periodPolicies.filter(p => {
+    // Count VIE contracts (life, pilier, 3a, 3b) - only active
+    const vieContracts = activePeriodPolicies.filter(p => {
       const type = (p.product_type || '').toLowerCase();
       return type.includes('vie') || type.includes('life') || type.includes('pilier') || 
              type.includes('3a') || type.includes('3b');
@@ -304,17 +309,19 @@ export default function CRMDashboard() {
     };
   }, [filteredPolicies, periodPolicies, calculateCA, calculateCAEnVigueur, realCommissions]);
 
-  // Top performers with real contract counts - Enhanced for podium
+  // Top performers with real contract counts - Enhanced for podium (only active contracts)
   const topPerformers = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
 
     const collaborateurs = clients.filter(c => c.type_adresse === 'collaborateur');
+    // Only count active contracts
+    const activePolicies = policies.filter(p => p.status === 'active');
     
     const agentScores = collaborateurs.map(agent => {
       const agentClientIds = clients.filter(c => c.assigned_agent_id === agent.id).map(c => c.id);
-      const monthContracts = policies.filter(p => {
-        const date = new Date(p.created_at);
+      const monthContracts = activePolicies.filter(p => {
+        const date = new Date(p.start_date);
         return agentClientIds.includes(p.client_id) && 
                date.getMonth() === currentMonth && 
                date.getFullYear() === currentYear;
@@ -322,7 +329,7 @@ export default function CRMDashboard() {
 
       // Calculate commission for this agent from real data
       const agentCommissions = commissions.filter(c => {
-        const policy = policies.find(p => p.id === c.policy_id);
+        const policy = activePolicies.find(p => p.id === c.policy_id);
         if (!policy) return false;
         const client = clients.find(cl => cl.id === policy.client_id);
         return client?.assigned_agent_id === agent.id;
@@ -345,16 +352,18 @@ export default function CRMDashboard() {
   // Employee of the month
   const employeeOfMonth = topPerformers[0] || null;
 
-  // Manager of the month
+  // Manager of the month (only active contracts)
   const managerOfMonth = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
+    // Only count active contracts
+    const activePolicies = policies.filter(p => p.status === 'active');
 
     const managerScores = teamPerformance.map(team => {
       const teamMemberIds = [team.managerId, ...team.teamMembers.map(m => m.id)];
       const teamClientIds = clients.filter(c => teamMemberIds.includes(c.assigned_agent_id)).map(c => c.id);
-      const monthContracts = policies.filter(p => {
-        const date = new Date(p.created_at);
+      const monthContracts = activePolicies.filter(p => {
+        const date = new Date(p.start_date);
         return teamClientIds.includes(p.client_id) && 
                date.getMonth() === currentMonth && 
                date.getFullYear() === currentYear;
@@ -375,18 +384,21 @@ export default function CRMDashboard() {
     return managerScores.sort((a, b) => b.monthContracts - a.monthContracts)[0] || null;
   }, [teamPerformance, clients, policies]);
 
-  // Monthly chart data
+  // Monthly chart data - only active contracts
   const monthlyChartData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     const currentYear = new Date().getFullYear();
 
+    // Only include active contracts
+    const activePolicies = filteredPolicies.filter(p => p.status === 'active');
+
     return months.map((month, i) => {
-      const monthPolicies = filteredPolicies.filter(p => {
-        const date = new Date(p.created_at);
+      const monthPolicies = activePolicies.filter(p => {
+        const date = new Date(p.start_date);
         return date.getFullYear() === currentYear && date.getMonth() === i;
       });
 
-      // Real commissions for this month
+      // Real commissions for this month (only paid = CA en vigueur)
       const monthCommissions = commissions.filter(c => {
         const date = new Date(c.created_at);
         return date.getFullYear() === currentYear && date.getMonth() === i;
