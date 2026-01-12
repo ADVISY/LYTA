@@ -121,36 +121,6 @@ Deno.serve(async (req) => {
 
     const tenantId = tenantAssignment.tenant_id;
 
-    // Get tenant seat information
-    const { data: tenant } = await supabaseAdmin
-      .from("tenants")
-      .select("seats_included, extra_users")
-      .eq("id", tenantId)
-      .single();
-
-    if (!tenant) {
-      return new Response(
-        JSON.stringify({ error: "Tenant non trouvé" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Count current active users in tenant
-    const { count: activeUsersCount } = await supabaseAdmin
-      .from("user_tenant_assignments")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId);
-
-    const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
-    const availableSeats = totalSeats - (activeUsersCount || 0);
-
-    if (availableSeats <= 0) {
-      return new Response(
-        JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Parse request body
     const { email, password, role, collaborateurId, clientId, firstName, lastName } = await req.json();
 
@@ -171,19 +141,6 @@ Deno.serve(async (req) => {
     if (!validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ error: "Rôle invalide" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Check if password has been compromised (HaveIBeenPwned)
-    const { isCompromised, count } = await checkPasswordCompromised(password);
-    if (isCompromised) {
-      console.warn(`Password found in ${count} data breaches`);
-      return new Response(
-        JSON.stringify({ 
-          error: `Ce mot de passe a été exposé dans ${count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.`,
-          code: "PASSWORD_COMPROMISED"
-        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -215,39 +172,169 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create the auth user
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        first_name: firstName || targetRecord.first_name,
-        last_name: lastName || targetRecord.last_name,
-      },
-    });
+    // Check if a user with this email already exists in auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
-    if (createError) {
-      console.error("Error creating user:", createError);
-      return new Response(
-        JSON.stringify({ error: createError.message }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    let userId: string;
 
-    const userId = newUser.user.id;
+    if (existingUser) {
+      // User already exists - we'll add the new role and link to the client record
+      console.log(`User ${email} already exists with ID ${existingUser.id}, adding role ${role}`);
+      userId = existingUser.id;
 
-    // Update the user_roles table (the trigger creates a default 'client' role, so we update it)
-    const { error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .update({ role })
-      .eq("user_id", userId);
-
-    if (roleError) {
-      console.error("Error updating role:", roleError);
-      // If role update fails, try to insert
-      await supabaseAdmin
+      // Check if user already has this role
+      const { data: existingRole } = await supabaseAdmin
         .from("user_roles")
-        .upsert({ user_id: userId, role }, { onConflict: "user_id" });
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", role)
+        .maybeSingle();
+
+      if (!existingRole) {
+        // Add the new role (user can have multiple roles)
+        const { error: roleInsertError } = await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: userId, role });
+
+        if (roleInsertError) {
+          console.error("Error adding role:", roleInsertError);
+          // Continue anyway - user might already have this role
+        }
+      }
+
+      // Check if user is already assigned to this tenant
+      const { data: existingTenantAssignment } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (!existingTenantAssignment) {
+        // Check seat availability only for new tenant assignments
+        const { data: tenant } = await supabaseAdmin
+          .from("tenants")
+          .select("seats_included, extra_users")
+          .eq("id", tenantId)
+          .single();
+
+        if (tenant) {
+          const { count: activeUsersCount } = await supabaseAdmin
+            .from("user_tenant_assignments")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId);
+
+          const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+          const availableSeats = totalSeats - (activeUsersCount || 0);
+
+          if (availableSeats <= 0) {
+            return new Response(
+              JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+
+        // Assign user to tenant
+        const { error: assignmentError } = await supabaseAdmin
+          .from("user_tenant_assignments")
+          .insert({ user_id: userId, tenant_id: tenantId });
+
+        if (assignmentError) {
+          console.error("Error assigning user to tenant:", assignmentError);
+        }
+      }
+    } else {
+      // New user - check password and create account
+      
+      // Get tenant seat information
+      const { data: tenant } = await supabaseAdmin
+        .from("tenants")
+        .select("seats_included, extra_users")
+        .eq("id", tenantId)
+        .single();
+
+      if (!tenant) {
+        return new Response(
+          JSON.stringify({ error: "Tenant non trouvé" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Count current active users in tenant
+      const { count: activeUsersCount } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId);
+
+      const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+      const availableSeats = totalSeats - (activeUsersCount || 0);
+
+      if (availableSeats <= 0) {
+        return new Response(
+          JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if password has been compromised (HaveIBeenPwned)
+      const { isCompromised, count } = await checkPasswordCompromised(password);
+      if (isCompromised) {
+        console.warn(`Password found in ${count} data breaches`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Ce mot de passe a été exposé dans ${count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.`,
+            code: "PASSWORD_COMPROMISED"
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Create the auth user
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          first_name: firstName || targetRecord.first_name,
+          last_name: lastName || targetRecord.last_name,
+        },
+      });
+
+      if (createError) {
+        console.error("Error creating user:", createError);
+        return new Response(
+          JSON.stringify({ error: createError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      userId = newUser.user.id;
+
+      // Update the user_roles table (the trigger creates a default 'client' role, so we update it)
+      const { error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .update({ role })
+        .eq("user_id", userId);
+
+      if (roleError) {
+        console.error("Error updating role:", roleError);
+        // If role update fails, try to insert
+        await supabaseAdmin
+          .from("user_roles")
+          .upsert({ user_id: userId, role }, { onConflict: "user_id" });
+      }
+
+      // Assign user to the same tenant
+      const { error: assignmentError } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .insert({ user_id: userId, tenant_id: tenantId });
+
+      if (assignmentError) {
+        console.error("Error assigning user to tenant:", assignmentError);
+        // This is not critical, continue
+      }
     }
 
     // Link the user to the client/collaborateur record
@@ -264,23 +351,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Assign user to the same tenant
-    const { error: assignmentError } = await supabaseAdmin
-      .from("user_tenant_assignments")
-      .insert({ user_id: userId, tenant_id: tenantId });
-
-    if (assignmentError) {
-      console.error("Error assigning user to tenant:", assignmentError);
-      // This is not critical, continue
-    }
-
-    console.log(`User account created successfully: ${email} with role ${role}`);
+    const wasExisting = !!existingUser;
+    console.log(`User account ${wasExisting ? 'linked' : 'created'} successfully: ${email} with role ${role}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         userId,
-        message: `Compte créé pour ${email} avec le rôle ${role}` 
+        wasExisting,
+        message: wasExisting 
+          ? `L'utilisateur existant ${email} a été lié avec le rôle ${role}` 
+          : `Compte créé pour ${email} avec le rôle ${role}` 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
