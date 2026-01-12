@@ -54,6 +54,24 @@ export const EmailTemplatesList = () => {
     is_active: true,
   });
 
+  const humanizeIdentifier = (raw: string) => {
+    const spaced = raw
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!spaced) return raw;
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
+
+  const getTemplateDisplayName = (template?: EmailTemplate | null) => {
+    if (!template) return "";
+    if (!template.is_system) return template.name;
+    return t(`templates.system.${template.name}`, {
+      defaultValue: humanizeIdentifier(template.name),
+    });
+  };
+
   const { data: templates, isLoading } = useQuery({
     queryKey: ["email-templates"],
     queryFn: async () => {
@@ -156,7 +174,7 @@ export const EmailTemplatesList = () => {
 
   const handleDuplicate = (template: EmailTemplate) => {
     setFormData({
-      name: `${template.name} (copie)`,
+      name: `${getTemplateDisplayName(template)} (copie)`,
       subject: template.subject,
       body_html: template.body_html,
       body_text: template.body_text || "",
@@ -283,7 +301,7 @@ export const EmailTemplatesList = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">{template.name}</CardTitle>
+                  <CardTitle className="text-base">{getTemplateDisplayName(template)}</CardTitle>
                 </div>
                 {template.is_system && (
                   <Badge variant="outline" className="gap-1 border-primary/50 text-primary">
@@ -428,7 +446,7 @@ export const EmailTemplatesList = () => {
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Aperçu: {selectedTemplate?.name}</DialogTitle>
+            <DialogTitle>Aperçu: {getTemplateDisplayName(selectedTemplate)}</DialogTitle>
             <DialogDescription>Sujet: {selectedTemplate?.subject}</DialogDescription>
           </DialogHeader>
           <div className="border rounded-lg p-4 bg-white dark:bg-muted">

@@ -161,6 +161,24 @@ export const EmailTemplatesList = () => {
     is_active: true,
   });
 
+  const humanizeIdentifier = (raw: string) => {
+    const spaced = raw
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!spaced) return raw;
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  };
+
+  const getTemplateDisplayName = (template?: EmailTemplate | null) => {
+    if (!template) return "";
+    if (!template.is_system) return template.name;
+    return t(`templates.system.${template.name}`, {
+      defaultValue: humanizeIdentifier(template.name),
+    });
+  };
+
   const { data: templates, isLoading } = useQuery({
     queryKey: ["email-templates"],
     queryFn: async () => {
@@ -281,7 +299,7 @@ export const EmailTemplatesList = () => {
 
   const handleDuplicate = (template: EmailTemplate) => {
     setFormData({
-      name: `${template.name} (copie)`,
+      name: `${getTemplateDisplayName(template)} (copie)`,
       subject: template.subject,
       body_html: template.body_html,
       body_text: template.body_text || "",
@@ -437,7 +455,7 @@ export const EmailTemplatesList = () => {
                     ) : (
                       <Mail className="h-5 w-5 text-primary" />
                     )}
-                    <CardTitle className="text-base line-clamp-1">{template.name}</CardTitle>
+                    <CardTitle className="text-base line-clamp-1">{getTemplateDisplayName(template)}</CardTitle>
                   </div>
                   {template.is_system && (
                     <Badge variant="outline" className="gap-1 shrink-0 border-primary/50 text-primary">
@@ -596,7 +614,7 @@ export const EmailTemplatesList = () => {
               ) : (
                 <Mail className="h-5 w-5 text-primary" />
               )}
-              {selectedTemplate?.name}
+              {getTemplateDisplayName(selectedTemplate)}
             </DialogTitle>
             <DialogDescription>Sujet: {selectedTemplate?.subject}</DialogDescription>
           </DialogHeader>
