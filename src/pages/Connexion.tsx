@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown, Building2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useSearchParams } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { useAuth } from "@/hooks/useAuth";
@@ -310,6 +311,7 @@ const ResetPasswordForm = ({ email, setEmail, loading, onSubmit, onBack, transla
 const Connexion = () => {
   const { t } = useTranslation();
   const { tenant, isLoading: tenantLoading, hasClientPortal } = useTenant();
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState<View>("choice");
   const [loginType, setLoginType] = useState<"client" | "team" | "king">("client");
   const [isResetPassword, setIsResetPassword] = useState(false);
@@ -324,6 +326,20 @@ const Connexion = () => {
   const { toast } = useToast();
   const { signIn, resetPassword, user, clearPendingVerification } = useAuth();
   const navigate = useNavigate();
+  
+  // Show email verified message if redirected after email verification
+  const emailVerified = searchParams.get('verified') === 'true';
+  
+  useEffect(() => {
+    if (emailVerified) {
+      toast({
+        title: t('auth.emailVerified', 'Email vérifié'),
+        description: t('auth.emailVerifiedDesc', 'Votre email a été vérifié. Veuillez vous connecter avec vos identifiants.'),
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/connexion');
+    }
+  }, [emailVerified, toast, t]);
   
   // Flag to completely block redirects during SMS flow
   const smsFlowActive = useRef(false);

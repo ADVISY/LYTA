@@ -1,7 +1,11 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+// Session timeout: 1 hour in milliseconds
+const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
 
 /**
  * Check if a password has been exposed in known data breaches
@@ -71,26 +75,159 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phoneNumber: string;
   } | null>(null);
   const navigate = useNavigate();
+  
+  // Track last activity time for session timeout
+  const lastActivityRef = useRef<number>(Date.now());
+  const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update last activity on user interaction
+  const updateLastActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    sessionStorage.setItem('lastActivity', String(lastActivityRef.current));
+  }, []);
+
+  // Check for session timeout due to inactivity
+  const checkSessionTimeout = useCallback(async () => {
+    const lastActivity = Number(sessionStorage.getItem('lastActivity') || lastActivityRef.current);
+    const timeSinceActivity = Date.now() - lastActivity;
+    
+    if (timeSinceActivity >= SESSION_TIMEOUT_MS && session) {
+      console.log('Session expired due to inactivity (1 hour)');
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      sessionStorage.removeItem('lastActivity');
+      sessionStorage.removeItem('userLoginData');
+      navigate('/connexion');
+    }
+  }, [session, navigate]);
+
+  // Set up activity tracking and timeout checking
+  useEffect(() => {
+    // Activity events to track
+    const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    
+    activityEvents.forEach(event => {
+      window.addEventListener(event, updateLastActivity, { passive: true });
+    });
+    
+    // Check for timeout periodically
+    activityTimeoutRef.current = setInterval(checkSessionTimeout, ACTIVITY_CHECK_INTERVAL_MS);
+    
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, updateLastActivity);
+      });
+      if (activityTimeoutRef.current) {
+        clearInterval(activityTimeoutRef.current);
+      }
+    };
+  }, [updateLastActivity, checkSessionTimeout]);
+
+  // Logout on page close/unload (security measure)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Mark session as should-logout for next load
+      sessionStorage.setItem('shouldLogout', 'true');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // User is leaving - mark for logout
+        sessionStorage.setItem('shouldLogout', 'true');
+      } else if (document.visibilityState === 'visible') {
+        // User returned - check if we should logout
+        const shouldLogout = sessionStorage.getItem('shouldLogout');
+        const lastActivity = Number(sessionStorage.getItem('lastActivity') || 0);
+        const timeSinceActivity = Date.now() - lastActivity;
+        
+        // If returning after more than 5 minutes of being hidden, force re-login
+        if (shouldLogout === 'true' && timeSinceActivity > 5 * 60 * 1000) {
+          sessionStorage.removeItem('shouldLogout');
+          supabase.auth.signOut().then(() => {
+            setSession(null);
+            setUser(null);
+            navigate('/connexion');
+          });
+        } else {
+          sessionStorage.removeItem('shouldLogout');
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [navigate]);
 
   useEffect(() => {
+    // Check if we should force logout on page load (came from redirect or page close)
+    const shouldLogout = sessionStorage.getItem('shouldLogout');
+    if (shouldLogout === 'true') {
+      sessionStorage.removeItem('shouldLogout');
+      supabase.auth.signOut().then(() => {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
+      return;
+    }
+
     // Set up auth state listener (must be registered before getSession)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // SECURITY: Force re-login on redirect from email verification
+      // Users should not be auto-logged in from email links
+      if (event === 'SIGNED_IN' && window.location.href.includes('access_token')) {
+        console.log('Blocking auto-login from email redirect');
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        navigate('/connexion');
+        return;
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Initialize activity tracking on login
+      if (session) {
+        updateLastActivity();
+      }
     });
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      // Check if session is still valid based on last activity
+      const lastActivity = Number(sessionStorage.getItem('lastActivity') || 0);
+      const timeSinceActivity = Date.now() - lastActivity;
+      
+      if (session && lastActivity > 0 && timeSinceActivity >= SESSION_TIMEOUT_MS) {
+        // Session expired due to inactivity
+        console.log('Existing session expired due to inactivity');
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        sessionStorage.removeItem('lastActivity');
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session) {
+          updateLastActivity();
+        }
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate, updateLastActivity]);
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -191,7 +328,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('Password check failed, proceeding with signup:', err);
     }
 
-    const redirectUrl = `${window.location.origin}/crm`;
+    // SECURITY: Redirect to login page after email verification, not auto-login
+    // The user must manually enter their credentials
+    const redirectUrl = `${window.location.origin}/connexion?verified=true`;
     
     const { error } = await supabase.auth.signUp({
       email,
@@ -214,6 +353,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Session might already be expired/invalid - ignore error
       console.log("Logout completed (session may have been expired)");
     }
+    // Clear all session data
+    sessionStorage.removeItem('lastActivity');
+    sessionStorage.removeItem('userLoginData');
+    sessionStorage.removeItem('shouldLogout');
     // Always clear local state and redirect, even if signOut fails
     setSession(null);
     setUser(null);

@@ -101,7 +101,11 @@
     "crmLogin": "Accesso CRM",
     "crmLoginDesc": "Accedi al tuo spazio di gestione",
     "sending": "Invio in corso...",
-    "sendLink": "Invia link"
+    "sendLink": "Invia link",
+    "emailVerified": "Email verificata",
+    "emailVerifiedDesc": "La tua email è stata verificata. Effettua l'accesso con le tue credenziali.",
+    "sessionExpired": "Sessione scaduta",
+    "sessionExpiredDesc": "La tua sessione è scaduta dopo 1 ora di inattività. Effettua nuovamente l'accesso."
   },
   "nav": {
     "dashboard": "Dashboard",

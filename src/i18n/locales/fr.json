@@ -101,7 +101,11 @@
     "crmLogin": "Connexion CRM",
     "crmLoginDesc": "Accédez à votre espace de gestion",
     "sending": "Envoi en cours...",
-    "sendLink": "Envoyer le lien"
+    "sendLink": "Envoyer le lien",
+    "emailVerified": "Email vérifié",
+    "emailVerifiedDesc": "Votre email a été vérifié. Veuillez vous connecter avec vos identifiants.",
+    "sessionExpired": "Session expirée",
+    "sessionExpiredDesc": "Votre session a expiré après 1 heure d'inactivité. Veuillez vous reconnecter."
   },
   "nav": {
     "dashboard": "Tableau de bord",
