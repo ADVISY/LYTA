@@ -91,14 +91,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if requesting user is admin
+    // Check if requesting user is admin (user can have multiple roles)
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", requestingUser.id)
-      .single();
+      .eq("user_id", requestingUser.id);
 
-    if (!roleData || roleData.role !== "admin") {
+    const isAdmin = roleData?.some(r => r.role === "admin");
+    
+    if (!isAdmin) {
       return new Response(
         JSON.stringify({ error: "Accès refusé. Seuls les administrateurs peuvent créer des comptes." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
