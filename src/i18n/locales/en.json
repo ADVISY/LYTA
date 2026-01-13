@@ -105,11 +105,7 @@
     "crmLogin": "CRM Login",
     "crmLoginDesc": "Access your management space",
     "sending": "Sending...",
-    "sendLink": "Send link",
-    "emailVerified": "Email verified",
-    "emailVerifiedDesc": "Your email has been verified. Please log in with your credentials.",
-    "sessionExpired": "Session expired",
-    "sessionExpiredDesc": "Your session has expired after 1 hour of inactivity. Please log in again."
+    "sendLink": "Send link"
   },
   "nav": {
     "dashboard": "Dashboard",

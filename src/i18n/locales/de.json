@@ -101,11 +101,7 @@
     "crmLogin": "CRM-Anmeldung",
     "crmLoginDesc": "Zugang zu Ihrem Verwaltungsbereich",
     "sending": "Wird gesendet...",
-    "sendLink": "Link senden",
-    "emailVerified": "E-Mail verifiziert",
-    "emailVerifiedDesc": "Ihre E-Mail wurde verifiziert. Bitte melden Sie sich mit Ihren Zugangsdaten an.",
-    "sessionExpired": "Sitzung abgelaufen",
-    "sessionExpiredDesc": "Ihre Sitzung ist nach 1 Stunde Inaktivität abgelaufen. Bitte melden Sie sich erneut an."
+    "sendLink": "Link senden"
   },
   "nav": {
     "dashboard": "Dashboard",
