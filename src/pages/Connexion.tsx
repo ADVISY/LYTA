@@ -428,15 +428,38 @@ const Connexion = () => {
           window.location.href = `${protocol}//${tenantSlug}.${baseDomain}/crm`;
         };
 
-        // Helper to get role (from cache or fetch)
+        // Helper to get the effective role for the chosen space (team/client/king)
+        // IMPORTANT: a user can have multiple roles → never use maybeSingle here
         const getRole = async (): Promise<string> => {
-          if (cachedData?.role) return cachedData.role;
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          return data?.role || 'client';
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('[Connexion] Error fetching roles:', error);
+            return 'client';
+          }
+
+          const roles = (data ?? []).map((r) => r.role as string);
+
+          const pickTeamRole = () => {
+            const teamRoles = ['admin', 'manager', 'agent', 'backoffice', 'compta', 'partner'];
+            return (
+              teamRoles.find((r) => roles.includes(r)) ??
+              roles.find((r) => r !== 'client' && r !== 'king') ??
+              (roles.includes('client') ? 'client' : (roles[0] ?? 'client'))
+            );
+          };
+
+          if (targetSpace === 'king') return roles.includes('king') ? 'king' : (roles[0] ?? 'client');
+          if (targetSpace === 'client') return roles.includes('client') ? 'client' : (roles[0] ?? 'client');
+          if (targetSpace === 'team') return pickTeamRole();
+
+          // Fallback (no target) - prefer king, then client, then best team
+          if (roles.includes('king')) return 'king';
+          if (roles.includes('client')) return 'client';
+          return pickTeamRole();
         };
 
         // Helper to get tenant slug (from cache or fetch)
@@ -659,6 +682,8 @@ const Connexion = () => {
 
     // IMPORTANT: set target BEFORE sign-in to avoid redirect race
     sessionStorage.setItem('loginTarget', loginType);
+    // Persist chosen space for the whole session (strict space separation)
+    sessionStorage.setItem('lyta_login_space', loginType);
 
     setLoading(true);
     // CRITICAL: Set flag BEFORE signIn to prevent any redirect
@@ -671,6 +696,7 @@ const Connexion = () => {
       if (result.error) {
         // Remove target when login fails
         sessionStorage.removeItem('loginTarget');
+        sessionStorage.removeItem('lyta_login_space');
         smsFlowActive.current = false;
         toast({
           title: "Erreur de connexion",
@@ -699,6 +725,7 @@ const Connexion = () => {
       }
     } catch (error: any) {
       sessionStorage.removeItem('loginTarget');
+      sessionStorage.removeItem('lyta_login_space');
       smsFlowActive.current = false;
       toast({
         title: "Erreur",
@@ -774,6 +801,7 @@ const Connexion = () => {
   const handleSmsCancelled = async () => {
     console.log("[Connexion] SMS verification cancelled");
     sessionStorage.removeItem('loginTarget');
+    sessionStorage.removeItem('lyta_login_space');
     setSmsVerificationData(null);
     setShowSmsVerification(false);
     clearPendingVerification();

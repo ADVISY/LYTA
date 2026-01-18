@@ -222,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear all session data to prevent role/session leakage
     sessionStorage.removeItem('lyta_active_role');
     sessionStorage.removeItem('loginTarget');
+    sessionStorage.removeItem('lyta_login_space');
     sessionStorage.removeItem('userLoginData');
     
     navigate("/connexion");

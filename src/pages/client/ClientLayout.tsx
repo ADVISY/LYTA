@@ -58,25 +58,24 @@ export default function ClientLayout() {
       
       setUser(session.user);
       
-      // Check user role - allow admins to also access client space if they chose it
-      const { data: roleData } = await supabase
+      // Check user roles (user can have multiple roles)
+      const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-      
-      const role = roleData?.role || 'client';
-      
+        .eq('user_id', session.user.id);
+
+      const roles = (rolesData ?? []).map((r) => r.role as string);
+      const hasClientRole = roles.includes('client');
+
       // Check if user has a client record (needed for client portal)
       const { data: clientRecord } = await supabase
         .from('clients')
         .select('*')
         .eq('user_id', session.user.id)
         .maybeSingle();
-      
-      // If user is admin/team but has no client record, silently redirect to CRM
-      // (No toast - they might have been redirected here accidentally)
-      if (role !== 'client' && !clientRecord) {
+
+      // If user has no client role/record, they should not be here
+      if (!hasClientRole && !clientRecord) {
         navigate("/crm", { replace: true });
         return;
       }

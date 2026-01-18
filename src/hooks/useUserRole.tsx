@@ -38,6 +38,7 @@ export function useUserRole() {
     setRoles([]);
     sessionStorage.removeItem(ACTIVE_ROLE_KEY);
     sessionStorage.removeItem('loginTarget');
+    sessionStorage.removeItem('lyta_login_space');
     sessionStorage.removeItem('userLoginData');
   }, []);
 
@@ -73,7 +74,7 @@ export function useUserRole() {
           setActiveRole(userRoles[0]);
         } else if (userRoles.length > 1) {
           // Multiple roles - prioritize based on login target
-          const loginTarget = sessionStorage.getItem('loginTarget');
+          const loginTarget = sessionStorage.getItem('lyta_login_space') || sessionStorage.getItem('loginTarget');
           if (loginTarget === 'king' && userRoles.includes('king')) {
             setActiveRole('king');
           } else if (loginTarget === 'client' && userRoles.includes('client')) {

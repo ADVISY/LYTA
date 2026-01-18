@@ -59,62 +59,75 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Get user role for route validation
-        const { data: roleData } = await supabase
+        // Load roles (user can have multiple roles)
+        const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          .eq('user_id', user.id);
 
-        const userRole = roleData?.role || 'client';
-        const currentPath = location.pathname;
-        
-        // Get the active login space from session
-        const activeSpace = sessionStorage.getItem('lyta_active_role');
-        const loginTarget = sessionStorage.getItem('loginTarget');
-        
-        // Determine what space the user intended to access
-        const intendedSpace = activeSpace || loginTarget;
-
-        // SECURITY: Validate role matches route
-        if (currentPath.startsWith('/king') && userRole !== 'king') {
-          console.error("[ProtectedRoute] Unauthorized access to king route");
+        if (rolesError) {
+          console.error("[ProtectedRoute] Error fetching user roles", rolesError);
           setIsAuthorized(false);
           setIsValidating(false);
           return;
         }
 
-        // SECURITY: CRM/Team routes - block if user logged in as CLIENT
-        if (currentPath.startsWith('/crm')) {
-          // If user explicitly chose CLIENT space, block CRM access
-          if (intendedSpace === 'client') {
-            console.error("[ProtectedRoute] Client space user trying to access CRM via URL");
-            setIsAuthorized(false);
-            setIsValidating(false);
-            return;
-          }
-          
-          // Also verify user has a team role (not just client)
-          if (userRole === 'client') {
-            console.error("[ProtectedRoute] Client role trying to access CRM");
+        const roles = (rolesData ?? []).map((r) => r.role as string);
+        const currentPath = location.pathname;
+
+        // Strict space separation: the chosen space must be present
+        const intendedSpace =
+          sessionStorage.getItem('lyta_login_space') ||
+          sessionStorage.getItem('loginTarget');
+
+        if (!intendedSpace) {
+          console.error("[ProtectedRoute] Missing intended space (force re-login)");
+          setIsAuthorized(false);
+          setIsValidating(false);
+          return;
+        }
+
+        const isKing = roles.includes('king');
+        const hasClientRole = roles.includes('client');
+        const hasTeamRole = roles.some((r) => r !== 'client' && r !== 'king');
+
+        // SECURITY: Validate role matches route
+        if (currentPath.startsWith('/king')) {
+          if (intendedSpace !== 'king' || !isKing) {
+            console.error("[ProtectedRoute] Unauthorized access to king route");
             setIsAuthorized(false);
             setIsValidating(false);
             return;
           }
         }
 
-        // SECURITY: Client space routes - block if user logged in as TEAM
-        if (currentPath.startsWith('/espace-client')) {
-          // If user explicitly chose TEAM space, block client space access
-          if (intendedSpace === 'team') {
-            console.error("[ProtectedRoute] Team space user trying to access client space via URL");
+        // SECURITY: CRM/Team routes - must be in TEAM space and have a team role
+        if (currentPath.startsWith('/crm')) {
+          if (intendedSpace !== 'team') {
+            console.error("[ProtectedRoute] Non-team space user trying to access CRM via URL");
             setIsAuthorized(false);
             setIsValidating(false);
             return;
           }
-          
-          // Verify user has client access (either client role or has client record)
-          if (!['client', 'king'].includes(userRole)) {
+
+          if (isKing || !hasTeamRole) {
+            console.error("[ProtectedRoute] User has no team role for CRM");
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+        }
+
+        // SECURITY: Client space routes - must be in CLIENT space and have a client record/role
+        if (currentPath.startsWith('/espace-client')) {
+          if (intendedSpace !== 'client') {
+            console.error("[ProtectedRoute] Non-client space user trying to access client space via URL");
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+
+          if (!hasClientRole) {
             const { data: clientRecord } = await supabase
               .from('clients')
               .select('id')
@@ -154,6 +167,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // Clear any stale session data
     sessionStorage.removeItem('lyta_active_role');
     sessionStorage.removeItem('loginTarget');
+    sessionStorage.removeItem('lyta_login_space');
     sessionStorage.removeItem('userLoginData');
     return <Navigate to="/connexion" replace />;
   }
