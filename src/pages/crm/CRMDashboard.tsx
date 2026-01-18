@@ -79,14 +79,26 @@ export default function CRMDashboard() {
     }
   }, [fetchClients, fetchPolicies, fetchCommissions]);
 
-  // Setup auto-refresh
+  // Setup auto-refresh - use refs to avoid dependency issues
+  const fetchClientsRef = useRef(fetchClients);
+  const fetchPoliciesRef = useRef(fetchPolicies);
+  const fetchCommissionsRef = useRef(fetchCommissions);
+  
+  // Keep refs updated
+  useEffect(() => {
+    fetchClientsRef.current = fetchClients;
+    fetchPoliciesRef.current = fetchPolicies;
+    fetchCommissionsRef.current = fetchCommissions;
+  });
+  
+  // Setup auto-refresh with stable interval
   useEffect(() => {
     refreshIntervalRef.current = setInterval(() => {
       // Silent background refresh (no loading indicator)
       Promise.all([
-        fetchClients(),
-        fetchPolicies(),
-        fetchCommissions(),
+        fetchClientsRef.current(),
+        fetchPoliciesRef.current(),
+        fetchCommissionsRef.current(),
       ]).catch(console.error);
     }, AUTO_REFRESH_INTERVAL);
 
@@ -95,7 +107,7 @@ export default function CRMDashboard() {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [fetchClients, fetchPolicies, fetchCommissions]);
+  }, []); // Empty deps - interval set once on mount
   // Get current user's collaborator record
   const myCollaborator = useMemo(() => {
     if (!user) return null;
