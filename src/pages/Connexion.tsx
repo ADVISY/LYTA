@@ -905,7 +905,7 @@ const Connexion = () => {
   const handleSmsVerified = async () => {
     console.log("[Connexion] SMS verified successfully");
 
-    // IMPORTANT: target was set before sign-in; clear it once SMS flow completes
+    // IMPORTANT: keep chosen space (lyta_login_space), but clear one-shot target
     sessionStorage.removeItem('loginTarget');
 
     // Clear SMS state
@@ -913,54 +913,14 @@ const Connexion = () => {
     setShowSmsVerification(false);
     clearPendingVerification();
 
-    setLoading(true);
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+    // Allow the redirect effect to run now that SMS is completed
+    smsFlowActive.current = false;
+    processedUserRef.current = null;
 
-      if (!currentUser) {
-        smsFlowActive.current = false;
-        toast({
-          title: "Erreur",
-          description: "Session expirée. Veuillez vous reconnecter.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Get user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', currentUser.id)
-        .maybeSingle();
-
-      const role = roleData?.role || 'client';
-
-      toast({
-        title: "Connexion réussie",
-        description: `Bienvenue sur votre espace ${displayName}.`,
-      });
-
-      // Now we can clear the flag and redirect
-      smsFlowActive.current = false;
-
-      if (role === 'king') {
-        navigate("/king/wizard");
-      } else if (loginType === 'client') {
-        navigate("/espace-client");
-      } else if (role === 'admin') {
-        // Admin users go to CRM with tenant
-        await redirectToTenantSubdomain(currentUser.id);
-      } else {
-        // Team members also go to CRM
-        await redirectToTenantSubdomain(currentUser.id);
-      }
-    } catch (error) {
-      console.error("Error after SMS verification:", error);
-      smsFlowActive.current = false;
-    } finally {
-      setLoading(false);
-    }
+    toast({
+      title: "Connexion réussie",
+      description: `Bienvenue sur votre espace ${displayName}.`,
+    });
   };
 
   const handleSmsCancelled = async () => {
