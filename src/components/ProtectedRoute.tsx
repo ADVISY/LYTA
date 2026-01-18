@@ -1,15 +1,22 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Roles that REQUIRE SMS 2FA verification
+const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner'];
+
+// How long a SMS verification is considered valid (in minutes)
+const SMS_VERIFICATION_VALIDITY_MINUTES = 480; // 8 hours
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
   const location = useLocation();
   const [isValidating, setIsValidating] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const validationInProgress = useRef(false);
 
-  // Server-side validation of user session and role
+  // Server-side validation of user session, role, AND SMS 2FA
   useEffect(() => {
     const validateSession = async () => {
       if (loading) return;
@@ -19,6 +26,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         setIsAuthorized(false);
         return;
       }
+
+      // Prevent duplicate validations
+      if (validationInProgress.current) return;
+      validationInProgress.current = true;
 
       try {
         // Verify session is still valid on server
@@ -36,7 +47,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         // Verify user exists in database
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, is_active')
+          .select('id, is_active, phone')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -89,7 +100,44 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
         const isKing = roles.includes('king');
         const hasClientRole = roles.includes('client');
-        const hasTeamRole = roles.some((r) => r !== 'client' && r !== 'king');
+
+        // ======== CRITICAL SECURITY: SMS 2FA VERIFICATION ========
+        // Check if user has any role that requires 2FA
+        const requiresSms2FA = roles.some(r => ROLES_REQUIRING_2FA.includes(r));
+        
+        if (requiresSms2FA) {
+          // Verify that user has completed SMS verification recently
+          const minValidTime = new Date();
+          minValidTime.setMinutes(minValidTime.getMinutes() - SMS_VERIFICATION_VALIDITY_MINUTES);
+          
+          const { data: smsVerification, error: smsError } = await supabase
+            .from('sms_verifications')
+            .select('id, verified_at')
+            .eq('user_id', user.id)
+            .eq('verification_type', 'login')
+            .not('verified_at', 'is', null)
+            .gte('verified_at', minValidTime.toISOString())
+            .order('verified_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (smsError) {
+            console.error("[ProtectedRoute] Error checking SMS verification", smsError);
+          }
+
+          if (!smsVerification) {
+            console.error("[ProtectedRoute] SECURITY: No valid SMS 2FA verification found for privileged user");
+            // Clear session and force re-login with SMS
+            sessionStorage.clear();
+            await signOut();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+
+          console.log("[ProtectedRoute] SMS 2FA verified at:", smsVerification.verified_at);
+        }
+        // ======== END SMS 2FA VERIFICATION ========
 
         // SECURITY: Validate role matches route
         if (currentPath.startsWith('/king')) {
@@ -181,6 +229,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         console.error("[ProtectedRoute] Validation error:", error);
         setIsAuthorized(false);
         setIsValidating(false);
+      } finally {
+        validationInProgress.current = false;
       }
     };
 

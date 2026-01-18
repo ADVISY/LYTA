@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -11,6 +11,10 @@ export function useUserRole() {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [activeRole, setActiveRoleState] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Prevent duplicate fetches
+  const fetchingRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   // Get stored active role from session
   const getStoredActiveRole = useCallback((): UserRole | null => {
@@ -44,19 +48,31 @@ export function useUserRole() {
 
   useEffect(() => {
     async function fetchRoles() {
-      if (!user) {
+      const userId = user?.id ?? null;
+      
+      // Skip if no user
+      if (!userId) {
         setRoles([]);
         setActiveRoleState(null);
         setLoading(false);
+        lastUserIdRef.current = null;
         return;
       }
 
+      // Skip if already fetching or same user
+      if (fetchingRef.current || lastUserIdRef.current === userId) {
+        return;
+      }
+
+      fetchingRef.current = true;
+      lastUserIdRef.current = userId;
+
       try {
-        console.log('[useUserRole] Fetching roles for user:', user.id);
+        console.log('[useUserRole] Fetching roles for user:', userId);
         const { data, error } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
 
         if (error) throw error;
 
@@ -98,11 +114,12 @@ export function useUserRole() {
         setActiveRoleState(null);
       } finally {
         setLoading(false);
+        fetchingRef.current = false;
       }
     }
 
     fetchRoles();
-  }, [user, getStoredActiveRole, setActiveRole]);
+  }, [user?.id, getStoredActiveRole, setActiveRole]);
 
   // For backwards compatibility, expose 'role' as activeRole
   const role = activeRole;

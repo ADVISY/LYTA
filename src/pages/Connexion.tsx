@@ -385,6 +385,10 @@ const Connexion = () => {
     toastRef.current = toast;
   });
 
+  // Roles that require SMS 2FA
+  const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner'];
+  const SMS_VERIFICATION_VALIDITY_MINUTES = 480; // 8 hours
+
   // Handle redirect after successful login (only when NOT in SMS flow)
   // Use a ref to track if we've already processed this user session
   const processedUserRef = useRef<string | null>(null);
@@ -420,6 +424,78 @@ const Connexion = () => {
       }
 
       redirectInProgress.current = true;
+      
+      // SECURITY CHECK: User has session but may need SMS 2FA
+      // Check if user has a role requiring 2FA and verify SMS status
+      try {
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        
+        const roles = (rolesData ?? []).map(r => r.role as string);
+        const needsSms2FA = roles.some(r => ROLES_REQUIRING_2FA.includes(r));
+        
+        if (needsSms2FA) {
+          // Check if user has a valid recent SMS verification
+          const minValidTime = new Date();
+          minValidTime.setMinutes(minValidTime.getMinutes() - SMS_VERIFICATION_VALIDITY_MINUTES);
+          
+          const { data: smsVerification } = await supabase
+            .from('sms_verifications')
+            .select('id, verified_at')
+            .eq('user_id', user.id)
+            .eq('verification_type', 'login')
+            .not('verified_at', 'is', null)
+            .gte('verified_at', minValidTime.toISOString())
+            .order('verified_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (!smsVerification) {
+            // User needs to complete SMS 2FA!
+            console.log('[Connexion] User has session but needs SMS 2FA verification');
+            
+            // Get user's phone number
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('phone')
+              .eq('id', user.id)
+              .maybeSingle();
+            
+            const phoneNumber = profile?.phone || user.phone;
+            
+            if (!phoneNumber) {
+              // No phone number - sign out and show error
+              toastRef.current({
+                title: "Vérification SMS requise",
+                description: "Aucun numéro de téléphone configuré. Contactez l'administrateur.",
+                variant: "destructive",
+              });
+              await supabase.auth.signOut();
+              redirectInProgress.current = false;
+              return;
+            }
+            
+            // Show SMS verification dialog
+            smsFlowActive.current = true;
+            setSmsVerificationData({
+              userId: user.id,
+              phoneNumber,
+            });
+            setShowSmsVerification(true);
+            redirectInProgress.current = false;
+            
+            toastRef.current({
+              title: "Vérification requise",
+              description: "Veuillez compléter la vérification SMS pour accéder à votre espace.",
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('[Connexion] Error checking SMS verification:', err);
+      }
       try {
         const targetSpace =
           sessionStorage.getItem('loginTarget') ||
