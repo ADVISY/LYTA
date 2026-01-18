@@ -538,16 +538,19 @@ const Connexion = () => {
         processedUserRef.current = user.id;
 
         // If no target space set, user navigated to /connexion while logged in
+        // IMPORTANT: we must set an intended space, otherwise ProtectedRoute will bounce back to /connexion.
         if (!targetSpace) {
           const globalRole = await getGlobalRole();
 
           if (globalRole === 'king') {
+            sessionStorage.setItem('lyta_login_space', 'king');
             navigateRef.current("/king/wizard", { replace: true });
             return;
           }
 
           const teamAccess = await getTeamAccess();
           if (teamAccess.allowed) {
+            sessionStorage.setItem('lyta_login_space', 'team');
             if (teamAccess.tenantSlug) {
               goToTenantCrm(teamAccess.tenantSlug);
             } else {
@@ -556,8 +559,31 @@ const Connexion = () => {
             return;
           }
 
-          // Default to client space if no team access
-          navigateRef.current("/espace-client", { replace: true });
+          // Fall back to client space only if user has a client role/record
+          if (globalRole === 'client') {
+            sessionStorage.setItem('lyta_login_space', 'client');
+            navigateRef.current("/espace-client", { replace: true });
+            return;
+          }
+
+          const { data: clientRecord } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (clientRecord) {
+            sessionStorage.setItem('lyta_login_space', 'client');
+            navigateRef.current("/espace-client", { replace: true });
+            return;
+          }
+
+          toastRef.current({
+            title: "Accès refusé",
+            description: "Votre compte n'a accès ni au CRM ni à l'espace client pour ce cabinet.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
           return;
         }
 
