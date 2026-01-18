@@ -3,8 +3,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Roles that REQUIRE SMS 2FA verification
-const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner'];
+// Roles that REQUIRE SMS 2FA verification - ALL roles require SMS
+const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner', 'client'];
 
 // How long a SMS verification is considered valid (in minutes)
 const SMS_VERIFICATION_VALIDITY_MINUTES = 480; // 8 hours
