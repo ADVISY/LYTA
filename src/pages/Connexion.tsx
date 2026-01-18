@@ -376,10 +376,22 @@ const Connexion = () => {
     sendLink: t('auth.sendLink', 'Envoyer le lien'),
   };
 
+  // Store stable refs for functions that may change
+  const navigateRef = useRef(navigate);
+  const toastRef = useRef(toast);
+  
+  useEffect(() => {
+    navigateRef.current = navigate;
+    toastRef.current = toast;
+  });
+
   // Handle redirect after successful login (only when NOT in SMS flow)
+  // Use a ref to track if we've already processed this user session
+  const processedUserRef = useRef<string | null>(null);
+  
   useEffect(() => {
     const handleRedirect = async () => {
-      // Wait for the login submit to finish (prevents “redirect missed” race)
+      // Wait for the login submit to finish (prevents "redirect missed" race)
       if (loading) return;
 
       // CRITICAL: Never redirect during SMS verification flow
@@ -391,10 +403,19 @@ const Connexion = () => {
         return;
       }
 
-      if (!user) return;
+      if (!user) {
+        // Reset processed user when user logs out
+        processedUserRef.current = null;
+        return;
+      }
 
-      // Prevent duplicate redirect calls
+      // Prevent duplicate redirect calls for the same user session
       if (redirectInProgress.current) {
+        return;
+      }
+      
+      // If we've already processed this exact user, don't do it again
+      if (processedUserRef.current === user.id) {
         return;
       }
 
@@ -421,7 +442,7 @@ const Connexion = () => {
           const isLocalhost = hostname === 'localhost' || hostname.includes('lovable');
 
           if (isLocalhost) {
-            navigate(`/crm?tenant=${tenantSlug}`, { replace: true });
+            navigateRef.current(`/crm?tenant=${tenantSlug}`, { replace: true });
             return;
           }
 
@@ -513,12 +534,15 @@ const Connexion = () => {
         // Clean up cached data after use
         sessionStorage.removeItem('userLoginData');
 
+        // Mark this user as processed to prevent re-running
+        processedUserRef.current = user.id;
+
         // If no target space set, user navigated to /connexion while logged in
         if (!targetSpace) {
           const globalRole = await getGlobalRole();
 
           if (globalRole === 'king') {
-            navigate("/king/wizard", { replace: true });
+            navigateRef.current("/king/wizard", { replace: true });
             return;
           }
 
@@ -527,13 +551,13 @@ const Connexion = () => {
             if (teamAccess.tenantSlug) {
               goToTenantCrm(teamAccess.tenantSlug);
             } else {
-              navigate("/crm", { replace: true });
+              navigateRef.current("/crm", { replace: true });
             }
             return;
           }
 
           // Default to client space if no team access
-          navigate("/espace-client", { replace: true });
+          navigateRef.current("/espace-client", { replace: true });
           return;
         }
 
@@ -543,9 +567,9 @@ const Connexion = () => {
         if (targetSpace === 'king') {
           const globalRole = await getGlobalRole();
           if (globalRole === 'king') {
-            navigate("/king/wizard", { replace: true });
+            navigateRef.current("/king/wizard", { replace: true });
           } else {
-            toast({
+            toastRef.current({
               title: "Accès refusé",
               description: "Vous n'avez pas les droits SUPER ADMIN.",
               variant: "destructive",
@@ -559,19 +583,19 @@ const Connexion = () => {
 
         // KING users always go to /king/wizard
         if (globalRole === 'king') {
-          navigate("/king/wizard", { replace: true });
+          navigateRef.current("/king/wizard", { replace: true });
           return;
         }
 
         if (targetSpace === 'client') {
-          navigate("/espace-client", { replace: true });
+          navigateRef.current("/espace-client", { replace: true });
           return;
         }
 
         // targetSpace === 'team'
         const teamAccess = await getTeamAccess();
         if (!teamAccess.allowed) {
-          toast({
+          toastRef.current({
             title: "Accès refusé",
             description: "Votre compte n'a pas accès au CRM (Espace Team).",
             variant: "destructive",
@@ -584,7 +608,7 @@ const Connexion = () => {
         if (teamAccess.tenantSlug) {
           goToTenantCrm(teamAccess.tenantSlug);
         } else {
-          navigate("/crm", { replace: true });
+          navigateRef.current("/crm", { replace: true });
         }
       } finally {
         redirectInProgress.current = false;
@@ -592,7 +616,7 @@ const Connexion = () => {
     };
 
     handleRedirect();
-  }, [user, loading, showSmsVerification, smsVerificationData]);
+  }, [user?.id, loading, showSmsVerification, smsVerificationData]);
 
   // Ensure SMS dialog stays open if data exists
   useEffect(() => {
