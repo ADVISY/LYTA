@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner', 'client'];
 
 // How long a SMS verification is considered valid (in minutes)
-const SMS_VERIFICATION_VALIDITY_MINUTES = 480; // 8 hours
+const SMS_VERIFICATION_VALIDITY_MINUTES = 120; // 2 hours
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();

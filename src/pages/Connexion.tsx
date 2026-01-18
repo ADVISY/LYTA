@@ -387,7 +387,7 @@ const Connexion = () => {
 
   // Roles that require SMS 2FA - ALL roles require SMS authentication
   const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 'compta', 'partner', 'client'];
-  const SMS_VERIFICATION_VALIDITY_MINUTES = 480; // 8 hours
+  const SMS_VERIFICATION_VALIDITY_MINUTES = 120; // 2 hours
 
   // Handle redirect after successful login (only when NOT in SMS flow)
   // Use a ref to track if we've already processed this user session
