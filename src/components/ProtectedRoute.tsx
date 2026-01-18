@@ -101,7 +101,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // SECURITY: CRM/Team routes - must be in TEAM space and have a team role
+        // SECURITY: CRM/Team routes - must be in TEAM space and have a tenant role
         if (currentPath.startsWith('/crm')) {
           if (intendedSpace !== 'team') {
             console.error("[ProtectedRoute] Non-team space user trying to access CRM via URL");
@@ -110,11 +110,43 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          if (isKing || !hasTeamRole) {
-            console.error("[ProtectedRoute] User has no team role for CRM");
+          if (isKing) {
+            console.error("[ProtectedRoute] King user trying to access CRM");
             setIsAuthorized(false);
             setIsValidating(false);
             return;
+          }
+
+          // Validate tenant membership (server-side)
+          const { data: assignment, error: assignmentError } = await supabase
+            .from('user_tenant_assignments')
+            .select('tenant_id, is_platform_admin')
+            .eq('user_id', user.id)
+            .not('tenant_id', 'is', null)
+            .maybeSingle();
+
+          if (assignmentError || !assignment?.tenant_id) {
+            console.error("[ProtectedRoute] User has no tenant assignment for CRM", assignmentError);
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+
+          // Platform admins are allowed regardless of tenant role assignment
+          if (!(assignment as any).is_platform_admin) {
+            const { data: tenantRoles, error: tenantRolesError } = await supabase
+              .from('user_tenant_roles')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('tenant_id', assignment.tenant_id)
+              .limit(1);
+
+            if (tenantRolesError || (tenantRoles?.length ?? 0) === 0) {
+              console.error("[ProtectedRoute] User has no tenant role for CRM", tenantRolesError);
+              setIsAuthorized(false);
+              setIsValidating(false);
+              return;
+            }
           }
         }
 

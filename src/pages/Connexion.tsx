@@ -400,7 +400,9 @@ const Connexion = () => {
 
       redirectInProgress.current = true;
       try {
-        const targetSpace = sessionStorage.getItem('loginTarget');
+        const targetSpace =
+          sessionStorage.getItem('loginTarget') ||
+          sessionStorage.getItem('lyta_login_space');
 
         // OPTIMIZATION: Use cached login data from signIn (no extra DB calls!)
         const cachedDataStr = sessionStorage.getItem('userLoginData');
@@ -428,49 +430,84 @@ const Connexion = () => {
           window.location.href = `${protocol}//${tenantSlug}.${baseDomain}/crm`;
         };
 
-        // Helper to get the effective role for the chosen space (team/client/king)
-        // IMPORTANT: a user can have multiple roles → never use maybeSingle here
-        const getRole = async (): Promise<string> => {
+        // Global roles (client/king) are stored in user_roles. Team access is tenant-based.
+        const getGlobalRole = async (): Promise<'king' | 'client' | string> => {
+          if (cachedData?.role) return cachedData.role;
+
           const { data, error } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id);
 
           if (error) {
-            console.error('[Connexion] Error fetching roles:', error);
+            console.error('[Connexion] Error fetching global roles:', error);
             return 'client';
           }
 
           const roles = (data ?? []).map((r) => r.role as string);
-
-          const pickTeamRole = () => {
-            const teamRoles = ['admin', 'manager', 'agent', 'backoffice', 'compta', 'partner'];
-            return (
-              teamRoles.find((r) => roles.includes(r)) ??
-              roles.find((r) => r !== 'client' && r !== 'king') ??
-              (roles.includes('client') ? 'client' : (roles[0] ?? 'client'))
-            );
-          };
-
-          if (targetSpace === 'king') return roles.includes('king') ? 'king' : (roles[0] ?? 'client');
-          if (targetSpace === 'client') return roles.includes('client') ? 'client' : (roles[0] ?? 'client');
-          if (targetSpace === 'team') return pickTeamRole();
-
-          // Fallback (no target) - prefer king, then client, then best team
           if (roles.includes('king')) return 'king';
           if (roles.includes('client')) return 'client';
-          return pickTeamRole();
+          return roles[0] ?? 'client';
         };
 
-        // Helper to get tenant slug (from cache or fetch)
-        const getTenantSlug = async (): Promise<string | null> => {
-          if (cachedData) return cachedData.tenant_slug;
-          const { data } = await supabase
+        const getTenantAssignment = async (): Promise<{
+          tenantId: string | null;
+          tenantSlug: string | null;
+          isPlatformAdmin: boolean;
+        }> => {
+          // cachedData contains tenant_slug but not tenant_id.
+          const { data, error } = await supabase
             .from('user_tenant_assignments')
-            .select('tenant_id, tenants(slug)')
+            .select('tenant_id, is_platform_admin, tenants(slug)')
             .eq('user_id', user.id)
+            .not('tenant_id', 'is', null)
             .maybeSingle();
-          return (data?.tenants as any)?.slug || null;
+
+          if (error) {
+            console.error('[Connexion] Error fetching tenant assignment:', error);
+          }
+
+          const tenantSlug =
+            cachedData?.tenant_slug ?? ((data?.tenants as any)?.slug || null);
+
+          return {
+            tenantId: (data?.tenant_id as string | undefined) ?? null,
+            tenantSlug,
+            isPlatformAdmin: Boolean((data as any)?.is_platform_admin),
+          };
+        };
+
+        const getTeamAccess = async (): Promise<{
+          allowed: boolean;
+          tenantSlug: string | null;
+        }> => {
+          const assignment = await getTenantAssignment();
+
+          if (!assignment.tenantId) {
+            return { allowed: false, tenantSlug: null };
+          }
+
+          // Platform admins are allowed regardless of tenant role assignment.
+          if (assignment.isPlatformAdmin) {
+            return { allowed: true, tenantSlug: assignment.tenantSlug };
+          }
+
+          const { data: tenantRoles, error } = await supabase
+            .from('user_tenant_roles')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('tenant_id', assignment.tenantId)
+            .limit(1);
+
+          if (error) {
+            console.error('[Connexion] Error fetching tenant roles:', error);
+            return { allowed: false, tenantSlug: assignment.tenantSlug };
+          }
+
+          return {
+            allowed: (tenantRoles?.length ?? 0) > 0,
+            tenantSlug: assignment.tenantSlug,
+          };
         };
 
         // Clean up cached data after use
@@ -478,24 +515,25 @@ const Connexion = () => {
 
         // If no target space set, user navigated to /connexion while logged in
         if (!targetSpace) {
-          const role = await getRole();
+          const globalRole = await getGlobalRole();
 
-          if (role === 'king') {
+          if (globalRole === 'king') {
             navigate("/king/wizard", { replace: true });
             return;
           }
 
-          if (role === 'client') {
-            navigate("/espace-client", { replace: true });
+          const teamAccess = await getTeamAccess();
+          if (teamAccess.allowed) {
+            if (teamAccess.tenantSlug) {
+              goToTenantCrm(teamAccess.tenantSlug);
+            } else {
+              navigate("/crm", { replace: true });
+            }
             return;
           }
 
-          const tenantSlug = await getTenantSlug();
-          if (tenantSlug) {
-            goToTenantCrm(tenantSlug);
-          } else {
-            navigate("/crm", { replace: true });
-          }
+          // Default to client space if no team access
+          navigate("/espace-client", { replace: true });
           return;
         }
 
@@ -503,8 +541,8 @@ const Connexion = () => {
         sessionStorage.removeItem('loginTarget');
 
         if (targetSpace === 'king') {
-          const role = await getRole();
-          if (role === 'king') {
+          const globalRole = await getGlobalRole();
+          if (globalRole === 'king') {
             navigate("/king/wizard", { replace: true });
           } else {
             toast({
@@ -517,10 +555,10 @@ const Connexion = () => {
           return;
         }
 
-        const role = await getRole();
+        const globalRole = await getGlobalRole();
 
         // KING users always go to /king/wizard
-        if (role === 'king') {
+        if (globalRole === 'king') {
           navigate("/king/wizard", { replace: true });
           return;
         }
@@ -531,19 +569,20 @@ const Connexion = () => {
         }
 
         // targetSpace === 'team'
-        if (role === 'client') {
+        const teamAccess = await getTeamAccess();
+        if (!teamAccess.allowed) {
           toast({
             title: "Accès refusé",
-            description: "Vous n'avez pas accès à l'espace Team.",
+            description: "Votre compte n'a pas accès au CRM (Espace Team).",
             variant: "destructive",
           });
-          navigate("/espace-client", { replace: true });
+          // Keep spaces strictly separated: force re-login if team access is missing.
+          await supabase.auth.signOut();
           return;
         }
 
-        const tenantSlug = await getTenantSlug();
-        if (tenantSlug) {
-          goToTenantCrm(tenantSlug);
+        if (teamAccess.tenantSlug) {
+          goToTenantCrm(teamAccess.tenantSlug);
         } else {
           navigate("/crm", { replace: true });
         }
