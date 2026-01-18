@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,8 +15,28 @@ export function useLanguage() {
   const { i18n } = useTranslation();
   const { user } = useAuth();
   const { tenant } = useTenant();
+  
+  // Track if we've already initialized to prevent re-runs
+  const initializedRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+  const lastTenantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Only re-initialize if user or tenant actually changed
+    const userId = user?.id ?? null;
+    const tenantId = tenant?.id ?? null;
+    
+    if (
+      initializedRef.current &&
+      lastUserIdRef.current === userId &&
+      lastTenantIdRef.current === tenantId
+    ) {
+      return;
+    }
+    
+    lastUserIdRef.current = userId;
+    lastTenantIdRef.current = tenantId;
+
     const initializeLanguage = async () => {
       // Check localStorage first (fastest)
       const storedLang = localStorage.getItem('preferred_language');
@@ -24,6 +44,7 @@ export function useLanguage() {
         if (i18n.language !== storedLang) {
           i18n.changeLanguage(storedLang);
         }
+        initializedRef.current = true;
         return;
       }
 
@@ -41,6 +62,7 @@ export function useLanguage() {
           if (preferredLang && SUPPORTED_LANGUAGES.includes(preferredLang as SupportedLanguage)) {
             i18n.changeLanguage(preferredLang);
             localStorage.setItem('preferred_language', preferredLang);
+            initializedRef.current = true;
             return;
           }
         } catch (error) {
@@ -53,6 +75,7 @@ export function useLanguage() {
       if (tenantDefaultLang && SUPPORTED_LANGUAGES.includes(tenantDefaultLang as SupportedLanguage)) {
         i18n.changeLanguage(tenantDefaultLang);
         localStorage.setItem('preferred_language', tenantDefaultLang);
+        initializedRef.current = true;
         return;
       }
 
@@ -61,10 +84,11 @@ export function useLanguage() {
       if (!currentLang || !SUPPORTED_LANGUAGES.includes(currentLang as SupportedLanguage)) {
         i18n.changeLanguage('fr');
       }
+      initializedRef.current = true;
     };
 
     initializeLanguage();
-  }, [user, tenant, i18n]);
+  }, [user?.id, tenant?.id]); // Only depend on IDs, not full objects
 
   const setLanguage = async (lang: SupportedLanguage) => {
     i18n.changeLanguage(lang);
