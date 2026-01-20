@@ -1527,6 +1527,9 @@ export type Database = {
       insurance_products: {
         Row: {
           category: string
+          commission_description: string | null
+          commission_type: string | null
+          commission_value: number | null
           company_id: string
           created_at: string
           description: string | null
@@ -1535,6 +1538,9 @@ export type Database = {
         }
         Insert: {
           category: string
+          commission_description?: string | null
+          commission_type?: string | null
+          commission_value?: number | null
           company_id: string
           created_at?: string
           description?: string | null
@@ -1543,6 +1549,9 @@ export type Database = {
         }
         Update: {
           category?: string
+          commission_description?: string | null
+          commission_type?: string | null
+          commission_value?: number | null
           company_id?: string
           created_at?: string
           description?: string | null
