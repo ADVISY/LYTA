@@ -487,6 +487,18 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         ? selectedProducts[0].category 
         : 'multi';
 
+      // Determine the deductible to save at policy level
+      // Priority: LAMal franchise > first "other" product deductible > first product with deductible
+      let policyDeductible: number | null = parseFloat(lamalFranchise) || null;
+      if (!policyDeductible && productsData.length === 1) {
+        // Single product: use its deductible
+        policyDeductible = productsData[0].deductible;
+      } else if (!policyDeductible && categorizedSelection.other.length > 0) {
+        // Multiple products: use first "other" category product's deductible
+        const otherProduct = productsData.find(p => !['health', 'life'].includes(p.category) && p.deductible);
+        if (otherProduct) policyDeductible = otherProduct.deductible;
+      }
+
       const policyData = {
         client_id: clientId,
         product_id: mainProductId,
@@ -495,7 +507,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         end_date: endDate,
         premium_monthly: totalMonthly,
         premium_yearly: totalYearly,
-        deductible: parseFloat(lamalFranchise) || null,
+        deductible: policyDeductible,
         status: status,
         notes: notesParts.join('\n') || null,
         company_name: companyName,
