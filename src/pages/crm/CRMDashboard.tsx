@@ -57,6 +57,7 @@ export default function CRMDashboard() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
   const [agentFilter, setAgentFilter] = useState<string>('all');
+  const [chartYear, setChartYear] = useState<number>(new Date().getFullYear());
   const [allCommissionParts, setAllCommissionParts] = useState<any[]>([]);
   const [myCommissionParts, setMyCommissionParts] = useState<any[]>([]);
   const [partsLoading, setPartsLoading] = useState(true);
@@ -434,29 +435,44 @@ export default function CRMDashboard() {
     return managerScores.sort((a, b) => b.monthContracts - a.monthContracts)[0] || null;
   }, [teamPerformance, clients, policies]);
 
-  // Monthly chart data - all active contracts (including future dates)
+  // Get available years from policies (from earliest to current year + 1 for future contracts)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    
+    // Add years from all policies
+    policies.forEach(p => {
+      if (p.start_date) {
+        const year = new Date(p.start_date).getFullYear();
+        years.add(year);
+      }
+    });
+    
+    // Always include current year
+    years.add(currentYear);
+    
+    // Sort years descending
+    return Array.from(years).sort((a, b) => b - a);
+  }, [policies]);
+
+  // Monthly chart data - filtered by selected year
   const monthlyChartData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-    const currentYear = new Date().getFullYear();
 
-    // Include all active contracts regardless of date
+    // Include all active contracts for the selected year
     const activePolicies = filteredPolicies.filter(p => p.status === 'active');
 
     return months.map((month, i) => {
-      // Match contracts for this month in current year OR any future year
+      // Match contracts for this month in selected year
       const monthPolicies = activePolicies.filter(p => {
         const date = new Date(p.start_date);
-        const policyYear = date.getFullYear();
-        const policyMonth = date.getMonth();
-        // Include if: same year same month, OR future year mapped to this month
-        return (policyYear === currentYear && policyMonth === i) ||
-               (policyYear > currentYear && policyMonth === i);
+        return date.getFullYear() === chartYear && date.getMonth() === i;
       });
 
-      // Real commissions for this month (current year only for historical data)
+      // Real commissions for this month in selected year
       const monthCommissions = commissions.filter(c => {
         const date = new Date(c.created_at);
-        return date.getFullYear() === currentYear && date.getMonth() === i;
+        return date.getFullYear() === chartYear && date.getMonth() === i;
       });
 
       let lca = 0;
@@ -487,7 +503,7 @@ export default function CRMDashboard() {
 
       return { month, lca, vie, total: lca + vie, ca: Math.round(caLca + caVie), commission: Math.round(commission) };
     });
-  }, [filteredPolicies, commissions]);
+  }, [filteredPolicies, commissions, chartYear]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-CH', { 
@@ -786,7 +802,19 @@ export default function CRMDashboard() {
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-sm font-semibold">{t('dashboard.performance', { year: new Date().getFullYear() })}</CardTitle>
+                      <CardTitle className="text-sm font-semibold">{t('dashboard.performance', { year: chartYear })}</CardTitle>
+                      <Select value={chartYear.toString()} onValueChange={(v) => setChartYear(parseInt(v))}>
+                        <SelectTrigger className="w-[100px] h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableYears.map(year => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year} {year === new Date().getFullYear() && '(actuel)'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       <div className="flex items-center gap-1.5">
