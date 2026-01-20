@@ -5,13 +5,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2, Users, Globe, Phone, Edit2, Check, X, DollarSign } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2, Users, Edit2, Check, X, DollarSign, Plus, Trash2, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
 import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,27 +57,19 @@ type Company = {
   id: string;
   name: string;
   logo_url: string | null;
+  website?: string | null;
   products: Product[];
 };
 
 const getCategoryLabels = (t: any): Record<string, { label: string; color: string }> => ({
-  health: { label: t('settings.categoryHealth'), color: "bg-emerald-100 text-emerald-700" },
-  auto: { label: t('settings.categoryAuto'), color: "bg-blue-100 text-blue-700" },
-  home: { label: t('settings.categoryProperty'), color: "bg-amber-100 text-amber-700" },
-  life: { label: t('settings.categoryLife'), color: "bg-violet-100 text-violet-700" },
-  legal: { label: t('settings.categoryLegal'), color: "bg-slate-100 text-slate-700" },
-  lamal: { label: "LAMal", color: "bg-teal-100 text-teal-700" },
-  lca: { label: "LCA", color: "bg-cyan-100 text-cyan-700" },
+  health: { label: t('settings.categoryHealth'), color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  auto: { label: t('settings.categoryAuto'), color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  home: { label: t('settings.categoryProperty'), color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  life: { label: t('settings.categoryLife'), color: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" },
+  legal: { label: t('settings.categoryLegal'), color: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400" },
+  lamal: { label: "LAMal", color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" },
+  lca: { label: "LCA", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" },
 });
-
-const getCommissionTypeLabel = (type: string | null) => {
-  switch (type) {
-    case 'fixed': return 'Fixe (CHF)';
-    case 'multiplier': return 'Multiplicateur (×)';
-    case 'percentage': return 'Pourcentage (%)';
-    default: return 'Non défini';
-  }
-};
 
 const formatCommissionDisplay = (type: string | null, value: number | null, description: string | null) => {
   if (!type || value === null || value === 0) return null;
@@ -64,6 +82,16 @@ const formatCommissionDisplay = (type: string | null, value: number | null, desc
   }
 };
 
+const CATEGORIES = [
+  { value: 'health', label: 'Santé' },
+  { value: 'lamal', label: 'LAMal' },
+  { value: 'lca', label: 'LCA (Complémentaire)' },
+  { value: 'life', label: 'Vie / 3e pilier' },
+  { value: 'auto', label: 'Auto' },
+  { value: 'home', label: 'Habitation' },
+  { value: 'legal', label: 'Protection juridique' },
+];
+
 export default function CRMCompagnies() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -74,6 +102,20 @@ export default function CRMCompagnies() {
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ type: string; value: string; description: string }>({ type: 'multiplier', value: '', description: '' });
   const [saving, setSaving] = useState(false);
+  
+  // Company dialogs
+  const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
+  const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
+  const [companyForm, setCompanyForm] = useState({ name: '', logo_url: '', website: '' });
+  const [deleteCompanyDialog, setDeleteCompanyDialog] = useState<Company | null>(null);
+  
+  // Product dialogs
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
+  const [productForm, setProductForm] = useState({ name: '', category: 'health', description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
+  const [deleteProductDialog, setDeleteProductDialog] = useState<Product | null>(null);
+  
   const categoryLabels = getCategoryLabels(t);
 
   useEffect(() => {
@@ -84,7 +126,6 @@ export default function CRMCompagnies() {
     try {
       setLoading(true);
       
-      // Fetch companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('insurance_companies')
         .select('*')
@@ -92,7 +133,6 @@ export default function CRMCompagnies() {
       
       if (companiesError) throw companiesError;
 
-      // Fetch products
       const { data: productsData, error: productsError } = await supabase
         .from('insurance_products')
         .select('*')
@@ -100,7 +140,6 @@ export default function CRMCompagnies() {
       
       if (productsError) throw productsError;
 
-      // Group products by company
       const companiesWithProducts = (companiesData || []).map(company => ({
         ...company,
         products: (productsData || []).filter(p => p.company_id === company.id)
@@ -124,7 +163,8 @@ export default function CRMCompagnies() {
     setOpenCompanies(newOpen);
   };
 
-  const startEditProduct = (product: Product) => {
+  // Commission inline edit
+  const startEditCommission = (product: Product) => {
     setEditingProduct(product.id);
     setEditForm({
       type: product.commission_type || 'multiplier',
@@ -133,7 +173,7 @@ export default function CRMCompagnies() {
     });
   };
 
-  const cancelEditProduct = () => {
+  const cancelEditCommission = () => {
     setEditingProduct(null);
     setEditForm({ type: 'multiplier', value: '', description: '' });
   };
@@ -142,7 +182,6 @@ export default function CRMCompagnies() {
     try {
       setSaving(true);
       
-      // Generate description based on type
       let description = editForm.description;
       if (!description) {
         switch (editForm.type) {
@@ -169,19 +208,186 @@ export default function CRMCompagnies() {
 
       if (error) throw error;
 
-      toast({
-        title: "Succès",
-        description: "Commission mise à jour"
-      });
-
+      toast({ title: "Succès", description: "Commission mise à jour" });
       setEditingProduct(null);
       fetchCompanies();
     } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Company CRUD
+  const openAddCompany = () => {
+    setCompanyToEdit(null);
+    setCompanyForm({ name: '', logo_url: '', website: '' });
+    setCompanyDialogOpen(true);
+  };
+
+  const openEditCompany = (company: Company) => {
+    setCompanyToEdit(company);
+    setCompanyForm({ 
+      name: company.name, 
+      logo_url: company.logo_url || '', 
+      website: company.website || '' 
+    });
+    setCompanyDialogOpen(true);
+  };
+
+  const saveCompany = async () => {
+    try {
+      setSaving(true);
+      
+      if (companyToEdit) {
+        const { error } = await supabase
+          .from('insurance_companies')
+          .update({ 
+            name: companyForm.name, 
+            logo_url: companyForm.logo_url || null,
+            website: companyForm.website || null
+          })
+          .eq('id', companyToEdit.id);
+        if (error) throw error;
+        toast({ title: "Succès", description: "Compagnie modifiée" });
+      } else {
+        const { error } = await supabase
+          .from('insurance_companies')
+          .insert({ 
+            name: companyForm.name, 
+            logo_url: companyForm.logo_url || null,
+            website: companyForm.website || null
+          });
+        if (error) throw error;
+        toast({ title: "Succès", description: "Compagnie créée" });
+      }
+      
+      setCompanyDialogOpen(false);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCompany = async () => {
+    if (!deleteCompanyDialog) return;
+    try {
+      setSaving(true);
+      
+      // First delete all products of this company
+      const { error: productsError } = await supabase
+        .from('insurance_products')
+        .delete()
+        .eq('company_id', deleteCompanyDialog.id);
+      if (productsError) throw productsError;
+      
+      const { error } = await supabase
+        .from('insurance_companies')
+        .delete()
+        .eq('id', deleteCompanyDialog.id);
+      if (error) throw error;
+      
+      toast({ title: "Succès", description: "Compagnie supprimée" });
+      setDeleteCompanyDialog(null);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Product CRUD
+  const openAddProduct = (companyId: string) => {
+    setProductToEdit(null);
+    setProductCompanyId(companyId);
+    setProductForm({ name: '', category: 'health', description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
+    setProductDialogOpen(true);
+  };
+
+  const openEditProduct = (product: Product, companyId: string) => {
+    setProductToEdit(product);
+    setProductCompanyId(companyId);
+    setProductForm({
+      name: product.name,
+      category: product.category,
+      description: product.description || '',
+      commission_type: product.commission_type || 'multiplier',
+      commission_value: product.commission_value?.toString() || '',
+      commission_description: product.commission_description || ''
+    });
+    setProductDialogOpen(true);
+  };
+
+  const saveProduct = async () => {
+    try {
+      setSaving(true);
+      
+      let description = productForm.commission_description;
+      if (!description && productForm.commission_value) {
+        switch (productForm.commission_type) {
+          case 'fixed':
+            description = `${productForm.commission_value} CHF par contrat`;
+            break;
+          case 'multiplier':
+            description = `Prime mensuelle × ${productForm.commission_value}`;
+            break;
+          case 'percentage':
+            description = `${productForm.commission_value}% de la prime`;
+            break;
+        }
+      }
+      
+      const productData = {
+        name: productForm.name,
+        category: productForm.category,
+        description: productForm.description || null,
+        commission_type: productForm.commission_type,
+        commission_value: parseFloat(productForm.commission_value) || 0,
+        commission_description: description || null
+      };
+      
+      if (productToEdit) {
+        const { error } = await supabase
+          .from('insurance_products')
+          .update(productData)
+          .eq('id', productToEdit.id);
+        if (error) throw error;
+        toast({ title: "Succès", description: "Produit modifié" });
+      } else {
+        const { error } = await supabase
+          .from('insurance_products')
+          .insert({ ...productData, company_id: productCompanyId });
+        if (error) throw error;
+        toast({ title: "Succès", description: "Produit créé" });
+      }
+      
+      setProductDialogOpen(false);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteProduct = async () => {
+    if (!deleteProductDialog) return;
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from('insurance_products')
+        .delete()
+        .eq('id', deleteProductDialog.id);
+      if (error) throw error;
+      
+      toast({ title: "Succès", description: "Produit supprimé" });
+      setDeleteProductDialog(null);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -213,13 +419,17 @@ export default function CRMCompagnies() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
-            <Building2 className="h-6 w-6 text-white" />
+            <Building2 className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-3xl font-bold">{t('companies.title')}</h1>
             <p className="text-muted-foreground">{t('companies.subtitle')}</p>
           </div>
         </div>
+        <Button onClick={openAddCompany} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Ajouter une compagnie
+        </Button>
       </div>
 
       {/* Stats */}
@@ -227,31 +437,27 @@ export default function CRMCompagnies() {
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('companies.companies')}</p>
-            <p className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
-              {companies.length}
-            </p>
+            <p className="text-2xl font-bold text-primary">{companies.length}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('companies.products')}</p>
-            <p className="text-2xl font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">
-              {totalProducts}
-            </p>
+            <p className="text-2xl font-bold text-primary">{totalProducts}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('settings.categoryHealth')}</p>
-            <p className="text-2xl font-bold bg-gradient-to-r from-violet-500 to-violet-600 bg-clip-text text-transparent">
-              {companies.reduce((sum, c) => sum + c.products.filter(p => p.category === 'health').length, 0)}
+            <p className="text-2xl font-bold text-primary">
+              {companies.reduce((sum, c) => sum + c.products.filter(p => ['health', 'lamal', 'lca'].includes(p.category)).length, 0)}
             </p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('settings.categoryAuto')}/{t('settings.categoryProperty')}</p>
-            <p className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
+            <p className="text-2xl font-bold text-primary">
               {companies.reduce((sum, c) => sum + c.products.filter(p => ['auto', 'home'].includes(p.category)).length, 0)}
             </p>
           </CardContent>
@@ -278,10 +484,10 @@ export default function CRMCompagnies() {
             onOpenChange={() => toggleCompany(company.id)}
           >
             <Card className="border-0 shadow-lg bg-card/80 backdrop-blur overflow-hidden">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center gap-4 flex-1">
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                         {company.logo_url ? (
                           <img 
@@ -303,32 +509,60 @@ export default function CRMCompagnies() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="hidden sm:flex gap-2">
-                        {Object.entries(
-                          company.products.reduce((acc, p) => {
-                            acc[p.category] = (acc[p.category] || 0) + 1;
-                            return acc;
-                          }, {} as Record<string, number>)
-                        ).map(([cat, count]) => (
-                          <Badge 
-                            key={cat} 
-                            variant="secondary"
-                            className={cn("text-xs", categoryLabels[cat]?.color)}
-                          >
-                            {categoryLabels[cat]?.label || cat} ({count})
-                          </Badge>
-                        ))}
-                      </div>
-                      {openCompanies.has(company.id) ? (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                      )}
+                  </CollapsibleTrigger>
+                  <div className="flex items-center gap-3">
+                    <div className="hidden sm:flex gap-2">
+                      {Object.entries(
+                        company.products.reduce((acc, p) => {
+                          acc[p.category] = (acc[p.category] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>)
+                      ).map(([cat, count]) => (
+                        <Badge 
+                          key={cat} 
+                          variant="secondary"
+                          className={cn("text-xs", categoryLabels[cat]?.color)}
+                        >
+                          {categoryLabels[cat]?.label || cat} ({count})
+                        </Badge>
+                      ))}
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditCompany(company)}>
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Modifier la compagnie
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openAddProduct(company.id)}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter un produit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => setDeleteCompanyDialog(company)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Supprimer la compagnie
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        {openCompanies.has(company.id) ? (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
                   </div>
-                </CardHeader>
-              </CollapsibleTrigger>
+                </div>
+              </CardHeader>
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-4">
@@ -345,11 +579,22 @@ export default function CRMCompagnies() {
                     </TabsList>
 
                     <TabsContent value="products">
+                      <div className="mb-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => openAddProduct(company.id)}
+                          className="gap-1.5"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Ajouter un produit
+                        </Button>
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {company.products.map((product) => (
                           <div
                             key={product.id}
-                            className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                            className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors group"
                           >
                             <div className="flex items-start gap-3">
                               <div className="p-2 rounded-lg bg-background">
@@ -358,16 +603,34 @@ export default function CRMCompagnies() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="font-medium text-sm truncate">{product.name}</p>
-                                  {editingProduct !== product.id && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 shrink-0"
-                                      onClick={() => startEditProduct(product)}
-                                    >
-                                      <Edit2 className="h-3 w-3" />
-                                    </Button>
-                                  )}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <MoreVertical className="h-3 w-3" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openEditProduct(product, company.id)}>
+                                        <Edit2 className="h-4 w-4 mr-2" />
+                                        Modifier le produit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => startEditCommission(product)}>
+                                        <DollarSign className="h-4 w-4 mr-2" />
+                                        Modifier la commission
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => setDeleteProductDialog(product)}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Supprimer
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                                 <Badge 
                                   variant="secondary" 
@@ -419,7 +682,7 @@ export default function CRMCompagnies() {
                                         variant="outline"
                                         size="sm"
                                         className="h-7 text-xs"
-                                        onClick={cancelEditProduct}
+                                        onClick={cancelEditCommission}
                                         disabled={saving}
                                       >
                                         <X className="h-3 w-3" />
@@ -430,8 +693,8 @@ export default function CRMCompagnies() {
                                   <div className="mt-2">
                                     {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description) ? (
                                       <div className="flex items-center gap-1.5 text-xs">
-                                        <DollarSign className="h-3 w-3 text-emerald-600" />
-                                        <span className="font-medium text-emerald-700">
+                                        <DollarSign className="h-3 w-3 text-primary" />
+                                        <span className="font-medium text-primary">
                                           {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description)}
                                         </span>
                                       </div>
@@ -462,6 +725,198 @@ export default function CRMCompagnies() {
           </Collapsible>
         ))}
       </div>
+
+      {/* Company Dialog */}
+      <Dialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {companyToEdit ? 'Modifier la compagnie' : 'Ajouter une compagnie'}
+            </DialogTitle>
+            <DialogDescription>
+              {companyToEdit ? 'Modifiez les informations de la compagnie.' : 'Ajoutez une nouvelle compagnie d\'assurance.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nom de la compagnie *</Label>
+              <Input
+                value={companyForm.name}
+                onChange={(e) => setCompanyForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ex: Groupe Mutuel"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>URL du logo</Label>
+              <Input
+                value={companyForm.logo_url}
+                onChange={(e) => setCompanyForm(prev => ({ ...prev, logo_url: e.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Site web</Label>
+              <Input
+                value={companyForm.website}
+                onChange={(e) => setCompanyForm(prev => ({ ...prev, website: e.target.value }))}
+                placeholder="https://www.example.ch"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompanyDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={saveCompany} disabled={saving || !companyForm.name}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {companyToEdit ? 'Modifier' : 'Créer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Dialog */}
+      <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {productToEdit ? 'Modifier le produit' : 'Ajouter un produit'}
+            </DialogTitle>
+            <DialogDescription>
+              {productToEdit ? 'Modifiez les informations du produit.' : 'Ajoutez un nouveau produit d\'assurance.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nom du produit *</Label>
+              <Input
+                value={productForm.name}
+                onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ex: Assurance complémentaire Optima"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Catégorie *</Label>
+              <Select
+                value={productForm.category}
+                onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={productForm.description}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Description du produit..."
+                rows={2}
+              />
+            </div>
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Configuration de la commission
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Type de calcul</Label>
+                  <Select
+                    value={productForm.commission_type}
+                    onValueChange={(value) => setProductForm(prev => ({ ...prev, commission_type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixe (CHF)</SelectItem>
+                      <SelectItem value="multiplier">Multiplicateur (×)</SelectItem>
+                      <SelectItem value="percentage">Pourcentage (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {productForm.commission_type === 'fixed' ? 'Montant (CHF)' : 
+                     productForm.commission_type === 'multiplier' ? 'Multiplicateur' : 'Pourcentage'}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={productForm.commission_value}
+                    onChange={(e) => setProductForm(prev => ({ ...prev, commission_value: e.target.value }))}
+                    placeholder={productForm.commission_type === 'fixed' ? '70' : productForm.commission_type === 'multiplier' ? '16' : '4'}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label>Description de la formule (optionnel)</Label>
+                <Input
+                  value={productForm.commission_description}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, commission_description: e.target.value }))}
+                  placeholder="Ex: Prime mensuelle × 16"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProductDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={saveProduct} disabled={saving || !productForm.name}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {productToEdit ? 'Modifier' : 'Créer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Company Confirmation */}
+      <AlertDialog open={!!deleteCompanyDialog} onOpenChange={() => setDeleteCompanyDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la compagnie ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer <strong>{deleteCompanyDialog?.name}</strong> ?
+              Cette action supprimera également tous les produits associés ({deleteCompanyDialog?.products.length} produits).
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteCompany} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Product Confirmation */}
+      <AlertDialog open={!!deleteProductDialog} onOpenChange={() => setDeleteProductDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le produit ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer <strong>{deleteProductDialog?.name}</strong> ?
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
