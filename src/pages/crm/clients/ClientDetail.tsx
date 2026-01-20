@@ -740,11 +740,20 @@ export default function ClientDetail() {
                         const durationMatch = notes.match(/Durée[:\s]*(\d+)\s*ans/i);
                         const durationYears = durationMatch ? parseInt(durationMatch[1]) : null;
                         
-                        // Use deductible from field or parsed from notes
-                        const displayDeductible = policy.deductible || franchiseFromNotes;
+                        // Use deductible from field, parsed from notes, or from products_data
+                        let displayDeductible = policy.deductible || franchiseFromNotes;
+                        
+                        // If no deductible found yet, try to get it from products_data
+                        if (!displayDeductible && productsData.length > 0) {
+                          // Find first product with a deductible
+                          const productWithDeductible = productsData.find((p: any) => p.deductible && p.deductible > 0);
+                          if (productWithDeductible) {
+                            displayDeductible = productWithDeductible.deductible;
+                          }
+                        }
                         
                         // Calculate totals from products_data
-                        const totalFromProducts = productsData.reduce((sum, p) => sum + (p.premium || 0), 0);
+                        const totalFromProducts = productsData.reduce((sum: number, p: any) => sum + (p.premium || 0), 0);
                         
                         return (
                             <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
