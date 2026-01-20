@@ -257,11 +257,27 @@ export default function CRMParametres() {
       collabMap.set(c.user_id, c);
     });
 
-    const accounts = roles?.map(r => ({
-      ...r,
-      collaborateur: collabMap.get(r.user_id) || null,
-    })) || [];
+    // Group roles by user_id to avoid duplicate entries
+    const userMap = new Map<string, any>();
+    roles?.forEach(r => {
+      const userId = r.user_id;
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          ...r,
+          roles: [r.role],
+          collaborateur: collabMap.get(userId) || null,
+        });
+      } else {
+        // Add role to existing user
+        const existing = userMap.get(userId);
+        if (!existing.roles.includes(r.role)) {
+          existing.roles.push(r.role);
+        }
+      }
+    });
 
+    // Convert map to array
+    const accounts = Array.from(userMap.values());
     setUserAccounts(accounts);
   };
 
@@ -790,7 +806,7 @@ export default function CRMParametres() {
                 </TableHeader>
                 <TableBody>
                   {userAccounts.map(account => (
-                    <TableRow key={account.id}>
+                    <TableRow key={account.user_id}>
                       <TableCell>
                         <span className="font-medium">
                           {account.profiles?.first_name} {account.profiles?.last_name}
@@ -800,9 +816,13 @@ export default function CRMParametres() {
                         {account.profiles?.email}
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn("text-white", roleBadgeColors[account.role] || "bg-gray-500")}>
-                          {t(`settings.${account.role}`) || account.role}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {(account.roles || [account.role]).map((role: string) => (
+                            <Badge key={role} className={cn("text-white", roleBadgeColors[role] || "bg-gray-500")}>
+                              {roleLabels[role] || role}
+                            </Badge>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {account.collaborateur ? (

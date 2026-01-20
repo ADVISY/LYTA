@@ -140,9 +140,15 @@ export default function CRMCompagnies() {
       
       if (productsError) throw productsError;
 
+      // Filter out "Dépôt contrat" products - they are only for email submissions
+      const visibleProducts = (productsData || []).filter(p => 
+        !p.name?.toLowerCase().includes('dépôt contrat') && 
+        !p.name?.toLowerCase().includes('depot contrat')
+      );
+
       const companiesWithProducts = (companiesData || []).map(company => ({
         ...company,
-        products: (productsData || []).filter(p => p.company_id === company.id)
+        products: visibleProducts.filter(p => p.company_id === company.id)
       }));
 
       setCompanies(companiesWithProducts);

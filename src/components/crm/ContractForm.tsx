@@ -607,7 +607,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden gap-4">
             {/* Common Fields Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Compagnie *</Label>
                 <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
@@ -662,7 +662,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 lg:col-span-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Documents</Label>
                 <DocumentUpload
                   documents={documents}

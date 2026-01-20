@@ -100,78 +100,69 @@ export default function DocumentUpload({ onUpload, onRemove, documents = [], sho
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-3 items-end">
-        <div className="flex-1 space-y-2">
-          <Label>Type de document</Label>
-          <Select value={selectedKind} onValueChange={setSelectedKind}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {docKindOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-            onChange={handleFileSelect}
-            className="hidden"
-            id="file-upload"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            {uploading ? "Upload..." : "Ajouter un fichier"}
-          </Button>
-        </div>
+    <div className="space-y-3">
+      <div className="flex gap-2 items-center">
+        <Select value={selectedKind} onValueChange={setSelectedKind}>
+          <SelectTrigger className="w-32 h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {docKindOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="file-upload"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="h-9 px-3"
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
+          <span className="ml-2 hidden sm:inline">{uploading ? "..." : "Ajouter"}</span>
+        </Button>
       </div>
 
       {showList && documents.length > 0 && (
-        <div className="space-y-2">
-          <Label className="text-sm text-muted-foreground">Documents ajoutés ({documents.length})</Label>
-          <div className="space-y-2">
-            {documents.map((doc, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">{doc.file_name}</p>
-                    <p className="text-xs text-muted-foreground">{getDocKindLabel(doc.doc_kind)}</p>
-                  </div>
-                </div>
-                {onRemove && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onRemove(index)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
+        <div className="space-y-1">
+          {documents.map((doc, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+            >
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="truncate">{doc.file_name}</span>
               </div>
-            ))}
-          </div>
+              {onRemove && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemove(index)}
+                  className="h-6 w-6 p-0 text-destructive hover:text-destructive shrink-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
