@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2, Users, Globe, Phone } from "lucide-react";
+import { Building2, Package, Search, ChevronDown, ChevronRight, Loader2, Users, Globe, Phone, Edit2, Check, X, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -14,12 +14,17 @@ import {
 } from "@/components/ui/collapsible";
 import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
 import { useTranslation } from "react-i18next";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 type Product = {
   id: string;
   name: string;
   category: string;
   description: string | null;
+  commission_type: string | null;
+  commission_value: number | null;
+  commission_description: string | null;
 };
 
 type Company = {
@@ -35,14 +40,40 @@ const getCategoryLabels = (t: any): Record<string, { label: string; color: strin
   home: { label: t('settings.categoryProperty'), color: "bg-amber-100 text-amber-700" },
   life: { label: t('settings.categoryLife'), color: "bg-violet-100 text-violet-700" },
   legal: { label: t('settings.categoryLegal'), color: "bg-slate-100 text-slate-700" },
+  lamal: { label: "LAMal", color: "bg-teal-100 text-teal-700" },
+  lca: { label: "LCA", color: "bg-cyan-100 text-cyan-700" },
 });
+
+const getCommissionTypeLabel = (type: string | null) => {
+  switch (type) {
+    case 'fixed': return 'Fixe (CHF)';
+    case 'multiplier': return 'Multiplicateur (×)';
+    case 'percentage': return 'Pourcentage (%)';
+    default: return 'Non défini';
+  }
+};
+
+const formatCommissionDisplay = (type: string | null, value: number | null, description: string | null) => {
+  if (!type || value === null || value === 0) return null;
+  
+  switch (type) {
+    case 'fixed': return `${value} CHF`;
+    case 'multiplier': return `Prime × ${value}`;
+    case 'percentage': return `${value}%`;
+    default: return description || null;
+  }
+};
 
 export default function CRMCompagnies() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openCompanies, setOpenCompanies] = useState<Set<string>>(new Set());
+  const [editingProduct, setEditingProduct] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ type: string; value: string; description: string }>({ type: 'multiplier', value: '', description: '' });
+  const [saving, setSaving] = useState(false);
   const categoryLabels = getCategoryLabels(t);
 
   useEffect(() => {
@@ -91,6 +122,69 @@ export default function CRMCompagnies() {
       newOpen.add(id);
     }
     setOpenCompanies(newOpen);
+  };
+
+  const startEditProduct = (product: Product) => {
+    setEditingProduct(product.id);
+    setEditForm({
+      type: product.commission_type || 'multiplier',
+      value: product.commission_value?.toString() || '',
+      description: product.commission_description || ''
+    });
+  };
+
+  const cancelEditProduct = () => {
+    setEditingProduct(null);
+    setEditForm({ type: 'multiplier', value: '', description: '' });
+  };
+
+  const saveProductCommission = async (productId: string) => {
+    try {
+      setSaving(true);
+      
+      // Generate description based on type
+      let description = editForm.description;
+      if (!description) {
+        switch (editForm.type) {
+          case 'fixed':
+            description = `${editForm.value} CHF par contrat`;
+            break;
+          case 'multiplier':
+            description = `Prime mensuelle × ${editForm.value}`;
+            break;
+          case 'percentage':
+            description = `${editForm.value}% de la prime`;
+            break;
+        }
+      }
+
+      const { error } = await supabase
+        .from('insurance_products')
+        .update({
+          commission_type: editForm.type,
+          commission_value: parseFloat(editForm.value) || 0,
+          commission_description: description
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: "Commission mise à jour"
+      });
+
+      setEditingProduct(null);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredCompanies = companies.filter(company => {
@@ -262,17 +356,91 @@ export default function CRMCompagnies() {
                                 <Package className="h-4 w-4 text-primary" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{product.name}</p>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="font-medium text-sm truncate">{product.name}</p>
+                                  {editingProduct !== product.id && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 shrink-0"
+                                      onClick={() => startEditProduct(product)}
+                                    >
+                                      <Edit2 className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
                                 <Badge 
                                   variant="secondary" 
                                   className={cn("text-xs mt-1", categoryLabels[product.category]?.color)}
                                 >
                                   {categoryLabels[product.category]?.label || product.category}
                                 </Badge>
-                                {product.description && (
-                                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                                    {product.description}
-                                  </p>
+                                
+                                {/* Commission Display/Edit */}
+                                {editingProduct === product.id ? (
+                                  <div className="mt-3 space-y-2 p-2 rounded-lg bg-background border">
+                                    <Select
+                                      value={editForm.type}
+                                      onValueChange={(value) => setEditForm(prev => ({ ...prev, type: value }))}
+                                    >
+                                      <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="fixed">Fixe (CHF)</SelectItem>
+                                        <SelectItem value="multiplier">Multiplicateur (×)</SelectItem>
+                                        <SelectItem value="percentage">Pourcentage (%)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      type="number"
+                                      placeholder={editForm.type === 'fixed' ? 'Montant CHF' : editForm.type === 'multiplier' ? 'Ex: 16' : 'Ex: 4'}
+                                      value={editForm.value}
+                                      onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))}
+                                      className="h-8 text-xs"
+                                    />
+                                    <Input
+                                      placeholder="Description (optionnel)"
+                                      value={editForm.description}
+                                      onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                                      className="h-8 text-xs"
+                                    />
+                                    <div className="flex gap-1">
+                                      <Button
+                                        size="sm"
+                                        className="h-7 text-xs flex-1"
+                                        onClick={() => saveProductCommission(product.id)}
+                                        disabled={saving || !editForm.value}
+                                      >
+                                        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                                        Sauver
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={cancelEditProduct}
+                                        disabled={saving}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-2">
+                                    {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description) ? (
+                                      <div className="flex items-center gap-1.5 text-xs">
+                                        <DollarSign className="h-3 w-3 text-emerald-600" />
+                                        <span className="font-medium text-emerald-700">
+                                          {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description)}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground italic">
+                                        Pas de commission définie
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
