@@ -434,21 +434,26 @@ export default function CRMDashboard() {
     return managerScores.sort((a, b) => b.monthContracts - a.monthContracts)[0] || null;
   }, [teamPerformance, clients, policies]);
 
-  // Monthly chart data - only active contracts
+  // Monthly chart data - all active contracts (including future dates)
   const monthlyChartData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     const currentYear = new Date().getFullYear();
 
-    // Only include active contracts
+    // Include all active contracts regardless of date
     const activePolicies = filteredPolicies.filter(p => p.status === 'active');
 
     return months.map((month, i) => {
+      // Match contracts for this month in current year OR any future year
       const monthPolicies = activePolicies.filter(p => {
         const date = new Date(p.start_date);
-        return date.getFullYear() === currentYear && date.getMonth() === i;
+        const policyYear = date.getFullYear();
+        const policyMonth = date.getMonth();
+        // Include if: same year same month, OR future year mapped to this month
+        return (policyYear === currentYear && policyMonth === i) ||
+               (policyYear > currentYear && policyMonth === i);
       });
 
-      // Real commissions for this month (only paid = CA en vigueur)
+      // Real commissions for this month (current year only for historical data)
       const monthCommissions = commissions.filter(c => {
         const date = new Date(c.created_at);
         return date.getFullYear() === currentYear && date.getMonth() === i;
