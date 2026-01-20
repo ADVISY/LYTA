@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useTenant } from '@/contexts/TenantContext';
+import { useUserTenant } from '@/hooks/useUserTenant';
 import { translateError } from '@/lib/errorTranslations';
 
 export type Commission = {
@@ -26,34 +26,8 @@ export type Commission = {
 export function useCommissions() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userTenantId, setUserTenantId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { tenantId: contextTenantId } = useTenant();
-
-  // Get user's tenant_id from their assignment
-  useEffect(() => {
-    const fetchUserTenant = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('user_tenant_assignments')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .not('tenant_id', 'is', null)
-        .limit(1)
-        .maybeSingle();
-
-      if (data?.tenant_id) {
-        setUserTenantId(data.tenant_id);
-      }
-    };
-
-    fetchUserTenant();
-  }, []);
-
-  // Use context tenant or user's assigned tenant
-  const effectiveTenantId = contextTenantId || userTenantId;
+  const { tenantId: effectiveTenantId, loading: tenantLoading } = useUserTenant();
 
   const fetchCommissions = async () => {
     try {
@@ -218,10 +192,10 @@ export function useCommissions() {
   };
 
   useEffect(() => {
-    if (effectiveTenantId) {
+    if (!tenantLoading && effectiveTenantId) {
       fetchCommissions();
     }
-  }, [effectiveTenantId]);
+  }, [effectiveTenantId, tenantLoading]);
 
   return {
     commissions,
