@@ -482,7 +482,6 @@ export default function CRMDashboard() {
 
       monthPolicies.forEach(p => {
         const type = (p.product_type || '').toLowerCase();
-        const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
 
         // VIE/Life products - use real commission from commissions table
         if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
@@ -493,9 +492,13 @@ export default function CRMDashboard() {
             caVie += policyCommission.amount || 0;
           }
         } else {
-          // LCA/Health products (LAMal, health, multi, complémentaire)
+          // LCA/Health products - use real commission from commissions table
+          // LAMal doesn't generate commission, only LCA (complementary) does
           lca++;
-          caLca += monthlyPremium * 16;
+          const policyCommission = commissions.find(c => c.policy_id === p.id);
+          if (policyCommission) {
+            caLca += policyCommission.amount || 0;
+          }
         }
       });
 
