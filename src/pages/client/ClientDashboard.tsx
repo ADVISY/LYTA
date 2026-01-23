@@ -40,7 +40,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function ClientDashboard() {
-  const { user, clientData } = useOutletContext<{ user: any; clientData: any }>();
+  const { user, clientData, advisorData } = useOutletContext<{ user: any; clientData: any; advisorData: any }>();
   const navigate = useNavigate();
   const [contracts, setContracts] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
