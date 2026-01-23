@@ -3693,6 +3693,18 @@ export type Database = {
         Returns: string
       }
       generate_verification_code: { Args: never; Returns: string }
+      get_assigned_advisor_public: {
+        Args: never
+        Returns: {
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          mobile: string
+          phone: string
+          photo_url: string
+        }[]
+      }
       get_company_contact: {
         Args: {
           p_channel?: string

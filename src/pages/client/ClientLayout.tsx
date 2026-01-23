@@ -89,17 +89,10 @@ export default function ClientLayout() {
       if (clientRecord) {
         setClientData(clientRecord);
         
-        // Fetch assigned advisor info
-        if (clientRecord.assigned_agent_id) {
-          const { data: advisor } = await supabase
-            .from('clients')
-            .select('id, first_name, last_name, email, phone, mobile, photo_url')
-            .eq('id', clientRecord.assigned_agent_id)
-            .maybeSingle();
-          
-          if (advisor) {
-            setAdvisorData(advisor);
-          }
+        // Fetch assigned advisor info via secure RPC function
+        const { data: advisorRows } = await supabase.rpc('get_assigned_advisor_public');
+        if (advisorRows && advisorRows.length > 0) {
+          setAdvisorData(advisorRows[0]);
         }
       }
       
