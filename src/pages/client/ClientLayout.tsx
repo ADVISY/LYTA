@@ -48,6 +48,11 @@ export default function ClientLayout() {
   const tenantLogo = tenant?.branding?.logo_url;
   const tenantName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
 
+  // Set page title for Client space
+  useEffect(() => {
+    document.title = `${tenantName} - Espace Client`;
+  }, [tenantName]);
+
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
