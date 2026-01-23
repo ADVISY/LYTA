@@ -303,52 +303,87 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Get user's tenant for branding
-    const { data: userTenant } = await supabaseAdmin
-      .from("user_tenants")
+    // Priority: 1) clients table (for client users), 2) user_tenant_assignments (for team users)
+    let tenantId: string | null = null;
+
+    // Check clients table first
+    const { data: clientRow } = await supabaseAdmin
+      .from("clients")
       .select("tenant_id")
       .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
       .limit(1)
       .maybeSingle();
+
+    if (clientRow?.tenant_id) {
+      tenantId = clientRow.tenant_id;
+      console.log("Tenant resolved from clients table:", tenantId);
+    }
+
+    // Fallback to user_tenant_assignments
+    if (!tenantId) {
+      const { data: assignment } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .not("tenant_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (assignment?.tenant_id) {
+        tenantId = assignment.tenant_id;
+        console.log("Tenant resolved from user_tenant_assignments:", tenantId);
+      }
+    }
 
     let branding: TenantBranding | null = null;
     let tenantName = "Lyta";
 
-    if (userTenant?.tenant_id) {
+    if (tenantId) {
+      // Fetch tenant name + branding from tenant_branding table
       const { data: tenant } = await supabaseAdmin
         .from("tenants")
         .select(`
           name,
-          display_name,
-          logo_url,
-          primary_color,
-          secondary_color,
-          email_sender_name,
-          email_sender_address,
-          company_address,
-          company_phone,
-          company_website,
-          company_email,
-          email_footer_text
+          tenant_branding (
+            display_name,
+            logo_url,
+            primary_color,
+            secondary_color,
+            email_sender_name,
+            email_sender_address,
+            company_address,
+            company_phone,
+            company_website,
+            company_email,
+            email_footer_text
+          )
         `)
-        .eq("id", userTenant.tenant_id)
+        .eq("id", tenantId)
         .maybeSingle();
 
       if (tenant) {
         tenantName = tenant.name || "Lyta";
-        branding = {
-          display_name: tenant.display_name,
-          logo_url: tenant.logo_url,
-          primary_color: tenant.primary_color,
-          secondary_color: tenant.secondary_color,
-          email_sender_name: tenant.email_sender_name,
-          email_sender_address: tenant.email_sender_address,
-          company_address: tenant.company_address,
-          company_phone: tenant.company_phone,
-          company_website: tenant.company_website,
-          company_email: tenant.company_email,
-          email_footer_text: tenant.email_footer_text,
-        };
+        const tb = (tenant.tenant_branding as any)?.[0];
+        if (tb) {
+          branding = {
+            display_name: tb.display_name,
+            logo_url: tb.logo_url,
+            primary_color: tb.primary_color,
+            secondary_color: tb.secondary_color,
+            email_sender_name: tb.email_sender_name,
+            email_sender_address: tb.email_sender_address,
+            company_address: tb.company_address,
+            company_phone: tb.company_phone,
+            company_website: tb.company_website,
+            company_email: tb.company_email,
+            email_footer_text: tb.email_footer_text,
+          };
+          console.log("Branding loaded for tenant:", tenantName);
+        }
       }
+    } else {
+      console.log("No tenant found for user, using default Lyta branding");
     }
 
     // Generate password reset link using Supabase Admin API

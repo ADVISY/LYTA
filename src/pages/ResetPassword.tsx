@@ -1,11 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
@@ -15,14 +14,18 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [isProcessingToken, setIsProcessingToken] = useState(true);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const { toast } = useToast();
-  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const processedRef = useRef(false);
 
   useEffect(() => {
     // Process the recovery token from URL hash or query params
     const processRecoveryToken = async () => {
+      if (processedRef.current) return;
+      processedRef.current = true;
+
       try {
         // Check URL hash for token (Supabase format: #access_token=...&type=recovery)
         const hashParams = new URLSearchParams(location.hash.substring(1));
@@ -34,6 +37,13 @@ const ResetPassword = () => {
         const queryParams = new URLSearchParams(location.search);
         const code = queryParams.get('code');
 
+        console.log("[ResetPassword] Processing token...", { 
+          hasAccessToken: !!accessToken, 
+          tokenType, 
+          hasRefreshToken: !!refreshToken,
+          hasCode: !!code 
+        });
+
         if (accessToken && tokenType === 'recovery' && refreshToken) {
           // Set the session with the tokens from the URL
           const { error } = await supabase.auth.setSession({
@@ -42,39 +52,67 @@ const ResetPassword = () => {
           });
 
           if (error) {
-            console.error("Error setting session:", error);
+            console.error("[ResetPassword] Error setting session:", error);
+            setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
+            setIsProcessingToken(false);
+            return;
+          }
+
+          // Clear URL to prevent re-processing
+          window.history.replaceState({}, document.title, location.pathname);
+          
+          // Wait for session to be established
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            console.log("[ResetPassword] Session established successfully");
+            setSessionReady(true);
+          } else {
             setTokenError("Le lien de réinitialisation est invalide ou expiré.");
           }
         } else if (code) {
           // Exchange code for session (PKCE flow)
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
-            console.error("Error exchanging code:", error);
+            console.error("[ResetPassword] Error exchanging code:", error);
+            setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
+            setIsProcessingToken(false);
+            return;
+          }
+
+          // Clear URL
+          window.history.replaceState({}, document.title, location.pathname);
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            console.log("[ResetPassword] Session established via PKCE");
+            setSessionReady(true);
+          } else {
             setTokenError("Le lien de réinitialisation est invalide ou expiré.");
           }
-        } else if (!session && !authLoading) {
-          // No token in URL and no session - wait a bit for auth to process
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Check session again
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          if (!currentSession) {
-            setTokenError("Aucun lien de réinitialisation valide trouvé.");
+        } else {
+          // No token in URL - check if we already have a valid session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log("[ResetPassword] Existing session found");
+            setSessionReady(true);
+          } else {
+            setTokenError("Aucun lien de réinitialisation valide trouvé. Veuillez demander un nouveau lien depuis la page de connexion.");
           }
         }
       } catch (err) {
-        console.error("Error processing recovery token:", err);
+        console.error("[ResetPassword] Error processing recovery token:", err);
         setTokenError("Une erreur est survenue lors du traitement du lien.");
       } finally {
         setIsProcessingToken(false);
       }
     };
 
-    // Only process if auth is not loading
-    if (!authLoading) {
-      processRecoveryToken();
-    }
-  }, [location, session, authLoading]);
+    processRecoveryToken();
+  }, [location.hash, location.search, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,9 +179,9 @@ const ResetPassword = () => {
   };
 
   // Show loading while processing token
-  if (isProcessingToken || authLoading) {
+  if (isProcessingToken) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Vérification du lien...</p>
@@ -155,7 +193,7 @@ const ResetPassword = () => {
   // Show error if token is invalid
   if (tokenError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
         <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20">
           <div className="text-center mb-8">
             <img 
@@ -178,7 +216,7 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20">
         <div className="text-center mb-8">
           <img 
