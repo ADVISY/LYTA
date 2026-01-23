@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -128,6 +128,7 @@ export default function ClientDetail() {
   const [loadingParts, setLoadingParts] = useState<Record<string, boolean>>({});
   const [creatingClientAccount, setCreatingClientAccount] = useState(false);
   const [clientAccountDialogOpen, setClientAccountDialogOpen] = useState(false);
+  const [resendingInvitation, setResendingInvitation] = useState(false);
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -269,6 +270,47 @@ export default function ClientDetail() {
     }
   };
 
+  const handleResendInvitation = async () => {
+    if (!client || !client.email) {
+      toast({
+        title: "Erreur",
+        description: "Email du client requis",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResendingInvitation(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non authentifié");
+
+      // Use send-password-reset edge function to resend invitation
+      const response = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email: client.email,
+          redirectUrl: `${window.location.origin}/reset-password`,
+        },
+      });
+
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({
+        title: "Invitation renvoyée",
+        description: `Un nouvel email a été envoyé à ${client.email}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de renvoyer l'invitation",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingInvitation(false);
+    }
+  };
+
   const handleDeletePolicy = async () => {
     if (!policyToDelete) return;
     try {
@@ -387,10 +429,21 @@ export default function ClientDetail() {
             </Button>
           )}
           {hasClientPortal && client.user_id && client.type_adresse === 'client' && (
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              {t('clientDetail.clientSpaceActive')}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {t('clientDetail.clientSpaceActive')}
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleResendInvitation}
+                disabled={resendingInvitation}
+                title="Renvoyer l'email d'invitation"
+              >
+                <RefreshCw className={`h-4 w-4 ${resendingInvitation ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           )}
           <SendEmailDialog
             clientEmail={client.email || ""}
