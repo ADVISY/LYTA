@@ -62,7 +62,8 @@
     "unknownProduct": "Produit inconnu",
     "select": "Sélectionner",
     "saving": "Enregistrement...",
-    "update": "Mettre à jour"
+    "update": "Mettre à jour",
+    "deleting": "Suppression..."
   },
   "auth": {
     "login": "Connexion",
@@ -483,7 +484,13 @@
     "productList": "Liste des produits",
     "noProducts": "Aucun produit",
     "clientAccounts": "Comptes clients",
-    "noClientAccounts": "Aucun compte client créé"
+    "noClientAccounts": "Aucun compte client créé",
+    "resendPassword": "Renvoyer le mot de passe",
+    "passwordResent": "Nouveau mot de passe envoyé par email",
+    "deleteAccount": "Supprimer le compte",
+    "confirmDeleteAccount": "Confirmer la suppression",
+    "deleteAccountWarning": "Voulez-vous vraiment supprimer le compte client de {{name}} ? Le client ne pourra plus se connecter à son espace.",
+    "clientAccountDeleted": "Compte client supprimé"
   },
   "notifications": {
     "title": "Notifications",

@@ -59,6 +59,7 @@
     "select": "Auswählen",
     "saving": "Speichern...",
     "update": "Aktualisieren",
+    "deleting": "Löschen...",
     "month": "Monat",
     "year": "Jahr",
     "week": "Woche",
@@ -483,7 +484,13 @@
     "productList": "Produktliste",
     "noProducts": "Keine Produkte",
     "clientAccounts": "Kundenkonten",
-    "noClientAccounts": "Keine Kundenkonten erstellt"
+    "noClientAccounts": "Keine Kundenkonten erstellt",
+    "resendPassword": "Passwort erneut senden",
+    "passwordResent": "Neues Passwort per E-Mail gesendet",
+    "deleteAccount": "Konto löschen",
+    "confirmDeleteAccount": "Löschung bestätigen",
+    "deleteAccountWarning": "Möchten Sie das Kundenkonto von {{name}} wirklich löschen? Der Kunde kann sich nicht mehr in seinem Bereich anmelden.",
+    "clientAccountDeleted": "Kundenkonto gelöscht"
   },
   "notifications": {
     "title": "Benachrichtigungen",

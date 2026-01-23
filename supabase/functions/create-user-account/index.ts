@@ -389,7 +389,7 @@ Deno.serve(async (req) => {
     const branding: TenantBranding | null = tenant.tenant_branding?.[0] || null;
 
     // Parse request body - password is now optional
-    const { email, role, collaborateurId, clientId, firstName, lastName } = await req.json();
+    const { email, role, collaborateurId, clientId, firstName, lastName, regeneratePassword } = await req.json();
 
     // Determine if this is a collaborateur or client account creation
     const targetId = collaborateurId || clientId;
@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if the record exists and doesn't already have a user_id
+    // Check if the record exists
     let query = supabaseAdmin
       .from("clients")
       .select("id, user_id, first_name, last_name, email")
@@ -432,6 +432,83 @@ Deno.serve(async (req) => {
       );
     }
 
+    // If regeneratePassword is true and user already has an account, regenerate and send new password
+    if (regeneratePassword && targetRecord.user_id) {
+      console.log(`Regenerating password for existing user ${email}`);
+      
+      const newPassword = generateReadablePassword();
+      
+      // Update the user's password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetRecord.user_id,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        console.error("Error updating password:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Erreur lors de la mise à jour du mot de passe" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const clientName = `${firstName || targetRecord.first_name || ''} ${lastName || targetRecord.last_name || ''}`.trim() || email;
+      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
+      const loginUrl = `${baseUrl}/connexion`;
+
+      // Send email with new password
+      if (RESEND_API_KEY) {
+        const { subject, html } = generateWelcomeEmailWithPassword(
+          clientName, 
+          email, 
+          newPassword, 
+          loginUrl, 
+          branding, 
+          tenant.name
+        );
+        
+        const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
+        const senderEmail = branding?.email_sender_address;
+        const fromAddress = senderEmail && senderEmail.includes('@') 
+          ? `${senderName} <${senderEmail}>`
+          : `${senderName} <support@lyta.ch>`;
+
+        console.log(`Sending new password email from ${fromAddress} to ${email}`);
+
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [email],
+            subject: `🔐 Votre nouveau mot de passe - ${branding?.display_name || tenant.name}`,
+            html,
+          }),
+        });
+
+        if (emailResponse.ok) {
+          const emailResult = await emailResponse.json();
+          console.log(`New password email sent successfully to ${email}. ID: ${emailResult.id}`);
+        } else {
+          const errorText = await emailResponse.text();
+          console.error(`Failed to send email to ${email}:`, errorText);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          userId: targetRecord.user_id,
+          message: `Nouveau mot de passe envoyé à ${email}` 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Normal flow - check if user already has an account
     if (targetRecord.user_id) {
       return new Response(
         JSON.stringify({ error: isClientAccount ? "Ce client a déjà un compte utilisateur" : "Ce collaborateur a déjà un compte utilisateur" }),

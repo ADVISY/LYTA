@@ -63,6 +63,7 @@
     "select": "Select",
     "saving": "Saving...",
     "update": "Update",
+    "deleting": "Deleting...",
     "month": "month",
     "year": "year",
     "week": "week",
@@ -484,7 +485,13 @@
     "client": "Client",
     "partner": "Partner",
     "clientAccounts": "Client Accounts",
-    "noClientAccounts": "No client account created"
+    "noClientAccounts": "No client account created",
+    "resendPassword": "Resend password",
+    "passwordResent": "New password sent by email",
+    "deleteAccount": "Delete account",
+    "confirmDeleteAccount": "Confirm deletion",
+    "deleteAccountWarning": "Are you sure you want to delete the client account for {{name}}? The client will no longer be able to access their portal.",
+    "clientAccountDeleted": "Client account deleted"
   },
   "notifications": {
     "title": "Notifications",

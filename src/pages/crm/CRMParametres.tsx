@@ -126,6 +126,12 @@ export default function CRMParametres() {
     collaborateurId: "",
   });
   const [showNewPassword, setShowNewPassword] = useState(false);
+  
+  // État pour suppression/reset du compte client
+  const [deletingClientAccountId, setDeletingClientAccountId] = useState<string | null>(null);
+  const [resettingPasswordClientId, setResettingPasswordClientId] = useState<string | null>(null);
+  const [confirmDeleteClientDialog, setConfirmDeleteClientDialog] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<any>(null);
 
   // Handler pour cliquer sur "Créer un compte"
   const handleAddUserClick = () => {
@@ -562,6 +568,60 @@ export default function CRMParametres() {
       toast.error(t('settings.accountCreationError'));
     } finally {
       setIsCreatingAccount(false);
+    }
+  };
+
+  // Supprimer le compte client (retirer user_id et supprimer l'utilisateur auth)
+  const handleDeleteClientAccount = async (client: any) => {
+    setDeletingClientAccountId(client.id);
+    try {
+      // Retirer le user_id du client
+      const { error: updateError } = await supabase
+        .from("clients")
+        .update({ user_id: null })
+        .eq("id", client.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(t('settings.clientAccountDeleted'));
+      setConfirmDeleteClientDialog(false);
+      setClientToDelete(null);
+      loadClientAccounts();
+    } catch (error: any) {
+      console.error("Error deleting client account:", error);
+      toast.error(t('common.error'));
+    } finally {
+      setDeletingClientAccountId(null);
+    }
+  };
+
+  // Renvoyer un nouveau mot de passe au client
+  const handleResendPassword = async (client: any) => {
+    setResettingPasswordClientId(client.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non authentifié");
+
+      // Appeler l'edge function pour recréer un mot de passe et l'envoyer
+      const response = await supabase.functions.invoke('create-user-account', {
+        body: {
+          email: client.profile?.email || client.email,
+          role: 'client',
+          clientId: client.id,
+          firstName: client.first_name,
+          lastName: client.last_name,
+          regeneratePassword: true,
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      toast.success(t('settings.passwordResent'));
+    } catch (error: any) {
+      console.error("Error resending password:", error);
+      toast.error(t('common.error'));
+    } finally {
+      setResettingPasswordClientId(null);
     }
   };
 
@@ -1074,6 +1134,7 @@ export default function CRMParametres() {
                       <TableHead>{t('common.email')}</TableHead>
                       <TableHead>{t('common.status')}</TableHead>
                       <TableHead>{t('settings.createdAt')}</TableHead>
+                      <TableHead className="text-right">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1095,11 +1156,40 @@ export default function CRMParametres() {
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(client.created_at).toLocaleDateString("fr-CH")}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              title={t('settings.resendPassword')}
+                              onClick={() => handleResendPassword(client)}
+                              disabled={resettingPasswordClientId === client.id}
+                            >
+                              {resettingPasswordClientId === client.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              title={t('settings.deleteAccount')}
+                              onClick={() => {
+                                setClientToDelete(client);
+                                setConfirmDeleteClientDialog(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                     {clientAccounts.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                           {t('settings.noClientAccounts')}
                         </TableCell>
                       </TableRow>
@@ -1109,6 +1199,42 @@ export default function CRMParametres() {
               </CardContent>
             </Card>
           )}
+
+          {/* Dialog de confirmation de suppression */}
+          <Dialog open={confirmDeleteClientDialog} onOpenChange={setConfirmDeleteClientDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('settings.confirmDeleteAccount')}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-muted-foreground">
+                  {t('settings.deleteAccountWarning', { name: `${clientToDelete?.first_name} ${clientToDelete?.last_name}` })}
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setConfirmDeleteClientDialog(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => clientToDelete && handleDeleteClientAccount(clientToDelete)}
+                    disabled={deletingClientAccountId === clientToDelete?.id}
+                  >
+                    {deletingClientAccountId === clientToDelete?.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {t('common.deleting')}
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t('common.delete')}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* RÔLES */}

@@ -59,6 +59,7 @@
     "select": "Seleziona",
     "saving": "Salvataggio...",
     "update": "Aggiorna",
+    "deleting": "Eliminazione...",
     "month": "mese",
     "year": "anno",
     "week": "settimana",
@@ -483,7 +484,13 @@
     "productList": "Lista prodotti",
     "noProducts": "Nessun prodotto",
     "clientAccounts": "Account clienti",
-    "noClientAccounts": "Nessun account cliente creato"
+    "noClientAccounts": "Nessun account cliente creato",
+    "resendPassword": "Reinvia password",
+    "passwordResent": "Nuova password inviata via email",
+    "deleteAccount": "Elimina account",
+    "confirmDeleteAccount": "Conferma eliminazione",
+    "deleteAccountWarning": "Vuoi davvero eliminare l'account cliente di {{name}}? Il cliente non potrà più accedere al suo spazio.",
+    "clientAccountDeleted": "Account cliente eliminato"
   },
   "notifications": {
     "title": "Notifiche",
