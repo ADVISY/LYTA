@@ -138,9 +138,20 @@ export default function CRMContracts() {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileCheck className="h-6 w-6 text-primary" />
-                      </div>
+                      {/* Company Logo or Icon */}
+                      {policy.product?.company?.logo_url ? (
+                        <div className="w-12 h-12 rounded-xl bg-white border border-border flex items-center justify-center overflow-hidden p-1 group-hover:scale-110 transition-transform">
+                          <img 
+                            src={policy.product.company.logo_url} 
+                            alt={policy.product.company.name}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <FileCheck className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
                       <div>
                         <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
                           {policy.product?.name || 'Produit inconnu'}
