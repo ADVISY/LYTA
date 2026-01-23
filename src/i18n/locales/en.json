@@ -482,7 +482,9 @@
     "backoffice": "Backoffice",
     "compta": "Accounting",
     "client": "Client",
-    "partner": "Partner"
+    "partner": "Partner",
+    "clientAccounts": "Client Accounts",
+    "noClientAccounts": "No client account created"
   },
   "notifications": {
     "title": "Notifications",

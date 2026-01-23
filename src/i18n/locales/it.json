@@ -481,7 +481,9 @@
     "categoryLpp": "LPP",
     "categoryOther": "Altro",
     "productList": "Lista prodotti",
-    "noProducts": "Nessun prodotto"
+    "noProducts": "Nessun prodotto",
+    "clientAccounts": "Account clienti",
+    "noClientAccounts": "Nessun account cliente creato"
   },
   "notifications": {
     "title": "Notifiche",

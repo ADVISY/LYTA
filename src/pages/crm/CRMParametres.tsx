@@ -113,9 +113,11 @@ export default function CRMParametres() {
 
   // Gestion des comptes
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
+  const [clientAccounts, setClientAccounts] = useState<any[]>([]);
   const [collaborateurs, setCollaborateurs] = useState<any[]>([]);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [accountSubTab, setAccountSubTab] = useState<"collaborateurs" | "clients">("collaborateurs");
   const [newAccount, setNewAccount] = useState({
     email: "",
     password: "",
@@ -152,6 +154,7 @@ export default function CRMParametres() {
     if (tenantId) {
       loadUserAccounts();
       loadCollaborateurs();
+      loadClientAccounts();
     }
   }, [user, tenantId]);
 
@@ -294,6 +297,45 @@ export default function CRMParametres() {
       .order("last_name");
     
     setCollaborateurs(data || []);
+  };
+
+  const loadClientAccounts = async () => {
+    if (!tenantId) return;
+
+    // Get all clients (type_adresse = 'client') with user accounts for this tenant
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, first_name, last_name, email, user_id, created_at, status")
+      .eq("type_adresse", "client")
+      .eq("tenant_id", tenantId)
+      .not("user_id", "is", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading client accounts:", error);
+      return;
+    }
+
+    // Get user profiles for emails
+    if (data && data.length > 0) {
+      const userIds = data.map(c => c.user_id).filter(Boolean);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds);
+
+      const profileMap = new Map();
+      profiles?.forEach(p => profileMap.set(p.id, p));
+
+      const clientsWithProfiles = data.map(c => ({
+        ...c,
+        profile: profileMap.get(c.user_id) || null,
+      }));
+
+      setClientAccounts(clientsWithProfiles);
+    } else {
+      setClientAccounts([]);
+    }
   };
 
   const saveSettings = () => {
@@ -716,277 +758,357 @@ export default function CRMParametres() {
 
         {/* GESTION DES COMPTES */}
         <TabsContent value="comptes" className="space-y-6 mt-6">
-          {/* Infos sur les sièges utilisateurs */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">{t('subscription.activeUsers')}</p>
-                      <p className="text-2xl font-bold">{tenantSeats.activeUsers}</p>
-                    </div>
-                  </div>
-                  <div className="border-l pl-6">
-                    <p className="text-sm text-muted-foreground">{t('subscription.includedInPlan')}</p>
-                    <p className="text-xl font-semibold">{tenantSeats.seatsIncluded}</p>
-                  </div>
-                  {tenantSeats.extraUsers > 0 && (
-                    <div className="border-l pl-6">
-                      <p className="text-sm text-muted-foreground">{t('subscription.extra')}</p>
-                      <p className="text-xl font-semibold text-amber-600">+{tenantSeats.extraUsers}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">{t('settings.availableSeats')}</p>
-                  <p className={cn(
-                    "text-xl font-bold",
-                    tenantSeats.availableSeats > 0 ? "text-green-600" : "text-red-600"
-                  )}>
-                    {tenantSeats.availableSeats}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Sous-onglets Collaborateurs / Clients */}
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              variant={accountSubTab === "collaborateurs" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAccountSubTab("collaborateurs")}
+              className="gap-2"
+            >
+              <UserCheck className="h-4 w-4" />
+              {t('nav.collaborators')}
+            </Button>
+            <Button
+              variant={accountSubTab === "clients" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAccountSubTab("clients")}
+              className="gap-2"
+            >
+              <User className="h-4 w-4" />
+              {t('nav.clients')}
+            </Button>
+          </div>
 
-          {/* Alerte si quota dépassé ou atteint */}
-          {!tenantSeats.canAddUser && (
-            <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
-              <Lock className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800 dark:text-amber-200">
-                <strong>{t('settings.noSeatsAvailable')}.</strong> {t('settings.unlockSeat')} (+{tenantSeats.seatPrice} CHF/{t('common.month')}).
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Workflow:</strong><br />
-              1. {t('collaborators.addCollaborator')} dans <strong>{t('nav.collaborators')}</strong><br />
-              2. {t('settings.createAccount')}
-            </AlertDescription>
-          </Alert>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <UserCheck className="h-5 w-5" />
-                  {t('settings.userAccounts')}
-                </CardTitle>
-                <Button size="sm" onClick={handleAddUserClick}>
-                  {tenantSeats.canAddUser ? (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('settings.createAccount')}
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-4 w-4 mr-2" />
-                      {t('settings.unlockSeat')}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('settings.users')}</TableHead>
-                    <TableHead>{t('common.email')}</TableHead>
-                    <TableHead>{t('collaborators.role')}</TableHead>
-                    <TableHead>{t('settings.linkedCollaborator')}</TableHead>
-                    <TableHead>{t('settings.createdAt')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userAccounts.map(account => (
-                    <TableRow key={account.user_id}>
-                      <TableCell>
-                        <span className="font-medium">
-                          {account.profiles?.first_name} {account.profiles?.last_name}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {account.profiles?.email}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(account.roles || [account.role]).map((role: string) => (
-                            <Badge key={role} className={cn("text-white", roleBadgeColors[role] || "bg-gray-500")}>
-                              {roleLabels[role] || role}
-                            </Badge>
-                          ))}
+          {/* SOUS-ONGLET COLLABORATEURS */}
+          {accountSubTab === "collaborateurs" && (
+            <>
+              {/* Infos sur les sièges utilisateurs */}
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">{t('subscription.activeUsers')}</p>
+                          <p className="text-2xl font-bold">{tenantSeats.activeUsers}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {account.collaborateur ? (
-                          <span className="text-sm">
-                            {account.collaborateur.first_name} {account.collaborateur.last_name}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(account.created_at).toLocaleDateString("fr-CH")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {userAccounts.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        {t('settings.noCollaboratorsAvailable')}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Dialog de création de compte */}
-          <Dialog open={isAddingAccount} onOpenChange={setIsAddingAccount}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Créer un compte utilisateur</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Collaborateur *</Label>
-                  <Select 
-                    value={newAccount.collaborateurId}
-                    onValueChange={(v) => {
-                      const collab = collaborateurs.find(c => c.id === v);
-                      setNewAccount({ 
-                        ...newAccount, 
-                        collaborateurId: v,
-                        email: collab?.email || newAccount.email
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un collaborateur..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {collaborateurs.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground text-center">
-                          Aucun collaborateur disponible.<br />
-                          Créez d'abord une fiche collaborateur.
+                      </div>
+                      <div className="border-l pl-6">
+                        <p className="text-sm text-muted-foreground">{t('subscription.includedInPlan')}</p>
+                        <p className="text-xl font-semibold">{tenantSeats.seatsIncluded}</p>
+                      </div>
+                      {tenantSeats.extraUsers > 0 && (
+                        <div className="border-l pl-6">
+                          <p className="text-sm text-muted-foreground">{t('subscription.extra')}</p>
+                          <p className="text-xl font-semibold text-amber-600">+{tenantSeats.extraUsers}</p>
                         </div>
-                      ) : (
-                        collaborateurs.map(c => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.first_name} {c.last_name}
-                          </SelectItem>
-                        ))
                       )}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Seuls les collaborateurs sans compte apparaissent ici
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Email *</Label>
-                  <Input 
-                    type="email"
-                    value={newAccount.email}
-                    onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
-                    placeholder="email@exemple.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Mot de passe *</Label>
-                  <div className="relative">
-                    <Input 
-                      type={showNewPassword ? "text" : "password"}
-                      value={newAccount.password}
-                      onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
-                      placeholder="Minimum 8 caractères"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                    >
-                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">{t('settings.availableSeats')}</p>
+                      <p className={cn(
+                        "text-xl font-bold",
+                        tenantSeats.availableSeats > 0 ? "text-green-600" : "text-red-600"
+                      )}>
+                        {tenantSeats.availableSeats}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="space-y-2">
-                  <Label>Confirmer le mot de passe *</Label>
-                  <Input 
-                    type={showNewPassword ? "text" : "password"}
-                    value={newAccount.confirmPassword}
-                    onChange={(e) => setNewAccount({ ...newAccount, confirmPassword: e.target.value })}
-                    placeholder="Confirmer le mot de passe"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Rôle *</Label>
-                  <Select 
-                    value={newAccount.role}
-                    onValueChange={(v) => setNewAccount({ ...newAccount, role: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrateur</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="agent">Agent</SelectItem>
-                      <SelectItem value="backoffice">Backoffice</SelectItem>
-                      <SelectItem value="compta">Comptabilité</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Alert className="bg-muted">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    <strong>Accès par rôle :</strong><br />
-                    • <strong>Admin</strong> : Accès complet au CRM<br />
-                    • <strong>Manager</strong> : Ses adresses + équipe (sans Compta/Commissions)<br />
-                    • <strong>Agent</strong> : Uniquement ses propres adresses et contrats
+              {/* Alerte si quota dépassé ou atteint */}
+              {!tenantSeats.canAddUser && (
+                <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                  <Lock className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    <strong>{t('settings.noSeatsAvailable')}.</strong> {t('settings.unlockSeat')} (+{tenantSeats.seatPrice} CHF/{t('common.month')}).
                   </AlertDescription>
                 </Alert>
+              )}
 
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    onClick={handleCreateAccount} 
-                    disabled={isCreatingAccount || collaborateurs.length === 0}
-                    className="flex-1"
-                  >
-                    {isCreatingAccount ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Création...
-                      </>
-                    ) : (
-                      <>
-                        <UserCheck className="h-4 w-4 mr-2" />
-                        Créer le compte
-                      </>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Workflow:</strong><br />
+                  1. {t('collaborators.addCollaborator')} dans <strong>{t('nav.collaborators')}</strong><br />
+                  2. {t('settings.createAccount')}
+                </AlertDescription>
+              </Alert>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <UserCheck className="h-5 w-5" />
+                      {t('settings.userAccounts')}
+                    </CardTitle>
+                    <Button size="sm" onClick={handleAddUserClick}>
+                      {tenantSeats.canAddUser ? (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          {t('settings.createAccount')}
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-4 w-4 mr-2" />
+                          {t('settings.unlockSeat')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('settings.users')}</TableHead>
+                        <TableHead>{t('common.email')}</TableHead>
+                        <TableHead>{t('collaborators.role')}</TableHead>
+                        <TableHead>{t('settings.linkedCollaborator')}</TableHead>
+                        <TableHead>{t('settings.createdAt')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {userAccounts.map(account => (
+                        <TableRow key={account.user_id}>
+                          <TableCell>
+                            <span className="font-medium">
+                              {account.profiles?.first_name} {account.profiles?.last_name}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {account.profiles?.email}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {(account.roles || [account.role]).map((role: string) => (
+                                <Badge key={role} className={cn("text-white", roleBadgeColors[role] || "bg-gray-500")}>
+                                  {roleLabels[role] || role}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {account.collaborateur ? (
+                              <span className="text-sm">
+                                {account.collaborateur.first_name} {account.collaborateur.last_name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {new Date(account.created_at).toLocaleDateString("fr-CH")}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {userAccounts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            {t('settings.noCollaboratorsAvailable')}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Dialog de création de compte */}
+              <Dialog open={isAddingAccount} onOpenChange={setIsAddingAccount}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Créer un compte utilisateur</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Collaborateur *</Label>
+                      <Select 
+                        value={newAccount.collaborateurId}
+                        onValueChange={(v) => {
+                          const collab = collaborateurs.find(c => c.id === v);
+                          setNewAccount({ 
+                            ...newAccount, 
+                            collaborateurId: v,
+                            email: collab?.email || newAccount.email
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un collaborateur..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {collaborateurs.length === 0 ? (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              Aucun collaborateur disponible.<br />
+                              Créez d'abord une fiche collaborateur.
+                            </div>
+                          ) : (
+                            collaborateurs.map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.first_name} {c.last_name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Seuls les collaborateurs sans compte apparaissent ici
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Email *</Label>
+                      <Input 
+                        type="email"
+                        value={newAccount.email}
+                        onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
+                        placeholder="email@exemple.com"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Mot de passe *</Label>
+                      <div className="relative">
+                        <Input 
+                          type={showNewPassword ? "text" : "password"}
+                          value={newAccount.password}
+                          onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
+                          placeholder="Minimum 8 caractères"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Confirmer le mot de passe *</Label>
+                      <Input 
+                        type={showNewPassword ? "text" : "password"}
+                        value={newAccount.confirmPassword}
+                        onChange={(e) => setNewAccount({ ...newAccount, confirmPassword: e.target.value })}
+                        placeholder="Confirmer le mot de passe"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Rôle *</Label>
+                      <Select 
+                        value={newAccount.role}
+                        onValueChange={(v) => setNewAccount({ ...newAccount, role: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Administrateur</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="agent">Agent</SelectItem>
+                          <SelectItem value="backoffice">Backoffice</SelectItem>
+                          <SelectItem value="compta">Comptabilité</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Alert className="bg-muted">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        <strong>Accès par rôle :</strong><br />
+                        • <strong>Admin</strong> : Accès complet au CRM<br />
+                        • <strong>Manager</strong> : Ses adresses + équipe (sans Compta/Commissions)<br />
+                        • <strong>Agent</strong> : Uniquement ses propres adresses et contrats
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        onClick={handleCreateAccount} 
+                        disabled={isCreatingAccount || collaborateurs.length === 0}
+                        className="flex-1"
+                      >
+                        {isCreatingAccount ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Création...
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-2" />
+                            Créer le compte
+                          </>
+                        )}
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsAddingAccount(false)}>
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
+          {/* SOUS-ONGLET CLIENTS */}
+          {accountSubTab === "clients" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  {t('settings.clientAccounts')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('clients.client')}</TableHead>
+                      <TableHead>{t('common.email')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>{t('settings.createdAt')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientAccounts.map(client => (
+                      <TableRow key={client.id}>
+                        <TableCell>
+                          <span className="font-medium">
+                            {client.first_name} {client.last_name}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {client.profile?.email || client.email}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={client.status === 'actif' ? 'default' : 'secondary'}>
+                            {client.status || 'actif'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(client.created_at).toLocaleDateString("fr-CH")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {clientAccounts.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          {t('settings.noClientAccounts')}
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsAddingAccount(false)}>
-                    Annuler
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* RÔLES */}
