@@ -400,13 +400,25 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to generate password reset link");
     }
 
-    const resetLink = resetData?.properties?.action_link;
+    // Prefer sending a direct app link with token_hash (more reliable than the /verify redirect flow)
+    const hashedToken = resetData?.properties?.hashed_token;
+    const actionLink = resetData?.properties?.action_link;
+
+    let resetLink: string | null = null;
+    if (hashedToken && redirectUrl) {
+      const url = new URL(redirectUrl);
+      url.searchParams.set('token_hash', hashedToken);
+      url.searchParams.set('type', 'recovery');
+      resetLink = url.toString();
+      console.log("Reset link generated successfully (token_hash flow)");
+    } else if (actionLink) {
+      resetLink = actionLink;
+      console.log("Reset link generated successfully (action_link flow)");
+    }
 
     if (!resetLink) {
       throw new Error("Failed to generate reset link");
     }
-
-    console.log("Reset link generated successfully");
 
     // Get user's name from profile
     const { data: profile } = await supabaseAdmin

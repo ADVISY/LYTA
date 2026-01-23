@@ -24,17 +24,19 @@ const ResetPassword = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[ResetPassword] Auth state change:", event, !!session);
-      
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log("[ResetPassword] PASSWORD_RECOVERY event - session ready");
+
+      // Only mark ready when we actually have a session.
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'PASSWORD_RECOVERY')) {
+        console.log("[ResetPassword] Session ready");
         setSessionReady(true);
         setIsProcessingToken(false);
         setTokenError(null);
-      } else if (event === 'SIGNED_IN' && session) {
-        console.log("[ResetPassword] SIGNED_IN event - session ready");
-        setSessionReady(true);
+      }
+
+      // If we get signed out while on this page, show a clear error.
+      if (event === 'SIGNED_OUT') {
+        setTokenError("Votre session a expiré. Veuillez demander un nouveau lien de réinitialisation.");
         setIsProcessingToken(false);
-        setTokenError(null);
       }
     });
 
@@ -50,30 +52,34 @@ const ResetPassword = () => {
       try {
         // Check URL hash for token (Supabase format: #access_token=...&type=recovery)
         const hashParams = new URLSearchParams(location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const tokenType = hashParams.get('type');
-        const refreshToken = hashParams.get('refresh_token');
 
         // Also check query params for code flow
         const queryParams = new URLSearchParams(location.search);
         const code = queryParams.get('code');
+        const tokenHash = queryParams.get('token_hash');
+
+        // Support both hash and query variants
+        const accessToken = hashParams.get('access_token') ?? queryParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') ?? queryParams.get('refresh_token');
+        const tokenType = hashParams.get('type') ?? queryParams.get('type');
 
         console.log("[ResetPassword] Processing token...", { 
           hasAccessToken: !!accessToken, 
           tokenType, 
           hasRefreshToken: !!refreshToken,
-          hasCode: !!code 
+          hasCode: !!code,
+          hasTokenHash: !!tokenHash,
         });
 
-        if (accessToken && tokenType === 'recovery' && refreshToken) {
-          // Set the session with the tokens from the URL
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
+        // Preferred flow: token_hash (most robust, no redirect verification needed)
+        if (tokenHash && tokenType === 'recovery') {
+          const { error } = await supabase.auth.verifyOtp({
+            type: 'recovery',
+            token_hash: tokenHash,
           });
 
           if (error) {
-            console.error("[ResetPassword] Error setting session:", error);
+            console.error("[ResetPassword] Error verifying OTP:", error);
             setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
             setIsProcessingToken(false);
             return;
@@ -90,7 +96,7 @@ const ResetPassword = () => {
             console.log("[ResetPassword] Session established successfully");
             setSessionReady(true);
           } else {
-            console.error("[ResetPassword] No session after setSession");
+            console.error("[ResetPassword] No session after verifyOtp");
             setTokenError("Le lien de réinitialisation est invalide ou expiré.");
           }
         } else if (code) {
@@ -114,6 +120,31 @@ const ResetPassword = () => {
             setSessionReady(true);
           } else {
             console.error("[ResetPassword] No session after code exchange");
+            setTokenError("Le lien de réinitialisation est invalide ou expiré.");
+          }
+        } else if (accessToken && refreshToken) {
+          // Legacy implicit flow: setSession from tokens
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error("[ResetPassword] Error setting session:", error);
+            setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
+            setIsProcessingToken(false);
+            return;
+          }
+
+          window.history.replaceState({}, document.title, location.pathname);
+
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log("[ResetPassword] Session established from tokens");
+            setSessionReady(true);
+          } else {
+            console.error("[ResetPassword] No session after setSession");
             setTokenError("Le lien de réinitialisation est invalide ou expiré.");
           }
         } else {
