@@ -39,6 +39,7 @@ export default function ClientLayout() {
   const { tenant } = useTenant();
   const [user, setUser] = useState<any>(null);
   const [clientData, setClientData] = useState<any>(null);
+  const [advisorData, setAdvisorData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -82,6 +83,19 @@ export default function ClientLayout() {
       
       if (clientRecord) {
         setClientData(clientRecord);
+        
+        // Fetch assigned advisor info
+        if (clientRecord.assigned_agent_id) {
+          const { data: advisor } = await supabase
+            .from('clients')
+            .select('id, first_name, last_name, email, phone, mobile, photo_url')
+            .eq('id', clientRecord.assigned_agent_id)
+            .maybeSingle();
+          
+          if (advisor) {
+            setAdvisorData(advisor);
+          }
+        }
       }
       
       setLoading(false);
@@ -206,6 +220,47 @@ export default function ClientLayout() {
                 Espace Client • en ligne
               </p>
             </div>
+            
+            {/* Advisor Info */}
+            {advisorData && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 text-center">Votre conseiller</p>
+                <div className="flex items-center gap-3">
+                  {advisorData.photo_url ? (
+                    <img 
+                      src={advisorData.photo_url} 
+                      alt={`${advisorData.first_name} ${advisorData.last_name}`}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-6 w-6 text-primary" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">
+                      {advisorData.first_name} {advisorData.last_name}
+                    </p>
+                    {(advisorData.phone || advisorData.mobile) && (
+                      <a 
+                        href={`tel:${advisorData.mobile || advisorData.phone}`}
+                        className="text-xs text-muted-foreground hover:text-primary truncate block"
+                      >
+                        {advisorData.mobile || advisorData.phone}
+                      </a>
+                    )}
+                    {advisorData.email && (
+                      <a 
+                        href={`mailto:${advisorData.email}`}
+                        className="text-xs text-primary hover:underline truncate block"
+                      >
+                        {advisorData.email}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Collapsible Navigation Section */}
@@ -311,6 +366,39 @@ export default function ClientLayout() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">Espace Client</p>
+                
+                {/* Mobile Advisor Info */}
+                {advisorData && (
+                  <div className="mt-4 pt-4 border-t border-border w-full">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 text-center">Votre conseiller</p>
+                    <div className="flex items-center gap-3">
+                      {advisorData.photo_url ? (
+                        <img 
+                          src={advisorData.photo_url} 
+                          alt={`${advisorData.first_name} ${advisorData.last_name}`}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="font-medium text-sm truncate">
+                          {advisorData.first_name} {advisorData.last_name}
+                        </p>
+                        {(advisorData.phone || advisorData.mobile) && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {advisorData.mobile || advisorData.phone}
+                          </p>
+                        )}
+                        {advisorData.email && (
+                          <p className="text-xs text-primary truncate">{advisorData.email}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <nav className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
                 <NavItems onItemClick={() => setMobileMenuOpen(false)} />

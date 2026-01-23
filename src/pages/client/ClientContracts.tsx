@@ -174,9 +174,20 @@ export default function ClientContracts() {
                   <CollapsibleTrigger asChild>
                     <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <Icon className="h-6 w-6 text-primary" />
-                        </div>
+                        {/* Company Logo or Category Icon */}
+                        {contract.product?.company?.logo_url ? (
+                          <div className="h-12 w-12 rounded-xl bg-white border border-border flex items-center justify-center overflow-hidden p-1">
+                            <img 
+                              src={contract.product.company.logo_url} 
+                              alt={contract.product.company.name}
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <Icon className="h-6 w-6 text-primary" />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <CardTitle className="text-base truncate">
