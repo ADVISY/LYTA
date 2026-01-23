@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   MessageCircle, 
   Send, 
@@ -14,8 +14,22 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type AdvisorData = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  photo_url: string | null;
+};
+
 export default function ClientMessages() {
-  const { clientData } = useOutletContext<{ user: any; clientData: any }>();
+  const { clientData, advisorData } = useOutletContext<{ 
+    user: any; 
+    clientData: any; 
+    advisorData: AdvisorData | null;
+  }>();
   const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -37,11 +51,28 @@ export default function ClientMessages() {
     setSending(false);
   };
 
+  const getAdvisorName = () => {
+    if (advisorData?.first_name || advisorData?.last_name) {
+      return `${advisorData.first_name || ''} ${advisorData.last_name || ''}`.trim();
+    }
+    return "Équipe Advisy";
+  };
+
+  const getAdvisorInitials = () => {
+    if (advisorData?.first_name || advisorData?.last_name) {
+      return `${advisorData.first_name?.[0] || ''}${advisorData.last_name?.[0] || ''}`.toUpperCase();
+    }
+    return "A";
+  };
+
+  const getAdvisorEmail = () => advisorData?.email || "contact@advisy.ch";
+  const getAdvisorPhone = () => advisorData?.mobile || advisorData?.phone || "+41 21 922 09 60";
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Messages</h1>
-        <p className="text-muted-foreground">Contactez votre conseiller Advisy</p>
+        <p className="text-muted-foreground">Contactez votre conseiller</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -97,36 +128,43 @@ export default function ClientMessages() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <Avatar className="h-14 w-14">
+                  {advisorData?.photo_url ? (
+                    <AvatarImage 
+                      src={advisorData.photo_url} 
+                      alt={getAdvisorName()}
+                      className="object-cover"
+                    />
+                  ) : null}
                   <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
-                    A
+                    {getAdvisorInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">Équipe Advisy</p>
+                  <p className="font-medium">{getAdvisorName()}</p>
                   <p className="text-sm text-muted-foreground">Conseiller assurance</p>
                 </div>
               </div>
               
               <div className="pt-4 border-t space-y-3">
                 <a 
-                  href="mailto:contact@advisy.ch" 
+                  href={`mailto:${getAdvisorEmail()}`} 
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors"
                 >
                   <Mail className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">contact@advisy.ch</p>
+                    <p className="text-sm text-muted-foreground">{getAdvisorEmail()}</p>
                   </div>
                 </a>
                 
                 <a 
-                  href="tel:+41219220960" 
+                  href={`tel:${getAdvisorPhone().replace(/\s/g, '')}`} 
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors"
                 >
                   <Phone className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Téléphone</p>
-                    <p className="text-sm text-muted-foreground">+41 21 922 09 60</p>
+                    <p className="text-sm text-muted-foreground">{getAdvisorPhone()}</p>
                   </div>
                 </a>
                 
@@ -146,7 +184,7 @@ export default function ClientMessages() {
               <p className="text-sm text-center">
                 <span className="font-medium">Besoin d'aide urgente?</span>
                 <br />
-                <a href="tel:+41219220960" className="text-primary hover:underline">
+                <a href={`tel:${getAdvisorPhone().replace(/\s/g, '')}`} className="text-primary hover:underline">
                   Appelez-nous directement
                 </a>
               </p>

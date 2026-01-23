@@ -422,7 +422,7 @@ export default function ClientLayout() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
         <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
-          <Outlet context={{ user, clientData }} />
+          <Outlet context={{ user, clientData, advisorData }} />
         </div>
       </main>
     </div>
