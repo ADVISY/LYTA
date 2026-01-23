@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
 interface CreateTenantAdminRequest {
   tenant_id: string;
   email: string;
@@ -13,6 +15,14 @@ interface CreateTenantAdminRequest {
   last_name: string;
   phone?: string;
   language?: string;
+}
+
+interface TenantBranding {
+  display_name: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  email_sender_name: string | null;
+  email_sender_address: string | null;
 }
 
 // Default roles configuration for new tenants
@@ -132,6 +142,286 @@ const DEFAULT_ROLES = [
   },
 ];
 
+// Generate welcome email HTML for new tenant admin
+function generateAdminWelcomeEmail(
+  adminName: string,
+  tenantName: string,
+  subdomain: string,
+  resetLink: string,
+  branding: TenantBranding | null
+): { subject: string; html: string } {
+  const displayName = branding?.display_name || tenantName;
+  const primaryColor = branding?.primary_color || '#0066FF';
+  const logoUrl = branding?.logo_url || '';
+
+  const logoHtml = logoUrl 
+    ? `<img src="${logoUrl}" alt="${displayName}" style="height: 50px; max-width: 180px; object-fit: contain;" />`
+    : `<div style="font-size: 42px; font-weight: 700; color: #ffffff; letter-spacing: -1px;">${displayName}</div>`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenue sur Lyta</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a2e;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f2f5;
+    }
+    
+    .email-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .email-container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 50%, #7C3AED 100%);
+      padding: 50px 40px 60px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: #ffffff;
+      border-radius: 30px 30px 0 0;
+    }
+    
+    .header-title {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 700;
+      margin: 24px 0 8px;
+    }
+    
+    .header-subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 16px;
+      margin: 0;
+    }
+    
+    .content {
+      padding: 30px 40px 40px;
+    }
+    
+    .greeting {
+      font-size: 22px;
+      font-weight: 600;
+      color: ${primaryColor};
+      margin-bottom: 24px;
+    }
+    
+    .text {
+      color: #4a4a68;
+      font-size: 15px;
+      margin-bottom: 16px;
+      line-height: 1.7;
+    }
+    
+    .info-box {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+      border-left: 4px solid ${primaryColor};
+      padding: 24px;
+      margin: 28px 0;
+      border-radius: 0 12px 12px 0;
+    }
+    
+    .info-box h3 {
+      margin: 0 0 16px;
+      color: ${primaryColor};
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .info-item {
+      display: flex;
+      margin: 12px 0;
+    }
+    
+    .info-label {
+      font-weight: 600;
+      color: #374151;
+      min-width: 140px;
+    }
+    
+    .info-value {
+      color: #4a4a68;
+    }
+    
+    .cta-container {
+      text-align: center;
+      margin: 36px 0;
+    }
+    
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 100%);
+      color: #ffffff !important;
+      padding: 18px 48px;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 16px;
+      box-shadow: 0 4px 14px rgba(0, 102, 255, 0.35);
+    }
+    
+    .warning-box {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 2px solid #f59e0b;
+      padding: 20px 24px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+    
+    .warning-box p {
+      margin: 0;
+      color: #92400e;
+      font-size: 14px;
+    }
+    
+    .features-list {
+      list-style: none;
+      padding: 0;
+      margin: 24px 0;
+    }
+    
+    .features-list li {
+      padding: 12px 0 12px 36px;
+      position: relative;
+      color: #4a4a68;
+      font-size: 15px;
+    }
+    
+    .features-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #10b981;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    
+    .signature {
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .footer {
+      background: #f8fafc;
+      padding: 28px 40px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .footer-text {
+      color: #6b7280;
+      font-size: 12px;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-container">
+      <div class="header">
+        ${logoHtml}
+        <h1 class="header-title">Bienvenue sur Lyta ! 🎉</h1>
+        <p class="header-subtitle">Votre plateforme CRM est prête</p>
+      </div>
+      <div class="content">
+        <p class="greeting">Bonjour ${adminName} 👋</p>
+        <p class="text">
+          Félicitations ! Votre espace <strong>${tenantName}</strong> a été créé avec succès sur la plateforme Lyta. 
+          Vous êtes désormais administrateur et pouvez commencer à configurer votre cabinet.
+        </p>
+        
+        <div class="info-box">
+          <h3>📋 Informations de votre espace</h3>
+          <div class="info-item">
+            <span class="info-label">Cabinet :</span>
+            <span class="info-value">${tenantName}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Adresse URL :</span>
+            <span class="info-value">https://${subdomain}.lyta.ch</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Rôle :</span>
+            <span class="info-value">Administrateur</span>
+          </div>
+        </div>
+        
+        <p class="text">
+          Pour accéder à votre espace et commencer la configuration, veuillez d'abord créer votre mot de passe personnel :
+        </p>
+        
+        <div class="cta-container">
+          <a href="${resetLink}" class="cta-button">
+            Créer mon mot de passe →
+          </a>
+        </div>
+        
+        <div class="warning-box">
+          <p>⏰ Ce lien expire dans 24 heures. Si vous n'avez pas demandé la création de ce compte, contactez-nous immédiatement.</p>
+        </div>
+        
+        <p class="text">En tant qu'administrateur, vous pourrez :</p>
+        <ul class="features-list">
+          <li>Gérer vos clients et leurs contrats d'assurance</li>
+          <li>Superviser vos collaborateurs et leurs performances</li>
+          <li>Suivre les commissions et générer des rapports</li>
+          <li>Personnaliser le branding de votre espace client</li>
+          <li>Configurer les automatisations email et SMS</li>
+        </ul>
+        
+        <div class="signature">
+          <p class="text">
+            Nous sommes ravis de vous avoir parmi nous !<br>
+            <strong>L'équipe Lyta</strong>
+          </p>
+        </div>
+      </div>
+      <div class="footer">
+        <p class="footer-text">© ${new Date().getFullYear()} Lyta. Tous droits réservés.</p>
+        <p class="footer-text">
+          Cet email a été envoyé automatiquement. Pour toute question, contactez 
+          <a href="mailto:support@lyta.ch" style="color: ${primaryColor};">support@lyta.ch</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  return {
+    subject: `🎉 Bienvenue sur Lyta - ${tenantName} est prêt !`,
+    html
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -182,16 +472,30 @@ serve(async (req) => {
       throw new Error("Missing required fields: tenant_id, email, first_name, last_name");
     }
 
-    // Verify tenant exists
+    // Verify tenant exists and get branding
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from("tenants")
-      .select("id, name, slug")
+      .select(`
+        id, 
+        name, 
+        slug,
+        tenant_branding (
+          display_name,
+          logo_url,
+          primary_color,
+          email_sender_name,
+          email_sender_address
+        )
+      `)
       .eq("id", tenant_id)
       .single();
 
     if (tenantError || !tenant) {
       throw new Error("Tenant not found");
     }
+
+    const branding: TenantBranding | null = tenant.tenant_branding?.[0] || null;
+    const adminName = `${first_name} ${last_name}`.trim();
 
     console.log("Processing tenant admin creation for:", tenant.name);
 
@@ -329,8 +633,8 @@ serve(async (req) => {
         })
         .eq("id", userId);
 
-      // Send password reset email for existing users too
-      const { error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      // Generate and send password reset email for existing users
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
@@ -338,10 +642,23 @@ serve(async (req) => {
         },
       });
 
-      if (linkError) {
-        console.error("Error generating password reset link for existing user:", linkError);
-      } else {
-        console.log("Password reset link sent to existing user:", email);
+      if (!linkError && linkData?.properties?.action_link && RESEND_API_KEY) {
+        const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, linkData.properties.action_link, branding);
+        
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Lyta <support@lyta.ch>",
+            to: [email],
+            subject,
+            html,
+          }),
+        });
+        console.log("Welcome email sent to existing user:", email);
       }
 
     } else {
@@ -392,7 +709,7 @@ serve(async (req) => {
           phone,
         });
 
-      // Send password reset email so admin can set their own password
+      // Generate password reset link and send branded welcome email
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
@@ -403,8 +720,28 @@ serve(async (req) => {
 
       if (linkError) {
         console.error("Error generating password reset link:", linkError);
-      } else {
-        console.log("Password reset link generated for:", email);
+      } else if (linkData?.properties?.action_link && RESEND_API_KEY) {
+        const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, linkData.properties.action_link, branding);
+        
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Lyta <support@lyta.ch>",
+            to: [email],
+            subject,
+            html,
+          }),
+        });
+
+        if (emailResponse.ok) {
+          console.log("Welcome email with password reset link sent to:", email);
+        } else {
+          console.error("Failed to send welcome email:", await emailResponse.text());
+        }
       }
 
       console.log("New admin user created:", userId);
@@ -468,9 +805,10 @@ serve(async (req) => {
         roles_initialized: !existingRoles || existingRoles.length === 0,
         admin_role_assigned: !!adminRoleId,
         subdomain: `${tenant.slug}.lyta.ch`,
+        email_sent: !!RESEND_API_KEY,
         message: isNewUser 
           ? `Admin créé avec succès. Un email d'invitation a été envoyé à ${email}. Sous-domaine: ${tenant.slug}.lyta.ch`
-          : `Utilisateur existant lié au tenant ${tenant.name} avec succès.`,
+          : `Utilisateur existant lié au tenant ${tenant.name} avec succès. Un email lui a été envoyé.`,
       }),
       {
         status: 200,
