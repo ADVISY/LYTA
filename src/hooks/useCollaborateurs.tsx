@@ -12,6 +12,7 @@ export interface Collaborateur {
   mobile: string | null;
   status: string | null;
   profession: string | null;
+  photo_url: string | null;
   created_at: string;
   // Manager
   manager_id: string | null;
@@ -68,7 +69,7 @@ export function useCollaborateurs() {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, first_name, last_name, email, mobile, status, profession, created_at, commission_rate, commission_rate_lca, commission_rate_vie, fixed_salary, bonus_rate, contract_type, work_percentage, hire_date, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate')
+        .select('id, first_name, last_name, email, mobile, status, profession, photo_url, created_at, commission_rate, commission_rate_lca, commission_rate_vie, fixed_salary, bonus_rate, contract_type, work_percentage, hire_date, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate')
         .eq('type_adresse', 'collaborateur')
         .order('first_name', { ascending: true });
 

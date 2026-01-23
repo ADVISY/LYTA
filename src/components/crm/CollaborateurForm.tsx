@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, User, Wallet, Briefcase, Users, PiggyBank } from "lucide-react";
 import { Collaborateur, CollaborateurFormData, useCollaborateurs } from "@/hooks/useCollaborateurs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CollaboratorPhotoUpload } from "./CollaboratorPhotoUpload";
 
 interface CollaborateurFormProps {
   open: boolean;
@@ -161,6 +162,18 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
 
             {/* Tab: Informations personnelles */}
             <TabsContent value="info" className="space-y-4">
+              {/* Photo Upload */}
+              <div className="flex justify-center pb-4 border-b">
+                <CollaboratorPhotoUpload
+                  collaboratorId={collaborateur?.id}
+                  currentPhotoUrl={collaborateur?.photo_url}
+                  firstName={formData.first_name}
+                  lastName={formData.last_name}
+                  size="lg"
+                  editable={true}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="first_name">{t("forms.collaborateur.firstName")} *</Label>
