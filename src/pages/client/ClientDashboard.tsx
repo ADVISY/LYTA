@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   FileText, 
   Send, 
@@ -18,10 +19,16 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Phone,
+  Mail,
+  Building2,
+  MapPin,
+  Globe
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useTenant } from "@/contexts/TenantContext";
 
 const categoryIcons: Record<string, any> = {
   health: Heart,
@@ -39,12 +46,34 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   cancelled: { label: "Résilié", variant: "destructive", icon: AlertCircle },
 };
 
+type AdvisorData = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  photo_url: string | null;
+};
+
 export default function ClientDashboard() {
-  const { user, clientData, advisorData } = useOutletContext<{ user: any; clientData: any; advisorData: any }>();
+  const { user, clientData, advisorData } = useOutletContext<{ 
+    user: any; 
+    clientData: any; 
+    advisorData: AdvisorData | null;
+  }>();
   const navigate = useNavigate();
+  const { tenant } = useTenant();
   const [contracts, setContracts] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Get tenant branding info
+  const branding = tenant?.branding;
+  const cabinetName = branding?.display_name || tenant?.name || "Cabinet";
+  const cabinetPhone = branding?.company_phone;
+  const cabinetEmail = branding?.company_email;
+  const cabinetLogo = branding?.logo_url;
 
   useEffect(() => {
     if (clientData?.id) {
@@ -93,6 +122,29 @@ export default function ClientDashboard() {
     return clientData?.first_name || user?.user_metadata?.first_name || 'Client';
   };
 
+  // Advisor helpers
+  const hasAdvisor = advisorData && (advisorData.first_name || advisorData.last_name);
+  
+  const getAdvisorName = () => {
+    if (hasAdvisor) {
+      return `${advisorData!.first_name || ''} ${advisorData!.last_name || ''}`.trim();
+    }
+    return null;
+  };
+
+  const getAdvisorInitials = () => {
+    if (hasAdvisor) {
+      return `${advisorData!.first_name?.[0] || ''}${advisorData!.last_name?.[0] || ''}`.toUpperCase();
+    }
+    return cabinetName[0]?.toUpperCase() || "C";
+  };
+
+  const getAdvisorPhone = () => advisorData?.mobile || advisorData?.phone || null;
+  
+  const formatPhoneForLink = (phone: string) => phone.replace(/\s/g, '').replace('+', '');
+  
+  const getWhatsAppLink = (phone: string) => `https://wa.me/${formatPhoneForLink(phone)}`;
+
   const activeContracts = contracts.filter(c => c.status === 'active').length;
   const totalPremium = contracts
     .filter(c => c.status === 'active')
@@ -129,8 +181,8 @@ export default function ClientDashboard() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                <Shield className="h-6 w-6 text-emerald-600" />
+              <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center">
+                <Shield className="h-6 w-6 text-secondary-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Prime mensuelle</p>
@@ -143,13 +195,133 @@ export default function ClientDashboard() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <MessageCircle className="h-6 w-6 text-blue-600" />
+              <div className="h-12 w-12 rounded-xl bg-accent flex items-center justify-center">
+                <MessageCircle className="h-6 w-6 text-accent-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Documents</p>
                 <p className="text-2xl font-bold">{documents.length}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Advisor & Cabinet Info Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Personal Advisor Card */}
+        {hasAdvisor && (
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Votre conseiller
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs">Personnel</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-14 w-14 ring-2 ring-primary/20">
+                  {advisorData?.photo_url ? (
+                    <AvatarImage 
+                      src={advisorData.photo_url} 
+                      alt={getAdvisorName() || "Conseiller"}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-lg font-medium">
+                    {getAdvisorInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-lg">{getAdvisorName()}</p>
+                  <p className="text-sm text-muted-foreground">Conseiller assurance</p>
+                  {advisorData?.email && (
+                    <a 
+                      href={`mailto:${advisorData.email}`}
+                      className="text-sm text-primary hover:underline block truncate"
+                    >
+                      {advisorData.email}
+                    </a>
+                  )}
+                </div>
+                {getAdvisorPhone() && (
+                  <div className="flex flex-col gap-2">
+                    <a 
+                      href={`tel:${formatPhoneForLink(getAdvisorPhone()!)}`}
+                      className="p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+                    >
+                      <Phone className="h-4 w-4" />
+                    </a>
+                    <a 
+                      href={getWhatsAppLink(getAdvisorPhone()!)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4 text-primary" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Cabinet Info Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              {cabinetName}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              {cabinetLogo ? (
+                <div className="h-14 w-14 rounded-lg bg-background border border-border flex items-center justify-center p-2">
+                  <img 
+                    src={cabinetLogo} 
+                    alt={cabinetName} 
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center">
+                  <Building2 className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0 space-y-1">
+                {cabinetPhone && (
+                  <a 
+                    href={`tel:${formatPhoneForLink(cabinetPhone)}`}
+                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                  >
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    {cabinetPhone}
+                  </a>
+                )}
+                {cabinetEmail && (
+                  <a 
+                    href={`mailto:${cabinetEmail}`}
+                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                  >
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    {cabinetEmail}
+                  </a>
+                )}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={() => navigate('/espace-client/messages')}
+              >
+                <Send className="h-4 w-4" />
+                Contacter
+              </Button>
             </div>
           </CardContent>
         </Card>
