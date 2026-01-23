@@ -128,7 +128,6 @@ export default function ClientDetail() {
   const [loadingParts, setLoadingParts] = useState<Record<string, boolean>>({});
   const [creatingClientAccount, setCreatingClientAccount] = useState(false);
   const [clientAccountDialogOpen, setClientAccountDialogOpen] = useState(false);
-  const [clientPassword, setClientPassword] = useState("");
 
   // Filter policies for this client
   const clientPolicies = policies.filter(p => p.client_id === id);
@@ -227,10 +226,10 @@ export default function ClientDetail() {
   };
 
   const handleCreateClientAccount = async () => {
-    if (!client || !client.email || !clientPassword) {
+    if (!client || !client.email) {
       toast({
         title: "Erreur",
-        description: "Email du client et mot de passe requis",
+        description: "Email du client requis",
         variant: "destructive",
       });
       return;
@@ -244,7 +243,6 @@ export default function ClientDetail() {
       const response = await supabase.functions.invoke('create-user-account', {
         body: {
           email: client.email,
-          password: clientPassword,
           role: 'client',
           clientId: client.id,
           firstName: client.first_name,
@@ -256,10 +254,9 @@ export default function ClientDetail() {
 
       toast({
         title: "Compte créé",
-        description: `Compte client créé pour ${client.email}`,
+        description: `Un email a été envoyé à ${client.email} avec les instructions de connexion`,
       });
       setClientAccountDialogOpen(false);
-      setClientPassword("");
       loadClient(); // Reload to get updated user_id
     } catch (error: any) {
       toast({
@@ -413,24 +410,17 @@ export default function ClientDetail() {
           <DialogHeader>
             <DialogTitle>Créer un espace client</DialogTitle>
             <DialogDescription>
-              Créer un compte pour permettre à {getClientName()} d'accéder à son espace client Advisy.
+              Un email sera envoyé à {getClientName()} avec un lien pour définir son mot de passe et accéder à son espace client.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>Email de destination</Label>
               <Input value={client.email || ""} disabled />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="clientPassword">Mot de passe temporaire</Label>
-              <Input
-                id="clientPassword"
-                type="password"
-                value={clientPassword}
-                onChange={(e) => setClientPassword(e.target.value)}
-                placeholder="Minimum 6 caractères"
-              />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Le client recevra un email personnalisé avec le branding de votre cabinet pour créer son mot de passe.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClientAccountDialogOpen(false)}>
@@ -438,9 +428,9 @@ export default function ClientDetail() {
             </Button>
             <Button 
               onClick={handleCreateClientAccount} 
-              disabled={creatingClientAccount || clientPassword.length < 6}
+              disabled={creatingClientAccount || !client.email}
             >
-              {creatingClientAccount ? "Création..." : "Créer le compte"}
+              {creatingClientAccount ? "Envoi en cours..." : "Envoyer l'invitation"}
             </Button>
           </DialogFooter>
         </DialogContent>
