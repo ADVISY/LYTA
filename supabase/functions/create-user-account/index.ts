@@ -15,10 +15,26 @@ interface TenantBranding {
   email_sender_address: string | null;
 }
 
-// Generate HTML email for account creation with password reset link
-function generateWelcomeEmail(
+// Generate a human-readable password
+function generateReadablePassword(): string {
+  const adjectives = ['Blue', 'Swift', 'Brave', 'Smart', 'Cool', 'Fast', 'Gold', 'Star', 'Mega', 'Super'];
+  const nouns = ['Tiger', 'Eagle', 'Lion', 'Wolf', 'Bear', 'Hawk', 'Fox', 'Puma', 'Shark', 'Cobra'];
+  const numbers = Math.floor(Math.random() * 900) + 100; // 3-digit number
+  const specials = ['!', '@', '#', '$', '&'];
+  
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const special = specials[Math.floor(Math.random() * specials.length)];
+  
+  return `${adj}${noun}${numbers}${special}`;
+}
+
+// Generate HTML email for account creation with password
+function generateWelcomeEmailWithPassword(
   clientName: string,
-  resetLink: string,
+  email: string,
+  password: string,
+  loginUrl: string,
   branding: TenantBranding | null,
   tenantName: string
 ): { subject: string; html: string } {
@@ -105,6 +121,43 @@ function generateWelcomeEmail(
       line-height: 1.7;
     }
     
+    .credentials-box {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 2px solid ${primaryColor};
+      padding: 24px;
+      border-radius: 12px;
+      margin: 24px 0;
+    }
+    
+    .credentials-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: ${primaryColor};
+      margin: 0 0 16px 0;
+    }
+    
+    .credential-row {
+      display: flex;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    
+    .credential-label {
+      color: #6b7280;
+      width: 120px;
+      flex-shrink: 0;
+    }
+    
+    .credential-value {
+      color: #1a1a2e;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+      background: #ffffff;
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+    }
+    
     .cta-container {
       text-align: center;
       margin: 32px 0;
@@ -189,17 +242,29 @@ function generateWelcomeEmail(
         <p class="text">
           Votre compte ${displayName} a été créé avec succès ! Vous pouvez maintenant accéder à votre espace personnel pour consulter vos contrats et documents d'assurance.
         </p>
-        <p class="text">
-          Pour des raisons de sécurité, vous devez définir votre propre mot de passe en cliquant sur le bouton ci-dessous :
-        </p>
+        
+        <div class="credentials-box">
+          <p class="credentials-title">🔐 Vos identifiants de connexion</p>
+          <div class="credential-row">
+            <span class="credential-label">Email :</span>
+            <span class="credential-value">${email}</span>
+          </div>
+          <div class="credential-row">
+            <span class="credential-label">Mot de passe :</span>
+            <span class="credential-value">${password}</span>
+          </div>
+        </div>
+        
         <div class="cta-container">
-          <a href="${resetLink}" class="cta-button">
-            Créer mon mot de passe →
+          <a href="${loginUrl}" class="cta-button">
+            Me connecter →
           </a>
         </div>
+        
         <div class="highlight-box">
-          <p>⏰ Ce lien expire dans 24 heures. Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet email.</p>
+          <p>🔒 Nous vous recommandons de modifier votre mot de passe après votre première connexion depuis votre profil.</p>
         </div>
+        
         <p class="text">Une fois connecté, vous pourrez :</p>
         <ul class="features-list">
           <li>Consulter tous vos contrats d'assurance</li>
@@ -222,7 +287,7 @@ function generateWelcomeEmail(
 `;
 
   return {
-    subject: `🔐 Créez votre mot de passe - ${displayName}`,
+    subject: `🔐 Vos identifiants de connexion - ${displayName}`,
     html
   };
 }
@@ -438,57 +503,81 @@ Deno.serve(async (req) => {
           .insert({ user_id: userId, tenant_id: tenantId });
       }
 
-      // Send password reset email so they can access the new portal
+      // Existing user - just notify them they have access to a new portal
       const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
-      console.log(`Generating password reset link for existing user ${email} with redirect to ${baseUrl}/reset-password`);
+      const loginUrl = `${baseUrl}/connexion`;
+      console.log(`Existing user ${email} linked to tenant, sending notification email`);
       
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: {
-          redirectTo: `${baseUrl}/reset-password`,
-        },
-      });
-
-      if (!linkError && linkData?.properties?.action_link) {
-        console.log(`Password reset link generated for existing user ${email}`);
+      if (RESEND_API_KEY) {
+        const displayName = branding?.display_name || branding?.email_sender_name || tenant.name;
+        const primaryColor = branding?.primary_color || '#0066FF';
+        const logoUrl = branding?.logo_url || '';
         
-        if (RESEND_API_KEY) {
-          const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
-          const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
-          const senderEmail = branding?.email_sender_address;
-          const fromAddress = senderEmail && senderEmail.includes('@') 
-            ? `${senderName} <${senderEmail}>`
-            : `${senderName} <support@lyta.ch>`;
+        const logoHtml = logoUrl 
+          ? `<img src="${logoUrl}" alt="${displayName}" style="height: 40px; max-width: 160px; object-fit: contain;" />`
+          : `<div style="font-size: 36px; font-weight: 700; color: #ffffff; letter-spacing: -1px;">${displayName}<span style="color: #7C3AED;">.</span></div>`;
+        
+        const existingUserHtml = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accès activé - ${displayName}</title>
+</head>
+<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f0f2f5; margin: 0; padding: 40px 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 50%, #7C3AED 100%); padding: 40px; text-align: center;">
+      ${logoHtml}
+      <h1 style="color: #fff; font-size: 26px; margin: 20px 0 0;">Accès activé !</h1>
+    </div>
+    <div style="padding: 30px 40px;">
+      <p style="font-size: 20px; font-weight: 600; color: ${primaryColor};">Bonjour ${clientName} 👋</p>
+      <p style="color: #4a4a68; font-size: 15px; line-height: 1.7;">
+        Bonne nouvelle ! Vous avez maintenant accès à votre espace client ${displayName}. Connectez-vous avec vos identifiants habituels.
+      </p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${loginUrl}" style="display: inline-block; background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 50px; font-weight: 600;">
+          Me connecter →
+        </a>
+      </div>
+      <p style="color: #4a4a68; font-size: 15px;">Cordialement,<br><strong>L'équipe ${displayName}</strong></p>
+    </div>
+  </div>
+</body>
+</html>`;
+        
+        const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
+        const senderEmail = branding?.email_sender_address;
+        const fromAddress = senderEmail && senderEmail.includes('@') 
+          ? `${senderName} <${senderEmail}>`
+          : `${senderName} <support@lyta.ch>`;
 
-          console.log(`Sending welcome email from ${fromAddress} to existing user ${email}`);
+        console.log(`Sending access notification email from ${fromAddress} to existing user ${email}`);
 
-          const emailResponse = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: fromAddress,
-              to: [email],
-              subject,
-              html,
-            }),
-          });
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [email],
+            subject: `✅ Votre accès ${displayName} est activé`,
+            html: existingUserHtml,
+          }),
+        });
 
-          if (emailResponse.ok) {
-            const emailResult = await emailResponse.json();
-            console.log(`Welcome email sent to existing user ${email}. ID: ${emailResult.id}`);
-          } else {
-            const errorText = await emailResponse.text();
-            console.error(`Failed to send email to existing user ${email}:`, errorText);
-          }
+        if (emailResponse.ok) {
+          const emailResult = await emailResponse.json();
+          console.log(`Access notification email sent to existing user ${email}. ID: ${emailResult.id}`);
         } else {
-          console.warn("RESEND_API_KEY not configured - email not sent");
+          const errorText = await emailResponse.text();
+          console.error(`Failed to send email to existing user ${email}:`, errorText);
         }
-      } else if (linkError) {
-        console.error("Error generating password reset link for existing user:", linkError);
+      } else {
+        console.warn("RESEND_API_KEY not configured - email not sent");
       }
 
     } else {
@@ -511,12 +600,13 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Create user with a secure random password (they'll reset it)
-      const tempPassword = crypto.randomUUID() + "Aa1!";
+      // Create user with a readable generated password
+      const generatedPassword = generateReadablePassword();
+      console.log(`Creating new user account for ${email} with generated password`);
       
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password: tempPassword,
+        password: generatedPassword,
         email_confirm: true,
         user_metadata: {
           first_name: firstName || targetRecord.first_name,
@@ -551,62 +641,52 @@ Deno.serve(async (req) => {
         .from("user_tenant_assignments")
         .insert({ user_id: userId, tenant_id: tenantId });
 
-      // Generate password reset link for user to set their own password
-      // Use a fallback URL if tenant slug is not available
+      // Send welcome email with credentials
       const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
-      console.log(`Generating password reset link for ${email} with redirect to ${baseUrl}/reset-password`);
+      const loginUrl = `${baseUrl}/connexion`;
+      console.log(`Sending welcome email with credentials to ${email}`);
       
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: {
-          redirectTo: `${baseUrl}/reset-password`,
-        },
-      });
-
-      if (linkError) {
-        console.error("Error generating password reset link:", linkError);
-      } else if (linkData?.properties?.action_link) {
-        console.log(`Password reset link generated successfully for ${email}`);
+      if (RESEND_API_KEY) {
+        const { subject, html } = generateWelcomeEmailWithPassword(
+          clientName, 
+          email, 
+          generatedPassword, 
+          loginUrl, 
+          branding, 
+          tenant.name
+        );
         
-        if (RESEND_API_KEY) {
-          // Send branded welcome email with password reset link
-          const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
-          
-          const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
-          const senderEmail = branding?.email_sender_address;
-          const fromAddress = senderEmail && senderEmail.includes('@') 
-            ? `${senderName} <${senderEmail}>`
-            : `${senderName} <support@lyta.ch>`;
+        const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
+        const senderEmail = branding?.email_sender_address;
+        const fromAddress = senderEmail && senderEmail.includes('@') 
+          ? `${senderName} <${senderEmail}>`
+          : `${senderName} <support@lyta.ch>`;
 
-          console.log(`Sending welcome email from ${fromAddress} to ${email}`);
+        console.log(`Sending welcome email from ${fromAddress} to ${email}`);
 
-          const emailResponse = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: fromAddress,
-              to: [email],
-              subject,
-              html,
-            }),
-          });
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [email],
+            subject,
+            html,
+          }),
+        });
 
-          if (emailResponse.ok) {
-            const emailResult = await emailResponse.json();
-            console.log(`Welcome email sent successfully to ${email}. ID: ${emailResult.id}`);
-          } else {
-            const errorText = await emailResponse.text();
-            console.error(`Failed to send email to ${email}:`, errorText);
-          }
+        if (emailResponse.ok) {
+          const emailResult = await emailResponse.json();
+          console.log(`Welcome email with credentials sent successfully to ${email}. ID: ${emailResult.id}`);
         } else {
-          console.warn("RESEND_API_KEY not configured - email not sent");
+          const errorText = await emailResponse.text();
+          console.error(`Failed to send email to ${email}:`, errorText);
         }
       } else {
-        console.warn("No action link generated for password reset");
+        console.warn("RESEND_API_KEY not configured - email not sent");
       }
     }
 
