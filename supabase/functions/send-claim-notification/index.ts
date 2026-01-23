@@ -12,6 +12,17 @@ interface ClaimNotificationRequest {
   tenantId: string;
 }
 
+interface ClaimDocument {
+  document_id: string;
+  document: {
+    id: string;
+    file_name: string;
+    file_key: string;
+    mime_type: string | null;
+    size_bytes: number | null;
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,7 +66,7 @@ serve(async (req: Request): Promise<Response> => {
     // Fetch client separately
     const { data: client } = await supabase
       .from("clients")
-      .select("id, first_name, last_name, email, phone, mobile, tenant_id")
+      .select("id, first_name, last_name, email, phone, mobile, address, postal_code, city, canton, birthdate, tenant_id")
       .eq("id", claim.client_id)
       .single();
     
@@ -68,6 +79,62 @@ serve(async (req: Request): Promise<Response> => {
         .eq("id", claim.policy_id)
         .single();
       policy = policyData;
+    }
+    
+    // Fetch documents linked to this claim
+    const { data: claimDocuments } = await supabase
+      .from("claim_documents")
+      .select(`
+        document_id,
+        document:documents!claim_documents_document_id_fkey (
+          id,
+          file_name,
+          file_key,
+          mime_type,
+          size_bytes
+        )
+      `)
+      .eq("claim_id", claimId);
+    
+    console.log("Claim documents found:", claimDocuments?.length || 0);
+    
+    // Generate signed URLs for documents
+    const documentsWithUrls: Array<{
+      fileName: string;
+      fileSize: string;
+      mimeType: string;
+      downloadUrl: string;
+    }> = [];
+    
+    if (claimDocuments && claimDocuments.length > 0) {
+      for (const docRow of claimDocuments) {
+        const doc = docRow.document as unknown as {
+          id: string;
+          file_name: string;
+          file_key: string;
+          mime_type: string | null;
+          size_bytes: number | null;
+        };
+        
+        if (doc?.file_key) {
+          const { data: signedUrlData } = await supabase.storage
+            .from("documents")
+            .createSignedUrl(doc.file_key, 60 * 60 * 24 * 7); // 7 days expiry
+          
+          if (signedUrlData?.signedUrl) {
+            const sizeInMb = doc.size_bytes 
+              ? (doc.size_bytes / 1024 / 1024).toFixed(2) + ' MB'
+              : 'Taille inconnue';
+            
+            documentsWithUrls.push({
+              fileName: doc.file_name,
+              fileSize: sizeInMb,
+              mimeType: doc.mime_type || 'application/octet-stream',
+              downloadUrl: signedUrlData.signedUrl
+            });
+          }
+        }
+      }
     }
     
     const clientTenantId = tenantId || claim.tenant_id || client?.tenant_id;
@@ -114,6 +181,17 @@ serve(async (req: Request): Promise<Response> => {
     const clientName = `${client?.first_name || ''} ${client?.last_name || ''}`.trim() || 'Client';
     const clientEmail = client?.email || 'Non renseigné';
     const clientPhone = client?.mobile || client?.phone || 'Non renseigné';
+    const clientAddress = client?.address || '';
+    const clientPostalCode = client?.postal_code || '';
+    const clientCity = client?.city || '';
+    const clientCanton = client?.canton || '';
+    const clientBirthdate = client?.birthdate 
+      ? new Date(client.birthdate).toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : 'Non renseigné';
+    
+    const fullAddress = [clientAddress, `${clientPostalCode} ${clientCity}`.trim(), clientCanton]
+      .filter(Boolean)
+      .join(', ') || 'Non renseignée';
     
     const claimTypeLabels: Record<string, string> = {
       'auto': 'Automobile',
@@ -149,6 +227,49 @@ serve(async (req: Request): Promise<Response> => {
         </tr>`
       : '';
     
+    // Build documents section HTML
+    let documentsHtml = '';
+    if (documentsWithUrls.length > 0) {
+      const docItems = documentsWithUrls.map(doc => `
+        <tr>
+          <td style="padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="vertical-align: middle;">
+                  <span style="font-size: 20px;">📎</span>
+                </td>
+                <td style="padding-left: 12px; vertical-align: middle;">
+                  <div style="font-weight: 500; color: #1f2937;">${doc.fileName}</div>
+                  <div style="font-size: 12px; color: #6b7280;">${doc.fileSize}</div>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                  <a href="${doc.downloadUrl}" 
+                     style="display: inline-block; padding: 8px 16px; background: ${primaryColor}; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
+                    Télécharger
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="height: 8px;"></td></tr>
+      `).join('');
+      
+      documentsHtml = `
+        <h2 style="color: #1f2937; font-size: 18px; margin: 0 0 16px 0; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb;">
+          📁 Documents joints (${documentsWithUrls.length})
+        </h2>
+        <div style="background: #f3f4f6; border-radius: 8px; padding: 12px; margin-bottom: 24px;">
+          <table style="width: 100%;">
+            ${docItems}
+          </table>
+          <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; text-align: center;">
+            ⚠️ Les liens de téléchargement expirent dans 7 jours
+          </p>
+        </div>
+      `;
+    }
+    
     const emailHtml = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -169,7 +290,7 @@ serve(async (req: Request): Promise<Response> => {
       <!-- Content -->
       <div style="padding: 32px;">
         <p style="color: #374151; font-size: 16px; margin: 0 0 24px 0;">
-          Un client a soumis une nouvelle déclaration de sinistre. Voici les détails :
+          Un client a soumis une nouvelle déclaration de sinistre. Voici les détails complets :
         </p>
         
         <!-- Alert Box -->
@@ -196,6 +317,14 @@ serve(async (req: Request): Promise<Response> => {
             <td style="padding: 8px 0; color: #6b7280;">Téléphone:</td>
             <td style="padding: 8px 0;"><a href="tel:${clientPhone}" style="color: ${primaryColor};">${clientPhone}</a></td>
           </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Date de naissance:</td>
+            <td style="padding: 8px 0;">${clientBirthdate}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Adresse:</td>
+            <td style="padding: 8px 0;">${fullAddress}</td>
+          </tr>
         </table>
         
         <!-- Claim Info -->
@@ -216,11 +345,14 @@ serve(async (req: Request): Promise<Response> => {
         
         <!-- Description -->
         <h2 style="color: #1f2937; font-size: 18px; margin: 0 0 16px 0; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb;">
-          📝 Description
+          📝 Description du sinistre
         </h2>
         <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
           <p style="color: #374151; margin: 0; white-space: pre-wrap; line-height: 1.6;">${claim.description}</p>
         </div>
+        
+        <!-- Documents -->
+        ${documentsHtml}
         
         <!-- CTA -->
         <div style="text-align: center; margin-top: 32px;">
@@ -251,17 +383,21 @@ serve(async (req: Request): Promise<Response> => {
       fromAddress = `${senderName} <${senderEmail}>`;
     }
     
+    const docCount = documentsWithUrls.length;
+    const docSuffix = docCount > 0 ? ` + ${docCount} document${docCount > 1 ? 's' : ''}` : '';
+    
     const emailResponse = await resend.emails.send({
       from: fromAddress,
       to: [notificationEmail],
-      subject: `🚨 Nouveau sinistre - ${clientName} (${claimTypeLabel})`,
+      subject: `🚨 Nouveau sinistre - ${clientName} (${claimTypeLabel})${docSuffix}`,
       html: emailHtml,
     });
     
     console.log("Claim notification email sent:", emailResponse);
+    console.log("Documents included:", docCount);
     
     return new Response(
-      JSON.stringify({ success: true, emailId: emailResponse.data?.id }),
+      JSON.stringify({ success: true, emailId: emailResponse.data?.id, documentsIncluded: docCount }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
