@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   UserCog, Plus, Users, Search, Edit, Trash2, 
   Phone, Mail, Briefcase, UserCheck, UserX, Loader2, Shield
@@ -204,11 +205,14 @@ export default function CRMCollaborateurs() {
                     <TableRow key={collaborateur.id} className="group">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-violet-500/20 flex items-center justify-center">
-                            <span className="text-sm font-medium text-primary">
+                          <Avatar className="h-10 w-10">
+                            {collaborateur.photo_url && (
+                              <AvatarImage src={collaborateur.photo_url} alt={`${collaborateur.first_name} ${collaborateur.last_name}`} />
+                            )}
+                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-500/20 text-primary">
                               {collaborateur.first_name?.[0]}{collaborateur.last_name?.[0]}
-                            </span>
-                          </div>
+                            </AvatarFallback>
+                          </Avatar>
                           <div>
                             <p className="font-medium">
                               {collaborateur.first_name} {collaborateur.last_name}
