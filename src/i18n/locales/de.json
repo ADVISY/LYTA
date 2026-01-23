@@ -481,7 +481,9 @@
     "categoryLpp": "BVG",
     "categoryOther": "Andere",
     "productList": "Produktliste",
-    "noProducts": "Keine Produkte"
+    "noProducts": "Keine Produkte",
+    "clientAccounts": "Kundenkonten",
+    "noClientAccounts": "Keine Kundenkonten erstellt"
   },
   "notifications": {
     "title": "Benachrichtigungen",
