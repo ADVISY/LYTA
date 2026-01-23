@@ -439,36 +439,56 @@ Deno.serve(async (req) => {
       }
 
       // Send password reset email so they can access the new portal
+      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
+      console.log(`Generating password reset link for existing user ${email} with redirect to ${baseUrl}/reset-password`);
+      
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
-          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+          redirectTo: `${baseUrl}/reset-password`,
         },
       });
 
-      if (!linkError && linkData?.properties?.action_link && RESEND_API_KEY) {
-        const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
-        const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
-        const senderEmail = branding?.email_sender_address;
-        const fromAddress = senderEmail && senderEmail.includes('@') 
-          ? `${senderName} <${senderEmail}>`
-          : `${senderName} <support@lyta.ch>`;
+      if (!linkError && linkData?.properties?.action_link) {
+        console.log(`Password reset link generated for existing user ${email}`);
+        
+        if (RESEND_API_KEY) {
+          const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
+          const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
+          const senderEmail = branding?.email_sender_address;
+          const fromAddress = senderEmail && senderEmail.includes('@') 
+            ? `${senderName} <${senderEmail}>`
+            : `${senderName} <support@lyta.ch>`;
 
-        await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: fromAddress,
-            to: [email],
-            subject,
-            html,
-          }),
-        });
-        console.log(`Welcome email sent to existing user: ${email}`);
+          console.log(`Sending welcome email from ${fromAddress} to existing user ${email}`);
+
+          const emailResponse = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: fromAddress,
+              to: [email],
+              subject,
+              html,
+            }),
+          });
+
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json();
+            console.log(`Welcome email sent to existing user ${email}. ID: ${emailResult.id}`);
+          } else {
+            const errorText = await emailResponse.text();
+            console.error(`Failed to send email to existing user ${email}:`, errorText);
+          }
+        } else {
+          console.warn("RESEND_API_KEY not configured - email not sent");
+        }
+      } else if (linkError) {
+        console.error("Error generating password reset link for existing user:", linkError);
       }
 
     } else {
@@ -532,45 +552,61 @@ Deno.serve(async (req) => {
         .insert({ user_id: userId, tenant_id: tenantId });
 
       // Generate password reset link for user to set their own password
+      // Use a fallback URL if tenant slug is not available
+      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
+      console.log(`Generating password reset link for ${email} with redirect to ${baseUrl}/reset-password`);
+      
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
-          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+          redirectTo: `${baseUrl}/reset-password`,
         },
       });
 
       if (linkError) {
         console.error("Error generating password reset link:", linkError);
-      } else if (linkData?.properties?.action_link && RESEND_API_KEY) {
-        // Send branded welcome email with password reset link
-        const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
+      } else if (linkData?.properties?.action_link) {
+        console.log(`Password reset link generated successfully for ${email}`);
         
-        const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
-        const senderEmail = branding?.email_sender_address;
-        const fromAddress = senderEmail && senderEmail.includes('@') 
-          ? `${senderName} <${senderEmail}>`
-          : `${senderName} <support@lyta.ch>`;
+        if (RESEND_API_KEY) {
+          // Send branded welcome email with password reset link
+          const { subject, html } = generateWelcomeEmail(clientName, linkData.properties.action_link, branding, tenant.name);
+          
+          const senderName = branding?.email_sender_name || branding?.display_name || tenant.name;
+          const senderEmail = branding?.email_sender_address;
+          const fromAddress = senderEmail && senderEmail.includes('@') 
+            ? `${senderName} <${senderEmail}>`
+            : `${senderName} <support@lyta.ch>`;
 
-        const emailResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: fromAddress,
-            to: [email],
-            subject,
-            html,
-          }),
-        });
+          console.log(`Sending welcome email from ${fromAddress} to ${email}`);
 
-        if (emailResponse.ok) {
-          console.log(`Welcome email with password reset link sent to: ${email}`);
+          const emailResponse = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: fromAddress,
+              to: [email],
+              subject,
+              html,
+            }),
+          });
+
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json();
+            console.log(`Welcome email sent successfully to ${email}. ID: ${emailResult.id}`);
+          } else {
+            const errorText = await emailResponse.text();
+            console.error(`Failed to send email to ${email}:`, errorText);
+          }
         } else {
-          console.error("Failed to send email:", await emailResponse.text());
+          console.warn("RESEND_API_KEY not configured - email not sent");
         }
+      } else {
+        console.warn("No action link generated for password reset");
       }
     }
 
