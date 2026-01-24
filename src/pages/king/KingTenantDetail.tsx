@@ -20,7 +20,8 @@ import {
   X,
   Mail,
   CreditCard,
-  Calendar
+  Calendar,
+  RotateCcw
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +69,9 @@ export default function KingTenantDetail() {
   const [newNotificationEmail, setNewNotificationEmail] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const [brandingData, setBrandingData] = useState({
     logo_url: "",
@@ -1056,6 +1060,116 @@ export default function KingTenantDetail() {
                 >
                   {tenantData.status === 'suspended' ? 'Réactiver' : 'Suspendre'}
                 </Button>
+              </div>
+
+              {/* Reset Tenant Data */}
+              <div className="p-4 border border-amber-500/50 rounded-lg bg-amber-500/5">
+                <div className="flex items-start gap-4">
+                  <RotateCcw className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <p className="font-medium text-amber-600">Remettre à zéro les données</p>
+                      <p className="text-sm text-muted-foreground">
+                        Supprimer toutes les données métier (clients, collaborateurs, contrats, commissions, documents, suivis)
+                        tout en conservant la structure du tenant, ses utilisateurs et sa configuration.
+                      </p>
+                    </div>
+                    <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="border-amber-500 text-amber-600 hover:bg-amber-500/10">
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Remettre à zéro
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remettre à zéro {tenant.name} ?</AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-4">
+                            <p>
+                              Cette action va supprimer <strong>toutes les données métier</strong> :
+                            </p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>Clients, collaborateurs et partenaires</li>
+                              <li>Contrats et polices d'assurance</li>
+                              <li>Commissions et décomptes</li>
+                              <li>Documents et fichiers</li>
+                              <li>Suivis et réclamations</li>
+                            </ul>
+                            <p className="text-sm font-medium pt-2">
+                              ✓ La configuration du tenant, les utilisateurs système et le branding seront conservés.
+                            </p>
+                            <div className="pt-4">
+                              <Label htmlFor="confirm-reset" className="text-foreground">
+                                Tapez <strong>{tenant.name}</strong> pour confirmer
+                              </Label>
+                              <Input
+                                id="confirm-reset"
+                                className="mt-2"
+                                placeholder={tenant.name}
+                                value={resetConfirmation}
+                                onChange={(e) => setResetConfirmation(e.target.value)}
+                              />
+                            </div>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setResetConfirmation("")}>
+                            Annuler
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            className="bg-amber-600 text-white hover:bg-amber-700"
+                            disabled={resetConfirmation.toLowerCase() !== tenant.name.toLowerCase() || isResetting}
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              if (resetConfirmation.toLowerCase() !== tenant.name.toLowerCase()) {
+                                return;
+                              }
+                              
+                              setIsResetting(true);
+                              try {
+                                const response = await supabase.functions.invoke('reset-tenant-data', {
+                                  body: {
+                                    tenant_id: tenantId,
+                                    confirmation_name: resetConfirmation,
+                                    reset_all: true,
+                                  },
+                                });
+
+                                if (response.error) {
+                                  throw new Error(response.error.message || "Erreur de remise à zéro");
+                                }
+
+                                const deletedCounts = response.data?.deleted_counts || {};
+                                const totalDeleted = Object.values(deletedCounts).reduce((sum: number, count: any) => sum + (count || 0), 0);
+
+                                toast({
+                                  title: "Données remises à zéro",
+                                  description: `${totalDeleted} enregistrements supprimés.`,
+                                });
+                                
+                                // Refresh stats
+                                queryClient.invalidateQueries({ queryKey: ['king-tenant-stats', tenantId] });
+                                setResetDialogOpen(false);
+                              } catch (error: any) {
+                                console.error('Reset tenant error:', error);
+                                toast({
+                                  title: "Erreur",
+                                  description: error.message || "Impossible de remettre à zéro.",
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                setIsResetting(false);
+                                setResetConfirmation("");
+                              }
+                            }}
+                          >
+                            {isResetting ? "Remise à zéro..." : "Confirmer la remise à zéro"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
               </div>
 
               {/* Delete Tenant */}
