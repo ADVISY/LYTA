@@ -48,6 +48,7 @@ import KingTenants from "./pages/king/KingTenants";
 import KingTenantDetail from "./pages/king/KingTenantDetail";
 import KingWizard from "./pages/king/KingWizard";
 import KingUsers from "./pages/king/KingUsers";
+import KingClients from "./pages/king/KingClients";
 import KingSecurity from "./pages/king/KingSecurity";
 import KingSettings from "./pages/king/KingSettings";
 import ComplianceReport from "./pages/king/ComplianceReport";
@@ -101,6 +102,7 @@ const App = () => (
                 <Route path="tenants/:tenantId" element={<KingTenantDetail />} />
                 <Route path="wizard" element={<KingWizard />} />
                 <Route path="users" element={<KingUsers />} />
+                <Route path="clients" element={<KingClients />} />
                 <Route path="security" element={<KingSecurity />} />
                 <Route path="settings" element={<KingSettings />} />
                 <Route path="compliance" element={<ComplianceReport />} />
