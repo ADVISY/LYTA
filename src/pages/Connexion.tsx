@@ -1036,12 +1036,23 @@ const Connexion = () => {
     );
   }
 
+  // Determine gradient color based on context
+  // Priority: tenant branding color > LYTA gold (for main platform)
+  const getGradientColor = () => {
+    // If we have a tenant with a custom primary color, use it
+    if (tenant?.branding?.primary_color) {
+      return tenant.branding.primary_color; // hex color like #1800AD
+    }
+    // Default to LYTA gold for the main platform
+    return "#D4A418"; // LYTA gold
+  };
+
   return (
     <MouseGradient 
       className="min-h-screen bg-background"
-      gradientColor={view === "king" ? "hsl(45 93% 47%)" : "hsl(var(--primary))"}
+      gradientColor={getGradientColor()}
       gradientSize={800}
-      intensity={0.25}
+      intensity={0.3}
     >
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
