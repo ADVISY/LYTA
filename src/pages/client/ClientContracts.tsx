@@ -54,6 +54,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 export default function ClientContracts() {
   const { clientData } = useOutletContext<{ user: any; clientData: any }>();
   const [contracts, setContracts] = useState<any[]>([]);
+  const [policyDocuments, setPolicyDocuments] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -78,8 +79,61 @@ export default function ClientContracts() {
       .eq('client_id', clientData.id)
       .order('created_at', { ascending: false });
     
-    if (data) setContracts(data);
+    if (data) {
+      setContracts(data);
+      
+      // Fetch policy documents for each contract
+      const policyIds = data.map(c => c.id) as string[];
+      if (policyIds.length > 0) {
+        const { data: docs } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('owner_type', 'policy')
+          .in('owner_id', policyIds)
+          .or('document_type.eq.police,document_type.eq.police_assurance,document_type.ilike.%Police%');
+        
+        if (docs) {
+          const docsMap: Record<string, any> = {};
+          docs.forEach(doc => {
+            // Store the first matching document per policy
+            if (!docsMap[doc.owner_id]) {
+              docsMap[doc.owner_id] = doc;
+            }
+          });
+          setPolicyDocuments(docsMap);
+        }
+      }
+    }
     setLoading(false);
+  };
+
+  const handleViewDocument = async (doc: any) => {
+    if (!doc?.file_path) return;
+    
+    const { data } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_path, 3600);
+    
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    }
+  };
+
+  const handleDownloadDocument = async (doc: any) => {
+    if (!doc?.file_path) return;
+    
+    const { data } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_path, 3600);
+    
+    if (data?.signedUrl) {
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = doc.file_name || 'police-assurance.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -273,16 +327,34 @@ export default function ClientContracts() {
                         )}
                       </div>
                       
-                      {/* Actions */}
+                      {/* Actions - Policy Document */}
                       <div className="flex gap-2 mt-6 pt-4 border-t">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Eye className="h-4 w-4" />
-                          Voir le document
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Download className="h-4 w-4" />
-                          Télécharger
-                        </Button>
+                        {policyDocuments[contract.id] ? (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="gap-2"
+                              onClick={() => handleViewDocument(policyDocuments[contract.id])}
+                            >
+                              <Eye className="h-4 w-4" />
+                              Voir la police
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="gap-2"
+                              onClick={() => handleDownloadDocument(policyDocuments[contract.id])}
+                            >
+                              <Download className="h-4 w-4" />
+                              Télécharger
+                            </Button>
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            Aucune police d'assurance disponible
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </CollapsibleContent>
