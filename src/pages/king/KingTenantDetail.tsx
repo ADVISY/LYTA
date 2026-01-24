@@ -66,6 +66,8 @@ export default function KingTenantDetail() {
     contract_notification_emails: [] as string[],
   });
   const [newNotificationEmail, setNewNotificationEmail] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [brandingData, setBrandingData] = useState({
     logo_url: "",
@@ -1027,42 +1029,130 @@ export default function KingTenantDetail() {
             <CardHeader>
               <CardTitle className="text-destructive">Zone de danger</CardTitle>
               <CardDescription>
-                Actions irréversibles
+                Actions irréversibles - Procédez avec précaution
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer ce tenant
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Cette action est irréversible. Toutes les données associées à ce tenant 
-                      seront définitivement supprimées (utilisateurs, clients, contrats, etc.).
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annuler</AlertDialogCancel>
-                    <AlertDialogAction 
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      onClick={() => {
-                        toast({
-                          title: "Non implémenté",
-                          description: "La suppression de tenant n'est pas encore disponible.",
-                          variant: "destructive",
-                        });
-                      }}
-                    >
-                      Supprimer définitivement
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+            <CardContent className="space-y-6">
+              {/* Suspend Access */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Suspendre l'accès</p>
+                  <p className="text-sm text-muted-foreground">
+                    Bloquer temporairement l'accès au CRM pour ce tenant
+                  </p>
+                </div>
+                <Button
+                  variant={tenantData.status === 'suspended' ? 'default' : 'outline'}
+                  onClick={() => {
+                    const newStatus = tenantData.status === 'suspended' ? 'active' : 'suspended';
+                    setTenantData({ ...tenantData, status: newStatus });
+                    updateTenant.mutate({ ...tenantData, status: newStatus });
+                  }}
+                >
+                  {tenantData.status === 'suspended' ? 'Réactiver' : 'Suspendre'}
+                </Button>
+              </div>
+
+              {/* Delete Tenant */}
+              <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/5">
+                <div className="flex items-start gap-4">
+                  <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <p className="font-medium text-destructive">Supprimer définitivement</p>
+                      <p className="text-sm text-muted-foreground">
+                        Cette action supprimera toutes les données : utilisateurs, clients, contrats, 
+                        commissions, documents. Cette action est irréversible.
+                      </p>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Supprimer ce tenant
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer {tenant.name} ?</AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-4">
+                            <p>
+                              Cette action est <strong>irréversible</strong>. Toutes les données 
+                              associées seront définitivement supprimées :
+                            </p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>{stats?.users || 0} utilisateurs</li>
+                              <li>{stats?.clients || 0} clients</li>
+                              <li>{stats?.policies || 0} contrats</li>
+                              <li>Tous les documents, commissions, suivis...</li>
+                            </ul>
+                            <div className="pt-4">
+                              <Label htmlFor="confirm-name" className="text-foreground">
+                                Tapez <strong>{tenant.name}</strong> pour confirmer
+                              </Label>
+                              <Input
+                                id="confirm-name"
+                                className="mt-2"
+                                placeholder={tenant.name}
+                                value={deleteConfirmation}
+                                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                              />
+                            </div>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setDeleteConfirmation("")}>
+                            Annuler
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={deleteConfirmation.toLowerCase() !== tenant.name.toLowerCase() || isDeleting}
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              if (deleteConfirmation.toLowerCase() !== tenant.name.toLowerCase()) {
+                                return;
+                              }
+                              
+                              setIsDeleting(true);
+                              try {
+                                const { data: session } = await supabase.auth.getSession();
+                                const response = await supabase.functions.invoke('delete-tenant', {
+                                  body: {
+                                    tenant_id: tenantId,
+                                    confirmation_name: deleteConfirmation,
+                                  },
+                                });
+
+                                if (response.error) {
+                                  throw new Error(response.error.message || "Erreur de suppression");
+                                }
+
+                                toast({
+                                  title: "Tenant supprimé",
+                                  description: `${tenant.name} a été supprimé avec succès.`,
+                                });
+                                navigate('/king/tenants');
+                              } catch (error: any) {
+                                console.error('Delete tenant error:', error);
+                                toast({
+                                  title: "Erreur",
+                                  description: error.message || "Impossible de supprimer le tenant.",
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                setIsDeleting(false);
+                                setDeleteConfirmation("");
+                              }
+                            }}
+                          >
+                            {isDeleting ? "Suppression..." : "Supprimer définitivement"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
