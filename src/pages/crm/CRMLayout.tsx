@@ -38,6 +38,7 @@ import { LanguageSelector } from "@/components/ui/language-selector";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import { SoundToggle } from "@/components/crm/SoundToggle";
+import { MouseGradient } from "@/components/ui/mouse-gradient";
 
 interface MenuItem {
   to: string;
@@ -187,8 +188,17 @@ export default function CRMLayout() {
     </div>
   );
 
+  // Get tenant primary color for gradient
+  const gradientColor = tenant?.branding?.primary_color || "#D4A418";
+
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
+    <MouseGradient
+      className="h-screen flex bg-background overflow-hidden"
+      gradientColor={gradientColor}
+      gradientSize={1200}
+      intensity={0.3}
+      alwaysVisible={true}
+    >
       {/* Welcome Message */}
       {showWelcome && (
         <WelcomeMessage
@@ -387,6 +397,6 @@ export default function CRMLayout() {
           </div>
         </footer>
       </main>
-    </div>
+    </MouseGradient>
   );
 }
