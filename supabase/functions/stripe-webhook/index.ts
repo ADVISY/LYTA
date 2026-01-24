@@ -309,6 +309,111 @@ serve(async (req) => {
         break;
       }
 
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        logStep("Payment intent succeeded", { 
+          customerId: paymentIntent.customer,
+          amount: paymentIntent.amount
+        });
+
+        // Try to find tenant by customer ID
+        if (paymentIntent.customer) {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('id, name, stripe_customer_id')
+            .eq('stripe_customer_id', paymentIntent.customer)
+            .single();
+
+          if (tenant) {
+            // Update payment status
+            await supabaseAdmin
+              .from('tenants')
+              .update({
+                payment_status: 'paid',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', tenant.id);
+
+            logStep("Tenant payment updated via payment_intent", { tenantId: tenant.id });
+          } else {
+            // Customer exists but no tenant linked - try to find by receipt_email
+            const receiptEmail = paymentIntent.receipt_email;
+            if (receiptEmail) {
+              const { data: tenantByEmail } = await supabaseAdmin
+                .from('tenants')
+                .select('id, name')
+                .or(`email.eq.${receiptEmail},admin_email.eq.${receiptEmail}`)
+                .single();
+
+              if (tenantByEmail) {
+                await supabaseAdmin
+                  .from('tenants')
+                  .update({
+                    stripe_customer_id: paymentIntent.customer,
+                    payment_status: 'paid',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', tenantByEmail.id);
+
+                logStep("Tenant linked and updated via email", { tenantId: tenantByEmail.id });
+
+                await supabaseAdmin
+                  .from('king_notifications')
+                  .insert({
+                    title: '💳 Nouveau paiement',
+                    message: `Paiement de ${(paymentIntent.amount / 100).toFixed(2)} CHF reçu`,
+                    kind: 'payment_received',
+                    priority: 'normal',
+                    tenant_id: tenantByEmail.id,
+                    tenant_name: tenantByEmail.name,
+                    action_url: `/king/tenants/${tenantByEmail.id}`,
+                    action_label: 'Voir le tenant',
+                    metadata: {
+                      payment_intent_id: paymentIntent.id,
+                      amount: paymentIntent.amount,
+                    }
+                  });
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case 'subscription_schedule.canceled': {
+        const schedule = event.data.object;
+        logStep("Subscription schedule canceled", { 
+          customerId: schedule.customer
+        });
+
+        if (schedule.customer) {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('id, name')
+            .eq('stripe_customer_id', schedule.customer)
+            .single();
+
+          if (tenant) {
+            await supabaseAdmin
+              .from('king_notifications')
+              .insert({
+                title: '⚠️ Abonnement programmé annulé',
+                message: `Le schedule d'abonnement de ${tenant.name} a été annulé`,
+                kind: 'subscription_cancelled',
+                priority: 'normal',
+                tenant_id: tenant.id,
+                tenant_name: tenant.name,
+                action_url: `/king/tenants/${tenant.id}`,
+                action_label: 'Voir le tenant',
+                metadata: {
+                  schedule_id: schedule.id,
+                }
+              });
+          }
+        }
+        break;
+      }
+
       default:
         logStep("Unhandled event type", { type: event.type });
     }
