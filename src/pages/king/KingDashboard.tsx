@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Building2, Users, FileCheck, TrendingUp, Crown, ArrowUpRight, ArrowDownRight, DollarSign, CreditCard, AlertTriangle, ChevronRight, Target, PieChart, Bell, Activity, TrendingDown, Percent } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +12,7 @@ import { KingNotificationsInbox } from "@/components/king/KingNotificationsInbox
 import { useKingNotifications } from "@/hooks/useKingNotifications";
 import { formatDistanceToNow, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useEffect } from "react";
 
 const PLAN_COLORS: Record<TenantPlan, string> = {
   start: '#64748b',
@@ -22,7 +23,41 @@ const PLAN_COLORS: Record<TenantPlan, string> = {
 
 export default function KingDashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { unreadCount } = useKingNotifications();
+
+  // Realtime subscription to auto-refresh dashboard
+  useEffect(() => {
+    const channel = supabase
+      .channel('king-dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tenants' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['king-dashboard-stats-extended'] });
+          queryClient.invalidateQueries({ queryKey: ['king-recent-tenants'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_tenant_assignments' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['king-dashboard-stats-extended'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'policies' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['king-dashboard-stats-extended'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Stripe revenue stats
   const { data: stripeStats, isLoading: stripeLoading } = useStripeStats();
