@@ -55,6 +55,8 @@ interface TenantFormData {
   primary_color: string;
   secondary_color: string;
   display_name: string;
+  email_domain: string;
+  email_sender_name: string;
   
   // Step 3 - Security
   enable_2fa_login: boolean;
@@ -87,6 +89,8 @@ const initialFormData: TenantFormData = {
   primary_color: "#0066FF",
   secondary_color: "#1a1a2e",
   display_name: "",
+  email_domain: "",
+  email_sender_name: "",
   enable_2fa_login: false,
   enable_2fa_contract: false,
   password_min_length: 8,
@@ -183,7 +187,7 @@ export default function KingWizard() {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const runOnboarding = async (tenantId: string, slug: string, tenantName: string) => {
+  const runOnboarding = async (tenantId: string, slug: string, tenantName: string, emailDomain?: string) => {
     setIsOnboarding(true);
     try {
       const response = await supabase.functions.invoke('tenant-onboarding', {
@@ -192,6 +196,7 @@ export default function KingWizard() {
           slug: slug,
           tenant_name: tenantName,
           step: "full",
+          email_domain: emailDomain || null,
         },
       });
 
@@ -243,7 +248,11 @@ export default function KingWizard() {
       // Store tenant ID for notifications
       setCreatedTenantId(tenant.id);
 
-      // 2. Create branding
+      // 2. Create branding with email config
+      const emailSenderAddress = formData.email_domain 
+        ? `hello@${formData.email_domain.replace(/^https?:\/\//, '').replace(/^www\./, '')}`
+        : null;
+      
       await supabase
         .from('tenant_branding')
         .insert({
@@ -252,6 +261,8 @@ export default function KingWizard() {
           primary_color: formData.primary_color,
           secondary_color: formData.secondary_color,
           display_name: formData.display_name || formData.name,
+          email_sender_name: formData.email_sender_name || formData.display_name || formData.name,
+          email_sender_address: emailSenderAddress,
         });
 
       // 3. Create security settings
@@ -294,7 +305,7 @@ export default function KingWizard() {
       toast.success("Client SaaS créé avec succès!");
 
       // 5. Run automatic onboarding (DNS + Resend)
-      runOnboarding(tenant.id, formData.slug, formData.name);
+      runOnboarding(tenant.id, formData.slug, formData.name, formData.email_domain);
       
     } catch (error: any) {
       console.error("Error creating tenant:", error);
@@ -707,6 +718,56 @@ export default function KingWizard() {
                 <p className="text-xs text-muted-foreground">
                   Ce nom apparaîtra dans le header et la page de connexion
                 </p>
+              </div>
+
+              {/* Email Configuration */}
+              <div className="md:col-span-2 border-t pt-6 mt-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Mail className="h-5 w-5 text-amber-500" />
+                  <h3 className="font-semibold">Configuration Email</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Ces paramètres définissent comment les emails automatiques seront envoyés aux clients
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email_domain">Domaine email du tenant</Label>
+                    <Input
+                      id="email_domain"
+                      value={formData.email_domain}
+                      onChange={(e) => updateFormData("email_domain", e.target.value.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, ''))}
+                      placeholder="cabinet-xyz.ch"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Domaine pour l'envoi d'emails (ex: hello@cabinet-xyz.ch)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email_sender_name">Nom de l'expéditeur</Label>
+                    <Input
+                      id="email_sender_name"
+                      value={formData.email_sender_name}
+                      onChange={(e) => updateFormData("email_sender_name", e.target.value)}
+                      placeholder={formData.display_name || formData.name || "Mon Cabinet"}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Nom affiché comme expéditeur des emails
+                    </p>
+                  </div>
+                </div>
+                {formData.email_domain && (
+                  <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <p className="text-sm">
+                      <strong>📧 Adresse d'envoi:</strong>{" "}
+                      <code className="bg-muted px-2 py-0.5 rounded text-xs">
+                        {formData.email_sender_name || formData.display_name || formData.name || "Cabinet"} &lt;hello@{formData.email_domain}&gt;
+                      </code>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      ⚠️ Le domaine sera automatiquement configuré sur Resend. Le tenant devra ajouter les enregistrements DNS chez son provider.
+                    </p>
+                  </div>
+                )}
               </div>
               
               {/* Preview */}
