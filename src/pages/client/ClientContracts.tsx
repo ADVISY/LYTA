@@ -328,9 +328,9 @@ export default function ClientContracts() {
                       </div>
                       
                       {/* Actions - Policy Document */}
-                      <div className="flex gap-2 mt-6 pt-4 border-t">
+                      <div className="mt-6 pt-4 border-t">
                         {policyDocuments[contract.id] ? (
-                          <>
+                          <div className="flex gap-2">
                             <Button 
                               variant="outline" 
                               size="sm" 
@@ -349,11 +349,19 @@ export default function ClientContracts() {
                               <Download className="h-4 w-4" />
                               Télécharger
                             </Button>
-                          </>
+                          </div>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic">
-                            Aucune police d'assurance disponible
-                          </p>
+                          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
+                            <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                              <AlertCircle className="h-4 w-4 text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Document non disponible</p>
+                              <p className="text-xs text-muted-foreground">
+                                La police d'assurance sera bientôt ajoutée par votre conseiller
+                              </p>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </CardContent>
