@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, ReactNode } from "react";
-import { motion, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue } from "framer-motion";
 
 interface ReactiveGridProps {
   children?: ReactNode;
@@ -14,18 +14,15 @@ interface ReactiveGridProps {
 export function ReactiveGrid({
   children,
   className = "",
-  gridColor = "hsl(var(--primary))",
+  gridColor = "#D4A418",
   gridSize = 60,
   lineOpacity = 0.08,
-  glowIntensity = 0.3,
+  glowIntensity = 0.4,
   glowRadius = 300,
 }: ReactiveGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-
-  // Spring physics for smooth movement
-  const mouseX = useSpring(0, { stiffness: 100, damping: 25 });
-  const mouseY = useSpring(0, { stiffness: 100, damping: 25 });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -33,8 +30,8 @@ export function ReactiveGrid({
 
     const updateDimensions = () => {
       setDimensions({
-        width: container.offsetWidth,
-        height: container.offsetHeight,
+        width: container.offsetWidth || 1,
+        height: container.offsetHeight || 1,
       });
     };
 
@@ -43,8 +40,10 @@ export function ReactiveGrid({
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect();
-      mouseX.set(e.clientX - rect.left);
-      mouseY.set(e.clientY - rect.top);
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
     };
 
     container.addEventListener("mousemove", handleMouseMove);
@@ -53,11 +52,12 @@ export function ReactiveGrid({
       container.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", updateDimensions);
     };
-  }, [mouseX, mouseY]);
+  }, []);
 
-  // Generate grid lines
-  const verticalLines = Math.ceil(dimensions.width / gridSize) + 1;
-  const horizontalLines = Math.ceil(dimensions.height / gridSize) + 1;
+  // Calculate gradient position as percentages
+  const gradientCx = (mousePos.x / dimensions.width) || 0.5;
+  const gradientCy = (mousePos.y / dimensions.height) || 0.5;
+  const gradientR = glowRadius / Math.max(dimensions.width, dimensions.height, 1);
 
   return (
     <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
@@ -71,7 +71,7 @@ export function ReactiveGrid({
         <defs>
           {/* Grid pattern */}
           <pattern
-            id="grid-pattern"
+            id="reactive-grid-pattern"
             width={gridSize}
             height={gridSize}
             patternUnits="userSpaceOnUse"
@@ -86,20 +86,20 @@ export function ReactiveGrid({
           </pattern>
 
           {/* Radial gradient for glow effect */}
-          <motion.radialGradient
-            id="glow-gradient"
-            cx={useTransform(mouseX, (x) => x / dimensions.width)}
-            cy={useTransform(mouseY, (y) => y / dimensions.height)}
-            r={glowRadius / Math.max(dimensions.width, dimensions.height)}
+          <radialGradient
+            id="reactive-glow-gradient"
+            cx={gradientCx}
+            cy={gradientCy}
+            r={gradientR}
           >
             <stop offset="0%" stopColor={gridColor} stopOpacity={glowIntensity} />
             <stop offset="50%" stopColor={gridColor} stopOpacity={glowIntensity * 0.3} />
             <stop offset="100%" stopColor={gridColor} stopOpacity="0" />
-          </motion.radialGradient>
+          </radialGradient>
 
           {/* Mask for grid glow effect */}
-          <mask id="glow-mask">
-            <rect width="100%" height="100%" fill="url(#glow-gradient)" />
+          <mask id="reactive-glow-mask">
+            <rect width="100%" height="100%" fill="url(#reactive-glow-gradient)" />
           </mask>
         </defs>
 
@@ -107,7 +107,7 @@ export function ReactiveGrid({
         <rect
           width="100%"
           height="100%"
-          fill="url(#grid-pattern)"
+          fill="url(#reactive-grid-pattern)"
           className="text-foreground"
         />
 
@@ -115,36 +115,20 @@ export function ReactiveGrid({
         <rect
           width="100%"
           height="100%"
-          fill="url(#grid-pattern)"
-          mask="url(#glow-mask)"
+          fill="url(#reactive-grid-pattern)"
+          mask="url(#reactive-glow-mask)"
           style={{ color: gridColor }}
         />
 
-        {/* Intersection dots that glow near cursor */}
-        <g>
-          {Array.from({ length: verticalLines }).map((_, i) => (
-            Array.from({ length: horizontalLines }).map((_, j) => (
-              <motion.circle
-                key={`${i}-${j}`}
-                cx={i * gridSize}
-                cy={j * gridSize}
-                r="1.5"
-                fill={gridColor}
-                style={{
-                  opacity: useTransform(
-                    [mouseX, mouseY],
-                    ([mx, my]) => {
-                      const dx = (i * gridSize) - (mx as number);
-                      const dy = (j * gridSize) - (my as number);
-                      const distance = Math.sqrt(dx * dx + dy * dy);
-                      return Math.max(0, 1 - distance / glowRadius) * glowIntensity;
-                    }
-                  ),
-                }}
-              />
-            ))
-          )).flat()}
-        </g>
+        {/* Glow circle at mouse position */}
+        <circle
+          cx={mousePos.x}
+          cy={mousePos.y}
+          r={glowRadius * 0.15}
+          fill={gridColor}
+          opacity={glowIntensity * 0.15}
+          style={{ transition: "cx 0.1s ease-out, cy 0.1s ease-out" }}
+        />
       </svg>
 
       {/* Content */}
