@@ -15,6 +15,7 @@ interface OnboardingRequest {
   slug: string;
   tenant_name: string;
   step: "dns" | "resend" | "full";
+  email_domain?: string | null; // Custom email domain for the tenant
 }
 
 interface NotificationPayload {
@@ -125,12 +126,10 @@ async function createCloudflareDNS(slug: string): Promise<{ success: boolean; me
 }
 
 // Add domain to Resend for email sending
-async function addResendDomain(slug: string): Promise<{ success: boolean; message: string; domain_id?: string; records?: unknown[] }> {
+async function addResendDomain(domain: string): Promise<{ success: boolean; message: string; domain_id?: string; records?: unknown[]; is_custom_domain?: boolean }> {
   if (!RESEND_API_KEY) {
     return { success: false, message: "Resend API key not configured" };
   }
-
-  const domain = `${slug}.lyta.ch`;
 
   try {
     // First check if domain already exists
@@ -150,7 +149,8 @@ async function addResendDomain(slug: string): Promise<{ success: boolean; messag
           success: true, 
           message: `Domain ${domain} already configured in Resend`,
           domain_id: existingDomain.id,
-          records: existingDomain.records
+          records: existingDomain.records,
+          is_custom_domain: true
         };
       }
     }
@@ -175,7 +175,8 @@ async function addResendDomain(slug: string): Promise<{ success: boolean; messag
         success: true, 
         message: `Domain ${domain} added to Resend. DNS records need to be configured.`,
         domain_id: createData.id,
-        records: createData.records
+        records: createData.records,
+        is_custom_domain: true
       };
     } else {
       console.error("Resend domain error:", createData);
@@ -294,7 +295,7 @@ serve(async (req) => {
       throw new Error("Unauthorized: Only KING users can run onboarding");
     }
 
-    const { tenant_id, slug, tenant_name, step }: OnboardingRequest = await req.json();
+    const { tenant_id, slug, tenant_name, step, email_domain }: OnboardingRequest = await req.json();
 
     if (!tenant_id || !slug || !tenant_name) {
       throw new Error("Missing required fields: tenant_id, slug, tenant_name");
@@ -304,10 +305,11 @@ serve(async (req) => {
       tenant_id,
       slug,
       tenant_name,
+      email_domain: email_domain || null,
       steps: [],
     };
 
-    // Step 1: DNS Configuration
+    // Step 1: DNS Configuration (for lyta.ch subdomain)
     if (step === "dns" || step === "full") {
       await createKingNotification(supabase, {
         title: "🌐 Configuration DNS en cours",
@@ -336,24 +338,60 @@ serve(async (req) => {
 
     // Step 2: Resend Domain Configuration
     if (step === "resend" || step === "full") {
+      // Use custom email domain if provided, otherwise fallback to slug.lyta.ch
+      const resendDomain = email_domain || `${slug}.lyta.ch`;
+      const isCustomDomain = !!email_domain;
+      
       await createKingNotification(supabase, {
         title: "📧 Configuration email en cours",
-        message: `Ajout du domaine ${slug}.lyta.ch sur Resend...`,
+        message: `Ajout du domaine ${resendDomain} sur Resend...`,
         kind: "info",
         priority: "high",
         tenant_id,
         tenant_name,
-        metadata: { step: "resend", status: "in_progress" },
+        metadata: { step: "resend", status: "in_progress", domain: resendDomain, is_custom: isCustomDomain },
       });
 
-      const resendResult = await addResendDomain(slug);
+      const resendResult = await addResendDomain(resendDomain);
       results.resend = resendResult;
       (results.steps as string[]).push("resend");
 
-      if (resendResult.success && resendResult.records && Array.isArray(resendResult.records)) {
+      // If custom domain, show DNS records that tenant needs to configure
+      if (resendResult.success && resendResult.records && Array.isArray(resendResult.records) && isCustomDomain) {
+        // For custom domains, we can't add DNS records automatically - tenant must do it
+        const dnsRecords = resendResult.records as Array<{ type: string; name: string; value: string }>;
+        
+        // Create notification with DNS records for tenant to configure
+        await createKingNotification(supabase, {
+          title: "📋 DNS à configurer par le tenant",
+          message: `Le tenant doit ajouter ${dnsRecords.length} enregistrements DNS chez son provider pour ${resendDomain}`,
+          kind: "warning",
+          priority: "high",
+          tenant_id,
+          tenant_name,
+          metadata: { 
+            step: "resend_dns_manual", 
+            status: "pending_tenant_action",
+            domain: resendDomain,
+            dns_records: dnsRecords.map(r => ({
+              type: r.type,
+              name: r.name,
+              value: r.value
+            }))
+          },
+        });
+        
+        results.resend_dns = { 
+          success: true, 
+          message: `${dnsRecords.length} DNS records need to be configured by tenant`,
+          requires_tenant_action: true,
+          records: dnsRecords
+        };
+      } else if (resendResult.success && resendResult.records && Array.isArray(resendResult.records)) {
+        // For lyta.ch subdomain, we can add DNS records automatically
         await createKingNotification(supabase, {
           title: "📋 Configuration DNS email",
-          message: `Ajout des enregistrements SPF, DKIM, DMARC pour ${slug}.lyta.ch...`,
+          message: `Ajout des enregistrements SPF, DKIM, DMARC pour ${resendDomain}...`,
           kind: "info",
           priority: "normal",
           tenant_id,
@@ -361,7 +399,6 @@ serve(async (req) => {
           metadata: { step: "resend_dns", status: "in_progress" },
         });
 
-        // Add the Resend DNS records to Cloudflare
         const dnsRecords = resendResult.records as Array<{ type: string; name: string; value: string }>;
         const resendDnsResult = await addResendDNSRecords(slug, dnsRecords);
         results.resend_dns = resendDnsResult;
@@ -384,7 +421,12 @@ serve(async (req) => {
         priority: "high",
         tenant_id,
         tenant_name,
-        metadata: { step: "resend", status: resendResult.success ? "completed" : "failed", result: resendResult },
+        metadata: { 
+          step: "resend", 
+          status: resendResult.success ? "completed" : "failed", 
+          result: resendResult,
+          is_custom_domain: isCustomDomain
+        },
       });
     }
 
