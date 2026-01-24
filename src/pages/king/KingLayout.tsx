@@ -144,7 +144,7 @@ export default function KingLayout() {
         <aside className="hidden lg:flex flex-col bg-card border-r border-border">
           {/* Logo Section */}
           <div className="w-72 p-6 border-b border-border">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-center gap-3">
               <img 
                 src={lytaLogo} 
                 alt="LYTA" 
