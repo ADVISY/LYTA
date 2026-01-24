@@ -144,13 +144,12 @@ export default function KingLayout() {
         <aside className="hidden lg:flex flex-col h-screen sticky top-0 bg-card border-r border-border">
           {/* Logo Section */}
           <div className="w-72 p-6 border-b border-border">
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center">
               <img 
                 src={lytaLogo} 
                 alt="LYTA" 
                 className="h-14 object-contain"
               />
-              <ThemeToggle />
             </div>
             <div className="flex items-center justify-center gap-2 mt-3">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
@@ -218,6 +217,7 @@ export default function KingLayout() {
                       <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
                       <p className="text-xs text-amber-600 font-semibold">KING LYTA</p>
                     </div>
+                    <ThemeToggle />
                   </div>
                   <Button
                     variant="outline"
