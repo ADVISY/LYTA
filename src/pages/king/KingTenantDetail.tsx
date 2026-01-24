@@ -21,7 +21,8 @@ import {
   Mail,
   CreditCard,
   Calendar,
-  RotateCcw
+  RotateCcw,
+  Download
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +73,7 @@ export default function KingTenantDetail() {
   const [resetConfirmation, setResetConfirmation] = useState("");
   const [isResetting, setIsResetting] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [brandingData, setBrandingData] = useState({
     logo_url: "",
@@ -1060,6 +1062,106 @@ export default function KingTenantDetail() {
                 >
                   {tenantData.status === 'suspended' ? 'Réactiver' : 'Suspendre'}
                 </Button>
+              </div>
+
+              {/* Export Data */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Exporter les données</p>
+                  <p className="text-sm text-muted-foreground">
+                    Télécharger une sauvegarde CSV de toutes les données du tenant
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={isExporting}
+                    onClick={async () => {
+                      setIsExporting(true);
+                      try {
+                        const response = await supabase.functions.invoke('export-tenant-data', {
+                          body: { tenant_id: tenantId, format: 'csv' },
+                        });
+
+                        if (response.error) {
+                          throw new Error(response.error.message || "Erreur d'export");
+                        }
+
+                        // Create download link
+                        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${tenant?.slug}-export-${new Date().toISOString().split('T')[0]}.csv`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+
+                        toast({
+                          title: "Export terminé",
+                          description: "Le fichier CSV a été téléchargé.",
+                        });
+                      } catch (error: any) {
+                        console.error('Export error:', error);
+                        toast({
+                          title: "Erreur",
+                          description: error.message || "Impossible d'exporter les données.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isExporting ? "Export..." : "CSV"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={isExporting}
+                    onClick={async () => {
+                      setIsExporting(true);
+                      try {
+                        const response = await supabase.functions.invoke('export-tenant-data', {
+                          body: { tenant_id: tenantId, format: 'json' },
+                        });
+
+                        if (response.error) {
+                          throw new Error(response.error.message || "Erreur d'export");
+                        }
+
+                        // Create download link
+                        const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${tenant?.slug}-export-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+
+                        toast({
+                          title: "Export terminé",
+                          description: "Le fichier JSON a été téléchargé.",
+                        });
+                      } catch (error: any) {
+                        console.error('Export error:', error);
+                        toast({
+                          title: "Erreur",
+                          description: error.message || "Impossible d'exporter les données.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isExporting ? "Export..." : "JSON"}
+                  </Button>
+                </div>
               </div>
 
               {/* Reset Tenant Data */}
