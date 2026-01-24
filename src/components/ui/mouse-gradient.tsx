@@ -7,6 +7,7 @@ interface MouseGradientProps {
   gradientColor?: string;
   gradientSize?: number;
   intensity?: number;
+  alwaysVisible?: boolean;
 }
 
 export function MouseGradient({
@@ -15,13 +16,15 @@ export function MouseGradient({
   gradientColor = "hsl(var(--primary))",
   gradientSize = 600,
   intensity = 0.15,
+  alwaysVisible = true,
 }: MouseGradientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Spring physics for smooth movement
-  const mouseX = useSpring(0, { stiffness: 150, damping: 20 });
-  const mouseY = useSpring(0, { stiffness: 150, damping: 20 });
+  const mouseX = useSpring(50, { stiffness: 150, damping: 20 });
+  const mouseY = useSpring(50, { stiffness: 150, damping: 20 });
 
   // Transform to percentage for CSS
   const gradientX = useTransform(mouseX, (v) => `${v}%`);
@@ -37,11 +40,17 @@ export function MouseGradient({
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       mouseX.set(x);
       mouseY.set(y);
+      if (!hasInteracted) setHasInteracted(true);
     };
 
     container.addEventListener("mousemove", handleMouseMove);
     return () => container.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, hasInteracted]);
+
+  // Calculate opacity: visible if alwaysVisible, more intense on hover
+  const baseOpacity = alwaysVisible ? intensity * 0.6 : 0;
+  const hoverOpacity = intensity;
+  const currentOpacity = isHovered ? hoverOpacity : baseOpacity;
 
   return (
     <div
@@ -54,7 +63,7 @@ export function MouseGradient({
       <motion.div
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
         style={{
-          opacity: isHovered ? intensity : 0,
+          opacity: currentOpacity,
           background: useTransform(
             [gradientX, gradientY],
             ([x, y]) =>

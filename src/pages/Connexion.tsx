@@ -13,6 +13,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { SmsVerificationDialog } from "@/components/auth/SmsVerificationDialog";
 import { useTranslation } from "react-i18next";
 import { LanguageSelector } from "@/components/ui/language-selector";
+import { MouseGradient } from "@/components/ui/mouse-gradient";
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
 
@@ -1036,7 +1037,12 @@ const Connexion = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <MouseGradient 
+      className="min-h-screen bg-background"
+      gradientColor={view === "king" ? "hsl(45 93% 47%)" : "hsl(var(--primary))"}
+      gradientSize={800}
+      intensity={0.25}
+    >
       <div className="absolute inset-0 bg-[url('/images/bg-pattern-gray.png')] opacity-40 pointer-events-none" />
       
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
@@ -1081,7 +1087,7 @@ const Connexion = () => {
           onCancel={handleSmsCancelled}
         />
       )}
-    </div>
+    </MouseGradient>
   );
 };
 
