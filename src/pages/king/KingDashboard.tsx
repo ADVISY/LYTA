@@ -470,55 +470,71 @@ export default function KingDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentTenants?.map((tenant) => (
-                <div
-                  key={tenant.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/king/tenants/${tenant.id}`)}
-                >
+              {recentTenants?.map((tenant) => {
+                // tenant_branding can be an object or an array depending on the query
+                const branding = Array.isArray(tenant.tenant_branding)
+                  ? tenant.tenant_branding[0]
+                  : tenant.tenant_branding;
+                const logoUrl = branding?.logo_url;
+                const primaryColor = branding?.primary_color;
+
+                return (
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{
-                      backgroundColor: tenant.tenant_branding?.[0]?.primary_color
-                        ? `${tenant.tenant_branding[0].primary_color}20`
-                        : 'hsl(var(--primary) / 0.1)'
-                    }}
+                    key={tenant.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/king/tenants/${tenant.id}`)}
                   >
-                    {tenant.tenant_branding?.[0]?.logo_url ? (
-                      <img
-                        src={tenant.tenant_branding[0].logo_url}
-                        alt={tenant.name}
-                        className="h-6 w-6 object-contain"
-                      />
-                    ) : (
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
+                      style={{
+                        backgroundColor: logoUrl
+                          ? 'transparent'
+                          : primaryColor
+                            ? `${primaryColor}20`
+                            : 'hsl(var(--primary) / 0.1)'
+                      }}
+                    >
+                      {logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt={tenant.name}
+                          className="w-full h-full object-contain p-1"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const sibling = target.nextElementSibling as HTMLElement;
+                            if (sibling) sibling.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
                       <Building2
-                        className="h-5 w-5"
+                        className={`h-5 w-5 ${logoUrl ? 'hidden' : ''}`}
                         style={{
-                          color: tenant.tenant_branding?.[0]?.primary_color || 'hsl(var(--primary))'
+                          color: primaryColor || 'hsl(var(--primary))'
                         }}
                       />
-                    )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{tenant.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(tenant.created_at), { addSuffix: true, locale: fr })}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        tenant.status === 'active'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-0'
+                          : tenant.status === 'pending'
+                          ? 'bg-orange-500/10 text-orange-600 border-0'
+                          : 'bg-blue-500/10 text-blue-600 border-0'
+                      }
+                    >
+                      {tenant.status === 'active' ? 'Actif' : tenant.status === 'pending' ? 'En attente' : 'Test'}
+                    </Badge>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{tenant.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(tenant.created_at), { addSuffix: true, locale: fr })}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={
-                      tenant.status === 'active'
-                        ? 'bg-emerald-500/10 text-emerald-600 border-0'
-                        : tenant.status === 'pending'
-                        ? 'bg-orange-500/10 text-orange-600 border-0'
-                        : 'bg-blue-500/10 text-blue-600 border-0'
-                    }
-                  >
-                    {tenant.status === 'active' ? 'Actif' : tenant.status === 'pending' ? 'En attente' : 'Test'}
-                  </Badge>
-                </div>
-              ))}
+                );
+              })}
               <Button
                 variant="outline"
                 className="w-full"

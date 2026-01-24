@@ -150,15 +150,20 @@ export default function KingTenantDetail() {
         contract_notification_emails: tenant.contract_notification_emails || [],
       });
 
-      if (tenant.tenant_branding?.[0]) {
+      // tenant_branding can be an object or an array depending on the query
+      const branding = Array.isArray(tenant.tenant_branding) 
+        ? tenant.tenant_branding[0] 
+        : tenant.tenant_branding;
+      
+      if (branding) {
         setBrandingData({
-          logo_url: tenant.tenant_branding[0].logo_url || "",
-          primary_color: tenant.tenant_branding[0].primary_color || "#0066FF",
-          secondary_color: tenant.tenant_branding[0].secondary_color || "#1a1a2e",
-          display_name: tenant.tenant_branding[0].display_name || "",
-          email_sender_name: tenant.tenant_branding[0].email_sender_name || "",
-          email_sender_address: tenant.tenant_branding[0].email_sender_address || "",
-          claims_notification_email: tenant.tenant_branding[0].claims_notification_email || "",
+          logo_url: branding.logo_url || "",
+          primary_color: branding.primary_color || "#0066FF",
+          secondary_color: branding.secondary_color || "#1a1a2e",
+          display_name: branding.display_name || "",
+          email_sender_name: branding.email_sender_name || "",
+          email_sender_address: branding.email_sender_address || "",
+          claims_notification_email: branding.claims_notification_email || "",
         });
       }
 
