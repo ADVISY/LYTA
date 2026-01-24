@@ -248,6 +248,8 @@ export default function KingTenants() {
             <div className="space-y-4">
               {filteredTenants.map((tenant) => {
                 const stats: TenantStats = tenantsStats?.[tenant.id] || { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0, active_users: 0 };
+                const logoUrl = tenant.tenant_branding?.[0]?.logo_url;
+                const primaryColor = tenant.tenant_branding?.[0]?.primary_color;
                 
                 return (
                   <div
@@ -257,27 +259,30 @@ export default function KingTenants() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-4">
                         <div 
-                          className="w-12 h-12 rounded-lg flex items-center justify-center"
+                          className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden"
                           style={{ 
-                            backgroundColor: tenant.tenant_branding?.[0]?.primary_color 
-                              ? `${tenant.tenant_branding[0].primary_color}20` 
+                            backgroundColor: primaryColor 
+                              ? `${primaryColor}20` 
                               : 'hsl(var(--primary) / 0.1)' 
                           }}
                         >
-                          {tenant.tenant_branding?.[0]?.logo_url ? (
+                          {logoUrl ? (
                             <img 
-                              src={tenant.tenant_branding[0].logo_url} 
+                              src={logoUrl} 
                               alt={tenant.name}
                               className="h-8 w-8 object-contain"
-                            />
-                          ) : (
-                            <Building2 
-                              className="h-6 w-6" 
-                              style={{ 
-                                color: tenant.tenant_branding?.[0]?.primary_color || 'hsl(var(--primary))' 
+                              onError={(e) => {
+                                // Hide broken image and show fallback
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                const sibling = (e.target as HTMLImageElement).nextElementSibling;
+                                if (sibling) sibling.classList.remove('hidden');
                               }}
                             />
-                          )}
+                          ) : null}
+                          <Building2 
+                            className={`h-6 w-6 ${logoUrl ? 'hidden' : ''}`}
+                            style={{ color: primaryColor || 'hsl(var(--primary))' }}
+                          />
                         </div>
                         <div>
                           <p className="font-semibold text-lg">{tenant.name}</p>
