@@ -1049,27 +1049,19 @@ const Connexion = () => {
   };
 
   return (
-    <ReactiveGrid
+    <MouseGradient 
       className="min-h-screen bg-background"
-      gridColor={getGradientColor()}
-      gridSize={50}
-      lineOpacity={0.06}
-      glowIntensity={0.4}
-      glowRadius={250}
+      gradientColor={getGradientColor()}
+      gradientSize={1000}
+      intensity={0.5}
+      alwaysVisible={true}
     >
-      <MouseGradient 
-        className="min-h-screen"
-        gradientColor={getGradientColor()}
-        gradientSize={1000}
-        intensity={0.5}
-        alwaysVisible={true}
-      >
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-          <LanguageSelector />
-          <ThemeToggle />
-        </div>
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <LanguageSelector />
+        <ThemeToggle />
+      </div>
 
-        <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
+      <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
           {showPlatformLogo ? (
             <img src={lytaLogo} alt="Platform" className="h-24 sm:h-32 mx-auto" />
@@ -1106,8 +1098,7 @@ const Connexion = () => {
           onCancel={handleSmsCancelled}
         />
       )}
-      </MouseGradient>
-    </ReactiveGrid>
+    </MouseGradient>
   );
 };
 
