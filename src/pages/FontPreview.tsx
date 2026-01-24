@@ -39,11 +39,18 @@ const singleFonts = [
 
 const fontPairings = [
   {
+    name: "Poppins + Outfit",
+    display: { name: "Poppins", family: "'Poppins', sans-serif" },
+    body: { name: "Outfit", family: "'Outfit', sans-serif" },
+    description: "Géométrique premium avec corps contemporain",
+    recommended: true,
+    highlight: true
+  },
+  {
     name: "Outfit + Inter",
     display: { name: "Outfit", family: "'Outfit', sans-serif" },
     body: { name: "Inter", family: "'Inter', sans-serif" },
-    description: "Titres modernes et impactants, texte ultra-lisible",
-    recommended: true
+    description: "Titres modernes et impactants, texte ultra-lisible"
   },
   {
     name: "Poppins + DM Sans",
@@ -221,7 +228,7 @@ export default function FontPreview() {
                   key={pairing.name}
                   className={`cursor-pointer transition-all hover:shadow-lg ${
                     selectedPairing === pairing.name ? 'ring-2 ring-primary border-primary' : ''
-                  }`}
+                  } ${(pairing as any).highlight ? 'border-2 border-primary/50 bg-primary/5' : ''}`}
                   onClick={() => setSelectedPairing(pairing.name)}
                 >
                   <CardHeader className="pb-2">
