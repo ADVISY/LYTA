@@ -248,8 +248,12 @@ export default function KingTenants() {
             <div className="space-y-4">
               {filteredTenants.map((tenant) => {
                 const stats: TenantStats = tenantsStats?.[tenant.id] || { clients: 0, collaborateurs: 0, policies: 0, commissions_total: 0, active_users: 0 };
-                const logoUrl = tenant.tenant_branding?.[0]?.logo_url;
-                const primaryColor = tenant.tenant_branding?.[0]?.primary_color;
+                // tenant_branding can be an object or an array depending on the query
+                const branding = Array.isArray(tenant.tenant_branding) 
+                  ? tenant.tenant_branding[0] 
+                  : tenant.tenant_branding;
+                const logoUrl = branding?.logo_url;
+                const primaryColor = branding?.primary_color;
                 
                 return (
                   <div
