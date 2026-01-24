@@ -31,6 +31,7 @@ interface PlatformUser {
   created_at: string;
   roles: string[];
   tenants: { id: string; name: string }[];
+  hasClientAccess: boolean;
 }
 
 const roleConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -80,6 +81,15 @@ export default function KingUsers() {
       .select("user_id, tenant:tenants(id, name)")
       .in("user_id", userIds);
 
+    // Fetch client roles for these users (to check if they also have client access)
+    const { data: clientRoles } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "client")
+      .in("user_id", userIds);
+
+    const usersWithClientAccess = new Set(clientRoles?.map((cr) => cr.user_id) || []);
+
     // Build user objects
     const usersMap = new Map<string, PlatformUser>();
 
@@ -92,6 +102,7 @@ export default function KingUsers() {
         created_at: profile.created_at,
         roles: [],
         tenants: [],
+        hasClientAccess: usersWithClientAccess.has(profile.id),
       });
     });
 
@@ -147,6 +158,7 @@ export default function KingUsers() {
   const otherCount = users.filter(
     (u) => !u.roles.includes("king") && !u.roles.includes("admin")
   ).length;
+  const clientAccessCount = users.filter((u) => u.hasClientAccess).length;
 
   return (
     <div className="space-y-6">
@@ -158,7 +170,7 @@ export default function KingUsers() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -196,6 +208,20 @@ export default function KingUsers() {
               <div>
                 <p className="text-2xl font-bold">{otherCount}</p>
                 <p className="text-sm text-muted-foreground">Collaborateurs</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{clientAccessCount}</p>
+                <p className="text-sm text-muted-foreground">Avec espace client</p>
               </div>
             </div>
           </CardContent>
