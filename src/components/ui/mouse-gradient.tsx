@@ -113,12 +113,12 @@ export function MouseGradient({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Animated gradient overlay - above background, below content */}
+      {/* Animated gradient overlay - fixed behind all content */}
       <motion.div
         className="pointer-events-none fixed inset-0 transition-opacity duration-500"
         style={{
           opacity: currentOpacity,
-          zIndex: 1,
+          zIndex: -1,
           background: useTransform(
             [gradientX, gradientY],
             ([x, y]) =>
@@ -127,10 +127,8 @@ export function MouseGradient({
         }}
       />
 
-      {/* Content - above gradient */}
-      <div className="relative" style={{ zIndex: 2 }}>
-        {children}
-      </div>
+      {/* Content - no z-index manipulation */}
+      {children}
     </div>
   );
 }
