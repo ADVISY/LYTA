@@ -109,15 +109,16 @@ export function MouseGradient({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden ${className}`}
+      className={`relative ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Animated gradient overlay */}
+      {/* Animated gradient overlay - fixed position to avoid layout issues */}
       <motion.div
-        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
+        className="pointer-events-none fixed inset-0 transition-opacity duration-500"
         style={{
           opacity: currentOpacity,
+          zIndex: 0,
           background: useTransform(
             [gradientX, gradientY],
             ([x, y]) =>
@@ -126,8 +127,8 @@ export function MouseGradient({
         }}
       />
 
-      {/* Content */}
-      <div className="relative z-10">{children}</div>
+      {/* Content - no z-index manipulation */}
+      {children}
     </div>
   );
 }
