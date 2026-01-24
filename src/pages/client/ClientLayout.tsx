@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { MouseGradient } from "@/components/ui/mouse-gradient";
 import { 
   Home, 
   FileText, 
@@ -202,8 +203,17 @@ export default function ClientLayout() {
     </div>
   );
 
+  // Get tenant primary color for gradient
+  const gradientColor = tenant?.branding?.primary_color || "#D4A418";
+
   return (
-    <div className="min-h-screen flex bg-background">
+    <MouseGradient
+      className="min-h-screen flex bg-background"
+      gradientColor={gradientColor}
+      gradientSize={1200}
+      intensity={0.3}
+      alwaysVisible={true}
+    >
       {/* Desktop Sidebar */}
       <TooltipProvider>
         <aside className="hidden lg:flex flex-col bg-card border-r border-border">
@@ -435,6 +445,6 @@ export default function ClientLayout() {
           <Outlet context={{ user, clientData, advisorData }} />
         </div>
       </main>
-    </div>
+    </MouseGradient>
   );
 }
