@@ -138,10 +138,10 @@ export default function KingLayout() {
   );
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <TooltipProvider>
-        <aside className="hidden lg:flex flex-col bg-card border-r border-border">
+        <aside className="hidden lg:flex flex-col h-screen sticky top-0 bg-card border-r border-border">
           {/* Logo Section */}
           <div className="w-72 p-6 border-b border-border">
             <div className="flex flex-col items-center gap-3">
@@ -278,7 +278,7 @@ export default function KingLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
