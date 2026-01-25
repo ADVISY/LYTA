@@ -5,6 +5,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useTheme } from "@/hooks/useTheme";
 import { PlanModule } from "@/config/plans";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,6 +69,7 @@ export default function CRMLayout() {
   const { role, loading } = useUserRole();
   const { tenant } = useTenant();
   const { hasModule, loading: planLoading } = usePlanFeatures();
+  const { theme } = useTheme();
   useLanguage(); // Initialize language based on user/tenant preferences
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -366,7 +368,10 @@ export default function CRMLayout() {
 
       {/* Main Content - Only this area scrolls */}
       <main 
-        className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0"
+        className={cn(
+          "flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 relative",
+          theme === "dark" && "bg-background"
+        )}
         style={{
           backgroundImage: "url('/images/bg-pattern-gray.png')",
           backgroundSize: "cover",
@@ -375,7 +380,14 @@ export default function CRMLayout() {
           backgroundAttachment: "fixed"
         }}
       >
-        <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1">
+        {/* Dark mode overlay */}
+        {theme === "dark" && (
+          <div 
+            className="absolute inset-0 bg-background/85 pointer-events-none" 
+            style={{ mixBlendMode: "multiply" }}
+          />
+        )}
+        <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1 relative z-10">
           <Outlet />
         </div>
         

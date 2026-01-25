@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
@@ -40,6 +41,7 @@ const menuItems = [
 export default function KingLayout() {
   const { user, signOut } = useAuth();
   const { role, loading, isKing } = useUserRole();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -280,7 +282,10 @@ export default function KingLayout() {
 
       {/* Main Content */}
       <main 
-        className="flex-1 overflow-y-auto"
+        className={cn(
+          "flex-1 overflow-y-auto relative",
+          theme === "dark" && "bg-background"
+        )}
         style={{
           backgroundImage: "url('/images/bg-pattern-gray.png')",
           backgroundSize: "cover",
@@ -289,7 +294,14 @@ export default function KingLayout() {
           backgroundAttachment: "fixed"
         }}
       >
-        <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
+        {/* Dark mode overlay */}
+        {theme === "dark" && (
+          <div 
+            className="absolute inset-0 bg-background/85 pointer-events-none" 
+            style={{ mixBlendMode: "multiply" }}
+          />
+        )}
+        <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto relative z-10">
           <Outlet />
         </div>
       </main>
