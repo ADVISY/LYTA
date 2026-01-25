@@ -692,6 +692,30 @@ const Connexion = () => {
         }
 
         if (targetSpace === 'client') {
+          // SECURITY: Verify user actually has client access before redirecting
+          const hasClientAccess = globalRole === 'client';
+          
+          if (!hasClientAccess) {
+            // Check if user has a client record
+            const { data: clientRecord } = await supabase
+              .from('clients')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            
+            if (!clientRecord) {
+              toastRef.current({
+                title: "Accès refusé",
+                description: "Votre compte n'a pas accès à l'espace client.",
+                variant: "destructive",
+              });
+              sessionStorage.clear();
+              await supabase.auth.signOut();
+              redirectInProgress.current = false;
+              return;
+            }
+          }
+          
           navigateRef.current("/espace-client", { replace: true });
           return;
         }

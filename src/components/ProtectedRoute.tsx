@@ -93,6 +93,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
         if (!intendedSpace) {
           console.error("[ProtectedRoute] Missing intended space (force re-login)");
+          sessionStorage.clear();
+          await signOut();
           setIsAuthorized(false);
           setIsValidating(false);
           return;
@@ -100,6 +102,47 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
         const isKing = roles.includes('king');
         const hasClientRole = roles.includes('client');
+
+        // ======== CRITICAL SECURITY: STRICT SPACE VALIDATION ========
+        // Validate that the intended space matches what the user is trying to access
+        // AND that the user actually has access to that space
+        
+        // If user chose CLIENT space but is trying to access CRM or KING routes - BLOCK
+        if (intendedSpace === 'client') {
+          if (currentPath.startsWith('/crm') || currentPath.startsWith('/king')) {
+            console.error("[ProtectedRoute] SECURITY: Client space user attempting to access restricted route via URL:", currentPath);
+            sessionStorage.clear();
+            await signOut();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+        }
+        
+        // If user chose TEAM space but is trying to access CLIENT or KING routes - BLOCK
+        if (intendedSpace === 'team') {
+          if (currentPath.startsWith('/espace-client') || currentPath.startsWith('/king')) {
+            console.error("[ProtectedRoute] SECURITY: Team space user attempting to access restricted route via URL:", currentPath);
+            sessionStorage.clear();
+            await signOut();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+        }
+        
+        // If user chose KING space but is trying to access CRM or CLIENT routes - BLOCK
+        if (intendedSpace === 'king') {
+          if (currentPath.startsWith('/crm') || currentPath.startsWith('/espace-client')) {
+            console.error("[ProtectedRoute] SECURITY: King space user attempting to access restricted route via URL:", currentPath);
+            sessionStorage.clear();
+            await signOut();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+        }
+        // ======== END STRICT SPACE VALIDATION ========
 
         // ======== CRITICAL SECURITY: SMS 2FA VERIFICATION ========
         // Check if user has any role that requires 2FA
