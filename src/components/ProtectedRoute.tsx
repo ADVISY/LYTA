@@ -9,6 +9,38 @@ const ROLES_REQUIRING_2FA = ['king', 'admin', 'manager', 'agent', 'backoffice', 
 // How long a SMS verification is considered valid (in minutes)
 const SMS_VERIFICATION_VALIDITY_MINUTES = 120; // 2 hours
 
+/**
+ * Check if we're on a tenant subdomain (e.g., advisy.lyta.ch)
+ * Returns the tenant slug or null if on main platform
+ */
+function getTenantSlugFromHostname(): string | null {
+  const hostname = window.location.hostname;
+  
+  // Skip for localhost and preview domains
+  if (
+    hostname === 'localhost' ||
+    hostname.includes('lovable.app') ||
+    hostname.includes('lovableproject.com') ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname)
+  ) {
+    // Check for ?tenant= query param in dev
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('tenant');
+  }
+  
+  // Extract subdomain from hostname like "advisy.lyta.ch"
+  const parts = hostname.split('.');
+  if (parts.length >= 3) {
+    const subdomain = parts[0];
+    // Ignore common subdomains that are not tenants
+    if (subdomain !== 'www' && subdomain !== 'app' && subdomain !== 'api') {
+      return subdomain;
+    }
+  }
+  
+  return null;
+}
+
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
   const location = useLocation();
@@ -86,19 +118,68 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         const roles = (rolesData ?? []).map((r) => r.role as string);
         const currentPath = location.pathname;
 
-        // Strict space separation: the chosen space must be present
+        // ======== CRITICAL SECURITY: CROSS-DOMAIN SESSION HIJACK PREVENTION ========
+        // When user has a Supabase session from another domain (e.g., KING on app.lyta.ch),
+        // but opens a tenant subdomain (e.g., advisy.lyta.ch) in a new tab, the Supabase
+        // session cookie is shared BUT sessionStorage is NOT.
+        // This check ensures users must explicitly login on THIS domain.
+        
+        const currentTenantSlug = getTenantSlugFromHostname();
         const intendedSpace =
           sessionStorage.getItem('lyta_login_space') ||
           sessionStorage.getItem('loginTarget');
 
+        // SECURITY: If there's no intended space in sessionStorage, the user did NOT
+        // login through this domain's login flow - they have a stale cross-domain session
         if (!intendedSpace) {
-          console.error("[ProtectedRoute] Missing intended space (force re-login)");
+          console.error("[ProtectedRoute] SECURITY: No login context - possible cross-domain session. Forcing re-login.");
+          
+          // Clear the session for this domain but DON'T call signOut() 
+          // (which would affect ALL domains). Just clear local state and redirect.
           sessionStorage.clear();
-          await signOut();
+          
+          // For tenant subdomains, we need to sign out to prevent auto-redirect loops
+          if (currentTenantSlug) {
+            console.error("[ProtectedRoute] On tenant subdomain without valid login context - signing out");
+            await signOut();
+          }
+          
           setIsAuthorized(false);
           setIsValidating(false);
           return;
         }
+        
+        // SECURITY: Verify the intended space matches the current domain context
+        // If on a tenant subdomain, the user MUST have logged in with 'team' or 'client' space
+        if (currentTenantSlug) {
+          if (intendedSpace === 'king') {
+            console.error("[ProtectedRoute] SECURITY: KING user accessing tenant domain - blocking");
+            sessionStorage.clear();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+          
+          // Verify user actually belongs to THIS tenant
+          const { data: tenantCheck } = await supabase
+            .from('user_tenant_assignments')
+            .select('tenant_id, tenants!inner(slug)')
+            .eq('user_id', user.id)
+            .not('tenant_id', 'is', null)
+            .maybeSingle();
+          
+          const userTenantSlug = (tenantCheck?.tenants as any)?.slug;
+          
+          if (!userTenantSlug || userTenantSlug !== currentTenantSlug) {
+            console.error(`[ProtectedRoute] SECURITY: User tenant (${userTenantSlug}) does not match domain tenant (${currentTenantSlug})`);
+            sessionStorage.clear();
+            await signOut();
+            setIsAuthorized(false);
+            setIsValidating(false);
+            return;
+          }
+        }
+        // ======== END CROSS-DOMAIN SECURITY ========
 
         const isKing = roles.includes('king');
         const hasClientRole = roles.includes('client');
