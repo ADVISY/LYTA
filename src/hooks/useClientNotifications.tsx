@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserTenant } from '@/hooks/useUserTenant';
 
-// CRM/Team notification kinds (NOT client notifications)
-const CRM_NOTIFICATION_KINDS = ['new_contract', 'team_alert', 'task', 'reminder', 'system'];
+// Client-specific notification kinds (from clientNotifications.ts)
+const CLIENT_NOTIFICATION_KINDS = ['contract', 'document', 'invoice', 'claim', 'message'];
 
-export interface Notification {
+export interface ClientNotification {
   id: string;
   user_id: string;
   kind: string;
@@ -15,41 +14,32 @@ export interface Notification {
   payload: any;
   read_at: string | null;
   created_at: string;
-  tenant_id?: string | null;
 }
 
-export const useNotifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+export const useClientNotifications = () => {
+  const [notifications, setNotifications] = useState<ClientNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { tenantId } = useUserTenant();
 
   const fetchNotifications = async () => {
     if (!user) return;
     
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
-        .in('kind', CRM_NOTIFICATION_KINDS)
+        .in('kind', CLIENT_NOTIFICATION_KINDS)
         .order('created_at', { ascending: false })
         .limit(50);
-
-      // Filter by tenant if available
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       
       setNotifications(data || []);
       setUnreadCount((data || []).filter(n => !n.read_at).length);
     } catch (error) {
-      console.error('Error fetching CRM notifications:', error);
+      console.error('Error fetching client notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -75,18 +65,12 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      let query = supabase
+      await supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('user_id', user.id)
-        .in('kind', CRM_NOTIFICATION_KINDS)
+        .in('kind', CLIENT_NOTIFICATION_KINDS)
         .is('read_at', null);
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      await query;
       
       setNotifications(prev => 
         prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
@@ -98,16 +82,12 @@ export const useNotifications = () => {
   };
 
   useEffect(() => {
-    if (tenantId !== undefined) {
-      fetchNotifications();
-    }
-  }, [user, tenantId]);
+    fetchNotifications();
 
-  // Subscribe to real-time notifications
-  useEffect(() => {
-    if (user && tenantId) {
+    // Subscribe to real-time notifications
+    if (user) {
       const channel = supabase
-        .channel('crm-notifications-channel')
+        .channel('client-notifications-channel')
         .on(
           'postgres_changes',
           {
@@ -117,12 +97,9 @@ export const useNotifications = () => {
             filter: `user_id=eq.${user.id}`
           },
           (payload) => {
-            const newNotification = payload.new as Notification;
-            // Only add if it's a CRM notification kind and matches tenant
-            if (
-              CRM_NOTIFICATION_KINDS.includes(newNotification.kind) &&
-              (!tenantId || newNotification.tenant_id === tenantId)
-            ) {
+            const newNotification = payload.new as ClientNotification;
+            // Only add if it's a client notification kind
+            if (CLIENT_NOTIFICATION_KINDS.includes(newNotification.kind)) {
               setNotifications(prev => [newNotification, ...prev]);
               setUnreadCount(prev => prev + 1);
             }
@@ -134,7 +111,7 @@ export const useNotifications = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user, tenantId]);
+  }, [user]);
 
   return {
     notifications,

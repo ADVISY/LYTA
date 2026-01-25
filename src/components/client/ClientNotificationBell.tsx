@@ -1,6 +1,6 @@
 import { Bell, FileText, FolderOpen, AlertTriangle, MessageCircle, Receipt, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useClientNotifications } from '@/hooks/useClientNotifications';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -42,7 +42,7 @@ const getNotificationIcon = (kind: string) => {
 
 export const ClientNotificationBell = () => {
   const { t } = useTranslation();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useClientNotifications();
   const navigate = useNavigate();
 
   const handleNotificationClick = (notification: any) => {

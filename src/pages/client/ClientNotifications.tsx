@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useClientNotifications } from "@/hooks/useClientNotifications";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   Bell, 
   Check, 
   FileText, 
-  AlertCircle, 
-  Info,
-  CheckCircle2
+  FolderOpen,
+  AlertTriangle,
+  MessageCircle,
+  Receipt
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -18,61 +17,15 @@ import { cn } from "@/lib/utils";
 
 const kindConfig: Record<string, { icon: any; color: string }> = {
   contract: { icon: FileText, color: "text-blue-600 bg-blue-100" },
-  alert: { icon: AlertCircle, color: "text-amber-600 bg-amber-100" },
-  info: { icon: Info, color: "text-primary bg-primary/10" },
-  success: { icon: CheckCircle2, color: "text-emerald-600 bg-emerald-100" },
+  document: { icon: FolderOpen, color: "text-emerald-600 bg-emerald-100" },
+  invoice: { icon: Receipt, color: "text-rose-600 bg-rose-100" },
+  claim: { icon: AlertTriangle, color: "text-amber-600 bg-amber-100" },
+  message: { icon: MessageCircle, color: "text-purple-600 bg-purple-100" },
+  default: { icon: Bell, color: "text-muted-foreground bg-muted" },
 };
 
 export default function ClientNotifications() {
-  const { user } = useOutletContext<{ user: any; clientData: any }>();
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user?.id) {
-      fetchNotifications();
-    }
-  }, [user]);
-
-  const fetchNotifications = async () => {
-    setLoading(true);
-    
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (data) setNotifications(data);
-    setLoading(false);
-  };
-
-  const markAsRead = async (id: string) => {
-    await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('id', id);
-    
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
-    );
-  };
-
-  const markAllAsRead = async () => {
-    const unreadIds = notifications.filter(n => !n.read_at).map(n => n.id);
-    if (unreadIds.length === 0) return;
-    
-    await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .in('id', unreadIds);
-    
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
-    );
-  };
-
-  const unreadCount = notifications.filter(n => !n.read_at).length;
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useClientNotifications();
 
   if (loading) {
     return (
@@ -115,7 +68,7 @@ export default function ClientNotifications() {
       ) : (
         <div className="space-y-2 lg:space-y-3">
           {notifications.map((notification) => {
-            const config = kindConfig[notification.kind] || kindConfig.info;
+            const config = kindConfig[notification.kind] || kindConfig.default;
             const Icon = config.icon;
             const isUnread = !notification.read_at;
             
