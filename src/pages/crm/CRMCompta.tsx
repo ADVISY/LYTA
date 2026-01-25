@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2, Lock } from "lucide-react";
+import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2, Lock, QrCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import html2pdf from "html2pdf.js";
+import QRInvoiceTab from "@/components/crm/qr-invoice/QRInvoiceTab";
 
 interface DecompteCommission {
   commission: Commission;
@@ -104,6 +105,7 @@ export default function CRMCompta() {
   
   // Check if payroll module is available
   const hasPayrollAccess = hasModule('payroll');
+  const hasQRInvoiceAccess = hasModule('qr_invoice');
   
   // Tenant branding for PDFs
   const tenantName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
@@ -853,7 +855,11 @@ export default function CRMCompta() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn("grid w-full max-w-md", hasPayrollAccess ? "grid-cols-2" : "grid-cols-1")}>
+        <TabsList className={cn(
+          "grid w-full max-w-lg",
+          hasPayrollAccess && hasQRInvoiceAccess ? "grid-cols-3" :
+          hasPayrollAccess || hasQRInvoiceAccess ? "grid-cols-2" : "grid-cols-1"
+        )}>
           <TabsTrigger value="decomptes" className="gap-2">
             <FileText className="h-4 w-4" />
             {t('accounting.statements')}
@@ -864,6 +870,10 @@ export default function CRMCompta() {
               {t('accounting.payslips')}
             </TabsTrigger>
           )}
+          <TabsTrigger value="qr-invoices" className="gap-2">
+            <QrCode className="h-4 w-4" />
+            {t('qrInvoice.tabTitle')}
+          </TabsTrigger>
         </TabsList>
 
         {/* Décomptes Tab */}
@@ -1057,6 +1067,11 @@ export default function CRMCompta() {
           </Card>
         </TabsContent>
         )}
+
+        {/* QR Invoice Tab */}
+        <TabsContent value="qr-invoices" className="space-y-6">
+          <QRInvoiceTab />
+        </TabsContent>
       </Tabs>
 
       {/* Preview Decomptes Dialog */}

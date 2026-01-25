@@ -2161,6 +2161,165 @@ export type Database = {
           },
         ]
       }
+      qr_invoice_logs: {
+        Row: {
+          action: string
+          details: Json | null
+          id: string
+          invoice_id: string
+          performed_at: string
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          details?: Json | null
+          id?: string
+          invoice_id: string
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          details?: Json | null
+          id?: string
+          invoice_id?: string
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_invoice_logs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "qr_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_invoices: {
+        Row: {
+          amount_ht: number
+          amount_ttc: number
+          client_address: string | null
+          client_city: string | null
+          client_country: string | null
+          client_email: string | null
+          client_id: string | null
+          client_name: string
+          client_postal_code: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string
+          generated_at: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          is_vat_included: boolean | null
+          location: string | null
+          notes: string | null
+          object: string | null
+          paid_at: string | null
+          pdf_path: string | null
+          pdf_url: string | null
+          sent_at: string | null
+          service_description: string | null
+          service_type: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          vat_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          amount_ht?: number
+          amount_ttc?: number
+          client_address?: string | null
+          client_city?: string | null
+          client_country?: string | null
+          client_email?: string | null
+          client_id?: string | null
+          client_name: string
+          client_postal_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          generated_at?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          is_vat_included?: boolean | null
+          location?: string | null
+          notes?: string | null
+          object?: string | null
+          paid_at?: string | null
+          pdf_path?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
+          service_description?: string | null
+          service_type: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          amount_ht?: number
+          amount_ttc?: number
+          client_address?: string | null
+          client_city?: string | null
+          client_country?: string | null
+          client_email?: string | null
+          client_id?: string | null
+          client_name?: string
+          client_postal_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          generated_at?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          is_vat_included?: boolean | null
+          location?: string | null
+          notes?: string | null
+          object?: string | null
+          paid_at?: string | null
+          pdf_path?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
+          service_description?: string | null
+          service_type?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reserve_accounts: {
         Row: {
           agent_id: string
@@ -2565,12 +2724,15 @@ export type Database = {
           email_footer_text: string | null
           email_sender_address: string | null
           email_sender_name: string | null
+          iban: string | null
           id: string
           logo_url: string | null
           primary_color: string | null
+          qr_iban: string | null
           secondary_color: string | null
           tenant_id: string
           updated_at: string
+          vat_number: string | null
         }
         Insert: {
           claims_notification_email?: string | null
@@ -2583,12 +2745,15 @@ export type Database = {
           email_footer_text?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
+          iban?: string | null
           id?: string
           logo_url?: string | null
           primary_color?: string | null
+          qr_iban?: string | null
           secondary_color?: string | null
           tenant_id: string
           updated_at?: string
+          vat_number?: string | null
         }
         Update: {
           claims_notification_email?: string | null
@@ -2601,12 +2766,15 @@ export type Database = {
           email_footer_text?: string | null
           email_sender_address?: string | null
           email_sender_name?: string | null
+          iban?: string | null
           id?: string
           logo_url?: string | null
           primary_color?: string | null
+          qr_iban?: string | null
           secondary_color?: string | null
           tenant_id?: string
           updated_at?: string
+          vat_number?: string | null
         }
         Relationships: [
           {
@@ -3728,6 +3896,10 @@ export type Database = {
           size_bytes: number
           version: number
         }[]
+      }
+      get_next_invoice_number: {
+        Args: { p_tenant_id: string }
+        Returns: string
       }
       get_partner_policies: {
         Args: {

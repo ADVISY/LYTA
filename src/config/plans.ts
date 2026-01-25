@@ -17,7 +17,8 @@ export type PlanModule =
   | 'mandate_automation'
   | 'client_portal'
   | 'advanced_dashboard'
-  | 'advanced_settings';
+  | 'advanced_settings'
+  | 'qr_invoice';
 
 export interface PlanConfig {
   name: string;
@@ -61,7 +62,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'prime',
     displayName: 'Prime',
     description: 'L\'expérience complète',
-    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice'],
     monthlyPrice: 250,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -72,7 +73,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'founder',
     displayName: 'Prime Founder',
     description: 'Offre de lancement 6 mois',
-    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice'],
     monthlyPrice: 150,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -97,6 +98,7 @@ export const MODULE_DISPLAY_NAMES: Record<PlanModule, string> = {
   client_portal: 'Espace client',
   advanced_dashboard: 'Dashboard avancé',
   advanced_settings: 'Paramètres avancés',
+  qr_invoice: 'Factures QR',
 };
 
 /**
@@ -115,6 +117,7 @@ export const MODULE_ICONS: Record<PlanModule, string> = {
   client_portal: 'Globe',
   advanced_dashboard: 'LayoutDashboard',
   advanced_settings: 'Settings',
+  qr_invoice: 'QrCode',
 };
 
 /**

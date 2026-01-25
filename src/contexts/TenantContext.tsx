@@ -22,6 +22,9 @@ interface Tenant {
     company_phone?: string | null;
     company_email?: string | null;
     company_website?: string | null;
+    iban?: string | null;
+    qr_iban?: string | null;
+    vat_number?: string | null;
   };
 }
 
