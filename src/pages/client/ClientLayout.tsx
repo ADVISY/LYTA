@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, NavLink } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -41,6 +42,7 @@ export default function ClientLayout() {
   const location = useLocation();
   const { toast } = useToast();
   const { tenant } = useTenant();
+  const { theme } = useTheme();
   const [user, setUser] = useState<any>(null);
   const [clientData, setClientData] = useState<any>(null);
   const [advisorData, setAdvisorData] = useState<any>(null);
@@ -443,7 +445,10 @@ export default function ClientLayout() {
 
       {/* Main Content */}
       <main 
-        className="flex-1 overflow-auto"
+        className={cn(
+          "flex-1 overflow-auto relative",
+          theme === "dark" && "bg-background"
+        )}
         style={{
           backgroundImage: "url('/images/bg-pattern-gray.png')",
           backgroundSize: "cover",
@@ -452,7 +457,14 @@ export default function ClientLayout() {
           backgroundAttachment: "fixed"
         }}
       >
-        <div className="lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 max-w-7xl mx-auto">
+        {/* Dark mode overlay */}
+        {theme === "dark" && (
+          <div 
+            className="absolute inset-0 bg-background/85 pointer-events-none" 
+            style={{ mixBlendMode: "multiply" }}
+          />
+        )}
+        <div className="lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 max-w-7xl mx-auto relative z-10">
           <Outlet context={{ user, clientData, advisorData }} />
         </div>
       </main>
