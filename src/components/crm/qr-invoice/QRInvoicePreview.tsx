@@ -1,7 +1,8 @@
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import QRCode from "qrcode";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ export function QRInvoicePreview({
   const printRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = React.useState(false);
   const [sending, setSending] = React.useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
 
   const tenantBranding = tenant?.branding;
   const tenantName = tenantBranding?.display_name || tenant?.name || 'Cabinet';
@@ -112,6 +114,23 @@ export function QRInvoicePreview({
     
     return data.join('\n');
   }, [invoice, tenantIBAN, tenantName, tenantAddress, qrReference]);
+
+  // Generate QR code image
+  useEffect(() => {
+    if (qrData && open) {
+      QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: 'M',
+        margin: 0,
+        width: 166, // ~46mm at 96dpi
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      })
+        .then((url) => setQrCodeDataUrl(url))
+        .catch((err) => console.error('QR Code generation error:', err));
+    }
+  }, [qrData, open]);
 
   const handleDownload = async () => {
     if (!printRef.current) return;
@@ -416,22 +435,33 @@ export function QRInvoicePreview({
               <h3 style={{ fontSize: '11pt', fontWeight: 'bold', margin: '0 0 3mm 0' }}>Section paiement</h3>
               
               <div style={{ display: 'flex', gap: '10mm' }}>
-                {/* QR Code placeholder */}
+                {/* Swiss QR Code */}
                 <div style={{ 
                   width: '46mm', 
                   height: '46mm', 
-                  border: '1px solid #000',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: '#fff'
                 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '8pt', margin: 0 }}>QR Code</p>
-                    <p style={{ fontSize: '6pt', color: '#666', margin: '2mm 0 0 0' }}>
-                      (Généré automatiquement)
-                    </p>
-                  </div>
+                  {qrCodeDataUrl ? (
+                    <img 
+                      src={qrCodeDataUrl} 
+                      alt="Swiss QR Code" 
+                      style={{ width: '46mm', height: '46mm' }}
+                    />
+                  ) : (
+                    <div style={{ 
+                      width: '46mm', 
+                      height: '46mm', 
+                      border: '1px dashed #ccc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <p style={{ fontSize: '8pt', color: '#999' }}>QR</p>
+                    </div>
+                  )}
                 </div>
                 
                 <div style={{ flex: 1 }}>
