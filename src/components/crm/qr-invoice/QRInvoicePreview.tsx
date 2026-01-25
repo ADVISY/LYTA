@@ -14,6 +14,14 @@ import { Download, Printer, Send, CheckCircle, Loader2 } from "lucide-react";
 import { QRInvoice } from "@/hooks/useQRInvoices";
 import { useTenant } from "@/contexts/TenantContext";
 import html2pdf from "html2pdf.js";
+import { 
+  validateIBAN, 
+  getIBANForQR, 
+  getQRReferenceType, 
+  generateQRReference,
+  formatIBAN as formatIBANDisplay,
+  formatQRReference
+} from "@/lib/ibanUtils";
 
 interface QRInvoicePreviewProps {
   invoice: QRInvoice | null;
@@ -22,44 +30,6 @@ interface QRInvoicePreviewProps {
   onGenerate: (pdfBlob?: Blob) => Promise<void>;
   onSend: () => Promise<void>;
   onMarkPaid: () => void;
-}
-
-// Validate and clean IBAN - Swiss IBAN can be 21-22 alphanumeric characters
-// In Switzerland, IBAN can end with a letter (e.g., CH32 0024 3243 6350 0601 T)
-function validateAndCleanIBAN(iban: string): string {
-  if (!iban) return '';
-  // Remove all spaces and non-alphanumeric characters, keep letters and digits
-  const cleaned = iban.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  // Swiss IBAN: CH + 2 check digits + 17-18 alphanumeric (some end with letter)
-  // Valid lengths: 21 (standard) or 22 (with letter suffix like "T")
-  if ((cleaned.length === 21 || cleaned.length === 22) && cleaned.startsWith('CH')) {
-    return cleaned;
-  }
-  // Return as-is for other formats
-  return cleaned;
-}
-
-// Swiss QR Bill reference generation (QRR format - 27 digits)
-function generateQRReference(invoiceNumber: string): string {
-  // Extract numeric part and pad to 26 digits
-  const numericPart = invoiceNumber.replace(/\D/g, '').padStart(26, '0').slice(0, 26);
-  // Modulo 10 recursive check digit calculation
-  const weights = [0, 9, 4, 6, 8, 2, 7, 1, 3, 5];
-  let carry = 0;
-  for (const char of numericPart) {
-    carry = weights[(carry + parseInt(char)) % 10];
-  }
-  const checkDigit = (10 - carry) % 10;
-  return numericPart + checkDigit;
-}
-
-function formatIBAN(iban: string): string {
-  const clean = iban.replace(/\s/g, '');
-  return clean.replace(/(.{4})/g, '$1 ').trim();
-}
-
-function formatReference(ref: string): string {
-  return ref.replace(/(.{5})/g, '$1 ').trim();
 }
 
 // Format service type for display (capitalize, remove underscores/hyphens)
@@ -117,9 +87,11 @@ export function QRInvoicePreview({
   const tenantEmail = tenantBranding?.company_email || '';
   const tenantLogo = tenantBranding?.logo_url;
   const rawIBAN = tenantBranding?.iban || tenantBranding?.qr_iban || '';
-  const tenantIBAN = validateAndCleanIBAN(rawIBAN);
+  const ibanValidation = validateIBAN(rawIBAN);
+  const tenantIBAN = getIBANForQR(rawIBAN); // Get IBAN suitable for QR code
   const tenantVAT = tenantBranding?.vat_number || '';
   const primaryColor = tenantBranding?.primary_color || '#0f172a';
+  const referenceType = getQRReferenceType(rawIBAN); // QRR, SCOR, or NON
 
   const qrReference = useMemo(() => {
     if (!invoice) return '';
@@ -128,7 +100,7 @@ export function QRInvoicePreview({
 
   // Generate Swiss QR Bill payload according to SIX specs
   const qrData = useMemo(() => {
-    if (!invoice || !tenantIBAN) return '';
+    if (!invoice || !tenantIBAN || !ibanValidation.isValid) return '';
     
     // Parse address components
     const addressParts = tenantAddress.split(',').map(s => s.trim());
@@ -138,12 +110,17 @@ export function QRInvoicePreview({
     const postalCode = postalMatch ? postalMatch[1] : '';
     const city = postalMatch ? postalMatch[2] : postalCity;
     
+    // Determine reference based on IBAN type
+    // QR-IBAN requires QRR, regular IBAN uses NON (or SCOR if creditor reference available)
+    const refType = referenceType;
+    const reference = refType === 'QRR' ? qrReference : '';
+    
     // Swiss QR Bill SPC format (SIX standard)
     const lines = [
       'SPC',                          // QR Type
       '0200',                         // Version
       '1',                            // Coding Type (UTF-8)
-      tenantIBAN,                     // IBAN (21 chars, no spaces)
+      tenantIBAN,                     // IBAN (21 chars for QR, no spaces)
       'S',                            // Creditor address type (S = structured)
       tenantName.slice(0, 70),        // Creditor name (max 70)
       streetAndNumber.slice(0, 70),   // Street or address line 1
@@ -167,14 +144,14 @@ export function QRInvoicePreview({
       invoice.client_postal_code || '',              // Debtor postal
       (invoice.client_city || '').slice(0, 35),      // Debtor city
       invoice.client_country || 'CH',                // Debtor country
-      'QRR',                          // Reference type (QR-Reference)
-      qrReference,                    // Payment reference (27 digits)
+      refType,                        // Reference type (QRR, SCOR, or NON)
+      reference,                      // Payment reference (27 digits for QRR, empty for NON)
       (invoice.object || formatServiceType(invoice.service_type)).slice(0, 140), // Message
       'EPD',                          // End Payment Data
     ];
     
     return lines.join('\r\n');
-  }, [invoice, tenantIBAN, tenantName, tenantAddress, qrReference]);
+  }, [invoice, tenantIBAN, tenantName, tenantAddress, qrReference, ibanValidation.isValid, referenceType]);
 
   // Load logo as base64 for PDF embedding
   useEffect(() => {
@@ -576,8 +553,8 @@ export function QRInvoicePreview({
                 Informations de paiement
               </div>
               <div style={{ fontSize: '8.5pt', color: '#15803d' }}>
-                <div><strong>IBAN:</strong> {formatIBAN(tenantIBAN)}</div>
-                <div><strong>Référence:</strong> {formatReference(qrReference)}</div>
+                <div><strong>IBAN:</strong> {formatIBANDisplay(tenantIBAN)}</div>
+                <div><strong>Référence:</strong> {formatQRReference(qrReference)}</div>
               </div>
             </div>
 
@@ -618,14 +595,14 @@ export function QRInvoicePreview({
               
               <div style={{ marginBottom: '3mm' }}>
                 <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000' }}>Compte / Payable à</div>
-                <div style={{ fontSize: '8pt', marginTop: '1mm' }}>{formatIBAN(tenantIBAN)}</div>
+                <div style={{ fontSize: '8pt', marginTop: '1mm' }}>{formatIBANDisplay(tenantIBAN)}</div>
                 <div style={{ fontSize: '8pt' }}>{tenantName}</div>
                 <div style={{ fontSize: '8pt' }}>{tenantAddress}</div>
               </div>
               
               <div style={{ marginBottom: '3mm' }}>
                 <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000' }}>Référence</div>
-                <div style={{ fontSize: '8pt', marginTop: '1mm' }}>{formatReference(qrReference)}</div>
+                <div style={{ fontSize: '8pt', marginTop: '1mm' }}>{formatQRReference(qrReference)}</div>
               </div>
               
               <div style={{ marginBottom: '3mm' }}>
@@ -685,14 +662,14 @@ export function QRInvoicePreview({
                 <div style={{ flex: 1, fontSize: '8pt' }}>
                   <div style={{ marginBottom: '3mm' }}>
                     <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000' }}>Compte / Payable à</div>
-                    <div style={{ marginTop: '1mm' }}>{formatIBAN(tenantIBAN)}</div>
+                    <div style={{ marginTop: '1mm' }}>{formatIBANDisplay(tenantIBAN)}</div>
                     <div>{tenantName}</div>
                     <div>{tenantAddress}</div>
                   </div>
                   
                   <div style={{ marginBottom: '3mm' }}>
                     <div style={{ fontSize: '6pt', fontWeight: 'bold', color: '#000' }}>Référence</div>
-                    <div style={{ marginTop: '1mm' }}>{formatReference(qrReference)}</div>
+                    <div style={{ marginTop: '1mm' }}>{formatQRReference(qrReference)}</div>
                   </div>
                   
                   <div style={{ marginBottom: '3mm' }}>
