@@ -38,7 +38,6 @@ import { LanguageSelector } from "@/components/ui/language-selector";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import { SoundToggle } from "@/components/crm/SoundToggle";
-import { ReactiveGrid } from "@/components/ui/reactive-grid";
 
 
 interface MenuItem {
@@ -366,21 +365,22 @@ export default function CRMLayout() {
       </div>
 
       {/* Main Content - Only this area scrolls */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 relative">
-        <ReactiveGrid 
-          className="absolute inset-0 pointer-events-none" 
-          gridColor="hsl(246 100% 34%)"
-          gridSize={50}
-          lineOpacity={0.04}
-          glowIntensity={0.25}
-          glowRadius={350}
-        />
-        <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1 relative z-10">
+      <main 
+        className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0"
+        style={{
+          backgroundImage: "url('/images/bg-pattern-gray.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed"
+        }}
+      >
+        <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1">
           <Outlet />
         </div>
         
         {/* Footer with support email - sticky at bottom of scroll area */}
-        <footer className="border-t border-border bg-card py-3 px-4 lg:px-6 flex-shrink-0 mt-auto relative z-10">
+        <footer className="border-t border-border bg-card py-3 px-4 lg:px-6 flex-shrink-0 mt-auto">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-4">
               <span>© {new Date().getFullYear()} LYTA</span>
