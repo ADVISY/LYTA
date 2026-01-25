@@ -42,25 +42,61 @@ function formatServiceType(serviceType: string): string {
     .join(' ');
 }
 
-// Convert image URL to base64 for PDF embedding (fixes CORS issues)
+// Convert image URL to base64 for PDF embedding
+// Uses a proxy approach for external URLs that may have CORS issues
 async function imageUrlToBase64(url: string): Promise<string> {
   try {
     // If already base64, return as-is
     if (url.startsWith('data:')) return url;
     
-    const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) throw new Error('Failed to fetch image');
+    // For Supabase storage URLs, they should work with CORS
+    // For external URLs, we need a different approach
+    const isSupabaseUrl = url.includes('supabase') || url.includes('hjedkkpmfzhtdzotskiv');
     
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    if (isSupabaseUrl) {
+      const response = await fetch(url, { mode: 'cors' });
+      if (!response.ok) throw new Error('Failed to fetch image');
+      
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+    
+    // For external URLs (like e-advisy.ch), use Image element approach
+    // This can work if the server allows cross-origin image loading
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          try {
+            resolve(canvas.toDataURL('image/png'));
+          } catch (e) {
+            console.warn('Canvas toDataURL failed (CORS):', e);
+            resolve('');
+          }
+        } else {
+          resolve('');
+        }
+      };
+      img.onerror = () => {
+        console.warn('Image failed to load:', url);
+        resolve('');
+      };
+      img.src = url;
     });
   } catch (error) {
     console.error('Error converting image to base64:', error);
-    return ''; // Return empty on error
+    return '';
   }
 }
 
@@ -100,7 +136,7 @@ export function QRInvoicePreview({
 
   // Generate Swiss QR Bill payload according to SIX specs
   const qrData = useMemo(() => {
-    if (!invoice || !tenantIBAN || !ibanValidation.isValid) return '';
+    if (!invoice || !tenantIBAN) return '';
     
     // Parse address components
     const addressParts = tenantAddress.split(',').map(s => s.trim());
@@ -305,31 +341,28 @@ export function QRInvoicePreview({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15mm' }}>
             {/* Company Info Left */}
               <div style={{ flex: 1 }}>
-                {(logoBase64 || tenantLogo) ? (
+                {/* Always show company name as text for PDF reliability */}
+                <div style={{ 
+                  fontSize: '20pt', 
+                  fontWeight: '700', 
+                  color: primaryColor,
+                  marginBottom: '4mm',
+                  letterSpacing: '-0.5px'
+                }}>
+                  {tenantName}
+                </div>
+                {/* Show logo below if available (for preview only - may not appear in PDF) */}
+                {logoBase64 && (
                   <img 
-                    src={logoBase64 || tenantLogo} 
-                    alt={tenantName}
+                    src={logoBase64} 
+                    alt=""
                     style={{ 
-                      maxHeight: '18mm', 
-                      maxWidth: '55mm', 
+                      maxHeight: '12mm', 
+                      maxWidth: '40mm', 
                       objectFit: 'contain',
-                      marginBottom: '4mm'
-                    }}
-                    onError={(e) => {
-                      // Fallback to text if image fails
-                      (e.target as HTMLImageElement).style.display = 'none';
+                      marginBottom: '3mm'
                     }}
                   />
-                ) : (
-                  <div style={{ 
-                    fontSize: '20pt', 
-                    fontWeight: '700', 
-                    color: primaryColor,
-                    marginBottom: '4mm',
-                    letterSpacing: '-0.5px'
-                  }}>
-                    {tenantName}
-                  </div>
                 )}
                 <div style={{ fontSize: '8.5pt', color: '#64748b', lineHeight: '1.6' }}>
                   <div>{tenantAddress}</div>
