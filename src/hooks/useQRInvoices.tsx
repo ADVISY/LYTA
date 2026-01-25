@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useUserTenant } from "./useUserTenant";
 import { useToast } from "./use-toast";
+import { ClientNotifications } from "@/lib/clientNotifications";
 
 export interface QRInvoice {
   id: string;
@@ -146,6 +147,11 @@ export function useQRInvoices() {
         performed_by: user.id,
         details: { invoice_number: invoiceNumber }
       });
+
+      // Notifier le client si une facture est liée à un client
+      if (data.client_id) {
+        ClientNotifications.newInvoice(data.client_id, invoiceNumber, invoiceData.amount_ttc);
+      }
 
       await fetchInvoices();
       return data as QRInvoice;

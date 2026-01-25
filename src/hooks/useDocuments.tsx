@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserTenant } from '@/hooks/useUserTenant';
 import { translateError } from '@/lib/errorTranslations';
+import { ClientNotifications } from '@/lib/clientNotifications';
 
 export type Document = {
   id: string;
@@ -63,6 +64,11 @@ export function useDocuments() {
         .single();
 
       if (error) throw error;
+
+      // Notifier le client si c'est un document client
+      if (data && documentData.owner_type === 'client' && documentData.owner_id) {
+        ClientNotifications.newDocument(documentData.owner_id, documentData.file_name, documentData.doc_kind);
+      }
 
       toast({
         title: "Document créé",

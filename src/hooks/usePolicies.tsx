@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserTenant } from '@/hooks/useUserTenant';
 import { translateError } from '@/lib/errorTranslations';
+import { ClientNotifications } from '@/lib/clientNotifications';
 
 export type Policy = {
   id: string;
@@ -126,6 +127,11 @@ export function usePolicies() {
         .maybeSingle();
 
       if (error) throw error;
+
+      // Notifier le client si le contrat est créé
+      if (data?.id && policyData.client_id) {
+        ClientNotifications.newContract(policyData.client_id, data.id, policyData.product_name);
+      }
 
       toast({
         title: "Police créée",
