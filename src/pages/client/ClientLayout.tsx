@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import MobileBottomNav from "@/components/client/MobileBottomNav";
+import { ClientNotificationBell } from "@/components/client/ClientNotificationBell";
 
 import { 
   Home, 
@@ -224,6 +225,7 @@ export default function ClientLayout() {
                   <span className="text-xl font-bold">{tenantName}</span>
                 </div>
               )}
+              <ClientNotificationBell />
               <ThemeToggle />
             </div>
             <div className="flex items-center justify-center gap-2 mt-3">
@@ -362,6 +364,7 @@ export default function ClientLayout() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            <ClientNotificationBell />
             <ThemeToggle />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
