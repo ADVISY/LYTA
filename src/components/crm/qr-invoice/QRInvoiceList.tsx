@@ -136,8 +136,8 @@ export function QRInvoiceList({
                 <Badge 
                   variant={config.variant}
                   className={cn(
-                    displayStatus === 'paid' && "bg-green-500 hover:bg-green-600",
-                    displayStatus === 'overdue' && "bg-destructive"
+                    displayStatus === 'paid' && "bg-emerald-600 hover:bg-emerald-700 text-white",
+                    displayStatus === 'overdue' && "bg-destructive text-destructive-foreground"
                   )}
                 >
                   {config.label}
@@ -174,7 +174,7 @@ export function QRInvoiceList({
                     <DropdownMenuSeparator />
                     {(invoice.status === 'generated' || invoice.status === 'sent' || displayStatus === 'overdue') && (
                       <DropdownMenuItem onClick={() => onMarkPaid(invoice)}>
-                        <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                        <CheckCircle className="mr-2 h-4 w-4 text-emerald-600" />
                         {t('qrInvoice.markPaid')}
                       </DropdownMenuItem>
                     )}

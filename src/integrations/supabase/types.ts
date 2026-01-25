@@ -3932,13 +3932,16 @@ export type Database = {
           company_phone: string
           company_website: string
           display_name: string
+          iban: string
           logo_url: string
           primary_color: string
+          qr_iban: string
           secondary_color: string
           tenant_id: string
           tenant_name: string
           tenant_plan: string
           tenant_status: string
+          vat_number: string
         }[]
       }
       get_user_dashboard_scope: {

@@ -193,6 +193,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
             company_phone: tenantBranding.company_phone || null,
             company_email: tenantBranding.company_email || null,
             company_website: tenantBranding.company_website || null,
+            iban: tenantBranding.iban || null,
+            qr_iban: tenantBranding.qr_iban || null,
+            vat_number: tenantBranding.vat_number || null,
           },
         };
 
