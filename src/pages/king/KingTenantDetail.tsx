@@ -83,6 +83,9 @@ export default function KingTenantDetail() {
     email_sender_name: "",
     email_sender_address: "",
     claims_notification_email: "",
+    iban: "",
+    qr_iban: "",
+    vat_number: "",
   });
 
   const [subscriptionData, setSubscriptionData] = useState({
@@ -170,6 +173,9 @@ export default function KingTenantDetail() {
           email_sender_name: branding.email_sender_name || "",
           email_sender_address: branding.email_sender_address || "",
           claims_notification_email: branding.claims_notification_email || "",
+          iban: branding.iban || "",
+          qr_iban: branding.qr_iban || "",
+          vat_number: branding.vat_number || "",
         });
       }
 
@@ -234,6 +240,9 @@ export default function KingTenantDetail() {
           email_sender_name: brandingData.email_sender_name || null,
           email_sender_address: brandingData.email_sender_address || null,
           claims_notification_email: brandingData.claims_notification_email || null,
+          iban: brandingData.iban || null,
+          qr_iban: brandingData.qr_iban || null,
+          vat_number: brandingData.vat_number || null,
           updated_at: new Date().toISOString(),
         })
         .eq('tenant_id', tenantId);
@@ -886,6 +895,55 @@ export default function KingTenantDetail() {
                       <p className="text-xs text-muted-foreground">
                         Recevez les déclarations de sinistres des clients à cette adresse
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Informations bancaires pour factures QR */}
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div>
+                      <Label className="text-base flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Informations bancaires (Factures QR)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Ces informations sont utilisées pour générer les factures QR suisses
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="iban">IBAN</Label>
+                      <Input
+                        id="iban"
+                        placeholder="CH93 0076 2011 6238 5295 7"
+                        value={brandingData.iban}
+                        onChange={(e) => setBrandingData({ ...brandingData, iban: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        IBAN du compte bancaire pour les paiements
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="qr_iban">QR-IBAN (optionnel)</Label>
+                      <Input
+                        id="qr_iban"
+                        placeholder="CH44 3199 9123 0008 8901 2"
+                        value={brandingData.qr_iban}
+                        onChange={(e) => setBrandingData({ ...brandingData, qr_iban: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Si différent de l'IBAN, utilisé spécifiquement pour les QR-factures
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="vat_number">Numéro TVA</Label>
+                      <Input
+                        id="vat_number"
+                        placeholder="CHE-123.456.789 TVA"
+                        value={brandingData.vat_number}
+                        onChange={(e) => setBrandingData({ ...brandingData, vat_number: e.target.value })}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
