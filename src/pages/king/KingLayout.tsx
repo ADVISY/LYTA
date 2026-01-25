@@ -23,7 +23,6 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
-import { ReactiveGrid } from "@/components/ui/reactive-grid";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -280,16 +279,17 @@ export default function KingLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative">
-        <ReactiveGrid 
-          className="absolute inset-0 pointer-events-none" 
-          gridColor="hsl(45 93% 47%)"
-          gridSize={50}
-          lineOpacity={0.04}
-          glowIntensity={0.3}
-          glowRadius={350}
-        />
-        <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto relative z-10">
+      <main 
+        className="flex-1 overflow-y-auto"
+        style={{
+          backgroundImage: "url('/images/bg-pattern-gray.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed"
+        }}
+      >
+        <div className="lg:p-8 p-4 pt-20 lg:pt-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
       </main>

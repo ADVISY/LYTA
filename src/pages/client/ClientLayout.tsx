@@ -8,7 +8,6 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import MobileBottomNav from "@/components/client/MobileBottomNav";
 import { ClientNotificationBell } from "@/components/client/ClientNotificationBell";
-import { ReactiveGrid } from "@/components/ui/reactive-grid";
 
 import { 
   Home, 
@@ -443,16 +442,17 @@ export default function ClientLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto relative">
-        <ReactiveGrid 
-          className="absolute inset-0" 
-          gridColor="hsl(246 100% 34%)"
-          gridSize={50}
-          lineOpacity={0.04}
-          glowIntensity={0.25}
-          glowRadius={350}
-        />
-        <div className="lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 max-w-7xl mx-auto relative z-10">
+      <main 
+        className="flex-1 overflow-auto"
+        style={{
+          backgroundImage: "url('/images/bg-pattern-gray.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed"
+        }}
+      >
+        <div className="lg:p-8 p-4 pt-16 pb-24 lg:pt-8 lg:pb-8 max-w-7xl mx-auto">
           <Outlet context={{ user, clientData, advisorData }} />
         </div>
       </main>
