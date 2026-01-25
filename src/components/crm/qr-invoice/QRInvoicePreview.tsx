@@ -341,28 +341,28 @@ export function QRInvoicePreview({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15mm' }}>
             {/* Company Info Left */}
               <div style={{ flex: 1 }}>
-                {/* Always show company name as text for PDF reliability */}
-                <div style={{ 
-                  fontSize: '20pt', 
-                  fontWeight: '700', 
-                  color: primaryColor,
-                  marginBottom: '4mm',
-                  letterSpacing: '-0.5px'
-                }}>
-                  {tenantName}
-                </div>
-                {/* Show logo below if available (for preview only - may not appear in PDF) */}
-                {logoBase64 && (
+                {/* Show logo if available, otherwise show company name as text */}
+                {logoBase64 ? (
                   <img 
                     src={logoBase64} 
-                    alt=""
+                    alt={tenantName}
                     style={{ 
-                      maxHeight: '12mm', 
-                      maxWidth: '40mm', 
+                      maxHeight: '18mm', 
+                      maxWidth: '50mm', 
                       objectFit: 'contain',
-                      marginBottom: '3mm'
+                      marginBottom: '4mm'
                     }}
                   />
+                ) : (
+                  <div style={{ 
+                    fontSize: '20pt', 
+                    fontWeight: '700', 
+                    color: primaryColor,
+                    marginBottom: '4mm',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {tenantName}
+                  </div>
                 )}
                 <div style={{ fontSize: '8.5pt', color: '#64748b', lineHeight: '1.6' }}>
                   <div>{tenantAddress}</div>
