@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,15 +40,16 @@ interface Policy {
   };
 }
 
-const claimTypes = [
-  { value: 'auto', label: 'Automobile', icon: Car },
-  { value: 'sante', label: 'Santé', icon: Heart },
-  { value: 'menage', label: 'Ménage/RC', icon: Home },
-  { value: 'juridique', label: 'Protection juridique', icon: Scale },
-  { value: 'autre', label: 'Autre', icon: Shield },
+const getClaimTypes = (t: (key: string) => string) => [
+  { value: 'auto', label: t('claimForm.types.auto'), icon: Car },
+  { value: 'sante', label: t('claimForm.types.health'), icon: Heart },
+  { value: 'menage', label: t('claimForm.types.household'), icon: Home },
+  { value: 'juridique', label: t('claimForm.types.legal'), icon: Scale },
+  { value: 'autre', label: t('claimForm.types.other'), icon: Shield },
 ];
 
 export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -60,6 +62,8 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
     incident_date: '',
     description: '',
   });
+
+  const claimTypes = getClaimTypes(t);
 
   useEffect(() => {
     fetchPolicies();
@@ -83,11 +87,10 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
     if (!files) return;
     
     const newFiles = Array.from(files).filter(file => {
-      // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "Fichier trop volumineux",
-          description: `${file.name} dépasse 10 MB`,
+          title: t('claimForm.fileTooLarge'),
+          description: t('claimForm.fileExceedsLimit', { name: file.name }),
           variant: "destructive"
         });
         return false;
@@ -108,8 +111,8 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
     
     if (!formData.claim_type || !formData.incident_date || !formData.description) {
       toast({
-        title: "Champs requis",
-        description: "Veuillez remplir tous les champs obligatoires",
+        title: t('claimForm.requiredFields'),
+        description: t('claimForm.fillRequiredFields'),
         variant: "destructive"
       });
       return;
@@ -118,14 +121,12 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
     setLoading(true);
     
     try {
-      // Get client tenant_id first
       const { data: clientData } = await supabase
         .from('clients')
         .select('tenant_id')
         .eq('id', clientId)
         .single();
       
-      // Create the claim
       const { data: claim, error: claimError } = await supabase
         .from('claims')
         .insert({
@@ -142,17 +143,12 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
       
       if (claimError) throw claimError;
       
-      if (claimError) throw claimError;
-      
-      // Upload files if any
       if (uploadedFiles.length > 0 && claim) {
         setUploading(true);
         
         for (const file of uploadedFiles) {
-          const fileExt = file.name.split('.').pop();
           const fileName = `${claim.id}/${Date.now()}-${file.name}`;
           
-          // Upload to storage
           const { error: uploadError } = await supabase.storage
             .from('documents')
             .upload(fileName, file);
@@ -162,7 +158,6 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
             continue;
           }
           
-          // Create document record
           const { data: doc } = await supabase
             .from('documents')
             .insert({
@@ -177,7 +172,6 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
             .select()
             .single();
           
-          // Link document to claim
           if (doc) {
             await supabase
               .from('claim_documents')
@@ -189,7 +183,6 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
         }
       }
       
-      // Send notification email to backoffice/gestionnaire
       if (claim) {
         try {
           await supabase.functions.invoke('send-claim-notification', {
@@ -199,22 +192,21 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
             }
           });
         } catch (notifError) {
-          // Don't fail the whole submission if notification fails
           console.error('Failed to send claim notification:', notifError);
         }
       }
       
       toast({
-        title: "Sinistre déclaré",
-        description: "Votre déclaration a été enregistrée. Notre équipe vous contactera rapidement."
+        title: t('claimForm.claimDeclared'),
+        description: t('claimForm.claimRegistered')
       });
       
       onSuccess();
     } catch (error: any) {
       console.error('Error:', error);
       toast({
-        title: "Erreur",
-        description: error.message || "Une erreur est survenue",
+        title: t('claimForm.error'),
+        description: error.message || t('claimForm.errorOccurred'),
         variant: "destructive"
       });
     } finally {
@@ -227,7 +219,7 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Type de sinistre */}
       <div className="space-y-2">
-        <Label>Type de sinistre *</Label>
+        <Label>{t('claimForm.claimType')} *</Label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {claimTypes.map((type) => {
             const Icon = type.icon;
@@ -253,13 +245,13 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
 
       {/* Contrat associé */}
       <div className="space-y-2">
-        <Label>Contrat associé (optionnel)</Label>
+        <Label>{t('claimForm.relatedContract')}</Label>
         <Select 
           value={formData.policy_id} 
           onValueChange={(value) => setFormData(prev => ({ ...prev, policy_id: value }))}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Sélectionner un contrat" />
+            <SelectValue placeholder={t('claimForm.selectContract')} />
           </SelectTrigger>
           <SelectContent>
             {policies.map((policy) => (
@@ -273,7 +265,7 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
 
       {/* Date du sinistre */}
       <div className="space-y-2">
-        <Label htmlFor="incident_date">Date du sinistre *</Label>
+        <Label htmlFor="incident_date">{t('claimForm.incidentDate')} *</Label>
         <Input
           id="incident_date"
           type="date"
@@ -286,10 +278,10 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
 
       {/* Description */}
       <div className="space-y-2">
-        <Label htmlFor="description">Description du sinistre *</Label>
+        <Label htmlFor="description">{t('claimForm.description')} *</Label>
         <Textarea
           id="description"
-          placeholder="Décrivez ce qui s'est passé, les circonstances, les dommages..."
+          placeholder={t('claimForm.descriptionPlaceholder')}
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           rows={4}
@@ -299,9 +291,9 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
 
       {/* Documents */}
       <div className="space-y-2">
-        <Label>Documents justificatifs (optionnel)</Label>
+        <Label>{t('claimForm.supportingDocuments')}</Label>
         <p className="text-sm text-muted-foreground mb-2">
-          Photos, factures, rapports de police, attestations médicales...
+          {t('claimForm.documentsHint')}
         </p>
         
         <div className="border-2 border-dashed rounded-lg p-4 text-center">
@@ -319,15 +311,14 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
           >
             <Upload className="h-8 w-8 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Cliquez pour ajouter des fichiers
+              {t('claimForm.clickToAddFiles')}
             </span>
             <span className="text-xs text-muted-foreground">
-              PDF, images, documents (max 10 MB par fichier)
+              {t('claimForm.fileTypes')}
             </span>
           </label>
         </div>
         
-        {/* Uploaded files list */}
         {uploadedFiles.length > 0 && (
           <div className="space-y-2 mt-3">
             {uploadedFiles.map((file, index) => (
@@ -358,11 +349,11 @@ export default function ClaimForm({ clientId, onSuccess, onCancel }: ClaimFormPr
       {/* Actions */}
       <div className="flex gap-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Annuler
+          {t('claimForm.cancel')}
         </Button>
         <Button type="submit" disabled={loading || uploading} className="flex-1">
           {(loading || uploading) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {uploading ? 'Envoi des fichiers...' : 'Soumettre la déclaration'}
+          {uploading ? t('claimForm.uploadingFiles') : t('claimForm.submitDeclaration')}
         </Button>
       </div>
     </form>
