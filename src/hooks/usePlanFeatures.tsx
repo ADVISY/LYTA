@@ -4,8 +4,8 @@ import { useUserTenant } from '@/hooks/useUserTenant';
 import { 
   TenantPlan, 
   PlanModule, 
-  getEnabledModules, 
-  isModuleEnabled,
+  getEnabledModules as getStaticEnabledModules, 
+  isModuleEnabled as isStaticModuleEnabled,
   PLAN_CONFIGS,
   MODULE_DISPLAY_NAMES 
 } from '@/config/plans';
@@ -49,8 +49,61 @@ interface UsePlanFeaturesReturn {
   refresh: () => Promise<void>;
 }
 
+// Cache for plan modules from database
+let cachedPlanModules: Record<string, string[]> | null = null;
+let cachedModuleNames: Record<string, string> | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch plan modules from database (with caching)
+ */
+async function fetchPlanModulesFromDB(): Promise<{ planModules: Record<string, string[]>; moduleNames: Record<string, string> }> {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (cachedPlanModules && cachedModuleNames && (now - cacheTimestamp) < CACHE_TTL) {
+    return { planModules: cachedPlanModules, moduleNames: cachedModuleNames };
+  }
+
+  try {
+    const [planModulesRes, modulesRes] = await Promise.all([
+      supabase.from('plan_modules').select('plan_id, module_id'),
+      supabase.from('platform_modules').select('id, display_name')
+    ]);
+
+    const planModules: Record<string, string[]> = {};
+    const moduleNames: Record<string, string> = {};
+
+    if (planModulesRes.data) {
+      for (const pm of planModulesRes.data) {
+        if (!planModules[pm.plan_id]) planModules[pm.plan_id] = [];
+        planModules[pm.plan_id].push(pm.module_id);
+      }
+    }
+
+    if (modulesRes.data) {
+      for (const m of modulesRes.data) {
+        moduleNames[m.id] = m.display_name;
+      }
+    }
+
+    // Update cache
+    cachedPlanModules = planModules;
+    cachedModuleNames = moduleNames;
+    cacheTimestamp = now;
+
+    return { planModules, moduleNames };
+  } catch (error) {
+    console.error('Error fetching plan modules from DB:', error);
+    // Fallback to static config
+    return { planModules: {}, moduleNames: {} };
+  }
+}
+
 /**
  * Hook to access plan features and module gating
+ * Uses database-driven configuration with fallback to static config
  */
 export function usePlanFeatures(): UsePlanFeaturesReturn {
   const { tenantId, loading: tenantLoading } = useUserTenant();
@@ -61,6 +114,8 @@ export function usePlanFeatures(): UsePlanFeaturesReturn {
     seatsIncluded: 1,
     seatsPrice: 20,
   });
+  const [dbPlanModules, setDbPlanModules] = useState<Record<string, string[]>>({});
+  const [dbModuleNames, setDbModuleNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,27 +127,35 @@ export function usePlanFeatures(): UsePlanFeaturesReturn {
 
     try {
       setLoading(true);
-      const { data, error: fetchError } = await supabase
-        .from('tenants')
-        .select('plan, plan_status, billing_status, seats_included, seats_price')
-        .eq('id', tenantId)
-        .maybeSingle();
+      
+      // Fetch tenant plan info and DB modules in parallel
+      const [tenantRes, dbData] = await Promise.all([
+        supabase
+          .from('tenants')
+          .select('plan, plan_status, billing_status, seats_included, seats_price')
+          .eq('id', tenantId)
+          .maybeSingle(),
+        fetchPlanModulesFromDB()
+      ]);
 
-      if (fetchError) {
-        console.error('Error fetching plan info:', fetchError);
+      if (tenantRes.error) {
+        console.error('Error fetching plan info:', tenantRes.error);
         setError('Erreur lors du chargement du plan');
         return;
       }
 
-      if (data) {
+      if (tenantRes.data) {
         setPlanInfo({
-          plan: (data.plan as TenantPlan) || 'start',
-          planStatus: (data.plan_status as 'active' | 'suspended') || 'active',
-          billingStatus: (data.billing_status as 'paid' | 'trial' | 'past_due' | 'canceled') || 'trial',
-          seatsIncluded: data.seats_included || 1,
-          seatsPrice: data.seats_price || 20,
+          plan: (tenantRes.data.plan as TenantPlan) || 'start',
+          planStatus: (tenantRes.data.plan_status as 'active' | 'suspended') || 'active',
+          billingStatus: (tenantRes.data.billing_status as 'paid' | 'trial' | 'past_due' | 'canceled') || 'trial',
+          seatsIncluded: tenantRes.data.seats_included || 1,
+          seatsPrice: tenantRes.data.seats_price || 20,
         });
       }
+
+      setDbPlanModules(dbData.planModules);
+      setDbModuleNames(dbData.moduleNames);
     } catch (err) {
       console.error('Error in plan fetch:', err);
       setError('Une erreur est survenue');
@@ -107,11 +170,26 @@ export function usePlanFeatures(): UsePlanFeaturesReturn {
     }
   }, [tenantId, tenantLoading, fetchPlanInfo]);
 
-  const enabledModules = getEnabledModules(planInfo.plan);
+  // Get enabled modules - prefer DB, fallback to static
+  const enabledModules = useCallback(() => {
+    const dbModules = dbPlanModules[planInfo.plan];
+    if (dbModules && dbModules.length > 0) {
+      return dbModules as PlanModule[];
+    }
+    // Fallback to static config
+    return getStaticEnabledModules(planInfo.plan);
+  }, [planInfo.plan, dbPlanModules])();
 
   const hasModule = useCallback(
-    (module: PlanModule) => isModuleEnabled(planInfo.plan, module),
-    [planInfo.plan]
+    (module: PlanModule) => {
+      const dbModules = dbPlanModules[planInfo.plan];
+      if (dbModules && dbModules.length > 0) {
+        return dbModules.includes(module);
+      }
+      // Fallback to static
+      return isStaticModuleEnabled(planInfo.plan, module);
+    },
+    [planInfo.plan, dbPlanModules]
   );
 
   const hasAnyModule = useCallback(
@@ -125,8 +203,11 @@ export function usePlanFeatures(): UsePlanFeaturesReturn {
   );
 
   const getModuleName = useCallback(
-    (module: PlanModule) => MODULE_DISPLAY_NAMES[module] || module,
-    []
+    (module: PlanModule) => {
+      // Prefer DB name, fallback to static
+      return dbModuleNames[module] || MODULE_DISPLAY_NAMES[module] || module;
+    },
+    [dbModuleNames]
   );
 
   return {
