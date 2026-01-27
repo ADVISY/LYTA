@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,29 +35,33 @@ const categoryIcons: Record<string, any> = {
   other: Shield,
 };
 
-const categoryLabels: Record<string, string> = {
-  health: "Santé",
-  auto: "Auto",
-  home: "Ménage/RC",
-  life: "Vie/Prévoyance",
-  legal: "Protection juridique",
-  property: "Ménage/RC",
-  multi: "Multi-produits",
-  other: "Autre",
-};
+const getCategoryLabels = (t: (key: string) => string): Record<string, string> => ({
+  health: t('clientSpace.categories.health'),
+  auto: t('clientSpace.categories.auto'),
+  home: t('clientSpace.categories.home'),
+  life: t('clientSpace.categories.life'),
+  legal: t('clientSpace.categories.legal'),
+  property: t('clientSpace.categories.property'),
+  multi: t('clientSpace.categories.multi'),
+  other: t('clientSpace.categories.other'),
+});
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any; color: string }> = {
-  active: { label: "Actif", variant: "default", icon: CheckCircle2, color: "text-emerald-600" },
-  pending: { label: "En attente", variant: "secondary", icon: Clock, color: "text-amber-600" },
-  cancelled: { label: "Résilié", variant: "destructive", icon: AlertCircle, color: "text-destructive" },
-};
+const getStatusConfig = (t: (key: string) => string): Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any; color: string }> => ({
+  active: { label: t('clientSpace.status.active'), variant: "default", icon: CheckCircle2, color: "text-emerald-600" },
+  pending: { label: t('clientSpace.status.pending'), variant: "secondary", icon: Clock, color: "text-amber-600" },
+  cancelled: { label: t('clientSpace.status.cancelled'), variant: "destructive", icon: AlertCircle, color: "text-destructive" },
+});
 
 export default function ClientContracts() {
+  const { t } = useTranslation();
   const { clientData } = useOutletContext<{ user: any; clientData: any }>();
   const [contracts, setContracts] = useState<any[]>([]);
   const [policyDocuments, setPolicyDocuments] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  const categoryLabels = getCategoryLabels(t);
+  const statusConfig = getStatusConfig(t);
 
   useEffect(() => {
     if (clientData?.id) {
@@ -154,8 +159,8 @@ export default function ClientContracts() {
   return (
     <div className="space-y-4 lg:space-y-6">
       <div>
-        <h1 className="text-xl lg:text-2xl font-bold">Mes contrats</h1>
-        <p className="text-sm lg:text-base text-muted-foreground">Retrouvez tous vos contrats d'assurance</p>
+        <h1 className="text-xl lg:text-2xl font-bold">{t('clientSpace.myContracts')}</h1>
+        <p className="text-sm lg:text-base text-muted-foreground">{t('clientSpace.findAllContracts')}</p>
       </div>
 
       {/* Stats - Horizontal scroll on mobile */}
@@ -167,7 +172,7 @@ export default function ClientContracts() {
             </div>
             <div>
               <p className="text-xl lg:text-2xl font-bold">{activeContracts.length}</p>
-              <p className="text-[10px] lg:text-sm text-muted-foreground">Contrats actifs</p>
+              <p className="text-[10px] lg:text-sm text-muted-foreground">{t('clientSpace.activeContracts')}</p>
             </div>
           </CardContent>
         </Card>
@@ -178,7 +183,7 @@ export default function ClientContracts() {
             </div>
             <div>
               <p className="text-xl lg:text-2xl font-bold">{contracts.length}</p>
-              <p className="text-[10px] lg:text-sm text-muted-foreground">Total contrats</p>
+              <p className="text-[10px] lg:text-sm text-muted-foreground">{t('clientSpace.totalContracts')}</p>
             </div>
           </CardContent>
         </Card>
@@ -191,7 +196,7 @@ export default function ClientContracts() {
               <p className="text-lg lg:text-2xl font-bold">
                 {formatCurrency(activeContracts.reduce((sum, c) => sum + (Number(c.premium_monthly) || 0), 0))}
               </p>
-              <p className="text-[10px] lg:text-sm text-muted-foreground">Prime mensuelle</p>
+              <p className="text-[10px] lg:text-sm text-muted-foreground">{t('clientSpace.monthlyPremium')}</p>
             </div>
           </CardContent>
         </Card>
@@ -202,9 +207,9 @@ export default function ClientContracts() {
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-base lg:text-lg font-medium mb-2">Aucun contrat</h3>
+            <h3 className="text-base lg:text-lg font-medium mb-2">{t('clientSpace.noContract')}</h3>
             <p className="text-sm text-muted-foreground">
-              Vous n'avez pas encore de contrat enregistré
+              {t('clientSpace.noContractRegistered')}
             </p>
           </CardContent>
         </Card>
@@ -245,7 +250,7 @@ export default function ClientContracts() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5 lg:mb-1 flex-wrap">
                             <CardTitle className="text-sm lg:text-base truncate">
-                              {contract.product?.name || categoryLabels[category] || 'Contrat'}
+                              {contract.product?.name || categoryLabels[category] || t('contracts.title')}
                             </CardTitle>
                             <Badge variant={status.variant} className="gap-1 text-[10px] lg:text-xs h-5 lg:h-6 flex-shrink-0">
                               <StatusIcon className="h-2.5 w-2.5 lg:h-3 lg:w-3" />
@@ -279,20 +284,20 @@ export default function ClientContracts() {
                         {/* Contract Details */}
                         <div className="space-y-3 lg:space-y-4">
                           <h4 className="font-medium text-xs lg:text-sm text-muted-foreground uppercase tracking-wide">
-                            Détails du contrat
+                            {t('clientSpace.contractDetails')}
                           </h4>
                           <div className="space-y-2 lg:space-y-3">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span className="text-xs lg:text-sm">
-                                Début: {format(new Date(contract.start_date), 'dd MMM yyyy', { locale: fr })}
+                                {t('clientSpace.startDate')}: {format(new Date(contract.start_date), 'dd MMM yyyy', { locale: fr })}
                               </span>
                             </div>
                             {contract.end_date && (
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                 <span className="text-xs lg:text-sm">
-                                  Fin: {format(new Date(contract.end_date), 'dd MMM yyyy', { locale: fr })}
+                                  {t('clientSpace.endDate')}: {format(new Date(contract.end_date), 'dd MMM yyyy', { locale: fr })}
                                 </span>
                               </div>
                             )}
@@ -300,7 +305,7 @@ export default function ClientContracts() {
                               <div className="flex items-center gap-2">
                                 <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                 <span className="text-xs lg:text-sm">
-                                  Franchise: {formatCurrency(Number(contract.deductible))}
+                                  {t('clientSpace.deductible')}: {formatCurrency(Number(contract.deductible))}
                                 </span>
                               </div>
                             )}
@@ -308,10 +313,10 @@ export default function ClientContracts() {
                         </div>
                         
                         {/* Products included */}
-                        {productsData && productsData.length > 0 && (
-                          <div className="space-y-3 lg:space-y-4">
-                            <h4 className="font-medium text-xs lg:text-sm text-muted-foreground uppercase tracking-wide">
-                              Produits inclus
+                          {productsData && productsData.length > 0 && (
+                            <div className="space-y-3 lg:space-y-4">
+                              <h4 className="font-medium text-xs lg:text-sm text-muted-foreground uppercase tracking-wide">
+                                {t('clientSpace.productsIncluded')}
                             </h4>
                             <div className="space-y-2">
                               {productsData.map((prod, idx) => (
@@ -338,7 +343,7 @@ export default function ClientContracts() {
                               onClick={() => handleViewDocument(policyDocuments[contract.id])}
                             >
                               <Eye className="h-4 w-4" />
-                              Voir la police
+                              {t('clientSpace.viewPolicy')}
                             </Button>
                             <Button 
                               variant="outline" 
@@ -347,7 +352,7 @@ export default function ClientContracts() {
                               onClick={() => handleDownloadDocument(policyDocuments[contract.id])}
                             >
                               <Download className="h-4 w-4" />
-                              Télécharger
+                              {t('clientSpace.download')}
                             </Button>
                           </div>
                         ) : (
@@ -356,9 +361,9 @@ export default function ClientContracts() {
                               <AlertCircle className="h-4 w-4 text-amber-600" />
                             </div>
                             <div>
-                              <p className="text-xs lg:text-sm font-medium">Document non disponible</p>
+                              <p className="text-xs lg:text-sm font-medium">{t('clientSpace.documentUnavailable')}</p>
                               <p className="text-[10px] lg:text-xs text-muted-foreground">
-                                La police sera ajoutée par votre conseiller
+                                {t('clientSpace.policyWillBeAdded')}
                               </p>
                             </div>
                           </div>

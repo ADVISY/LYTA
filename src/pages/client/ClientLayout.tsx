@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/hooks/useTheme";
@@ -27,17 +28,18 @@ import {
 import { cn } from "@/lib/utils";
 import { useTenant } from "@/contexts/TenantContext";
 
-const menuItems = [
-  { to: "/espace-client", icon: Home, label: "Accueil", end: true },
-  { to: "/espace-client/contrats", icon: FileText, label: "Mes contrats" },
-  { to: "/espace-client/documents", icon: FolderOpen, label: "Mes documents" },
-  { to: "/espace-client/sinistres", icon: AlertTriangle, label: "Sinistres" },
-  { to: "/espace-client/messages", icon: MessageCircle, label: "Messages" },
-  { to: "/espace-client/notifications", icon: Bell, label: "Notifications" },
-  { to: "/espace-client/profil", icon: User, label: "Mon profil" },
+const getMenuItems = (t: (key: string) => string) => [
+  { to: "/espace-client", icon: Home, label: t('clientSpace.home'), end: true },
+  { to: "/espace-client/contrats", icon: FileText, label: t('clientSpace.myContracts') },
+  { to: "/espace-client/documents", icon: FolderOpen, label: t('clientSpace.myDocuments') },
+  { to: "/espace-client/sinistres", icon: AlertTriangle, label: t('clientSpace.claims') },
+  { to: "/espace-client/messages", icon: MessageCircle, label: t('clientSpace.messages') },
+  { to: "/espace-client/notifications", icon: Bell, label: t('clientSpace.notifications') },
+  { to: "/espace-client/profil", icon: User, label: t('clientSpace.myProfile') },
 ];
 
 export default function ClientLayout() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -53,6 +55,8 @@ export default function ClientLayout() {
   // Get tenant branding
   const tenantLogo = tenant?.branding?.logo_url;
   const tenantName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
+  
+  const menuItems = getMenuItems(t);
 
   // Set page title for Client space
   useEffect(() => {
@@ -133,8 +137,8 @@ export default function ClientLayout() {
       console.log("Logout completed (session may have been expired)");
     }
     toast({
-      title: "Déconnexion",
-      description: "Vous avez été déconnecté avec succès",
+      title: t('auth.logout'),
+      description: t('auth.logoutSuccess'),
     });
     navigate("/connexion");
   };
@@ -233,14 +237,14 @@ export default function ClientLayout() {
             <div className="flex items-center justify-center gap-2 mt-3">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               <p className="text-xs text-muted-foreground">
-                Espace Client • en ligne
+                {t('clientSpace.title')} • {t('clientSpace.online')}
               </p>
             </div>
             
             {/* Advisor Info */}
             {advisorData && (
               <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 text-center">Votre conseiller</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 text-center">{t('clientSpace.yourAdvisor')}</p>
                 <div className="flex items-center gap-3">
                   {advisorData.photo_url ? (
                     <img 
@@ -322,7 +326,7 @@ export default function ClientLayout() {
                         <LogOut className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right">Déconnexion</TooltipContent>
+                    <TooltipContent side="right">{t('clientSpace.logout')}</TooltipContent>
                   </Tooltip>
                 </div>
               ) : (
@@ -345,7 +349,7 @@ export default function ClientLayout() {
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    Déconnexion
+                    {t('clientSpace.logout')}
                   </Button>
                 </>
               )}
@@ -391,7 +395,7 @@ export default function ClientLayout() {
                 {/* Advisor Info in slide menu */}
                 {advisorData && (
                   <div className="p-4 border-b border-border">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Votre conseiller</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">{t('clientSpace.yourAdvisor')}</p>
                     <div className="flex items-center gap-3">
                       {advisorData.photo_url ? (
                         <img 
@@ -434,7 +438,7 @@ export default function ClientLayout() {
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    Déconnexion
+                    {t('clientSpace.logout')}
                   </Button>
                 </div>
               </SheetContent>

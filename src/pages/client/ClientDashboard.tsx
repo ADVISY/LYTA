@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,11 +41,11 @@ const categoryIcons: Record<string, any> = {
   other: Shield,
 };
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
-  active: { label: "Actif", variant: "default", icon: CheckCircle2 },
-  pending: { label: "En attente", variant: "secondary", icon: Clock },
-  cancelled: { label: "Résilié", variant: "destructive", icon: AlertCircle },
-};
+const getStatusConfig = (t: (key: string) => string): Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> => ({
+  active: { label: t('clientSpace.status.active'), variant: "default", icon: CheckCircle2 },
+  pending: { label: t('clientSpace.status.pending'), variant: "secondary", icon: Clock },
+  cancelled: { label: t('clientSpace.status.cancelled'), variant: "destructive", icon: AlertCircle },
+});
 
 type AdvisorData = {
   id: string;
@@ -57,6 +58,7 @@ type AdvisorData = {
 };
 
 export default function ClientDashboard() {
+  const { t } = useTranslation();
   const { user, clientData, advisorData } = useOutletContext<{ 
     user: any; 
     clientData: any; 
@@ -64,6 +66,7 @@ export default function ClientDashboard() {
   }>();
   const navigate = useNavigate();
   const { tenant } = useTenant();
+  const statusConfig = getStatusConfig(t);
   const [contracts, setContracts] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,10 +158,10 @@ export default function ClientDashboard() {
       {/* Welcome Header */}
       <div>
         <h1 className="text-xl lg:text-2xl font-bold">
-          Bienvenue {getFirstName()} 👋
+          {t('clientSpace.welcome', { name: getFirstName() })}
         </h1>
         <p className="text-sm lg:text-base text-muted-foreground">
-          Retrouvez toutes vos assurances
+          {t('clientSpace.findAllInsurances')}
         </p>
       </div>
 
@@ -171,7 +174,7 @@ export default function ClientDashboard() {
                 <FileText className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-muted-foreground">Contrats actifs</p>
+                <p className="text-xs lg:text-sm text-muted-foreground">{t('clientSpace.activeContracts')}</p>
                 <p className="text-xl lg:text-2xl font-bold">{activeContracts}</p>
               </div>
             </div>
@@ -185,7 +188,7 @@ export default function ClientDashboard() {
                 <Shield className="h-5 w-5 lg:h-6 lg:w-6 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-muted-foreground">Prime mensuelle</p>
+                <p className="text-xs lg:text-sm text-muted-foreground">{t('clientSpace.monthlyPremium')}</p>
                 <p className="text-xl lg:text-2xl font-bold">{formatCurrency(totalPremium)}</p>
               </div>
             </div>
@@ -199,7 +202,7 @@ export default function ClientDashboard() {
                 <MessageCircle className="h-5 w-5 lg:h-6 lg:w-6 text-accent-foreground" />
               </div>
               <div>
-                <p className="text-xs lg:text-sm text-muted-foreground">Documents</p>
+                <p className="text-xs lg:text-sm text-muted-foreground">{t('clientSpace.documents')}</p>
                 <p className="text-xl lg:text-2xl font-bold">{documents.length}</p>
               </div>
             </div>
@@ -214,11 +217,11 @@ export default function ClientDashboard() {
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
             <CardHeader className="pb-2 lg:pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm lg:text-base flex items-center gap-2">
+            <CardTitle className="text-sm lg:text-base flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  Votre conseiller
+                  {t('clientSpace.yourAdvisor')}
                 </CardTitle>
-                <Badge variant="secondary" className="text-[10px] lg:text-xs">Personnel</Badge>
+                <Badge variant="secondary" className="text-[10px] lg:text-xs">{t('clientSpace.personal')}</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -237,7 +240,7 @@ export default function ClientDashboard() {
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-base lg:text-lg">{getAdvisorName()}</p>
-                  <p className="text-xs lg:text-sm text-muted-foreground">Conseiller assurance</p>
+                  <p className="text-xs lg:text-sm text-muted-foreground">{t('clientSpace.insuranceAdvisor')}</p>
                   {advisorData?.email && (
                     <a 
                       href={`mailto:${advisorData.email}`}
@@ -320,7 +323,7 @@ export default function ClientDashboard() {
                 onClick={() => navigate('/espace-client/messages')}
               >
                 <Send className="h-4 w-4" />
-                <span className="hidden sm:inline">Contacter</span>
+                <span className="hidden sm:inline">{t('clientSpace.contact')}</span>
               </Button>
             </div>
           </CardContent>
@@ -330,25 +333,25 @@ export default function ClientDashboard() {
       {/* Quick Actions - Horizontal scroll on mobile */}
       <Card>
         <CardHeader className="pb-2 lg:pb-3">
-          <CardTitle className="text-sm lg:text-base">Actions rapides</CardTitle>
+          <CardTitle className="text-sm lg:text-base">{t('clientSpace.quickActions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 lg:gap-3 overflow-x-auto pb-1 -mx-2 px-2 lg:mx-0 lg:px-0 lg:flex-wrap scrollbar-hide">
             <Button variant="outline" className="gap-2 flex-shrink-0 h-10 lg:h-11 text-xs lg:text-sm" onClick={() => navigate('/espace-client/sinistres')}>
               <AlertTriangle className="h-4 w-4" />
-              Déclarer un sinistre
+              {t('clientSpace.declareClaim')}
             </Button>
             <Button variant="outline" className="gap-2 flex-shrink-0 h-10 lg:h-11 text-xs lg:text-sm" onClick={() => navigate('/espace-client/messages')}>
               <Send className="h-4 w-4" />
-              Contacter
+              {t('clientSpace.contact')}
             </Button>
             <Button variant="outline" className="gap-2 flex-shrink-0 h-10 lg:h-11 text-xs lg:text-sm" onClick={() => navigate('/espace-client/contrats')}>
               <Eye className="h-4 w-4" />
-              Mes contrats
+              {t('clientSpace.myContracts')}
             </Button>
             <Button variant="outline" className="gap-2 flex-shrink-0 h-10 lg:h-11 text-xs lg:text-sm" onClick={() => navigate('/espace-client/documents')}>
               <FileText className="h-4 w-4" />
-              Documents
+              {t('clientSpace.documents')}
             </Button>
           </div>
         </CardContent>
@@ -358,11 +361,11 @@ export default function ClientDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2 lg:pb-3">
           <div>
-            <CardTitle className="text-sm lg:text-base">Vos contrats récents</CardTitle>
-            <p className="text-xs lg:text-sm text-muted-foreground">Aperçu de vos assurances</p>
+            <CardTitle className="text-sm lg:text-base">{t('clientSpace.yourRecentContracts')}</CardTitle>
+            <p className="text-xs lg:text-sm text-muted-foreground">{t('clientSpace.insuranceOverview')}</p>
           </div>
           <Button variant="ghost" size="sm" className="gap-1 text-xs lg:text-sm h-8 lg:h-9" onClick={() => navigate('/espace-client/contrats')}>
-            Voir tout
+            {t('clientSpace.seeAll')}
             <ChevronRight className="h-4 w-4" />
           </Button>
         </CardHeader>
@@ -372,9 +375,9 @@ export default function ClientDashboard() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
             </div>
           ) : contracts.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Aucun contrat pour le moment</p>
+              <p>{t('clientSpace.noContractsYet')}</p>
             </div>
           ) : (
             <div className="space-y-2 lg:space-y-3">
@@ -425,8 +428,8 @@ export default function ClientDashboard() {
       {/* Recent Documents */}
       {documents.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 lg:pb-3">
-            <CardTitle className="text-sm lg:text-base">Documents récents</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-2 lg:pb-3">
+            <CardTitle className="text-sm lg:text-base">{t('clientSpace.recentDocuments')}</CardTitle>
             <Button variant="ghost" size="sm" className="gap-1 text-xs lg:text-sm h-8 lg:h-9" onClick={() => navigate('/espace-client/documents')}>
               Voir tout
               <ChevronRight className="h-4 w-4" />
