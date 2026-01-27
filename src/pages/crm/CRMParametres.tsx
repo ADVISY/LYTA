@@ -69,7 +69,11 @@ export default function CRMParametres() {
   const { tenantId } = useUserTenant();
   const tenantSeats = useTenantSeats();
   const { role } = useUserRole();
-  const [activeTab, setActiveTab] = useState("profil");
+  
+  // Check URL params for tab selection (e.g., ?tab=abonnement)
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabFromUrl = urlParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "profil");
   const [showUnlockSeatDialog, setShowUnlockSeatDialog] = useState(false);
   
   const isAdmin = role === "admin";

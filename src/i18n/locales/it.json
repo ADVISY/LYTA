@@ -1688,5 +1688,18 @@
     "cancel": "Annulla",
     "uploadingFiles": "Caricamento file...",
     "submitDeclaration": "Invia dichiarazione"
+  },
+  "plans": {
+    "moduleNotAvailable": "Modulo non disponibile",
+    "moduleNotIncluded": "Modulo non incluso",
+    "notIncludedIn": "non è incluso nella tua offerta",
+    "notAvailableWith": "non è disponibile con la tua offerta",
+    "upgradeNow": "Aggiorna ora",
+    "seeAvailablePlans": "Vedi offerte disponibili",
+    "availableWith": "Disponibile con:",
+    "contactAdmin": "Contatta il tuo amministratore o passa a un'offerta superiore per accedere a questa funzionalità.",
+    "pro": "Pro",
+    "featureLocked": "Funzionalità bloccata",
+    "upgradeToAccess": "Passa a un'offerta superiore per sbloccare questa funzionalità"
   }
 }

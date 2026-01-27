@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -27,12 +27,15 @@ import {
   Zap,
   Globe,
   LucideIcon,
+  Lock,
+  Crown,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageSelector } from "@/components/ui/language-selector";
@@ -75,16 +78,10 @@ export default function CRMLayout() {
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Filter menu items based on plan
-  const menuItems = useMemo(() => {
-    const allMenuItems = getMenuItems(t);
-    return allMenuItems.filter((item) => {
-      // Items without requiredModule are always visible
-      if (!item.requiredModule) return true;
-      // Check if the module is enabled in the current plan
-      return hasModule(item.requiredModule);
-    });
-  }, [hasModule, t]);
+  const navigate = useNavigate();
+  
+  // Get all menu items (don't filter, we'll show locked ones differently)
+  const allMenuItems = useMemo(() => getMenuItems(t), [t]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {
@@ -145,7 +142,51 @@ export default function CRMLayout() {
 
   const NavItems = ({ onItemClick, collapsed = false }: { onItemClick?: () => void; collapsed?: boolean }) => (
     <div className="space-y-1">
-      {menuItems.map((item) => {
+      {allMenuItems.map((item) => {
+        const isLocked = item.requiredModule && !hasModule(item.requiredModule);
+        
+        // For locked items, show a non-clickable element with lock icon
+        if (isLocked) {
+          const lockedContent = (
+            <div
+              key={item.to}
+              className={cn(
+                "flex items-center gap-3 rounded-lg transition-colors cursor-not-allowed opacity-50",
+                collapsed ? "px-3 py-2.5 justify-center" : "px-3 py-2.5",
+                "text-muted-foreground"
+              )}
+              onClick={() => navigate('/crm/parametres?tab=abonnement')}
+              style={{ cursor: 'pointer', opacity: 0.6 }}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="text-sm font-medium flex-1">{item.label}</span>
+                  <Lock className="h-3 w-3 text-amber-500" />
+                </>
+              )}
+            </div>
+          );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={item.to} delayDuration={0}>
+                <TooltipTrigger asChild>{lockedContent}</TooltipTrigger>
+                <TooltipContent side="right" className="font-medium flex items-center gap-2">
+                  {item.label}
+                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-50 dark:bg-amber-950/20">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Pro
+                  </Badge>
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          return lockedContent;
+        }
+        
+        // Normal unlocked item
         const linkContent = (
           <NavLink
             key={item.to}
