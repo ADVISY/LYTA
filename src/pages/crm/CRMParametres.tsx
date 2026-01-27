@@ -13,19 +13,23 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
-  Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock
+  Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
+  CreditCard
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { useTenantSeats } from "@/hooks/useTenantSeats";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
+import { CabinetInfoSettings } from "@/components/crm/settings/CabinetInfoSettings";
+import CRMAbonnement from "@/pages/crm/CRMAbonnement";
 
 // Couleurs disponibles pour le thème - needs to be inside component to use translations
 const getThemeColors = (t: any) => [
@@ -64,9 +68,11 @@ export default function CRMParametres() {
   const { user, session } = useAuth();
   const { tenantId } = useUserTenant();
   const tenantSeats = useTenantSeats();
+  const { role } = useUserRole();
   const [activeTab, setActiveTab] = useState("profil");
   const [showUnlockSeatDialog, setShowUnlockSeatDialog] = useState(false);
   
+  const isAdmin = role === "admin";
   const themeColors = getThemeColors(t);
   const roleLabels = getRoleLabels(t);
   
@@ -657,6 +663,18 @@ export default function CRMParametres() {
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">{t('settings.profile')}</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="cabinet" className="gap-2 whitespace-nowrap">
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('settings.cabinet')}</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="abonnement" className="gap-2 whitespace-nowrap">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('subscription.title')}</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="comptes" className="gap-2 whitespace-nowrap">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">{t('settings.accounts')}</span>
@@ -815,6 +833,20 @@ export default function CRMParametres() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* CABINET INFO - Admin only */}
+        {isAdmin && (
+          <TabsContent value="cabinet" className="space-y-6 mt-6">
+            <CabinetInfoSettings />
+          </TabsContent>
+        )}
+
+        {/* ABONNEMENT - Admin only */}
+        {isAdmin && (
+          <TabsContent value="abonnement" className="space-y-6 mt-6">
+            <CRMAbonnement />
+          </TabsContent>
+        )}
 
         {/* GESTION DES COMPTES */}
         <TabsContent value="comptes" className="space-y-6 mt-6">
