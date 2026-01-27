@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, RefreshCw, ShieldCheck, X } from "lucide-react";
@@ -24,6 +25,7 @@ export function SmsVerificationDialog({
   onVerified,
   onCancel,
 }: SmsVerificationDialogProps) {
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -61,15 +63,15 @@ export function SmsVerificationDialog({
 
       if (data.simulated && data.testCode) {
         setTestCode(data.testCode);
-        toast.info("Mode test: code affiché ci-dessous");
+        toast.info(t('smsVerification.testModeInfo'));
       } else {
-        toast.success("Code envoyé par SMS");
+        toast.success(t('smsVerification.codeSent'));
       }
 
       setCountdown(60); // 60 seconds before resend
     } catch (error) {
       console.error("Error sending SMS:", error);
-      toast.error("Erreur lors de l'envoi du SMS");
+      toast.error(t('smsVerification.sendError'));
     } finally {
       setSending(false);
     }
@@ -77,7 +79,7 @@ export function SmsVerificationDialog({
 
   const verifyCode = async () => {
     if (code.length !== 6) {
-      toast.error("Veuillez entrer le code à 6 chiffres");
+      toast.error(t('smsVerification.enter6Digit'));
       return;
     }
 
@@ -94,19 +96,19 @@ export function SmsVerificationDialog({
       if (error) throw error;
 
       if (data.success) {
-        toast.success("Vérification réussie !");
+        toast.success(t('smsVerification.verificationSuccess'));
         onOpenChange(false);
         // Small delay to ensure dialog closes before calling onVerified
         setTimeout(() => {
           onVerified();
         }, 100);
       } else {
-        toast.error(data.error || "Code incorrect");
+        toast.error(data.error || t('smsVerification.invalidCode'));
         setCode("");
       }
     } catch (error: any) {
       console.error("Error verifying code:", error);
-      const message = error?.message || "Erreur de vérification";
+      const message = error?.message || t('smsVerification.verifyError');
       toast.error(message);
       setCode("");
     } finally {
@@ -134,12 +136,12 @@ export function SmsVerificationDialog({
           <div className="space-y-1">
             <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight">
               <ShieldCheck className="h-5 w-5 text-primary" />
-              Vérification SMS
+              {t('smsVerification.title')}
             </h2>
             <p className="text-sm text-muted-foreground">
               {verificationType === "login"
-                ? "Pour sécuriser votre connexion, entrez le code envoyé par SMS."
-                : "Pour valider le dépôt de contrat, entrez le code envoyé par SMS."}
+                ? t('smsVerification.descriptionLogin')
+                : t('smsVerification.descriptionContract')}
             </p>
           </div>
 
@@ -148,7 +150,7 @@ export function SmsVerificationDialog({
             variant="ghost"
             size="icon"
             onClick={handleCancel}
-            aria-label="Fermer"
+            aria-label={t('smsVerification.close')}
             className="shrink-0"
           >
             <X className="h-4 w-4" />
@@ -159,14 +161,14 @@ export function SmsVerificationDialog({
           {/* Phone display */}
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
             <Phone className="h-4 w-4" />
-            <span>Code envoyé au {maskedPhone}</span>
+            <span>{t('smsVerification.codeSentTo')} {maskedPhone}</span>
           </div>
 
           {/* Test code display (simulation mode) */}
           {testCode && (
             <div className="rounded-lg border bg-muted p-3 text-center">
               <p className="text-sm font-medium">
-                Mode test - Code: <span className="font-mono text-lg">{testCode}</span>
+                {t('smsVerification.testMode')} <span className="font-mono text-lg">{testCode}</span>
               </p>
             </div>
           )}
@@ -193,18 +195,18 @@ export function SmsVerificationDialog({
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              {countdown > 0 ? `Renvoyer dans ${countdown}s` : "Renvoyer le code"}
+              {countdown > 0 ? t('smsVerification.resendIn', { seconds: countdown }) : t('smsVerification.resendCode')}
             </Button>
           </div>
 
           {/* Actions */}
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={handleCancel} disabled={loading}>
-              Annuler
+              {t('smsVerification.cancel')}
             </Button>
             <Button className="flex-1" onClick={verifyCode} disabled={loading || code.length !== 6}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Vérifier
+              {t('smsVerification.verify')}
             </Button>
           </div>
         </div>

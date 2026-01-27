@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,7 @@ type AdvisorData = {
 };
 
 export default function ClientMessages() {
+  const { t } = useTranslation();
   const { clientData, advisorData } = useOutletContext<{ 
     user: any; 
     clientData: any; 
@@ -57,8 +59,8 @@ export default function ClientMessages() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     toast({
-      title: "Message envoyé",
-      description: "Votre conseiller vous répondra dans les plus brefs délais",
+      title: t('clientMessages.messageSent'),
+      description: t('clientMessages.messageSuccessDescription'),
     });
     
     setMessage("");
@@ -94,8 +96,8 @@ export default function ClientMessages() {
   return (
     <div className="space-y-4 lg:space-y-6">
       <div>
-        <h1 className="text-xl lg:text-2xl font-bold">Messages</h1>
-        <p className="text-sm lg:text-base text-muted-foreground">Contactez votre conseiller {cabinetName}</p>
+        <h1 className="text-xl lg:text-2xl font-bold">{t('clientMessages.title')}</h1>
+        <p className="text-sm lg:text-base text-muted-foreground">{t('clientMessages.subtitle', { cabinet: cabinetName })}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
@@ -105,12 +107,12 @@ export default function ClientMessages() {
             <CardHeader className="pb-2 lg:pb-4">
               <CardTitle className="text-base lg:text-lg flex items-center gap-2">
                 <MessageCircle className="h-4 w-4 lg:h-5 lg:w-5" />
-                Envoyer un message
+                {t('clientMessages.sendMessage')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 lg:space-y-4">
               <Textarea
-                placeholder="Écrivez votre message ici..."
+                placeholder={t('clientMessages.placeholder')}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={5}
@@ -122,7 +124,7 @@ export default function ClientMessages() {
                 className="gap-2 w-full sm:w-auto h-11"
               >
                 <Send className="h-4 w-4" />
-                {sending ? "Envoi en cours..." : "Envoyer"}
+                {sending ? t('clientMessages.sending') : t('clientMessages.send')}
               </Button>
             </CardContent>
           </Card>
@@ -130,13 +132,13 @@ export default function ClientMessages() {
           {/* Message History Placeholder */}
           <Card>
             <CardHeader className="pb-2 lg:pb-4">
-              <CardTitle className="text-base lg:text-lg">Historique des messages</CardTitle>
+              <CardTitle className="text-base lg:text-lg">{t('clientMessages.history')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-6 lg:py-8 text-muted-foreground">
                 <MessageCircle className="h-10 w-10 lg:h-12 lg:w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm lg:text-base">Aucun message pour le moment</p>
-                <p className="text-xs lg:text-sm">Vos échanges apparaîtront ici</p>
+                <p className="text-sm lg:text-base">{t('clientMessages.noMessages')}</p>
+                <p className="text-xs lg:text-sm">{t('clientMessages.messagesWillAppear')}</p>
               </div>
             </CardContent>
           </Card>
@@ -149,8 +151,8 @@ export default function ClientMessages() {
             <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
               <CardHeader className="pb-2 lg:pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base lg:text-lg">Votre conseiller</CardTitle>
-                  <Badge variant="secondary" className="text-[10px] lg:text-xs">Personnel</Badge>
+                  <CardTitle className="text-base lg:text-lg">{t('clientMessages.yourAdvisor')}</CardTitle>
+                  <Badge variant="secondary" className="text-[10px] lg:text-xs">{t('clientMessages.personal')}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 lg:space-y-4">
@@ -159,7 +161,7 @@ export default function ClientMessages() {
                     {advisorData?.photo_url ? (
                       <AvatarImage 
                         src={advisorData.photo_url} 
-                        alt={getAdvisorName() || "Conseiller"}
+                        alt={getAdvisorName() || t('clientMessages.insuranceAdvisor')}
                         className="object-cover"
                       />
                     ) : null}
@@ -169,7 +171,7 @@ export default function ClientMessages() {
                   </Avatar>
                   <div>
                     <p className="font-semibold text-base lg:text-lg">{getAdvisorName()}</p>
-                    <p className="text-xs lg:text-sm text-muted-foreground">Conseiller assurance</p>
+                    <p className="text-xs lg:text-sm text-muted-foreground">{t('clientMessages.insuranceAdvisor')}</p>
                   </div>
                 </div>
                 
@@ -207,8 +209,8 @@ export default function ClientMessages() {
                           </svg>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">WhatsApp</p>
-                          <p className="text-xs text-muted-foreground">Discuter maintenant</p>
+                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{t('clientMessages.whatsapp')}</p>
+                          <p className="text-xs text-muted-foreground">{t('clientMessages.chatNow')}</p>
                         </div>
                       </a>
                     </>
@@ -279,8 +281,8 @@ export default function ClientMessages() {
               <div className="flex items-center gap-3 pt-2 border-t text-xs lg:text-sm">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Horaires</p>
-                  <p className="text-muted-foreground">Lun-Ven: 9h-18h</p>
+                  <p className="font-medium">{t('clientMessages.openingHours')}</p>
+                  <p className="text-muted-foreground">{t('clientMessages.openingHoursValue')}</p>
                 </div>
               </div>
             </CardContent>
@@ -290,18 +292,18 @@ export default function ClientMessages() {
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="p-3 lg:p-4">
               <p className="text-xs lg:text-sm text-center">
-                <span className="font-medium">Besoin d'aide urgente?</span>
+                <span className="font-medium">{t('clientMessages.urgentHelp')}</span>
                 <br />
                 {getAdvisorPhone() ? (
                   <a href={`tel:${formatPhoneForLink(getAdvisorPhone()!)}`} className="text-primary hover:underline font-medium">
-                    Appelez {getAdvisorName() || "votre conseiller"}
+                    {t('clientMessages.callAdvisor', { name: getAdvisorName() || t('clientMessages.yourAdvisor') })}
                   </a>
                 ) : cabinetPhone ? (
                   <a href={`tel:${formatPhoneForLink(cabinetPhone)}`} className="text-primary hover:underline font-medium">
-                    Appelez le cabinet
+                    {t('clientMessages.callCabinet')}
                   </a>
                 ) : (
-                  <span className="text-muted-foreground">Contactez votre conseiller</span>
+                  <span className="text-muted-foreground">{t('clientMessages.contactAdvisor')}</span>
                 )}
               </p>
             </CardContent>

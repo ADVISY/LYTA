@@ -411,7 +411,7 @@ export default function ClientDashboard() {
                       <p className="text-xs lg:text-sm text-muted-foreground truncate">{contract.company_name || contract.product?.company?.name}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="font-semibold text-sm lg:text-base">{formatCurrency(Number(contract.premium_monthly) || 0)}<span className="text-xs text-muted-foreground">/mois</span></p>
+                      <p className="font-semibold text-sm lg:text-base">{formatCurrency(Number(contract.premium_monthly) || 0)}<span className="text-xs text-muted-foreground">{t('clientSpace.perMonth')}</span></p>
                       <Badge variant={status.variant} className="gap-1 text-[10px] lg:text-xs h-5 lg:h-6">
                         <StatusIcon className="h-3 w-3" />
                         {status.label}

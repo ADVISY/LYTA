@@ -265,10 +265,10 @@ export default function ClientContracts() {
                         <div className="text-right flex-shrink-0">
                           <p className="font-bold text-sm lg:text-lg">
                             {formatCurrency(Number(contract.premium_monthly) || 0)}
-                            <span className="text-[10px] lg:text-sm font-normal text-muted-foreground">/mois</span>
+                            <span className="text-[10px] lg:text-sm font-normal text-muted-foreground">{t('clientSpace.perMonth')}</span>
                           </p>
                           <p className="text-[10px] lg:text-sm text-muted-foreground hidden sm:block">
-                            {formatCurrency(Number(contract.premium_yearly) || 0)}/an
+                            {formatCurrency(Number(contract.premium_yearly) || 0)}{t('clientSpace.perYear')}
                           </p>
                         </div>
                         <Button variant="ghost" size="icon" className="h-8 w-8 lg:h-10 lg:w-10 flex-shrink-0">
@@ -323,7 +323,7 @@ export default function ClientContracts() {
                                 <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
                                   <span className="text-xs lg:text-sm">{prod.name}</span>
                                   <span className="text-xs lg:text-sm font-medium">
-                                    {formatCurrency(prod.premium || 0)}/mois
+                                    {formatCurrency(prod.premium || 0)}{t('clientSpace.perMonth')}
                                   </span>
                                 </div>
                               ))}
