@@ -1943,6 +1943,117 @@ export type Database = {
           },
         ]
       }
+      plan_modules: {
+        Row: {
+          created_at: string
+          id: string
+          module_id: string
+          plan_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          module_id: string
+          plan_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          module_id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "platform_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_modules_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_modules: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          display_name: string
+          icon: string | null
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          display_name: string
+          icon?: string | null
+          id: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          icon?: string | null
+          id?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      platform_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          extra_seat_price: number
+          id: string
+          is_active: boolean
+          monthly_price: number
+          seats_included: number
+          sort_order: number
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          extra_seat_price?: number
+          id: string
+          is_active?: boolean
+          monthly_price?: number
+          seats_included?: number
+          sort_order?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          extra_seat_price?: number
+          id?: string
+          is_active?: boolean
+          monthly_price?: number
+          seats_included?: number
+          sort_order?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       policies: {
         Row: {
           client_id: string | null
