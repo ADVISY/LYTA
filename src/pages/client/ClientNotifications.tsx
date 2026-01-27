@@ -1,4 +1,5 @@
 import { useClientNotifications } from "@/hooks/useClientNotifications";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ const kindConfig: Record<string, { icon: any; color: string }> = {
 };
 
 export default function ClientNotifications() {
+  const { t } = useTranslation();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useClientNotifications();
 
   if (loading) {
@@ -39,18 +41,18 @@ export default function ClientNotifications() {
     <div className="space-y-4 lg:space-y-6">
       <div className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
         <div>
-          <h1 className="text-xl lg:text-2xl font-bold">Notifications</h1>
+          <h1 className="text-xl lg:text-2xl font-bold">{t('clientNotifications.title')}</h1>
           <p className="text-sm lg:text-base text-muted-foreground">
             {unreadCount > 0 
-              ? `${unreadCount} notification${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}`
-              : "Toutes les notifications sont lues"
+              ? t('clientNotifications.unreadCount', { count: unreadCount })
+              : t('clientNotifications.allRead')
             }
           </p>
         </div>
         {unreadCount > 0 && (
           <Button variant="outline" onClick={markAllAsRead} className="gap-2 h-9 lg:h-10 text-xs lg:text-sm w-full sm:w-auto">
             <Check className="h-4 w-4" />
-            Tout marquer comme lu
+            {t('clientNotifications.markAllAsRead')}
           </Button>
         )}
       </div>
@@ -59,9 +61,9 @@ export default function ClientNotifications() {
         <Card>
           <CardContent className="py-10 lg:py-12 text-center">
             <Bell className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-base lg:text-lg font-medium mb-2">Aucune notification</h3>
+            <h3 className="text-base lg:text-lg font-medium mb-2">{t('clientNotifications.noNotifications')}</h3>
             <p className="text-sm text-muted-foreground">
-              Vous n'avez pas encore de notification
+              {t('clientNotifications.noNotificationsDescription')}
             </p>
           </CardContent>
         </Card>
@@ -105,7 +107,7 @@ export default function ClientNotifications() {
                           )}
                         </div>
                         {isUnread && (
-                          <Badge variant="default" className="flex-shrink-0 text-[10px] lg:text-xs h-5 lg:h-6">Nouveau</Badge>
+                          <Badge variant="default" className="flex-shrink-0 text-[10px] lg:text-xs h-5 lg:h-6">{t('clientNotifications.new')}</Badge>
                         )}
                       </div>
                       <p className="text-[10px] lg:text-xs text-muted-foreground mt-1.5 lg:mt-2">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 export default function ClientProfile() {
+  const { t } = useTranslation();
   const { user, clientData } = useOutletContext<{ user: any; clientData: any }>();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -68,14 +70,14 @@ export default function ClientProfile() {
     
     if (error) {
       toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le profil",
+        title: t('common.error'),
+        description: t('clientProfile.updateError'),
         variant: "destructive"
       });
     } else {
       toast({
-        title: "Profil mis à jour",
-        description: "Vos informations ont été enregistrées",
+        title: t('clientProfile.updateSuccess'),
+        description: t('clientProfile.updateSuccessDescription'),
       });
     }
     
@@ -89,8 +91,8 @@ export default function ClientProfile() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold">Mon profil</h1>
-        <p className="text-muted-foreground">Gérez vos informations personnelles</p>
+        <h1 className="text-2xl font-bold">{t('clientProfile.title')}</h1>
+        <p className="text-muted-foreground">{t('clientProfile.subtitle')}</p>
       </div>
 
       {/* Profile Header */}
@@ -109,7 +111,7 @@ export default function ClientProfile() {
               <p className="text-muted-foreground">{user?.email}</p>
               {clientData?.created_at && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Client depuis {format(new Date(clientData.created_at), 'MMMM yyyy', { locale: fr })}
+                  {t('clientProfile.clientSince')} {format(new Date(clientData.created_at), 'MMMM yyyy', { locale: fr })}
                 </p>
               )}
             </div>
@@ -122,13 +124,13 @@ export default function ClientProfile() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <User className="h-5 w-5" />
-            Informations personnelles
+            {t('clientProfile.personalInfo')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="first_name">Prénom</Label>
+              <Label htmlFor="first_name">{t('clientProfile.firstName')}</Label>
               <Input
                 id="first_name"
                 value={formData.first_name}
@@ -136,7 +138,7 @@ export default function ClientProfile() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="last_name">Nom</Label>
+              <Label htmlFor="last_name">{t('clientProfile.lastName')}</Label>
               <Input
                 id="last_name"
                 value={formData.last_name}
@@ -147,7 +149,7 @@ export default function ClientProfile() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('clientProfile.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -156,7 +158,7 @@ export default function ClientProfile() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mobile">Téléphone</Label>
+              <Label htmlFor="mobile">{t('clientProfile.phone')}</Label>
               <Input
                 id="mobile"
                 value={formData.mobile}
@@ -172,12 +174,12 @@ export default function ClientProfile() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Adresse
+            {t('clientProfile.address')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="address">Rue</Label>
+            <Label htmlFor="address">{t('clientProfile.street')}</Label>
             <Input
               id="address"
               value={formData.address}
@@ -187,7 +189,7 @@ export default function ClientProfile() {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="zip_code">Code postal</Label>
+              <Label htmlFor="zip_code">{t('clientProfile.zipCode')}</Label>
               <Input
                 id="zip_code"
                 value={formData.zip_code}
@@ -195,7 +197,7 @@ export default function ClientProfile() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">Ville</Label>
+              <Label htmlFor="city">{t('clientProfile.city')}</Label>
               <Input
                 id="city"
                 value={formData.city}
@@ -211,13 +213,13 @@ export default function ClientProfile() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Lock className="h-5 w-5" />
-            Sécurité
+            {t('clientProfile.security')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Button variant="outline" className="gap-2">
             <Shield className="h-4 w-4" />
-            Changer mon mot de passe
+            {t('clientProfile.changePassword')}
           </Button>
         </CardContent>
       </Card>
@@ -226,7 +228,7 @@ export default function ClientProfile() {
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={loading} className="gap-2">
           <Save className="h-4 w-4" />
-          {loading ? "Enregistrement..." : "Enregistrer les modifications"}
+          {loading ? t('common.saving') : t('clientProfile.saveChanges')}
         </Button>
       </div>
     </div>

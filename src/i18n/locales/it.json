@@ -1308,5 +1308,108 @@
     "moduleLocked": "Modulo Fatture QR bloccato",
     "moduleLockedDescription": "La funzionalità Fattura QR è disponibile solo con i piani Prime e Prime Founder.",
     "upgradePlan": "Aggiorna il mio abbonamento"
+  },
+  "clientSpace": {
+    "title": "Portale Cliente",
+    "home": "Home",
+    "myContracts": "I miei contratti",
+    "myDocuments": "I miei documenti",
+    "notifications": "Notifiche",
+    "myClaims": "I miei sinistri",
+    "myProfile": "Il mio profilo",
+    "logout": "Disconnetti",
+    "yourAdvisor": "Il tuo consulente"
+  },
+  "clientClaims": {
+    "title": "Dichiarazione di sinistro",
+    "subtitle": "Dichiara e segui i tuoi sinistri",
+    "declareClaim": "Dichiarare un sinistro",
+    "newDeclaration": "Nuova dichiarazione di sinistro",
+    "noClaims": "Nessun sinistro dichiarato",
+    "noClaimsDescription": "Non hai ancora dichiarato alcun sinistro",
+    "attachedDocuments": "Documenti allegati",
+    "noDocuments": "Nessun documento",
+    "incidentDate": "Data del sinistro",
+    "declaredOn": "Dichiarato il",
+    "documents": "documento(i)",
+    "stats": {
+      "total": "Sinistri totali",
+      "pending": "In corso",
+      "resolved": "Risolti"
+    },
+    "details": {
+      "title": "Dettagli del sinistro",
+      "fullDescription": "Descrizione completa",
+      "location": "Luogo del sinistro",
+      "circumstances": "Circostanze",
+      "estimatedDamage": "Importo stimato dei danni",
+      "thirdParty": "Terza parte coinvolta",
+      "policeReport": "Numero del verbale di polizia",
+      "witnesses": "Testimoni"
+    },
+    "types": {
+      "auto": "Auto",
+      "health": "Salute",
+      "household": "Casa/RC",
+      "legal": "Protezione giuridica",
+      "other": "Altro"
+    },
+    "statuses": {
+      "submitted": "Inviato",
+      "inReview": "In esame",
+      "approved": "Approvato",
+      "rejected": "Rifiutato",
+      "closed": "Chiuso"
+    }
+  },
+  "clientProfile": {
+    "title": "Il mio profilo",
+    "subtitle": "Gestisci le tue informazioni personali",
+    "personalInfo": "Informazioni personali",
+    "firstName": "Nome",
+    "lastName": "Cognome",
+    "email": "Email",
+    "phone": "Telefono",
+    "address": "Indirizzo",
+    "street": "Via",
+    "zipCode": "CAP",
+    "city": "Città",
+    "security": "Sicurezza",
+    "changePassword": "Cambia la mia password",
+    "saveChanges": "Salva le modifiche",
+    "updateSuccess": "Profilo aggiornato",
+    "updateSuccessDescription": "Le tue informazioni sono state salvate",
+    "updateError": "Impossibile aggiornare il profilo",
+    "clientSince": "Cliente dal"
+  },
+  "clientDocuments": {
+    "title": "I miei documenti",
+    "subtitle": "Tutti i tuoi documenti assicurativi",
+    "searchPlaceholder": "Cerca un documento...",
+    "noDocuments": "Nessun documento",
+    "noDocumentsDescription": "Non hai ancora alcun documento",
+    "noSearchResults": "Nessun documento corrisponde alla tua ricerca",
+    "view": "Visualizza",
+    "download": "Scarica",
+    "downloadError": "Impossibile scaricare il documento",
+    "viewError": "Impossibile aprire il documento",
+    "kinds": {
+      "managementMandate": "Mandato di gestione",
+      "policy": "Polizza assicurativa",
+      "certificate": "Attestato",
+      "invoice": "Fattura",
+      "statement": "Estratto conto",
+      "insuranceCard": "Tessera assicurativa",
+      "other": "Altro"
+    }
+  },
+  "clientNotifications": {
+    "title": "Notifiche",
+    "unreadCount": "{{count}} notifica(e) non letta(e)",
+    "allRead": "Tutte le notifiche sono lette",
+    "markAllAsRead": "Segna tutto come letto",
+    "noNotifications": "Nessuna notifica",
+    "noNotificationsDescription": "Non hai ancora alcuna notifica",
+    "new": "Nuovo"
   }
 }

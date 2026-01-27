@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,28 +77,32 @@ interface Claim {
   claim_documents?: ClaimDocument[];
 }
 
-const claimTypeConfig: Record<string, { label: string; icon: any; color: string }> = {
-  auto: { label: "Automobile", icon: Car, color: "text-blue-600 bg-blue-100" },
-  sante: { label: "Santé", icon: Heart, color: "text-red-600 bg-red-100" },
-  menage: { label: "Ménage/RC", icon: Home, color: "text-amber-600 bg-amber-100" },
-  juridique: { label: "Protection juridique", icon: Scale, color: "text-purple-600 bg-purple-100" },
-  autre: { label: "Autre", icon: Shield, color: "text-gray-600 bg-gray-100" },
-};
+const getClaimTypeConfig = (t: (key: string) => string): Record<string, { label: string; icon: any; color: string }> => ({
+  auto: { label: t('clientClaims.types.auto'), icon: Car, color: "text-blue-600 bg-blue-100" },
+  sante: { label: t('clientClaims.types.health'), icon: Heart, color: "text-red-600 bg-red-100" },
+  menage: { label: t('clientClaims.types.household'), icon: Home, color: "text-amber-600 bg-amber-100" },
+  juridique: { label: t('clientClaims.types.legal'), icon: Scale, color: "text-purple-600 bg-purple-100" },
+  autre: { label: t('clientClaims.types.other'), icon: Shield, color: "text-gray-600 bg-gray-100" },
+});
 
-const statusConfig: Record<string, { label: string; icon: any; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  submitted: { label: "Soumis", icon: Clock, variant: "secondary" },
-  in_review: { label: "En cours d'examen", icon: FileSearch, variant: "default" },
-  approved: { label: "Approuvé", icon: CheckCircle2, variant: "default" },
-  rejected: { label: "Refusé", icon: XCircle, variant: "destructive" },
-  closed: { label: "Clôturé", icon: CheckCircle2, variant: "outline" },
-};
+const getStatusConfig = (t: (key: string) => string): Record<string, { label: string; icon: any; variant: "default" | "secondary" | "destructive" | "outline" }> => ({
+  submitted: { label: t('clientClaims.statuses.submitted'), icon: Clock, variant: "secondary" },
+  in_review: { label: t('clientClaims.statuses.inReview'), icon: FileSearch, variant: "default" },
+  approved: { label: t('clientClaims.statuses.approved'), icon: CheckCircle2, variant: "default" },
+  rejected: { label: t('clientClaims.statuses.rejected'), icon: XCircle, variant: "destructive" },
+  closed: { label: t('clientClaims.statuses.closed'), icon: CheckCircle2, variant: "outline" },
+});
 
 export default function ClientClaims() {
+  const { t } = useTranslation();
   const { clientData } = useOutletContext<{ user: any; clientData: any }>();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  const claimTypeConfig = getClaimTypeConfig(t);
+  const statusConfig = getStatusConfig(t);
 
   useEffect(() => {
     if (clientData?.id) {
@@ -173,21 +178,21 @@ export default function ClientClaims() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Déclaration de sinistre</h1>
-          <p className="text-muted-foreground">Déclarez et suivez vos sinistres</p>
+          <h1 className="text-2xl font-bold">{t('clientClaims.title')}</h1>
+          <p className="text-muted-foreground">{t('clientClaims.subtitle')}</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Déclarer un sinistre
+              {t('clientClaims.declareClaim')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
-                Nouvelle déclaration de sinistre
+                {t('clientClaims.newDeclaration')}
               </DialogTitle>
             </DialogHeader>
             <ClaimForm 
@@ -208,7 +213,7 @@ export default function ClientClaims() {
             </div>
             <div>
               <p className="text-2xl font-bold">{claims.length}</p>
-              <p className="text-sm text-muted-foreground">Total sinistres</p>
+              <p className="text-sm text-muted-foreground">{t('clientClaims.stats.total')}</p>
             </div>
           </CardContent>
         </Card>
@@ -219,7 +224,7 @@ export default function ClientClaims() {
             </div>
             <div>
               <p className="text-2xl font-bold">{pendingClaims}</p>
-              <p className="text-sm text-muted-foreground">En cours</p>
+              <p className="text-sm text-muted-foreground">{t('clientClaims.stats.pending')}</p>
             </div>
           </CardContent>
         </Card>
@@ -230,7 +235,7 @@ export default function ClientClaims() {
             </div>
             <div>
               <p className="text-2xl font-bold">{resolvedClaims}</p>
-              <p className="text-sm text-muted-foreground">Résolus</p>
+              <p className="text-sm text-muted-foreground">{t('clientClaims.stats.resolved')}</p>
             </div>
           </CardContent>
         </Card>
@@ -241,13 +246,13 @@ export default function ClientClaims() {
         <Card>
           <CardContent className="py-12 text-center">
             <AlertTriangle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-medium mb-2">Aucun sinistre déclaré</h3>
+            <h3 className="text-lg font-medium mb-2">{t('clientClaims.noClaims')}</h3>
             <p className="text-muted-foreground mb-4">
-              Vous n'avez pas encore déclaré de sinistre
+              {t('clientClaims.noClaimsDescription')}
             </p>
             <Button onClick={() => setDialogOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Déclarer un sinistre
+              {t('clientClaims.declareClaim')}
             </Button>
           </CardContent>
         </Card>
@@ -310,15 +315,15 @@ export default function ClientClaims() {
                             </p>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
                               <span>
-                                Date du sinistre: {format(new Date(claim.incident_date), 'dd MMM yyyy', { locale: fr })}
+                                {t('clientClaims.incidentDate')}: {format(new Date(claim.incident_date), 'dd MMM yyyy', { locale: fr })}
                               </span>
                               <span>
-                                Déclaré le: {format(new Date(claim.created_at), 'dd MMM yyyy', { locale: fr })}
+                                {t('clientClaims.declaredOn')}: {format(new Date(claim.created_at), 'dd MMM yyyy', { locale: fr })}
                               </span>
                               {documents.length > 0 && (
                                 <span className="flex items-center gap-1">
                                   <FileText className="h-3 w-3" />
-                                  {documents.length} document{documents.length > 1 ? 's' : ''}
+                                  {documents.length} {t('clientClaims.documents', { count: documents.length })}
                                 </span>
                               )}
                             </div>
@@ -333,11 +338,11 @@ export default function ClientClaims() {
                           {/* Claim Details */}
                           <div className="space-y-4">
                             <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                              Détails du sinistre
+                              {t('clientClaims.details.title')}
                             </h4>
                             <div className="space-y-3">
                               <div>
-                                <p className="text-xs text-muted-foreground">Description complète</p>
+                                <p className="text-xs text-muted-foreground">{t('clientClaims.details.fullDescription')}</p>
                                 <p className="text-sm">{claim.description}</p>
                               </div>
                               
@@ -345,7 +350,7 @@ export default function ClientClaims() {
                                 <div className="flex items-start gap-2">
                                   <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Lieu du sinistre</p>
+                                    <p className="text-xs text-muted-foreground">{t('clientClaims.details.location')}</p>
                                     <p className="text-sm">{claim.location}</p>
                                   </div>
                                 </div>
@@ -353,7 +358,7 @@ export default function ClientClaims() {
                               
                               {claim.circumstances && (
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Circonstances</p>
+                                  <p className="text-xs text-muted-foreground">{t('clientClaims.details.circumstances')}</p>
                                   <p className="text-sm">{claim.circumstances}</p>
                                 </div>
                               )}
@@ -362,7 +367,7 @@ export default function ClientClaims() {
                                 <div className="flex items-center gap-2">
                                   <FileWarning className="h-4 w-4 text-muted-foreground" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Montant estimé des dommages</p>
+                                    <p className="text-xs text-muted-foreground">{t('clientClaims.details.estimatedDamage')}</p>
                                     <p className="text-sm font-medium">
                                       {new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(claim.damage_amount)}
                                     </p>
@@ -374,8 +379,8 @@ export default function ClientClaims() {
                                 <div className="flex items-start gap-2">
                                   <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Tiers impliqué</p>
-                                    <p className="text-sm">Oui</p>
+                                    <p className="text-xs text-muted-foreground">{t('clientClaims.details.thirdParty')}</p>
+                                    <p className="text-sm">{t('common.yes')}</p>
                                     {claim.third_party_info && typeof claim.third_party_info === 'object' && (
                                       <p className="text-xs text-muted-foreground mt-1">
                                         {claim.third_party_info.name || claim.third_party_info.description}
@@ -387,14 +392,14 @@ export default function ClientClaims() {
                               
                               {claim.police_report_number && (
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Numéro de rapport de police</p>
+                                  <p className="text-xs text-muted-foreground">{t('clientClaims.details.policeReport')}</p>
                                   <p className="text-sm font-mono">{claim.police_report_number}</p>
                                 </div>
                               )}
                               
                               {claim.witnesses && (
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Témoins</p>
+                                  <p className="text-xs text-muted-foreground">{t('clientClaims.details.witnesses')}</p>
                                   <p className="text-sm">{claim.witnesses}</p>
                                 </div>
                               )}
@@ -404,10 +409,10 @@ export default function ClientClaims() {
                           {/* Documents */}
                           <div className="space-y-4">
                             <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                              Documents joints ({documents.length})
+                              {t('clientClaims.attachedDocuments')} ({documents.length})
                             </h4>
                             {documents.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">Aucun document</p>
+                              <p className="text-sm text-muted-foreground">{t('clientClaims.noDocuments')}</p>
                             ) : (
                               <div className="space-y-2">
                                 {documents.map((doc) => (

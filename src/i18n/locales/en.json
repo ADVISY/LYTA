@@ -1318,5 +1318,108 @@
     "moduleLocked": "QR Invoices module locked",
     "moduleLockedDescription": "The QR Invoice feature is only available with Prime and Prime Founder plans.",
     "upgradePlan": "Upgrade my subscription"
+  },
+  "clientSpace": {
+    "title": "Client Portal",
+    "home": "Home",
+    "myContracts": "My contracts",
+    "myDocuments": "My documents",
+    "notifications": "Notifications",
+    "myClaims": "My claims",
+    "myProfile": "My profile",
+    "logout": "Logout",
+    "yourAdvisor": "Your advisor"
+  },
+  "clientClaims": {
+    "title": "Claim declaration",
+    "subtitle": "Declare and track your claims",
+    "declareClaim": "Declare a claim",
+    "newDeclaration": "New claim declaration",
+    "noClaims": "No claims declared",
+    "noClaimsDescription": "You haven't declared any claims yet",
+    "attachedDocuments": "Attached documents",
+    "noDocuments": "No document",
+    "incidentDate": "Incident date",
+    "declaredOn": "Declared on",
+    "documents": "document(s)",
+    "stats": {
+      "total": "Total claims",
+      "pending": "Pending",
+      "resolved": "Resolved"
+    },
+    "details": {
+      "title": "Claim details",
+      "fullDescription": "Full description",
+      "location": "Incident location",
+      "circumstances": "Circumstances",
+      "estimatedDamage": "Estimated damage amount",
+      "thirdParty": "Third party involved",
+      "policeReport": "Police report number",
+      "witnesses": "Witnesses"
+    },
+    "types": {
+      "auto": "Auto",
+      "health": "Health",
+      "household": "Household/Liability",
+      "legal": "Legal protection",
+      "other": "Other"
+    },
+    "statuses": {
+      "submitted": "Submitted",
+      "inReview": "Under review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "closed": "Closed"
+    }
+  },
+  "clientProfile": {
+    "title": "My profile",
+    "subtitle": "Manage your personal information",
+    "personalInfo": "Personal information",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "street": "Street",
+    "zipCode": "Postal code",
+    "city": "City",
+    "security": "Security",
+    "changePassword": "Change my password",
+    "saveChanges": "Save changes",
+    "updateSuccess": "Profile updated",
+    "updateSuccessDescription": "Your information has been saved",
+    "updateError": "Unable to update profile",
+    "clientSince": "Client since"
+  },
+  "clientDocuments": {
+    "title": "My documents",
+    "subtitle": "All your insurance documents",
+    "searchPlaceholder": "Search a document...",
+    "noDocuments": "No document",
+    "noDocumentsDescription": "You don't have any documents yet",
+    "noSearchResults": "No documents match your search",
+    "view": "View",
+    "download": "Download",
+    "downloadError": "Unable to download the document",
+    "viewError": "Unable to open the document",
+    "kinds": {
+      "managementMandate": "Management mandate",
+      "policy": "Insurance policy",
+      "certificate": "Certificate",
+      "invoice": "Invoice",
+      "statement": "Statement",
+      "insuranceCard": "Insurance card",
+      "other": "Other"
+    }
+  },
+  "clientNotifications": {
+    "title": "Notifications",
+    "unreadCount": "{{count}} unread notification(s)",
+    "allRead": "All notifications are read",
+    "markAllAsRead": "Mark all as read",
+    "noNotifications": "No notifications",
+    "noNotificationsDescription": "You don't have any notifications yet",
+    "new": "New"
   }
 }

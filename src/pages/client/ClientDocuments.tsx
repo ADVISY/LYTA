@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,15 +20,15 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
-const docKindLabels: Record<string, string> = {
-  mandat_gestion: "Mandat de gestion",
-  police: "Police d'assurance",
-  attestation: "Attestation",
-  facture: "Facture",
-  decompte: "Décompte",
-  carte_assurance: "Carte d'assurance",
-  other: "Autre",
-};
+const getDocKindLabels = (t: (key: string) => string): Record<string, string> => ({
+  mandat_gestion: t('clientDocuments.kinds.managementMandate'),
+  police: t('clientDocuments.kinds.policy'),
+  attestation: t('clientDocuments.kinds.certificate'),
+  facture: t('clientDocuments.kinds.invoice'),
+  decompte: t('clientDocuments.kinds.statement'),
+  carte_assurance: t('clientDocuments.kinds.insuranceCard'),
+  other: t('clientDocuments.kinds.other'),
+});
 
 const getFileIcon = (mimeType: string | null) => {
   if (!mimeType) return File;
@@ -37,11 +38,14 @@ const getFileIcon = (mimeType: string | null) => {
 };
 
 export default function ClientDocuments() {
+  const { t } = useTranslation();
   const { clientData } = useOutletContext<{ user: any; clientData: any }>();
   const { toast } = useToast();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const docKindLabels = getDocKindLabels(t);
 
   useEffect(() => {
     if (clientData?.id) {
@@ -82,8 +86,8 @@ export default function ClientDocuments() {
     } catch (error) {
       console.error('Download error:', error);
       toast({
-        title: "Erreur",
-        description: "Impossible de télécharger le document",
+        title: t('common.error'),
+        description: t('clientDocuments.downloadError'),
         variant: "destructive"
       });
     }
@@ -101,8 +105,8 @@ export default function ClientDocuments() {
     } catch (error) {
       console.error('View error:', error);
       toast({
-        title: "Erreur",
-        description: "Impossible d'ouvrir le document",
+        title: t('common.error'),
+        description: t('clientDocuments.viewError'),
         variant: "destructive"
       });
     }
@@ -134,8 +138,8 @@ export default function ClientDocuments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Mes documents</h1>
-          <p className="text-muted-foreground">Tous vos documents d'assurance</p>
+          <h1 className="text-2xl font-bold">{t('clientDocuments.title')}</h1>
+          <p className="text-muted-foreground">{t('clientDocuments.subtitle')}</p>
         </div>
       </div>
 
@@ -143,7 +147,7 @@ export default function ClientDocuments() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Rechercher un document..."
+          placeholder={t('clientDocuments.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
@@ -155,9 +159,9 @@ export default function ClientDocuments() {
         <Card>
           <CardContent className="py-12 text-center">
             <FolderOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-medium mb-2">Aucun document</h3>
+            <h3 className="text-lg font-medium mb-2">{t('clientDocuments.noDocuments')}</h3>
             <p className="text-muted-foreground">
-              {searchQuery ? "Aucun document ne correspond à votre recherche" : "Vous n'avez pas encore de document"}
+              {searchQuery ? t('clientDocuments.noSearchResults') : t('clientDocuments.noDocumentsDescription')}
             </p>
           </CardContent>
         </Card>
@@ -198,7 +202,7 @@ export default function ClientDocuments() {
                       onClick={() => handleView(doc)}
                     >
                       <Eye className="h-4 w-4" />
-                      Voir
+                      {t('clientDocuments.view')}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -207,7 +211,7 @@ export default function ClientDocuments() {
                       onClick={() => handleDownload(doc)}
                     >
                       <Download className="h-4 w-4" />
-                      Télécharger
+                      {t('clientDocuments.download')}
                     </Button>
                   </div>
                 </CardContent>

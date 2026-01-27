@@ -1308,5 +1308,108 @@
     "moduleLocked": "QR-Rechnungen Modul gesperrt",
     "moduleLockedDescription": "Die QR-Rechnung Funktion ist nur mit den Prime und Prime Founder Plänen verfügbar.",
     "upgradePlan": "Mein Abonnement upgraden"
+  },
+  "clientSpace": {
+    "title": "Kundenportal",
+    "home": "Startseite",
+    "myContracts": "Meine Verträge",
+    "myDocuments": "Meine Dokumente",
+    "notifications": "Benachrichtigungen",
+    "myClaims": "Meine Schäden",
+    "myProfile": "Mein Profil",
+    "logout": "Abmelden",
+    "yourAdvisor": "Ihr Berater"
+  },
+  "clientClaims": {
+    "title": "Schadenmeldung",
+    "subtitle": "Melden und verfolgen Sie Ihre Schäden",
+    "declareClaim": "Schaden melden",
+    "newDeclaration": "Neue Schadenmeldung",
+    "noClaims": "Keine Schäden gemeldet",
+    "noClaimsDescription": "Sie haben noch keine Schäden gemeldet",
+    "attachedDocuments": "Angehängte Dokumente",
+    "noDocuments": "Kein Dokument",
+    "incidentDate": "Schadendatum",
+    "declaredOn": "Gemeldet am",
+    "documents": "Dokument(e)",
+    "stats": {
+      "total": "Schäden insgesamt",
+      "pending": "In Bearbeitung",
+      "resolved": "Erledigt"
+    },
+    "details": {
+      "title": "Schadendetails",
+      "fullDescription": "Vollständige Beschreibung",
+      "location": "Schadenort",
+      "circumstances": "Umstände",
+      "estimatedDamage": "Geschätzter Schadenbetrag",
+      "thirdParty": "Drittpartei beteiligt",
+      "policeReport": "Polizeibericht-Nummer",
+      "witnesses": "Zeugen"
+    },
+    "types": {
+      "auto": "Auto",
+      "health": "Gesundheit",
+      "household": "Haushalt/Haftpflicht",
+      "legal": "Rechtsschutz",
+      "other": "Andere"
+    },
+    "statuses": {
+      "submitted": "Eingereicht",
+      "inReview": "In Prüfung",
+      "approved": "Genehmigt",
+      "rejected": "Abgelehnt",
+      "closed": "Geschlossen"
+    }
+  },
+  "clientProfile": {
+    "title": "Mein Profil",
+    "subtitle": "Verwalten Sie Ihre persönlichen Daten",
+    "personalInfo": "Persönliche Informationen",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "address": "Adresse",
+    "street": "Strasse",
+    "zipCode": "PLZ",
+    "city": "Stadt",
+    "security": "Sicherheit",
+    "changePassword": "Mein Passwort ändern",
+    "saveChanges": "Änderungen speichern",
+    "updateSuccess": "Profil aktualisiert",
+    "updateSuccessDescription": "Ihre Daten wurden gespeichert",
+    "updateError": "Profil konnte nicht aktualisiert werden",
+    "clientSince": "Kunde seit"
+  },
+  "clientDocuments": {
+    "title": "Meine Dokumente",
+    "subtitle": "Alle Ihre Versicherungsdokumente",
+    "searchPlaceholder": "Dokument suchen...",
+    "noDocuments": "Kein Dokument",
+    "noDocumentsDescription": "Sie haben noch keine Dokumente",
+    "noSearchResults": "Keine Dokumente entsprechen Ihrer Suche",
+    "view": "Anzeigen",
+    "download": "Herunterladen",
+    "downloadError": "Dokument konnte nicht heruntergeladen werden",
+    "viewError": "Dokument konnte nicht geöffnet werden",
+    "kinds": {
+      "managementMandate": "Verwaltungsauftrag",
+      "policy": "Versicherungspolice",
+      "certificate": "Bescheinigung",
+      "invoice": "Rechnung",
+      "statement": "Abrechnung",
+      "insuranceCard": "Versicherungskarte",
+      "other": "Andere"
+    }
+  },
+  "clientNotifications": {
+    "title": "Benachrichtigungen",
+    "unreadCount": "{{count}} ungelesene Benachrichtigung(en)",
+    "allRead": "Alle Benachrichtigungen sind gelesen",
+    "markAllAsRead": "Alle als gelesen markieren",
+    "noNotifications": "Keine Benachrichtigungen",
+    "noNotificationsDescription": "Sie haben noch keine Benachrichtigungen",
+    "new": "Neu"
   }
 }
