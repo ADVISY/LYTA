@@ -1698,5 +1698,18 @@
     "cancel": "Cancel",
     "uploadingFiles": "Uploading files...",
     "submitDeclaration": "Submit declaration"
+  },
+  "plans": {
+    "moduleNotAvailable": "Module not available",
+    "moduleNotIncluded": "Module not included",
+    "notIncludedIn": "is not included in your",
+    "notAvailableWith": "is not available with your",
+    "upgradeNow": "Upgrade now",
+    "seeAvailablePlans": "See available plans",
+    "availableWith": "Available with:",
+    "contactAdmin": "Contact your administrator or upgrade to a higher plan to access this feature.",
+    "pro": "Pro",
+    "featureLocked": "Feature locked",
+    "upgradeToAccess": "Upgrade to a higher plan to unlock this feature"
   }
 }

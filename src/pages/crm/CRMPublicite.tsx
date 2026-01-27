@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, MessageSquare, FileText, History, Settings, Megaphone } from "lucide-react";
+import { Mail, MessageSquare, FileText, History, Settings, Megaphone, Zap } from "lucide-react";
 import { EmailTemplatesList } from "@/components/crm/publicite/EmailTemplatesList";
 import { EmailComposer } from "@/components/crm/publicite/EmailComposer";
 import { SmsComposer } from "@/components/crm/publicite/SmsComposer";
 import { CampaignHistory } from "@/components/crm/publicite/CampaignHistory";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { CampaignStats } from "@/components/crm/publicite/CampaignStats";
+import { ModuleGatePage, ModuleGate } from "@/components/ModuleGate";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
 export default function CRMPublicite() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("email");
+  const { hasModule } = usePlanFeatures();
 
   return (
+    <ModuleGatePage module="emailing">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -93,5 +97,6 @@ export default function CRMPublicite() {
         </TabsContent>
       </Tabs>
     </div>
+    </ModuleGatePage>
   );
 }
