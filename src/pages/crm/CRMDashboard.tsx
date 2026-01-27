@@ -33,11 +33,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ComposedChart,
-  Line,
 } from "recharts";
 
 type PeriodFilter = 'all' | 'week' | 'month' | 'quarter' | 'year';
+type ChartViewMode = 'prime' | 'ca_estime' | 'ca_realise';
 
 // Auto-refresh interval in milliseconds (60 seconds)
 const AUTO_REFRESH_INTERVAL = 60000;
@@ -58,6 +57,7 @@ export default function CRMDashboard() {
   const [productFilter, setProductFilter] = useState<string>('all');
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [chartYear, setChartYear] = useState<number>(new Date().getFullYear());
+  const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('prime');
   const [allCommissionParts, setAllCommissionParts] = useState<any[]>([]);
   const [myCommissionParts, setMyCommissionParts] = useState<any[]>([]);
   const [partsLoading, setPartsLoading] = useState(true);
@@ -455,7 +455,7 @@ export default function CRMDashboard() {
     return Array.from(years).sort((a, b) => b - a);
   }, [policies]);
 
-  // Monthly chart data - filtered by selected year
+  // Monthly chart data - filtered by selected year - STACKED BAR with LCA, VIE, NON-VIE, HYPO
   const monthlyChartData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
@@ -475,38 +475,117 @@ export default function CRMDashboard() {
         return date.getFullYear() === chartYear && date.getMonth() === i;
       });
 
-      let lca = 0;
-      let vie = 0;
-      let caLca = 0;
-      let caVie = 0;
+      // Initialize values for each product category
+      let lcaPrime = 0, viePrime = 0, nonViePrime = 0, hypoPrime = 0;
+      let lcaCAEstime = 0, vieCAEstime = 0, nonVieCAEstime = 0, hypoCAEstime = 0;
+      let lcaCARealise = 0, vieCARealise = 0, nonVieCARealise = 0, hypoCARealise = 0;
 
       monthPolicies.forEach(p => {
         const type = (p.product_type || '').toLowerCase();
+        const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
+        const yearlyPremium = p.premium_yearly || monthlyPremium * 12;
+        
+        // Find the commission for this policy
+        const policyCommission = commissions.find(c => c.policy_id === p.id);
+        const commissionAmount = policyCommission?.amount || 0;
 
-        // VIE/Life products - use real commission from commissions table
-        if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
-          vie++;
-          // Find the commission for this policy
-          const policyCommission = commissions.find(c => c.policy_id === p.id);
-          if (policyCommission) {
-            caVie += policyCommission.amount || 0;
-          }
+        // Categorize by product type
+        if (type.includes('hypothe') || type.includes('hypo') || type.includes('mortgage')) {
+          // HYPO - Hypothèques
+          hypoPrime += yearlyPremium;
+          hypoCAEstime += yearlyPremium * 0.01; // Estimation 1%
+          hypoCARealise += commissionAmount;
+        } else if (type.includes('vie') || type.includes('life') || type.includes('pilier') || type.includes('3a') || type.includes('3b')) {
+          // VIE - Life insurance
+          viePrime += yearlyPremium;
+          vieCAEstime += commissionAmount || yearlyPremium * 0.05; // Use real or estimate 5%
+          vieCARealise += commissionAmount;
+        } else if (type.includes('lamal') || type.includes('lca') || type.includes('maladie') || 
+                   type.includes('complémentaire') || type.includes('complementaire') || 
+                   type.includes('health') || type.includes('multi') || type.includes('santé') || type.includes('sante')) {
+          // LCA - Health insurance
+          lcaPrime += yearlyPremium;
+          lcaCAEstime += monthlyPremium * 16; // LCA formula: monthly * 16
+          lcaCARealise += commissionAmount;
         } else {
-          // LCA/Health products - use real commission from commissions table
-          // LAMal doesn't generate commission, only LCA (complementary) does
-          lca++;
-          const policyCommission = commissions.find(c => c.policy_id === p.id);
-          if (policyCommission) {
-            caLca += policyCommission.amount || 0;
-          }
+          // NON-VIE - All other (auto, property, liability, legal, etc.)
+          nonViePrime += yearlyPremium;
+          nonVieCAEstime += yearlyPremium * 0.15; // Estimation 15%
+          nonVieCARealise += commissionAmount;
         }
       });
 
-      const commission = monthCommissions.reduce((sum, c) => sum + (c.amount || 0), 0);
-
-      return { month, lca, vie, total: lca + vie, ca: Math.round(caLca + caVie), commission: Math.round(commission) };
+      // Return data based on chart view mode
+      return { 
+        month, 
+        // Prime values
+        lcaPrime: Math.round(lcaPrime),
+        viePrime: Math.round(viePrime),
+        nonViePrime: Math.round(nonViePrime),
+        hypoPrime: Math.round(hypoPrime),
+        // CA estimé values
+        lcaCAEstime: Math.round(lcaCAEstime),
+        vieCAEstime: Math.round(vieCAEstime),
+        nonVieCAEstime: Math.round(nonVieCAEstime),
+        hypoCAEstime: Math.round(hypoCAEstime),
+        // CA réalisé values
+        lcaCARealise: Math.round(lcaCARealise),
+        vieCARealise: Math.round(vieCARealise),
+        nonVieCARealise: Math.round(nonVieCARealise),
+        hypoCARealise: Math.round(hypoCARealise),
+        // Computed values for display based on mode
+        lca: chartViewMode === 'prime' ? Math.round(lcaPrime) : chartViewMode === 'ca_estime' ? Math.round(lcaCAEstime) : Math.round(lcaCARealise),
+        vie: chartViewMode === 'prime' ? Math.round(viePrime) : chartViewMode === 'ca_estime' ? Math.round(vieCAEstime) : Math.round(vieCARealise),
+        nonVie: chartViewMode === 'prime' ? Math.round(nonViePrime) : chartViewMode === 'ca_estime' ? Math.round(nonVieCAEstime) : Math.round(nonVieCARealise),
+        hypo: chartViewMode === 'prime' ? Math.round(hypoPrime) : chartViewMode === 'ca_estime' ? Math.round(hypoCAEstime) : Math.round(hypoCARealise),
+        // Total for tooltip
+        total: chartViewMode === 'prime' 
+          ? Math.round(lcaPrime + viePrime + nonViePrime + hypoPrime)
+          : chartViewMode === 'ca_estime'
+            ? Math.round(lcaCAEstime + vieCAEstime + nonVieCAEstime + hypoCAEstime)
+            : Math.round(lcaCARealise + vieCARealise + nonVieCARealise + hypoCARealise),
+      };
     });
-  }, [filteredPolicies, commissions, chartYear]);
+  }, [filteredPolicies, commissions, chartYear, chartViewMode]);
+
+  // Custom tooltip for stacked bar chart
+  const CustomStackedTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0]?.payload;
+      const total = (data?.lca || 0) + (data?.vie || 0) + (data?.nonVie || 0) + (data?.hypo || 0);
+      
+      return (
+        <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm">
+          <p className="font-semibold text-foreground mb-2">{label} {chartYear}</p>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-4">
+              <span className="text-rose-500">LCA</span>
+              <span className="font-medium">{formatCurrency(data?.lca || 0)} CHF</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-blue-500">VIE</span>
+              <span className="font-medium">{formatCurrency(data?.vie || 0)} CHF</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-emerald-500">NON-VIE</span>
+              <span className="font-medium">{formatCurrency(data?.nonVie || 0)} CHF</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-violet-500">HYPO</span>
+              <span className="font-medium">{formatCurrency(data?.hypo || 0)} CHF</span>
+            </div>
+            <div className="border-t border-border pt-1 mt-1">
+              <div className="flex justify-between gap-4 font-semibold">
+                <span className="text-foreground">TOTAL</span>
+                <span>{formatCurrency(total)} CHF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-CH', { 
@@ -819,28 +898,69 @@ export default function CRMDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-rose-500" />
-                        <span>LCA</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded bg-blue-500" />
-                        <span>VIE</span>
-                      </div>
-                      {(canSeeFinancials || commissionScope !== 'none') && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-3 h-3 rounded bg-emerald-500" />
-                          <span>CA</span>
-                        </div>
-                      )}
+                    
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                      <button
+                        onClick={() => setChartViewMode('prime')}
+                        className={cn(
+                          "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                          chartViewMode === 'prime' 
+                            ? "bg-background text-foreground shadow-sm" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Prime
+                      </button>
+                      <button
+                        onClick={() => setChartViewMode('ca_estime')}
+                        className={cn(
+                          "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                          chartViewMode === 'ca_estime' 
+                            ? "bg-background text-foreground shadow-sm" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        CA estimé
+                      </button>
+                      <button
+                        onClick={() => setChartViewMode('ca_realise')}
+                        className={cn(
+                          "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                          chartViewMode === 'ca_realise' 
+                            ? "bg-background text-foreground shadow-sm" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        CA réalisé
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 text-xs mt-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-rose-500" />
+                      <span>LCA</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-blue-500" />
+                      <span>VIE</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-emerald-500" />
+                      <span>NON-VIE</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded bg-violet-500" />
+                      <span>HYPO</span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={monthlyChartData} margin={{ top: 20, right: 30, bottom: 20, left: 0 }}>
+                      <BarChart data={monthlyChartData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                         <XAxis 
                           dataKey="month" 
@@ -849,58 +969,43 @@ export default function CRMDashboard() {
                           tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                         />
                         <YAxis 
-                          yAxisId="left"
                           axisLine={false}
                           tickLine={false}
                           tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                        />
-                        {(canSeeFinancials || commissionScope !== 'none') && (
-                          <YAxis 
-                            yAxisId="right"
-                            orientation="right"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                            tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                          />
-                        )}
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                          formatter={(value: any, name: string) => {
-                            if (name === 'ca') return [`${formatCurrency(value)} CHF`, 'CA'];
-                            if (name === 'commission') return [`${formatCurrency(value)} CHF`, 'Commission'];
-                            return [value, name === 'lca' ? 'LCA' : 'VIE'];
+                          tickFormatter={(v) => {
+                            if (v >= 1000) {
+                              return `${new Intl.NumberFormat('fr-CH').format(v / 1000)}'000`;
+                            }
+                            return new Intl.NumberFormat('fr-CH').format(v);
                           }}
                         />
+                        <Tooltip content={<CustomStackedTooltip />} />
                         <Bar 
-                          yAxisId="left"
                           dataKey="lca" 
+                          stackId="stack"
                           fill="hsl(340 82% 52%)"
-                          radius={[4, 4, 0, 0]}
-                          maxBarSize={30}
+                          name="LCA"
                         />
                         <Bar 
-                          yAxisId="left"
                           dataKey="vie" 
+                          stackId="stack"
                           fill="hsl(217 91% 60%)"
-                          radius={[4, 4, 0, 0]}
-                          maxBarSize={30}
+                          name="VIE"
                         />
-                        {(canSeeFinancials || commissionScope !== 'none') && (
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="ca"
-                            stroke="hsl(142 76% 36%)"
-                            strokeWidth={2}
-                            dot={{ fill: 'hsl(142 76% 36%)', r: 4 }}
-                          />
-                        )}
-                      </ComposedChart>
+                        <Bar 
+                          dataKey="nonVie" 
+                          stackId="stack"
+                          fill="hsl(142 76% 36%)"
+                          name="NON-VIE"
+                        />
+                        <Bar 
+                          dataKey="hypo" 
+                          stackId="stack"
+                          fill="hsl(262 83% 58%)"
+                          name="HYPO"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
 
@@ -908,27 +1013,27 @@ export default function CRMDashboard() {
                   {canSeeFinancials && (
                     <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t">
                       <div className="text-center p-2.5 rounded-xl bg-rose-500/10">
-                        <p className="text-[9px] text-muted-foreground">{t('dashboard.lcaTotal')}</p>
+                        <p className="text-[9px] text-muted-foreground">LCA</p>
                         <p className="text-sm font-bold text-rose-600">
-                          {monthlyChartData.reduce((s, m) => s + m.lca, 0)}
+                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.lca, 0))} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-blue-500/10">
-                        <p className="text-[9px] text-muted-foreground">{t('dashboard.vieTotal')}</p>
+                        <p className="text-[9px] text-muted-foreground">VIE</p>
                         <p className="text-sm font-bold text-blue-600">
-                          {monthlyChartData.reduce((s, m) => s + m.vie, 0)}
+                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.vie, 0))} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-emerald-500/10">
-                        <p className="text-[9px] text-muted-foreground">{t('dashboard.annualCA')}</p>
+                        <p className="text-[9px] text-muted-foreground">NON-VIE</p>
                         <p className="text-sm font-bold text-emerald-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.ca, 0))}
+                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.nonVie, 0))} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-violet-500/10">
-                        <p className="text-[9px] text-muted-foreground">{t('dashboard.commissions')}</p>
+                        <p className="text-[9px] text-muted-foreground">HYPO</p>
                         <p className="text-sm font-bold text-violet-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.commission, 0))}
+                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.hypo, 0))} CHF
                         </p>
                       </div>
                     </div>
