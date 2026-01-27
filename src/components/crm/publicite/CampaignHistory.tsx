@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { fr, de, it, enUS } from "date-fns/locale";
 import { History, Search, Mail, MessageSquare, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ScheduledEmail {
@@ -25,30 +26,40 @@ interface ScheduledEmail {
   created_at: string;
 }
 
-const EMAIL_TYPE_LABELS: Record<string, string> = {
-  welcome: "Bienvenue",
-  contract_signed: "Contrat signé",
-  mandat_signed: "Mandat signé",
-  account_created: "Compte créé",
-  renewal_reminder: "Rappel renouvellement",
-  follow_up: "Suivi client",
-  birthday: "Anniversaire",
-  relation_client: "Relation client",
-  offre_speciale: "Offre spéciale",
-  sms: "SMS",
-};
-
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle }> = {
-  pending: { label: "En attente", variant: "secondary", icon: Clock },
-  sent: { label: "Envoyé", variant: "default", icon: CheckCircle },
-  failed: { label: "Échoué", variant: "destructive", icon: XCircle },
-  cancelled: { label: "Annulé", variant: "outline", icon: AlertCircle },
-};
-
 export const CampaignHistory = () => {
+  const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [channelFilter, setChannelFilter] = useState<"all" | "email" | "sms">("all");
+
+  const getDateLocale = () => {
+    switch (i18n.language) {
+      case 'de': return de;
+      case 'it': return it;
+      case 'en': return enUS;
+      default: return fr;
+    }
+  };
+
+  const getEmailTypeLabel = (type: string) => {
+    const key = `campaignHistory.types.${type}`;
+    const translated = t(key);
+    // If translation not found, humanize the key
+    if (translated === key || translated === type) {
+      return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    return translated;
+  };
+
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle }> = {
+      pending: { label: t('campaignHistory.pending'), variant: "secondary", icon: Clock },
+      sent: { label: t('campaignHistory.sent'), variant: "default", icon: CheckCircle },
+      failed: { label: t('campaignHistory.failed'), variant: "destructive", icon: XCircle },
+      cancelled: { label: t('campaignHistory.cancelled'), variant: "outline", icon: AlertCircle },
+    };
+    return configs[status] || configs.pending;
+  };
 
   const { data: emails, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["scheduled-emails", statusFilter],
@@ -84,7 +95,7 @@ export const CampaignHistory = () => {
   });
 
   const getStatusBadge = (status: string) => {
-    const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+    const config = getStatusConfig(status);
     const Icon = config.icon;
     return (
       <Badge variant={config.variant} className="gap-1">
@@ -119,15 +130,15 @@ export const CampaignHistory = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-primary" />
-                Historique des campagnes
+                {t('campaignHistory.title')}
               </CardTitle>
               <CardDescription>
-                Consultez l'historique des emails et SMS envoyés
+                {t('campaignHistory.subtitle')}
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? "animate-spin" : ""}`} />
-              Actualiser
+              {t('campaignHistory.refresh')}
             </Button>
           </div>
         </CardHeader>
@@ -137,7 +148,7 @@ export const CampaignHistory = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher..."
+                placeholder={t('campaignHistory.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -145,7 +156,7 @@ export const CampaignHistory = () => {
             </div>
             <Tabs value={channelFilter} onValueChange={(v) => setChannelFilter(v as "all" | "email" | "sms")}>
               <TabsList>
-                <TabsTrigger value="all">Tout</TabsTrigger>
+                <TabsTrigger value="all">{t('campaignHistory.all')}</TabsTrigger>
                 <TabsTrigger value="email" className="gap-1">
                   <Mail className="h-3 w-3" />
                   Email
@@ -158,14 +169,14 @@ export const CampaignHistory = () => {
             </Tabs>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Statut" />
+                <SelectValue placeholder={t('campaignHistory.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="sent">Envoyé</SelectItem>
-                <SelectItem value="failed">Échoué</SelectItem>
-                <SelectItem value="cancelled">Annulé</SelectItem>
+                <SelectItem value="all">{t('campaignHistory.allStatuses')}</SelectItem>
+                <SelectItem value="pending">{t('campaignHistory.pending')}</SelectItem>
+                <SelectItem value="sent">{t('campaignHistory.sent')}</SelectItem>
+                <SelectItem value="failed">{t('campaignHistory.failed')}</SelectItem>
+                <SelectItem value="cancelled">{t('campaignHistory.cancelled')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -174,25 +185,25 @@ export const CampaignHistory = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="p-4 rounded-lg bg-muted/50">
               <p className="text-2xl font-bold">{filteredEmails?.length || 0}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="text-sm text-muted-foreground">{t('campaignHistory.total')}</p>
             </div>
             <div className="p-4 rounded-lg bg-green-500/10">
               <p className="text-2xl font-bold text-green-600">
                 {filteredEmails?.filter((e) => e.status === "sent").length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Envoyés</p>
+              <p className="text-sm text-muted-foreground">{t('campaignHistory.sent')}</p>
             </div>
             <div className="p-4 rounded-lg bg-yellow-500/10">
               <p className="text-2xl font-bold text-yellow-600">
                 {filteredEmails?.filter((e) => e.status === "pending").length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">En attente</p>
+              <p className="text-sm text-muted-foreground">{t('campaignHistory.pending')}</p>
             </div>
             <div className="p-4 rounded-lg bg-red-500/10">
               <p className="text-2xl font-bold text-red-600">
                 {filteredEmails?.filter((e) => e.status === "failed").length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Échoués</p>
+              <p className="text-sm text-muted-foreground">{t('campaignHistory.failed')}</p>
             </div>
           </div>
 
@@ -202,11 +213,11 @@ export const CampaignHistory = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Canal</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Programmé pour</TableHead>
-                    <TableHead>Envoyé le</TableHead>
+                    <TableHead>{t('campaignHistory.type')}</TableHead>
+                    <TableHead>{t('campaignHistory.channel')}</TableHead>
+                    <TableHead>{t('campaignHistory.status')}</TableHead>
+                    <TableHead>{t('campaignHistory.scheduledFor')}</TableHead>
+                    <TableHead>{t('campaignHistory.sentAt')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,7 +225,7 @@ export const CampaignHistory = () => {
                     <TableRow key={email.id}>
                       <TableCell>
                         <span className="font-medium">
-                          {EMAIL_TYPE_LABELS[email.email_type] || email.email_type}
+                          {getEmailTypeLabel(email.email_type)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -232,11 +243,11 @@ export const CampaignHistory = () => {
                       </TableCell>
                       <TableCell>{getStatusBadge(email.status)}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {format(new Date(email.scheduled_for), "dd MMM yyyy HH:mm", { locale: fr })}
+                        {format(new Date(email.scheduled_for), "dd MMM yyyy HH:mm", { locale: getDateLocale() })}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {email.sent_at
-                          ? format(new Date(email.sent_at), "dd MMM yyyy HH:mm", { locale: fr })
+                          ? format(new Date(email.sent_at), "dd MMM yyyy HH:mm", { locale: getDateLocale() })
                           : "-"}
                       </TableCell>
                     </TableRow>
@@ -247,7 +258,7 @@ export const CampaignHistory = () => {
           ) : (
             <div className="text-center py-12">
               <History className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Aucun historique trouvé</p>
+              <p className="text-muted-foreground">{t('campaignHistory.noHistory')}</p>
             </div>
           )}
         </CardContent>

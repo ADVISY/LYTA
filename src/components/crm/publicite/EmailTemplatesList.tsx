@@ -30,15 +30,6 @@ interface EmailTemplate {
   created_at: string;
 }
 
-const CATEGORIES = [
-  { value: "transactional", label: "Transactionnel" },
-  { value: "marketing", label: "Marketing" },
-  { value: "notification", label: "Notification" },
-  { value: "reminder", label: "Rappel" },
-  { value: "onboarding", label: "Onboarding" },
-  { value: "sms", label: "SMS" },
-];
-
 // Pre-built templates
 const DEFAULT_TEMPLATES = {
   email: [
@@ -161,6 +152,12 @@ export const EmailTemplatesList = () => {
     is_active: true,
   });
 
+  const getCategoryLabel = (value: string) => {
+    const key = `templates.categories.${value}`;
+    const translated = t(key);
+    return translated === key ? value : translated;
+  };
+
   const humanizeIdentifier = (raw: string) => {
     const spaced = raw
       .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -206,12 +203,12 @@ export const EmailTemplatesList = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-templates"] });
-      toast({ title: "Template créé avec succès" });
+      toast({ title: t('templates.templateCreated') });
       setIsCreateOpen(false);
       resetForm();
     },
     onError: () => {
-      toast({ title: "Erreur lors de la création", variant: "destructive" });
+      toast({ title: t('templates.creationError'), variant: "destructive" });
     },
   });
 
@@ -232,12 +229,12 @@ export const EmailTemplatesList = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-templates"] });
-      toast({ title: "Template mis à jour" });
+      toast({ title: t('templates.templateUpdated') });
       setIsEditOpen(false);
       setSelectedTemplate(null);
     },
     onError: () => {
-      toast({ title: "Erreur lors de la mise à jour", variant: "destructive" });
+      toast({ title: t('templates.updateError'), variant: "destructive" });
     },
   });
 
@@ -248,10 +245,10 @@ export const EmailTemplatesList = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-templates"] });
-      toast({ title: "Template supprimé" });
+      toast({ title: t('templates.templateDeleted') });
     },
     onError: () => {
-      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+      toast({ title: t('templates.deleteError'), variant: "destructive" });
     },
   });
 
@@ -270,7 +267,7 @@ export const EmailTemplatesList = () => {
     }
     
     queryClient.invalidateQueries({ queryKey: ["email-templates"] });
-    toast({ title: `${templatesToImport.length} templates importés` });
+    toast({ title: `${templatesToImport.length} ${t('templates.templatesImported')}` });
   };
 
   const resetForm = () => {
@@ -299,7 +296,7 @@ export const EmailTemplatesList = () => {
 
   const handleDuplicate = (template: EmailTemplate) => {
     setFormData({
-      name: `${getTemplateDisplayName(template)} (copie)`,
+      name: `${getTemplateDisplayName(template)} (${t('templates.duplicated')})`,
       subject: template.subject,
       body_html: template.body_html,
       body_text: template.body_text || "",
@@ -327,42 +324,42 @@ export const EmailTemplatesList = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Templates de messages</h2>
+          <h2 className="text-xl font-semibold">{t('templates.title')}</h2>
           <p className="text-sm text-muted-foreground">
-            Gérez vos modèles d'emails et SMS
+            {t('templates.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={importDefaultTemplates}>
-            Importer des modèles
+            {t('templates.importModels')}
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                Nouveau
+                {t('templates.new')}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Créer un template</DialogTitle>
+                <DialogTitle>{t('templates.createTemplate')}</DialogTitle>
                 <DialogDescription>
-                  Créez un nouveau modèle réutilisable
+                  {t('templates.createTemplateDesc')}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nom du template</Label>
+                    <Label htmlFor="name">{t('templates.templateName')}</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="ex: Confirmation de rendez-vous"
+                      placeholder={t('templates.templateNamePlaceholder')}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category">Catégorie</Label>
+                    <Label htmlFor="category">{t('templates.category')}</Label>
                     <Select
                       value={formData.category}
                       onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -371,36 +368,37 @@ export const EmailTemplatesList = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="transactional">{getCategoryLabel('transactional')}</SelectItem>
+                        <SelectItem value="marketing">{getCategoryLabel('marketing')}</SelectItem>
+                        <SelectItem value="notification">{getCategoryLabel('notification')}</SelectItem>
+                        <SelectItem value="reminder">{getCategoryLabel('reminder')}</SelectItem>
+                        <SelectItem value="onboarding">{getCategoryLabel('onboarding')}</SelectItem>
+                        <SelectItem value="sms">{getCategoryLabel('sms')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Sujet</Label>
+                  <Label htmlFor="subject">{t('templates.subject')}</Label>
                   <Input
                     id="subject"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    placeholder="Sujet de l'email ou titre du SMS"
+                    placeholder={t('templates.subjectPlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="body_html">Contenu</Label>
+                  <Label htmlFor="body_html">{t('templates.content')}</Label>
                   <Textarea
                     id="body_html"
                     value={formData.body_html}
                     onChange={(e) => setFormData({ ...formData, body_html: e.target.value })}
-                    placeholder={templateType === "sms" ? "Contenu du SMS (160 caractères max recommandé)" : "<h1>Bonjour {{client_name}}</h1>..."}
+                    placeholder={templateType === "sms" ? t('templates.contentPlaceholderSms') : t('templates.contentPlaceholderEmail')}
                     rows={templateType === "sms" ? 4 : 10}
                     className="font-mono text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Variables: {"{{client_name}}"}, {"{{client_email}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
+                    {t('templates.variablesHint')}: {"{{client_name}}"}, {"{{client_email}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -409,18 +407,18 @@ export const EmailTemplatesList = () => {
                     checked={formData.is_active}
                     onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                   />
-                  <Label htmlFor="is_active">Template actif</Label>
+                  <Label htmlFor="is_active">{t('templates.activeTemplate')}</Label>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Annuler
+                  {t('templates.cancel')}
                 </Button>
                 <Button
                   onClick={() => createMutation.mutate(formData)}
                   disabled={createMutation.isPending || !formData.name || !formData.subject}
                 >
-                  {createMutation.isPending ? "Création..." : "Créer"}
+                  {createMutation.isPending ? t('templates.creating') : t('templates.create')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -453,102 +451,99 @@ export const EmailTemplatesList = () => {
                     {template.category === "sms" ? (
                       <MessageSquare className="h-5 w-5 text-blue-500" />
                     ) : (
-                      <Mail className="h-5 w-5 text-primary" />
+                      <FileText className="h-5 w-5 text-primary" />
                     )}
-                    <CardTitle className="text-base line-clamp-1">{getTemplateDisplayName(template)}</CardTitle>
+                    <div>
+                      <CardTitle className="text-base">{getTemplateDisplayName(template)}</CardTitle>
+                      <CardDescription className="text-xs">{template.subject}</CardDescription>
+                    </div>
                   </div>
                   {template.is_system && (
-                    <Badge variant="outline" className="gap-1 shrink-0 border-primary/50 text-primary">
+                    <Badge variant="outline" className="gap-1">
                       <Lock className="h-3 w-3" />
-                      {t('collaborators.system')}
+                      {t('templates.system')}
                     </Badge>
                   )}
                 </div>
-                <CardDescription className="line-clamp-2">
-                  {template.subject}
-                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={template.is_active ? "default" : "secondary"}>
-                      {template.is_active ? t('collaborators.activeCount') : t('collaborators.inactiveCount')}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedTemplate(template);
-                        setIsPreviewOpen(true);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDuplicate(template)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    {!template.is_system && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(template)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteMutation.mutate(template.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+              <CardContent className="pt-0">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge variant="secondary">{getCategoryLabel(template.category || '')}</Badge>
+                  <Badge variant={template.is_active ? "default" : "outline"}>
+                    {template.is_active ? t('templates.active') : t('templates.inactive')}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTemplate(template);
+                      setIsPreviewOpen(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDuplicate(template)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  {!template.is_system && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(template)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => deleteMutation.mutate(template.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground mb-4">
-              Aucun template {templateType === "sms" ? "SMS" : "email"} trouvé
-            </p>
-            <Button variant="outline" onClick={importDefaultTemplates}>
-              Importer des modèles par défaut
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12 border rounded-lg border-dashed">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground mb-2">{t('templates.noTemplates')}</p>
+          <p className="text-sm text-muted-foreground">{t('templates.noTemplatesDesc')}</p>
+        </div>
       )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Modifier le template</DialogTitle>
+            <DialogTitle>{t('templates.editTemplate')}</DialogTitle>
+            <DialogDescription>
+              {t('templates.editTemplateDesc')}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Nom du template</Label>
+                <Label htmlFor="edit-name">{t('templates.templateName')}</Label>
                 <Input
+                  id="edit-name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Catégorie</Label>
+                <Label htmlFor="edit-category">{t('templates.category')}</Label>
                 <Select
                   value={formData.category}
                   onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -557,48 +552,52 @@ export const EmailTemplatesList = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="transactional">{getCategoryLabel('transactional')}</SelectItem>
+                    <SelectItem value="marketing">{getCategoryLabel('marketing')}</SelectItem>
+                    <SelectItem value="notification">{getCategoryLabel('notification')}</SelectItem>
+                    <SelectItem value="reminder">{getCategoryLabel('reminder')}</SelectItem>
+                    <SelectItem value="onboarding">{getCategoryLabel('onboarding')}</SelectItem>
+                    <SelectItem value="sms">{getCategoryLabel('sms')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Sujet</Label>
+              <Label htmlFor="edit-subject">{t('templates.subject')}</Label>
               <Input
+                id="edit-subject"
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Contenu</Label>
+              <Label htmlFor="edit-body">{t('templates.content')}</Label>
               <Textarea
+                id="edit-body"
                 value={formData.body_html}
                 onChange={(e) => setFormData({ ...formData, body_html: e.target.value })}
-                rows={8}
+                rows={10}
                 className="font-mono text-sm"
               />
             </div>
             <div className="flex items-center gap-2">
               <Switch
+                id="edit-is_active"
                 checked={formData.is_active}
                 onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
               />
-              <Label>Template actif</Label>
+              <Label htmlFor="edit-is_active">{t('templates.activeTemplate')}</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Annuler
+              {t('templates.cancel')}
             </Button>
             <Button
               onClick={() => selectedTemplate && updateMutation.mutate({ id: selectedTemplate.id, data: formData })}
               disabled={updateMutation.isPending}
             >
-              {updateMutation.isPending ? "Mise à jour..." : "Enregistrer"}
+              {updateMutation.isPending ? t('templates.updating') : t('templates.update')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -606,32 +605,22 @@ export const EmailTemplatesList = () => {
 
       {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selectedTemplate?.category === "sms" ? (
-                <MessageSquare className="h-5 w-5 text-blue-500" />
-              ) : (
-                <Mail className="h-5 w-5 text-primary" />
-              )}
-              {getTemplateDisplayName(selectedTemplate)}
-            </DialogTitle>
-            <DialogDescription>Sujet: {selectedTemplate?.subject}</DialogDescription>
+            <DialogTitle>{t('templates.preview')}</DialogTitle>
+            <DialogDescription>{selectedTemplate?.subject}</DialogDescription>
           </DialogHeader>
-          <div className="border rounded-lg p-4 bg-white dark:bg-muted">
+          <div className="border rounded-lg p-4 bg-white">
             {selectedTemplate?.category === "sms" ? (
               <div className="max-w-xs mx-auto">
                 <div className="bg-blue-500 text-white rounded-2xl rounded-br-sm p-4">
-                  <p className="text-sm">{selectedTemplate?.body_html}</p>
+                  <p className="text-sm whitespace-pre-wrap">{selectedTemplate?.body_html}</p>
                 </div>
-                <p className="text-xs text-muted-foreground text-right mt-2">
-                  {selectedTemplate?.body_html?.length || 0} caractères
-                </p>
               </div>
             ) : (
               <div
+                className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedTemplate?.body_html || "") }}
-                className="prose dark:prose-invert max-w-none"
               />
             )}
           </div>
