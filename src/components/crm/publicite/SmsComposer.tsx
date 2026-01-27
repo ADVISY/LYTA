@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ interface SmsTemplate {
 }
 
 export const SmsComposer = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [selectedClients, setSelectedClients] = useState<Client[]>([]);
@@ -123,12 +125,12 @@ export const SmsComposer = () => {
   const handleSend = async () => {
     if (mode === "single") {
       if (!singlePhone || !message) {
-        toast({ title: "Numéro et message requis", variant: "destructive" });
+        toast({ title: t('smsComposer.phoneAndMessageRequired'), variant: "destructive" });
         return;
       }
     } else {
       if (selectedClients.length === 0 || !message) {
-        toast({ title: "Sélectionnez au moins un client et un message", variant: "destructive" });
+        toast({ title: t('smsComposer.selectClientAndMessage'), variant: "destructive" });
         return;
       }
     }
@@ -148,8 +150,8 @@ export const SmsComposer = () => {
       if (error) throw error;
 
       toast({
-        title: "SMS envoyés",
-        description: `${recipients.length} SMS envoyé${recipients.length > 1 ? "s" : ""} avec succès`,
+        title: t('smsComposer.smsSent'),
+        description: t('smsComposer.smsSentSuccess', { count: recipients.length }),
       });
 
       // Reset form
@@ -162,8 +164,8 @@ export const SmsComposer = () => {
     } catch (error: any) {
       console.error("SMS error:", error);
       toast({
-        title: "Erreur d'envoi SMS",
-        description: error.message || "Une erreur est survenue",
+        title: t('smsComposer.smsError'),
+        description: error.message || t('common.error'),
         variant: "destructive",
       });
     } finally {
@@ -182,17 +184,17 @@ export const SmsComposer = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-blue-500" />
-              Composer un SMS
+              {t('smsComposer.title')}
             </CardTitle>
             <CardDescription>
-              Envoyez un SMS à un ou plusieurs clients
+              {t('smsComposer.subtitle')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                L'envoi de SMS nécessite une configuration Twilio. Contactez votre administrateur si les SMS ne fonctionnent pas.
+                {t('smsComposer.twilioWarning')}
               </AlertDescription>
             </Alert>
 
@@ -204,7 +206,7 @@ export const SmsComposer = () => {
                 className="flex-1"
               >
                 <User className="h-4 w-4 mr-2" />
-                SMS unique
+                {t('smsComposer.singleSms')}
               </Button>
               <Button
                 variant={mode === "bulk" ? "default" : "outline"}
@@ -212,35 +214,35 @@ export const SmsComposer = () => {
                 className="flex-1"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Envoi groupé
+                {t('smsComposer.bulkSms')}
               </Button>
             </div>
 
             {mode === "single" ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="single-phone">Numéro de téléphone</Label>
+                  <Label htmlFor="single-phone">{t('smsComposer.phoneNumber')}</Label>
                   <Input
                     id="single-phone"
                     type="tel"
                     value={singlePhone}
                     onChange={(e) => setSinglePhone(e.target.value)}
-                    placeholder="+41 79 123 45 67"
+                    placeholder={t('smsComposer.phoneNumberPlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="single-name">Nom (optionnel)</Label>
+                  <Label htmlFor="single-name">{t('smsComposer.nameOptional')}</Label>
                   <Input
                     id="single-name"
                     value={singleName}
                     onChange={(e) => setSingleName(e.target.value)}
-                    placeholder="Jean Dupont"
+                    placeholder={t('smsComposer.namePlaceholder')}
                   />
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Destinataires sélectionnés ({selectedClients.length})</Label>
+                <Label>{t('smsComposer.selectedRecipients')} ({selectedClients.length})</Label>
                 {selectedClients.length > 0 ? (
                   <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/50 max-h-32 overflow-y-auto">
                     {selectedClients.map((client) => (
@@ -257,7 +259,7 @@ export const SmsComposer = () => {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground p-3 border rounded-lg border-dashed">
-                    Utilisez le panneau de droite pour sélectionner des clients
+                    {t('smsComposer.usePanelToSelect')}
                   </p>
                 )}
               </div>
@@ -265,13 +267,13 @@ export const SmsComposer = () => {
 
             {/* Template Selection */}
             <div className="space-y-2">
-              <Label>Template SMS (optionnel)</Label>
+              <Label>{t('smsComposer.templateOptional')}</Label>
               <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un template..." />
+                  <SelectValue placeholder={t('smsComposer.selectTemplate')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Aucun template</SelectItem>
+                  <SelectItem value="none">{t('smsComposer.noTemplate')}</SelectItem>
                   {templates?.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       <div className="flex items-center gap-2">
@@ -287,21 +289,21 @@ export const SmsComposer = () => {
             {/* Message */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="message">Message</Label>
+                <Label htmlFor="message">{t('smsComposer.message')}</Label>
                 <span className={`text-xs ${characterCount > 160 ? "text-yellow-500" : "text-muted-foreground"}`}>
-                  {characterCount}/160 ({smsCount} SMS)
+                  {characterCount}/160 ({smsCount} {t('smsComposer.smsCount')})
                 </span>
               </div>
               <Textarea
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Votre message SMS..."
+                placeholder={t('smsComposer.messagePlaceholder')}
                 rows={4}
                 maxLength={480}
               />
               <p className="text-xs text-muted-foreground">
-                Variables: {"{{client_name}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
+                {t('smsComposer.variablesHint')}: {"{{client_name}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
               </p>
             </div>
 
@@ -315,14 +317,14 @@ export const SmsComposer = () => {
               {isSending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Envoi en cours...
+                  {t('smsComposer.sending')}
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
                   {mode === "single"
-                    ? "Envoyer le SMS"
-                    : `Envoyer à ${selectedClients.length} destinataire${selectedClients.length > 1 ? "s" : ""}`}
+                    ? t('smsComposer.sendSms')
+                    : t('smsComposer.sendToRecipients', { count: selectedClients.length })}
                 </>
               )}
             </Button>
@@ -334,11 +336,11 @@ export const SmsComposer = () => {
       {mode === "bulk" ? (
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Sélectionner les clients</CardTitle>
+            <CardTitle className="text-base">{t('smsComposer.selectClients')}</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher..."
+                placeholder={t('smsComposer.searchClients')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -348,10 +350,10 @@ export const SmsComposer = () => {
           <CardContent className="pt-0">
             <div className="flex gap-2 mb-3">
               <Button variant="outline" size="sm" onClick={selectAllFiltered} className="flex-1">
-                Tout sélectionner
+                {t('smsComposer.selectAll')}
               </Button>
               <Button variant="outline" size="sm" onClick={clearSelection} className="flex-1">
-                Effacer
+                {t('smsComposer.clear')}
               </Button>
             </div>
             <ScrollArea className="h-[400px]">
@@ -388,7 +390,7 @@ export const SmsComposer = () => {
         message && (
           <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle className="text-base">Aperçu SMS</CardTitle>
+              <CardTitle className="text-base">{t('smsComposer.preview')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="max-w-xs mx-auto">
@@ -396,7 +398,7 @@ export const SmsComposer = () => {
                   <p className="text-sm whitespace-pre-wrap">{message}</p>
                 </div>
                 <p className="text-xs text-muted-foreground text-right mt-2">
-                  {characterCount} caractères • {smsCount} SMS
+                  {characterCount} {t('smsComposer.characters')} • {smsCount} {t('smsComposer.smsCount')}
                 </p>
               </div>
             </CardContent>
