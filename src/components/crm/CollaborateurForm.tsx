@@ -17,25 +17,27 @@ interface CollaborateurFormProps {
   onSubmit: (data: CollaborateurFormData) => Promise<boolean>;
 }
 
-const professionOptions = [
-  { value: "agent", label: "Agent" },
-  { value: "manager", label: "Manager" },
-  { value: "admin", label: "Administrateur" },
-  { value: "backoffice", label: "Backoffice" },
-  { value: "comptabilite", label: "Comptabilité" },
-  { value: "direction", label: "Direction" },
+const getProfessionOptions = (t: (key: string) => string) => [
+  { value: "agent", label: t("forms.professions.agent") },
+  { value: "manager", label: t("forms.professions.manager") },
+  { value: "admin", label: t("forms.professions.admin") },
+  { value: "backoffice", label: t("forms.professions.backoffice") },
+  { value: "comptabilite", label: t("forms.professions.comptabilite") },
+  { value: "direction", label: t("forms.professions.direction") },
 ];
 
-const contractTypeOptions = [
-  { value: "cdi", label: "CDI" },
-  { value: "cdd", label: "CDD" },
-  { value: "freelance", label: "Freelance" },
-  { value: "stagiaire", label: "Stagiaire" },
+const getContractTypeOptions = (t: (key: string) => string) => [
+  { value: "cdi", label: t("forms.contractTypes.cdi") },
+  { value: "cdd", label: t("forms.contractTypes.cdd") },
+  { value: "freelance", label: t("forms.contractTypes.freelance") },
+  { value: "stagiaire", label: t("forms.contractTypes.stagiaire") },
 ];
 
 export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit }: CollaborateurFormProps) {
   const { t } = useTranslation();
   const { collaborateurs } = useCollaborateurs();
+  const professionOptions = getProfessionOptions(t);
+  const contractTypeOptions = getContractTypeOptions(t);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CollaborateurFormData>({
     first_name: "",

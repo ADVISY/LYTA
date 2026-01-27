@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -47,6 +48,7 @@ interface CommissionFormProps {
 }
 
 export default function CommissionForm({ open, onOpenChange, onSuccess }: CommissionFormProps) {
+  const { t } = useTranslation();
   const { clients, fetchClients } = useClients();
   const { policies, fetchPolicies } = usePolicies();
   const { createCommission } = useCommissions();
@@ -212,11 +214,11 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
 
   const getClientName = (client: Client) => {
     if (client.company_name) return client.company_name;
-    return `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Sans nom';
+    return `${client.first_name || ''} ${client.last_name || ''}`.trim() || t('common.noName');
   };
 
   const getAgentName = (agent: Collaborateur) => {
-    return `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email || 'Inconnu';
+    return `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email || t('common.unknown');
   };
 
   const handleSelectClient = (client: Client) => {
@@ -364,14 +366,14 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nouvelle commission</DialogTitle>
+          <DialogTitle>{t('forms.commission.title')}</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Client Search */}
             <div className="space-y-2">
-              <Label>Rechercher un client</Label>
+              <Label>{t('forms.commission.searchClient')}</Label>
               <Popover open={clientOpen} onOpenChange={setClientOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -388,7 +390,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                     ) : (
                       <span className="text-muted-foreground flex items-center gap-2">
                         <Search className="h-4 w-4" />
-                        Rechercher par nom, prénom...
+                        {t('forms.commission.searchPlaceholder')}
                       </span>
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -397,12 +399,12 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 <PopoverContent className="w-[400px] p-0" align="start">
                   <Command shouldFilter={false}>
                     <CommandInput 
-                      placeholder="Rechercher un client..." 
+                      placeholder={t('forms.commission.searchPlaceholder')} 
                       value={searchQuery}
                       onValueChange={setSearchQuery}
                     />
                     <CommandList>
-                      <CommandEmpty>Aucun client trouvé</CommandEmpty>
+                      <CommandEmpty>{t('forms.commission.noClientFound')}</CommandEmpty>
                       <CommandGroup>
                         {filteredClients.slice(0, 10).map((client) => (
                           <CommandItem
@@ -438,26 +440,26 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 name="policy_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contrat</FormLabel>
+                    <FormLabel>{t('forms.commission.contract')}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un contrat" />
+                          <SelectValue placeholder={t('forms.commission.selectContract')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {clientPolicies.length === 0 ? (
                           <div className="p-2 text-sm text-muted-foreground text-center">
-                            Aucun contrat pour ce client
+                            {t('forms.commission.noContractForClient')}
                           </div>
                         ) : (
                           clientPolicies.map((policy) => (
                             <SelectItem key={policy.id} value={policy.id}>
                               <div className="flex items-center gap-2">
                                 <FileCheck className="h-4 w-4" />
-                                <span>{policy.policy_number || 'Sans numéro'}</span>
+                                <span>{policy.policy_number || t('forms.commission.noContractNumber')}</span>
                                 <span className="text-muted-foreground">
-                                  - {policy.product?.name || policy.product_type || 'Produit'}
+                                  - {policy.product?.name || policy.product_type || t('common.unknownProduct')}
                                 </span>
                               </div>
                             </SelectItem>
@@ -478,7 +480,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Montant total (CHF)</FormLabel>
+                    <FormLabel>{t('forms.commission.totalAmount')}</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -498,22 +500,22 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type de commission</FormLabel>
+                    <FormLabel>{t('forms.commission.commissionType')}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le type" />
+                          <SelectValue placeholder={t('forms.commission.selectType')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="acquisition">Acquisition</SelectItem>
-                        <SelectItem value="renewal">Renouvellement</SelectItem>
-                        <SelectItem value="bonus">Bonus</SelectItem>
+                        <SelectItem value="acquisition">{t('forms.commission.types.acquisition')}</SelectItem>
+                        <SelectItem value="renewal">{t('forms.commission.types.renewal')}</SelectItem>
+                        <SelectItem value="bonus">{t('forms.commission.types.bonus')}</SelectItem>
                         <SelectItem 
                           value="gestion" 
                           disabled={!hasMandat}
                         >
-                          Gestion (annuelle)
+                          {t('forms.commission.types.management')}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -528,7 +530,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
               <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                 <p className="text-sm">
-                  Mandat de gestion requis pour ce type de commission. Veuillez d'abord créer un mandat de gestion pour ce client.
+                  {t('forms.commission.mandateRequired')}
                 </p>
               </div>
             )}
@@ -543,11 +545,11 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
               )}>
                 <FileCheck className="h-4 w-4 flex-shrink-0" />
                 {checkingMandat ? (
-                  <span>Vérification du mandat de gestion...</span>
+                  <span>{t('forms.commission.mandateStatus.checking')}</span>
                 ) : hasMandat ? (
-                  <span>✓ Mandat de gestion signé - Commission de gestion autorisée</span>
+                  <span>{t('forms.commission.mandateStatus.signed')}</span>
                 ) : (
-                  <span>Pas de mandat de gestion signé - Les commissions de gestion sont désactivées</span>
+                  <span>{t('forms.commission.mandateStatus.notSigned')}</span>
                 )}
               </div>
             )}
@@ -559,17 +561,17 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Statut</FormLabel>
+                    <FormLabel>{t('forms.commission.status')}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner le statut" />
+                          <SelectValue placeholder={t('forms.commission.selectStatus')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="due">À payer</SelectItem>
-                        <SelectItem value="pending">En attente</SelectItem>
-                        <SelectItem value="paid">Payée</SelectItem>
+                        <SelectItem value="due">{t('forms.commission.statuses.due')}</SelectItem>
+                        <SelectItem value="pending">{t('forms.commission.statuses.pending')}</SelectItem>
+                        <SelectItem value="paid">{t('forms.commission.statuses.paid')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -583,7 +585,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>{t('forms.commission.date')}</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -598,15 +600,15 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Répartition de la commission
+                  {t('forms.commission.parts')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Summary */}
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
-                  <span>Total: <strong>{totalAmount.toFixed(2)} CHF</strong> (100%)</span>
+                  <span>{t('forms.commission.partsTotal')}: <strong>{totalAmount.toFixed(2)} CHF</strong> (100%)</span>
                   <span className={remainingRate < 0 ? "text-destructive" : "text-muted-foreground"}>
-                    Restant: <strong>{remainingRate.toFixed(1)}%</strong> ({((totalAmount * remainingRate) / 100).toFixed(2)} CHF)
+                    {t('forms.commission.partsRemaining')}: <strong>{remainingRate.toFixed(1)}%</strong> ({((totalAmount * remainingRate) / 100).toFixed(2)} CHF)
                   </span>
                 </div>
 
@@ -628,7 +630,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                             {part.agent_name}
                           </p>
                           {part.isManager && (
-                            <p className="text-xs text-amber-600">Commission équipe automatique</p>
+                            <p className="text-xs text-amber-600">{t('forms.commission.autoTeamCommission')}</p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -664,7 +666,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                 {remainingRate > 0 && availableAgents.length > 0 && (
                   <div className="flex items-end gap-3 pt-2 border-t">
                     <div className="flex-1">
-                      <Label className="text-xs mb-1.5 block">Collaborateur</Label>
+                      <Label className="text-xs mb-1.5 block">{t('forms.commission.collaborator')}</Label>
                       <Select 
                         value={selectedAgentId} 
                         onValueChange={(agentId) => {
@@ -684,8 +686,8 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                           }
                         }}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner..." />
+                      <SelectTrigger>
+                          <SelectValue placeholder={t('common.select')} />
                         </SelectTrigger>
                         <SelectContent>
                           {availableAgents.map((agent) => (
@@ -706,7 +708,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
                       </Select>
                     </div>
                     <div className="w-28">
-                      <Label className="text-xs mb-1.5 block">Pourcentage</Label>
+                      <Label className="text-xs mb-1.5 block">{t('forms.commission.percentage')}</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -734,7 +736,7 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
 
                 {availableAgents.length === 0 && commissionParts.length > 0 && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    Tous les collaborateurs ont été assignés
+                    {t('forms.commission.allAssigned')}
                   </p>
                 )}
               </CardContent>
@@ -746,10 +748,10 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>{t('forms.commission.notes')}</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Notes sur cette commission..."
+                      placeholder={t('forms.commission.notesPlaceholder')}
                       className="resize-none"
                       rows={2}
                       {...field}
@@ -762,10 +764,10 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={loading || !selectedClient}>
-                {loading ? "Enregistrement..." : "Enregistrer"}
+                {loading ? t('forms.commission.saving') : t('forms.commission.save')}
               </Button>
             </div>
           </form>
