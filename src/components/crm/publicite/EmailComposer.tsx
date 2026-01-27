@@ -194,10 +194,10 @@ export const EmailComposer = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
-              Composer un email
+              {t('emailComposer.title')}
             </CardTitle>
             <CardDescription>
-              Envoyez un email personnalisé à un ou plusieurs clients
+              {t('emailComposer.subtitle')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -209,7 +209,7 @@ export const EmailComposer = () => {
                 className="flex-1"
               >
                 <User className="h-4 w-4 mr-2" />
-                Email unique
+                {t('emailComposer.singleEmail')}
               </Button>
               <Button
                 variant={mode === "bulk" ? "default" : "outline"}
@@ -217,35 +217,35 @@ export const EmailComposer = () => {
                 className="flex-1"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Envoi groupé
+                {t('emailComposer.bulkEmail')}
               </Button>
             </div>
 
             {mode === "single" ? (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="single-email">Email du destinataire</Label>
+                  <Label htmlFor="single-email">{t('emailComposer.recipientEmail')}</Label>
                   <Input
                     id="single-email"
                     type="email"
                     value={singleEmail}
                     onChange={(e) => setSingleEmail(e.target.value)}
-                    placeholder="email@exemple.ch"
+                    placeholder={t('emailComposer.recipientEmailPlaceholder')}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="single-name">Nom du destinataire</Label>
+                  <Label htmlFor="single-name">{t('emailComposer.recipientName')}</Label>
                   <Input
                     id="single-name"
                     value={singleName}
                     onChange={(e) => setSingleName(e.target.value)}
-                    placeholder="Jean Dupont"
+                    placeholder={t('emailComposer.recipientNamePlaceholder')}
                   />
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Destinataires sélectionnés ({selectedClients.length})</Label>
+                <Label>{t('emailComposer.selectedRecipients')} ({selectedClients.length})</Label>
                 {selectedClients.length > 0 ? (
                   <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/50 max-h-32 overflow-y-auto">
                     {selectedClients.map((client) => (
@@ -262,7 +262,7 @@ export const EmailComposer = () => {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground p-3 border rounded-lg border-dashed">
-                    Utilisez le panneau de droite pour sélectionner des clients
+                    {t('emailComposer.usePanelToSelect')}
                   </p>
                 )}
               </div>
@@ -270,13 +270,13 @@ export const EmailComposer = () => {
 
             {/* Template Selection */}
             <div className="space-y-2">
-              <Label>Template (optionnel)</Label>
+              <Label>{t('emailComposer.templateOptional')}</Label>
               <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un template..." />
+                  <SelectValue placeholder={t('emailComposer.selectTemplate')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Aucun template</SelectItem>
+                  <SelectItem value="none">{t('emailComposer.noTemplate')}</SelectItem>
                   {templates?.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       <div className="flex items-center gap-2">
@@ -291,28 +291,28 @@ export const EmailComposer = () => {
 
             {/* Subject */}
             <div className="space-y-2">
-              <Label htmlFor="subject">Sujet</Label>
+              <Label htmlFor="subject">{t('emailComposer.subject')}</Label>
               <Input
                 id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Sujet de l'email"
+                placeholder={t('emailComposer.subjectPlaceholder')}
               />
             </div>
 
             {/* Body */}
             <div className="space-y-2">
-              <Label htmlFor="body">Message</Label>
+              <Label htmlFor="body">{t('emailComposer.message')}</Label>
               <Textarea
                 id="body"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder="Contenu de l'email..."
+                placeholder={t('emailComposer.messagePlaceholder')}
                 rows={10}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Variables: {"{{client_name}}"}, {"{{client_email}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
+                {t('emailComposer.variablesHint')}: {"{{client_name}}"}, {"{{client_email}}"}, {"{{company_name}}"}, {"{{agent_name}}"}
               </p>
             </div>
 
@@ -326,14 +326,14 @@ export const EmailComposer = () => {
               {isSending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Envoi en cours...
+                  {t('emailComposer.sending')}
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
                   {mode === "single"
-                    ? "Envoyer l'email"
-                    : `Envoyer à ${selectedClients.length} destinataire${selectedClients.length > 1 ? "s" : ""}`}
+                    ? t('emailComposer.sendEmail')
+                    : t('emailComposer.sendToRecipients', { count: selectedClients.length })}
                 </>
               )}
             </Button>
@@ -345,11 +345,11 @@ export const EmailComposer = () => {
       {mode === "bulk" ? (
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Sélectionner les clients</CardTitle>
+            <CardTitle className="text-base">{t('emailComposer.selectClients')}</CardTitle>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher..."
+                placeholder={t('emailComposer.searchClients')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -359,10 +359,10 @@ export const EmailComposer = () => {
           <CardContent className="pt-0">
             <div className="flex gap-2 mb-3">
               <Button variant="outline" size="sm" onClick={selectAllFiltered} className="flex-1">
-                Tout sélectionner
+                {t('emailComposer.selectAll')}
               </Button>
               <Button variant="outline" size="sm" onClick={clearSelection} className="flex-1">
-                Effacer
+                {t('emailComposer.clear')}
               </Button>
             </div>
             <ScrollArea className="h-[400px]">
@@ -398,11 +398,11 @@ export const EmailComposer = () => {
         body && (
           <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle className="text-base">Aperçu</CardTitle>
+              <CardTitle className="text-base">{t('emailComposer.preview')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="border rounded-lg p-4 bg-white dark:bg-muted overflow-hidden">
-                <p className="font-medium mb-2 text-sm">{subject || "Sans sujet"}</p>
+                <p className="font-medium mb-2 text-sm">{subject || t('emailComposer.noSubject')}</p>
                 <div
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body) }}
                   className="prose dark:prose-invert prose-sm max-w-none"

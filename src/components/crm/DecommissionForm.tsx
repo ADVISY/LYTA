@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ interface DecommissionFormProps {
 }
 
 export default function DecommissionForm({ open, onOpenChange, onSuccess }: DecommissionFormProps) {
+  const { t } = useTranslation();
   const { commissions, fetchCommissions, createCommission } = useCommissions();
   const { fetchCommissionParts, addMultipleParts } = useCommissionParts();
   const { collaborateurs: agents } = useCollaborateursCommission();
@@ -184,16 +186,16 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
   };
 
   const statusLabels: Record<string, string> = {
-    due: "À payer",
-    pending: "En attente",
-    paid: "Payée"
+    due: t('decommission.statusDue'),
+    pending: t('decommission.statusPending'),
+    paid: t('decommission.statusPaid')
   };
 
   const typeLabels: Record<string, string> = {
-    acquisition: "Acquisition",
-    renewal: "Renouvellement",
-    bonus: "Bonus",
-    gestion: "Gestion"
+    acquisition: t('decommission.typeAcquisition'),
+    renewal: t('decommission.typeRenewal'),
+    bonus: t('decommission.typeBonus'),
+    gestion: t('decommission.typeGestion')
   };
 
   return (
@@ -202,7 +204,7 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <MinusCircle className="h-5 w-5" />
-            Nouvelle décommission
+            {t('decommission.title')}
           </DialogTitle>
         </DialogHeader>
         
@@ -211,14 +213,14 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
           <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">Attention</p>
-              <p className="text-sm">Une décommission crée un montant négatif qui sera déduit des commissions. Cette opération est irréversible.</p>
+              <p className="font-medium">{t('decommission.warning')}</p>
+              <p className="text-sm">{t('decommission.warningMessage')}</p>
             </div>
           </div>
 
           {/* Commission Search */}
           <div className="space-y-2">
-            <Label>Rechercher la commission à décommissionner</Label>
+            <Label>{t('decommission.searchLabel')}</Label>
             <Popover open={commissionOpen} onOpenChange={setCommissionOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -240,7 +242,7 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
                   ) : (
                     <span className="text-muted-foreground flex items-center gap-2">
                       <Search className="h-4 w-4" />
-                      Rechercher par client, produit, n° police...
+                      {t('decommission.searchPlaceholder')}
                     </span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -249,12 +251,12 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
               <PopoverContent className="w-[500px] p-0" align="start">
                 <Command shouldFilter={false}>
                   <CommandInput 
-                    placeholder="Rechercher une commission..." 
+                    placeholder={t('decommission.searchCommission')} 
                     value={searchQuery}
                     onValueChange={setSearchQuery}
                   />
                   <CommandList>
-                    <CommandEmpty>Aucune commission trouvée</CommandEmpty>
+                    <CommandEmpty>{t('decommission.noCommissionFound')}</CommandEmpty>
                     <CommandGroup>
                       {filteredCommissions.slice(0, 15).map((commission) => (
                         <CommandItem
@@ -305,31 +307,31 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <FileCheck className="h-4 w-4" />
-                    Commission originale
+                    {t('decommission.originalCommission')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <span className="text-muted-foreground">Client:</span>
+                      <span className="text-muted-foreground">{t('decommission.client')}:</span>
                       <span className="ml-2 font-medium">{getClientName(selectedCommission)}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Montant:</span>
+                      <span className="text-muted-foreground">{t('decommission.amount')}:</span>
                       <span className="ml-2 font-medium text-emerald-600">{formatCurrency(Number(selectedCommission.amount))}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Type:</span>
+                      <span className="text-muted-foreground">{t('decommission.type')}:</span>
                       <span className="ml-2 font-medium">{typeLabels[selectedCommission.type || 'acquisition']}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Date:</span>
+                      <span className="text-muted-foreground">{t('decommission.date')}:</span>
                       <span className="ml-2 font-medium">
                         {selectedCommission.date ? format(new Date(selectedCommission.date), 'dd/MM/yyyy', { locale: fr }) : 'N/A'}
                       </span>
                     </div>
                     <div className="col-span-2">
-                      <span className="text-muted-foreground">Produit:</span>
+                      <span className="text-muted-foreground">{t('decommission.product')}:</span>
                       <span className="ml-2 font-medium">{selectedCommission.policy?.product?.name || 'N/A'}</span>
                     </div>
                   </div>
@@ -339,7 +341,7 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
               {/* Decommission Amount */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Montant à décommissionner (CHF)</Label>
+                  <Label>{t('decommission.amountToDecommission')}</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -349,11 +351,11 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
                     min={0.01}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Max: {formatCurrency(Number(selectedCommission.amount))}
+                    {t('decommission.maxAmount')}: {formatCurrency(Number(selectedCommission.amount))}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Date de décommission</Label>
+                  <Label>{t('decommission.decommissionDate')}</Label>
                   <Input
                     type="date"
                     value={date}
@@ -368,12 +370,12 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2 text-destructive">
                       <Users className="h-4 w-4" />
-                      Déduction par collaborateur
+                      {t('decommission.deductionByCollaborator')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {loadingParts ? (
-                      <p className="text-sm text-muted-foreground">Chargement...</p>
+                      <p className="text-sm text-muted-foreground">{t('decommission.loading')}</p>
                     ) : (
                       decommissionParts.map((part) => (
                         <div 
@@ -391,7 +393,7 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
                       ))
                     )}
                     <div className="flex items-center justify-between pt-2 border-t mt-2">
-                      <span className="font-medium">Total décommission</span>
+                      <span className="font-medium">{t('decommission.totalDecommission')}</span>
                       <span className="font-bold text-lg text-destructive">
                         - {formatCurrency(decommissionAmount)}
                       </span>
@@ -402,9 +404,9 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
 
               {/* Notes */}
               <div className="space-y-2">
-                <Label>Notes (optionnel)</Label>
+                <Label>{t('decommission.notesOptional')}</Label>
                 <Textarea
-                  placeholder="Raison de la décommission..."
+                  placeholder={t('decommission.notesPlaceholder')}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
@@ -415,14 +417,14 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={handleClose}>
-              Annuler
+              {t('decommission.cancel')}
             </Button>
             <Button 
               onClick={onSubmit} 
               disabled={loading || !selectedCommission || decommissionAmount <= 0}
               variant="destructive"
             >
-              {loading ? "Enregistrement..." : "Créer la décommission"}
+              {loading ? t('common.saving') : t('decommission.create')}
             </Button>
           </div>
         </div>
