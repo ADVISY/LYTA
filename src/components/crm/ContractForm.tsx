@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useDocuments } from "@/hooks/useDocuments";
@@ -60,15 +61,15 @@ interface ContractFormProps {
   policyId?: string;
 }
 
-const categoryLabels: Record<string, string> = {
-  health: "Santé",
-  auto: "Auto",
-  home: "Ménage/RC",
-  life: "Vie/Prévoyance",
-  legal: "Protection juridique",
-  property: "Ménage/RC",
-  other: "Autre",
-};
+const getCategoryLabels = (t: (key: string) => string): Record<string, string> => ({
+  health: t("forms.contract.categories.health"),
+  auto: t("forms.contract.categories.auto"),
+  home: t("forms.contract.categories.home"),
+  life: t("forms.contract.categories.life"),
+  legal: t("forms.contract.categories.legal"),
+  property: t("forms.contract.categories.property"),
+  other: t("forms.contract.categories.other"),
+});
 
 // Helper to generate unique IDs safely
 const generateId = (): string => {
@@ -107,10 +108,13 @@ const isLamalProduct = (productName: string | null | undefined): boolean => {
 };
 
 export default function ContractForm({ clientId, open, onOpenChange, onSuccess, editMode = false, policyId }: ContractFormProps) {
+  const { t } = useTranslation();
   const { createDocument } = useDocuments();
   const { createPolicy, updatePolicy, policies } = usePolicies();
   const { celebrate } = useCelebration();
   const { toast } = useToast();
+  
+  const categoryLabels = getCategoryLabels(t);
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -395,8 +399,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     
     if (selectedProducts.length === 0) {
       toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner au moins un produit",
+        title: t("common.error"),
+        description: t("forms.contract.selectProducts"),
         variant: "destructive"
       });
       return;
@@ -405,8 +409,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     if (hasExistingContractWithCompany) {
       const selectedCompany = companies.find(c => c.id === selectedCompanyId);
       toast({
-        title: "Erreur",
-        description: `Ce client a déjà un contrat avec ${selectedCompany?.name}. Un client ne peut avoir qu'un seul contrat par compagnie.`,
+        title: t("common.error"),
+        description: t("forms.clientHasContractWithCompany", { company: selectedCompany?.name }),
         variant: "destructive"
       });
       return;
@@ -542,18 +546,18 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       }
       
       toast({
-        title: editMode ? "Contrat mis à jour" : "Contrat créé",
+        title: editMode ? t("forms.contract.contractUpdated") : t("forms.contract.contractCreated"),
         description: editMode 
-          ? "Le contrat a été modifié avec succès" 
-          : `Contrat avec ${selectedProducts.length} produit(s) créé avec succès`
+          ? t("forms.contract.contractUpdatedDesc") 
+          : t("forms.contract.contractCreatedDesc", { count: selectedProducts.length })
       });
 
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
       toast({
-        title: "Erreur",
-        description: error.message || (editMode ? "Impossible de modifier le contrat" : "Impossible de créer le contrat"),
+        title: t("common.error"),
+        description: error.message || (editMode ? t("forms.contract.errorUpdating") : t("forms.contract.errorCreating")),
         variant: "destructive"
       });
     } finally {
@@ -591,10 +595,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {editMode ? "Modifier le contrat" : "Nouveaux contrats"}
+            {editMode ? t("forms.contract.editTitle") : t("forms.contract.title")}
             {selectedProducts.length > 0 && !editMode && (
               <span className="text-sm font-normal text-muted-foreground">
-                ({selectedProducts.length} produit{selectedProducts.length > 1 ? 's' : ''} sélectionné{selectedProducts.length > 1 ? 's' : ''})
+                ({t("forms.contract.productCount", { count: selectedProducts.length })})
               </span>
             )}
           </DialogTitle>
@@ -609,10 +613,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             {/* Common Fields Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Compagnie *</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.company")} *</Label>
                 <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
                   <SelectTrigger className={hasExistingContractWithCompany ? "border-destructive" : ""}>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder={t("common.select")} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((company) => {
@@ -624,7 +628,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                           className={hasContract ? "text-muted-foreground" : ""}
                         >
                           {company.name}
-                          {hasContract && " (contrat existant)"}
+                          {hasContract && ` ${t("forms.contract.existingContract")}`}
                         </SelectItem>
                       );
                     })}
@@ -632,7 +636,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 </Select>
                 {hasExistingContractWithCompany && (
                   <p className="text-xs text-destructive">
-                    Ce client a déjà un contrat avec cette compagnie
+                    {t("forms.contract.existingContractWarning")}
                   </p>
                 )}
               </div>
