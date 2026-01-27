@@ -21,6 +21,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { ModuleGatePage } from "@/components/ModuleGate";
 
 // Sources de données disponibles - will be translated in component
 const getDataSources = (t: any) => [
@@ -609,6 +610,7 @@ export default function CRMRapports() {
   };
 
   return (
+    <ModuleGatePage module="advanced_dashboard">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1015,5 +1017,6 @@ export default function CRMRapports() {
         </Card>
       )}
     </div>
+    </ModuleGatePage>
   );
 }

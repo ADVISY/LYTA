@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2, Lock, QrCode } from "lucide-react";
+import { Calculator, FileText, Printer, Eye, Loader2, Users, Calendar, DollarSign, FileDown, CheckSquare, Building2, Lock, QrCode, Crown, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
@@ -855,24 +855,28 @@ export default function CRMCompta() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn(
-          "grid w-full max-w-lg",
-          hasPayrollAccess && hasQRInvoiceAccess ? "grid-cols-3" :
-          hasPayrollAccess || hasQRInvoiceAccess ? "grid-cols-2" : "grid-cols-1"
-        )}>
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="decomptes" className="gap-2">
             <FileText className="h-4 w-4" />
             {t('accounting.statements')}
           </TabsTrigger>
-          {hasPayrollAccess && (
-            <TabsTrigger value="salaires" className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              {t('accounting.payslips')}
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="qr-invoices" className="gap-2">
+          <TabsTrigger 
+            value="salaires" 
+            className="gap-2"
+            disabled={!hasPayrollAccess}
+          >
+            <DollarSign className="h-4 w-4" />
+            {t('accounting.payslips')}
+            {!hasPayrollAccess && <Lock className="h-3 w-3 ml-1 text-amber-500" />}
+          </TabsTrigger>
+          <TabsTrigger 
+            value="qr-invoices" 
+            className="gap-2"
+            disabled={!hasQRInvoiceAccess}
+          >
             <QrCode className="h-4 w-4" />
             {t('qrInvoice.tabTitle')}
+            {!hasQRInvoiceAccess && <Lock className="h-3 w-3 ml-1 text-amber-500" />}
           </TabsTrigger>
         </TabsList>
 
@@ -968,9 +972,9 @@ export default function CRMCompta() {
           </Card>
         </TabsContent>
 
-        {/* Fiches de salaire Tab - Only if payroll module enabled */}
-        {hasPayrollAccess && (
+        {/* Fiches de salaire Tab */}
         <TabsContent value="salaires" className="space-y-6">
+          {hasPayrollAccess ? (
           <Card className="border-0 shadow-lg">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1065,12 +1069,74 @@ export default function CRMCompta() {
               </Button>
             </CardContent>
           </Card>
+          ) : (
+            <Card className="border-dashed border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center space-y-6">
+                <div className="relative">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-lg">
+                    <DollarSign className="h-10 w-10 text-primary" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 shadow-lg">
+                    <Crown className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+                <div className="space-y-2 max-w-md">
+                  <h3 className="text-xl font-bold">{t('accounting.payslips')}</h3>
+                  <p className="text-muted-foreground">
+                    {t('plans.notAvailableWith', "n'est pas disponible avec votre offre actuelle.")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('plans.upgradeToAccess', 'Passez à une offre supérieure pour générer des fiches de paie.')}
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => window.location.href = '/crm/parametres?tab=abonnement'}
+                  size="lg" 
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg"
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                  {t('plans.seeAvailablePlans', 'Voir les offres disponibles')}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
-        )}
 
         {/* QR Invoice Tab */}
         <TabsContent value="qr-invoices" className="space-y-6">
-          <QRInvoiceTab />
+          {hasQRInvoiceAccess ? (
+            <QRInvoiceTab />
+          ) : (
+            <Card className="border-dashed border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center space-y-6">
+                <div className="relative">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-lg">
+                    <QrCode className="h-10 w-10 text-primary" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 shadow-lg">
+                    <Crown className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+                <div className="space-y-2 max-w-md">
+                  <h3 className="text-xl font-bold">{t('qrInvoice.tabTitle')}</h3>
+                  <p className="text-muted-foreground">
+                    {t('plans.notAvailableWith', "n'est pas disponible avec votre offre actuelle.")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('plans.upgradeToAccess', 'Passez à une offre supérieure pour générer des factures QR suisses.')}
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => window.location.href = '/crm/parametres?tab=abonnement'}
+                  size="lg" 
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg"
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                  {t('plans.seeAvailablePlans', 'Voir les offres disponibles')}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
