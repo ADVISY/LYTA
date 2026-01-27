@@ -92,6 +92,7 @@
     "logoUrlPlaceholder": "https://...",
     "website": "Sito web",
     "websitePlaceholder": "https://www.example.ch",
+    "save": "Salva",
     "deleteCompany": "Elimina compagnia",
     "deleteCompanyConfirm": "Sei sicuro di voler eliminare",
     "deleteCompanyWarning": "Questa azione eliminerà anche tutti i prodotti associati ed è irreversibile.",
@@ -99,7 +100,23 @@
     "companyUpdated": "Compagnia aggiornata",
     "companyDeleted": "Compagnia eliminata",
     "modifyCompany": "Modifica compagnia",
-    "noCommissionDefined": "Nessuna commissione definita"
+    "addProduct": "Aggiungi prodotto",
+    "editProduct": "Modifica prodotto",
+    "editCommission": "Modifica commissione",
+    "noCommissionDefined": "Nessuna commissione definita",
+    "commissionConfig": "Configurazione commissione",
+    "calculationType": "Tipo di calcolo",
+    "fixed": "Fisso (CHF)",
+    "multiplier": "Moltiplicatore (×)",
+    "percentage": "Percentuale (%)",
+    "fixedAmount": "Importo (CHF)",
+    "multiplierValue": "Moltiplicatore",
+    "percentageValue": "Percentuale",
+    "formulaDesc": "Descrizione formula (opzionale)",
+    "formulaPlaceholder": "Es: Premio mensile × 16",
+    "deleteProduct": "Elimina prodotto",
+    "deleteProductConfirm": "Sei sicuro di voler eliminare",
+    "deleteProductWarning": "Questa azione è irreversibile."
   },
   "smsComposer": {
     "title": "Componi SMS",
@@ -614,6 +631,12 @@
     "contacts": "Contatti",
     "products": "Prodotti",
     "noCompanies": "Nessuna compagnia trovata"
+  },
+  "campaignStats": {
+    "emailsSent": "Email inviate",
+    "pending": "In attesa",
+    "smsSent": "SMS inviati",
+    "successRate": "Tasso di successo"
   },
   "settings": {
     "title": "Impostazioni",

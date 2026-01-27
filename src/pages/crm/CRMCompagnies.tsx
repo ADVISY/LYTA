@@ -82,14 +82,14 @@ const formatCommissionDisplay = (type: string | null, value: number | null, desc
   }
 };
 
-const CATEGORIES = [
-  { value: 'health', label: 'Santé' },
+const getCategoryOptions = (t: any) => [
+  { value: 'health', label: t('settings.categoryHealth') },
   { value: 'lamal', label: 'LAMal' },
-  { value: 'lca', label: 'LCA (Complémentaire)' },
-  { value: 'life', label: 'Vie / 3e pilier' },
-  { value: 'auto', label: 'Auto' },
-  { value: 'home', label: 'Habitation' },
-  { value: 'legal', label: 'Protection juridique' },
+  { value: 'lca', label: 'LCA' },
+  { value: 'life', label: t('settings.categoryLife') },
+  { value: 'auto', label: t('settings.categoryAuto') },
+  { value: 'home', label: t('settings.categoryProperty') },
+  { value: 'legal', label: t('settings.categoryLegal') },
 ];
 
 export default function CRMCompagnies() {
@@ -117,7 +117,7 @@ export default function CRMCompagnies() {
   const [deleteProductDialog, setDeleteProductDialog] = useState<Product | null>(null);
   
   const categoryLabels = getCategoryLabels(t);
-
+  const CATEGORIES = getCategoryOptions(t);
   useEffect(() => {
     fetchCompanies();
   }, []);
@@ -434,7 +434,7 @@ export default function CRMCompagnies() {
         </div>
         <Button onClick={openAddCompany} className="gap-2">
           <Plus className="h-4 w-4" />
-          Ajouter une compagnie
+          {t('companyForm.addCompany')}
         </Button>
       </div>
 
@@ -542,18 +542,18 @@ export default function CRMCompagnies() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEditCompany(company)}>
                           <Edit2 className="h-4 w-4 mr-2" />
-                          Modifier la compagnie
+                          {t('companyForm.modifyCompany')}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openAddProduct(company.id)}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Ajouter un produit
+                          {t('companyForm.addProduct')}
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => setDeleteCompanyDialog(company)}
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Supprimer la compagnie
+                          {t('companyForm.deleteCompany')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -593,7 +593,7 @@ export default function CRMCompagnies() {
                           className="gap-1.5"
                         >
                           <Plus className="h-4 w-4" />
-                          Ajouter un produit
+                          {t('companyForm.addProduct')}
                         </Button>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -622,18 +622,18 @@ export default function CRMCompagnies() {
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem onClick={() => openEditProduct(product, company.id)}>
                                         <Edit2 className="h-4 w-4 mr-2" />
-                                        Modifier le produit
+                                        {t('companyForm.editProduct')}
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => startEditCommission(product)}>
                                         <DollarSign className="h-4 w-4 mr-2" />
-                                        Modifier la commission
+                                        {t('companyForm.editCommission')}
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
                                         onClick={() => setDeleteProductDialog(product)}
                                         className="text-destructive"
                                       >
                                         <Trash2 className="h-4 w-4 mr-2" />
-                                        Supprimer
+                                        {t('common.delete')}
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -656,20 +656,20 @@ export default function CRMCompagnies() {
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="fixed">Fixe (CHF)</SelectItem>
-                                        <SelectItem value="multiplier">Multiplicateur (×)</SelectItem>
-                                        <SelectItem value="percentage">Pourcentage (%)</SelectItem>
+                                        <SelectItem value="fixed">{t('companyForm.fixed')}</SelectItem>
+                                        <SelectItem value="multiplier">{t('companyForm.multiplier')}</SelectItem>
+                                        <SelectItem value="percentage">{t('companyForm.percentage')}</SelectItem>
                                       </SelectContent>
                                     </Select>
                                     <Input
                                       type="number"
-                                      placeholder={editForm.type === 'fixed' ? 'Montant CHF' : editForm.type === 'multiplier' ? 'Ex: 16' : 'Ex: 4'}
+                                      placeholder={editForm.type === 'fixed' ? t('companyForm.fixedAmount') : editForm.type === 'multiplier' ? 'Ex: 16' : 'Ex: 4'}
                                       value={editForm.value}
                                       onChange={(e) => setEditForm(prev => ({ ...prev, value: e.target.value }))}
                                       className="h-8 text-xs"
                                     />
                                     <Input
-                                      placeholder="Description (optionnel)"
+                                      placeholder={t('companyForm.formulaDesc')}
                                       value={editForm.description}
                                       onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                                       className="h-8 text-xs"
@@ -682,7 +682,7 @@ export default function CRMCompagnies() {
                                         disabled={saving || !editForm.value}
                                       >
                                         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
-                                        Sauver
+                                        {t('common.save')}
                                       </Button>
                                       <Button
                                         variant="outline"
@@ -706,7 +706,7 @@ export default function CRMCompagnies() {
                                       </div>
                                     ) : (
                                       <p className="text-xs text-muted-foreground italic">
-                                        Pas de commission définie
+                                        {t('companyForm.noCommissionDefined')}
                                       </p>
                                     )}
                                   </div>
@@ -737,45 +737,45 @@ export default function CRMCompagnies() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {companyToEdit ? 'Modifier la compagnie' : 'Ajouter une compagnie'}
+              {companyToEdit ? t('companyForm.editCompany') : t('companyForm.addCompany')}
             </DialogTitle>
             <DialogDescription>
-              {companyToEdit ? 'Modifiez les informations de la compagnie.' : 'Ajoutez une nouvelle compagnie d\'assurance.'}
+              {companyToEdit ? t('companyForm.editCompanyDesc') : t('companyForm.addCompanyDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Nom de la compagnie *</Label>
+              <Label>{t('companyForm.companyName')} *</Label>
               <Input
                 value={companyForm.name}
                 onChange={(e) => setCompanyForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Groupe Mutuel"
+                placeholder={t('companyForm.companyNamePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label>URL du logo</Label>
+              <Label>{t('companyForm.logoUrl')}</Label>
               <Input
                 value={companyForm.logo_url}
                 onChange={(e) => setCompanyForm(prev => ({ ...prev, logo_url: e.target.value }))}
-                placeholder="https://..."
+                placeholder={t('companyForm.logoUrlPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label>Site web</Label>
+              <Label>{t('companyForm.website')}</Label>
               <Input
                 value={companyForm.website}
                 onChange={(e) => setCompanyForm(prev => ({ ...prev, website: e.target.value }))}
-                placeholder="https://www.example.ch"
+                placeholder={t('companyForm.websitePlaceholder')}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompanyDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={saveCompany} disabled={saving || !companyForm.name}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {companyToEdit ? 'Modifier' : 'Créer'}
+              {companyToEdit ? t('common.edit') : t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -786,23 +786,23 @@ export default function CRMCompagnies() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {productToEdit ? 'Modifier le produit' : 'Ajouter un produit'}
+              {productToEdit ? t('companyForm.editProduct') : t('companyForm.addProduct')}
             </DialogTitle>
             <DialogDescription>
-              {productToEdit ? 'Modifiez les informations du produit.' : 'Ajoutez un nouveau produit d\'assurance.'}
+              {productToEdit ? t('companyForm.editCompanyDesc') : t('companyForm.addCompanyDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Nom du produit *</Label>
+              <Label>{t('productForm.productName')} *</Label>
               <Input
                 value={productForm.name}
                 onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Assurance complémentaire Optima"
+                placeholder={t('productForm.productName')}
               />
             </div>
             <div className="space-y-2">
-              <Label>Catégorie *</Label>
+              <Label>{t('productForm.category')} *</Label>
               <Select
                 value={productForm.category}
                 onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}
@@ -818,22 +818,22 @@ export default function CRMCompagnies() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t('productForm.description')}</Label>
               <Textarea
                 value={productForm.description}
                 onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Description du produit..."
+                placeholder={t('productForm.description')}
                 rows={2}
               />
             </div>
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3 flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                Configuration de la commission
+                {t('companyForm.commissionConfig')}
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Type de calcul</Label>
+                  <Label>{t('companyForm.calculationType')}</Label>
                   <Select
                     value={productForm.commission_type}
                     onValueChange={(value) => setProductForm(prev => ({ ...prev, commission_type: value }))}
@@ -842,16 +842,16 @@ export default function CRMCompagnies() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fixed">Fixe (CHF)</SelectItem>
-                      <SelectItem value="multiplier">Multiplicateur (×)</SelectItem>
-                      <SelectItem value="percentage">Pourcentage (%)</SelectItem>
+                      <SelectItem value="fixed">{t('companyForm.fixed')}</SelectItem>
+                      <SelectItem value="multiplier">{t('companyForm.multiplier')}</SelectItem>
+                      <SelectItem value="percentage">{t('companyForm.percentage')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>
-                    {productForm.commission_type === 'fixed' ? 'Montant (CHF)' : 
-                     productForm.commission_type === 'multiplier' ? 'Multiplicateur' : 'Pourcentage'}
+                    {productForm.commission_type === 'fixed' ? t('companyForm.fixedAmount') : 
+                     productForm.commission_type === 'multiplier' ? t('companyForm.multiplierValue') : t('companyForm.percentageValue')}
                   </Label>
                   <Input
                     type="number"
@@ -862,22 +862,22 @@ export default function CRMCompagnies() {
                 </div>
               </div>
               <div className="space-y-2 mt-3">
-                <Label>Description de la formule (optionnel)</Label>
+                <Label>{t('companyForm.formulaDesc')}</Label>
                 <Input
                   value={productForm.commission_description}
                   onChange={(e) => setProductForm(prev => ({ ...prev, commission_description: e.target.value }))}
-                  placeholder="Ex: Prime mensuelle × 16"
+                  placeholder={t('companyForm.formulaPlaceholder')}
                 />
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProductDialogOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button onClick={saveProduct} disabled={saving || !productForm.name}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {productToEdit ? 'Modifier' : 'Créer'}
+              {productToEdit ? t('common.edit') : t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -887,18 +887,17 @@ export default function CRMCompagnies() {
       <AlertDialog open={!!deleteCompanyDialog} onOpenChange={() => setDeleteCompanyDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la compagnie ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('companyForm.deleteCompany')} ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer <strong>{deleteCompanyDialog?.name}</strong> ?
-              Cette action supprimera également tous les produits associés ({deleteCompanyDialog?.products.length} produits).
-              Cette action est irréversible.
+              {t('companyForm.deleteCompanyConfirm')} <strong>{deleteCompanyDialog?.name}</strong> ?
+              {' '}{t('companyForm.deleteCompanyWarning')} ({deleteCompanyDialog?.products.length} {t('companies.products').toLowerCase()})
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={deleteCompany} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Supprimer
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -908,17 +907,17 @@ export default function CRMCompagnies() {
       <AlertDialog open={!!deleteProductDialog} onOpenChange={() => setDeleteProductDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer le produit ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('companyForm.deleteProduct')} ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer <strong>{deleteProductDialog?.name}</strong> ?
-              Cette action est irréversible.
+              {t('companyForm.deleteProductConfirm')} <strong>{deleteProductDialog?.name}</strong> ?
+              {' '}{t('companyForm.deleteProductWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={deleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Supprimer
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mail, MessageSquare, CheckCircle, Clock, TrendingUp } from "lucide-react";
 
 export const CampaignStats = () => {
+  const { t } = useTranslation();
+  
   const { data: emailStats } = useQuery({
     queryKey: ["email-stats"],
     queryFn: async () => {
@@ -22,28 +25,28 @@ export const CampaignStats = () => {
 
   const stats = [
     {
-      label: "Emails envoyés",
+      label: t('campaignStats.emailsSent'),
       value: emailStats?.sent || 0,
       icon: Mail,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
     },
     {
-      label: "En attente",
+      label: t('campaignStats.pending'),
       value: emailStats?.pending || 0,
       icon: Clock,
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/10",
     },
     {
-      label: "SMS envoyés",
+      label: t('campaignStats.smsSent'),
       value: 0,
       icon: MessageSquare,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
     },
     {
-      label: "Taux de succès",
+      label: t('campaignStats.successRate'),
       value: emailStats?.total ? Math.round((emailStats.sent / emailStats.total) * 100) : 100,
       suffix: "%",
       icon: TrendingUp,

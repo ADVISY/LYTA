@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileDown, Printer, FileCheck, Save, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { fr, de, it, enUS } from "date-fns/locale";
 import { Client } from "@/hooks/useClients";
 import html2pdf from "html2pdf.js";
 import SignaturePad from "./SignaturePad";
@@ -52,6 +53,7 @@ const insuranceCompanies = [
 ];
 
 export default function MandatGestionForm({ client, onSaved }: MandatGestionFormProps) {
+  const { t, i18n } = useTranslation();
   const { tenant } = useTenant();
   const [insurances, setInsurances] = useState<InsuranceInfo>({
     rcMenage: "Non",
@@ -71,6 +73,17 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
   const { toast } = useToast();
   const { user } = useAuth();
   const { sendMandatSignedEmail } = useCrmEmails();
+
+  // Get date-fns locale based on current language
+  const getDateLocale = () => {
+    const lang = i18n.language?.split('-')[0] || 'fr';
+    switch (lang) {
+      case 'de': return de;
+      case 'it': return it;
+      case 'en': return enUS;
+      default: return fr;
+    }
+  };
 
   // Tenant branding info with fallbacks
   const companyName = tenant?.branding?.display_name || tenant?.name || "Cabinet";
@@ -159,8 +172,8 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
   const handleSaveMandat = async () => {
     if (!signatureAdvisy || !signatureClient) {
       toast({
-        title: "Signatures requises",
-        description: "Les deux signatures (Advisy et Client) sont nécessaires pour enregistrer le mandat.",
+        title: t('mandatForm.signaturesRequired'),
+        description: t('mandatForm.signaturesRequiredDesc'),
         variant: "destructive"
       });
       return;
@@ -168,8 +181,8 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
 
     if (!mandatRef.current) {
       toast({
-        title: "Erreur",
-        description: "Veuillez d'abord afficher l'aperçu du mandat.",
+        title: t('mandatForm.error'),
+        description: t('mandatForm.showPreviewFirst'),
         variant: "destructive"
       });
       return;
@@ -219,8 +232,8 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       }
 
       toast({
-        title: "Mandat enregistré",
-        description: "Le mandat de gestion signé a été sauvegardé et un email avec les identifiants a été envoyé au client."
+        title: t('mandatForm.mandatSaved'),
+        description: t('mandatForm.mandatSavedDesc')
       });
 
       // Callback pour rafraîchir la liste des documents
@@ -229,8 +242,8 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
     } catch (error: any) {
       console.error('Erreur sauvegarde mandat:', error);
       toast({
-        title: "Erreur",
-        description: error.message || "Impossible d'enregistrer le mandat.",
+        title: t('mandatForm.error'),
+        description: error.message || t('mandatForm.saveError'),
         variant: "destructive"
       });
     } finally {
@@ -281,139 +294,139 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5" />
-            Créer un Mandat de Gestion
+            {t('mandatForm.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Informations client pré-remplies */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
             <div>
-              <Label className="text-muted-foreground">Nom / Entreprise</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.nameCompany')}</Label>
               <p className="font-medium">{getClientName()}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Prénom / Contact</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.firstNameContact')}</Label>
               <p className="font-medium">{getClientPrenom()}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Adresse</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.address')}</Label>
               <p className="font-medium">{getFullAddress()}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Localité</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.locality')}</Label>
               <p className="font-medium">{getLocality()}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Date de naissance</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.birthdate')}</Label>
               <p className="font-medium">{getBirthdate()}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Email</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.email')}</Label>
               <p className="font-medium">{client.email || "N/A"}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Téléphone</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.phone')}</Label>
               <p className="font-medium">{client.mobile || client.phone || "N/A"}</p>
             </div>
             <div>
-              <Label className="text-muted-foreground">Nationalité / Permis</Label>
+              <Label className="text-muted-foreground">{t('mandatForm.nationalityPermit')}</Label>
               <p className="font-medium">{client.nationality || "N/A"} / {client.permit_type || "N/A"}</p>
             </div>
           </div>
 
           {/* Formulaire assurances actuelles */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Assurances actuelles du client</h3>
+            <h3 className="font-semibold text-lg">{t('mandatForm.currentInsurances')}</h3>
             <p className="text-sm text-muted-foreground">
-              Indiquez les compagnies d'assurance actuelles du client. Sélectionnez "Non" si le client n'a pas cette assurance.
+              {t('mandatForm.currentInsurancesDescription')}
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>RC Ménage</Label>
+                <Label>{t('mandatForm.rcMenage')}</Label>
                 <Select value={insurances.rcMenage} onValueChange={(v) => setInsurances({ ...insurances, rcMenage: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Assurance Auto</Label>
+                <Label>{t('mandatForm.autoInsurance')}</Label>
                 <Select value={insurances.auto} onValueChange={(v) => setInsurances({ ...insurances, auto: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Protection Juridique</Label>
+                <Label>{t('mandatForm.legalProtection')}</Label>
                 <Select value={insurances.protectionJuridique} onValueChange={(v) => setInsurances({ ...insurances, protectionJuridique: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Assurance Santé (LAMal/LCA)</Label>
+                <Label>{t('mandatForm.healthInsurance')}</Label>
                 <Select value={insurances.sante} onValueChange={(v) => setInsurances({ ...insurances, sante: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>3e Pilier / Assurance Vie</Label>
+                <Label>{t('mandatForm.pillar3Life')}</Label>
                 <Select value={insurances.vie3ePilier} onValueChange={(v) => setInsurances({ ...insurances, vie3ePilier: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Autre assurance</Label>
+                <Label>{t('mandatForm.otherInsurance')}</Label>
                 <Select value={insurances.autre} onValueChange={(v) => setInsurances({ ...insurances, autre: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {insuranceCompanies.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{c === "Non" ? t('mandatForm.no') : c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {insurances.autre === "Autre" && (
                   <Input 
-                    placeholder="Nom de la compagnie" 
+                    placeholder={t('mandatForm.companyName')}
                     value={autreCompany}
                     onChange={(e) => setAutreCompany(e.target.value)}
                     className="mt-2"
@@ -425,9 +438,9 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
 
           {/* Lieu de signature */}
           <div className="space-y-2">
-            <Label>Lieu de signature</Label>
+            <Label>{t('mandatForm.signatureLocation')}</Label>
             <Input 
-              placeholder="Ex: Genève, Lausanne, Sion..." 
+              placeholder={t('mandatForm.signatureLocationPlaceholder')}
               value={lieu}
               onChange={(e) => setLieu(e.target.value)}
             />
@@ -435,15 +448,15 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
 
           {/* Signatures digitales */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Signatures</h3>
+            <h3 className="font-semibold text-lg">{t('mandatForm.signatures')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <SignaturePad
-                label={`Signature ${companyName}`}
+                label={t('mandatForm.signatureCabinet', { cabinet: companyName })}
                 onSignatureChange={setSignatureAdvisy}
                 signature={signatureAdvisy}
               />
               <SignaturePad
-                label="Signature du Mandant"
+                label={t('mandatForm.signatureClient')}
                 onSignatureChange={setSignatureClient}
                 signature={signatureClient}
               />
@@ -453,15 +466,15 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <Button onClick={() => setShowPreview(!showPreview)} variant="outline">
-              {showPreview ? "Masquer l'aperçu" : "Afficher l'aperçu"}
+              {showPreview ? t('mandatForm.hidePreview') : t('mandatForm.showPreview')}
             </Button>
             <Button onClick={handleGeneratePDF} className="gap-2">
               <FileDown className="h-4 w-4" />
-              Télécharger PDF
+              {t('mandatForm.downloadPdf')}
             </Button>
             <Button onClick={handlePrint} variant="secondary" className="gap-2">
               <Printer className="h-4 w-4" />
-              Imprimer
+              {t('mandatForm.print')}
             </Button>
             <Button 
               onClick={handleSaveMandat} 
@@ -473,12 +486,12 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              {isSaving ? "Enregistrement..." : "Enregistrer le mandat"}
+              {isSaving ? t('common.saving') : t('mandatForm.saveMandat')}
             </Button>
           </div>
           {(!signatureAdvisy || !signatureClient) && (
             <p className="text-sm text-muted-foreground">
-              Les deux signatures sont requises pour enregistrer le mandat.
+              {t('mandatForm.signaturesRequiredDesc')}
             </p>
           )}
         </CardContent>
@@ -488,7 +501,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       {showPreview && (
         <Card>
           <CardHeader>
-            <CardTitle>Aperçu du Mandat</CardTitle>
+            <CardTitle>{t('mandatForm.showPreview')}</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <div 

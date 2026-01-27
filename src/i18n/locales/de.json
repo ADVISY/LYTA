@@ -92,6 +92,7 @@
     "logoUrlPlaceholder": "https://...",
     "website": "Webseite",
     "websitePlaceholder": "https://www.example.ch",
+    "save": "Speichern",
     "deleteCompany": "Gesellschaft löschen",
     "deleteCompanyConfirm": "Sind Sie sicher, dass Sie löschen möchten",
     "deleteCompanyWarning": "Diese Aktion löscht auch alle zugehörigen Produkte und ist unwiderruflich.",
@@ -99,7 +100,23 @@
     "companyUpdated": "Gesellschaft aktualisiert",
     "companyDeleted": "Gesellschaft gelöscht",
     "modifyCompany": "Gesellschaft bearbeiten",
-    "noCommissionDefined": "Keine Provision definiert"
+    "addProduct": "Produkt hinzufügen",
+    "editProduct": "Produkt bearbeiten",
+    "editCommission": "Provision bearbeiten",
+    "noCommissionDefined": "Keine Provision definiert",
+    "commissionConfig": "Provisionskonfiguration",
+    "calculationType": "Berechnungstyp",
+    "fixed": "Fest (CHF)",
+    "multiplier": "Multiplikator (×)",
+    "percentage": "Prozentsatz (%)",
+    "fixedAmount": "Betrag (CHF)",
+    "multiplierValue": "Multiplikator",
+    "percentageValue": "Prozentsatz",
+    "formulaDesc": "Formelbeschreibung (optional)",
+    "formulaPlaceholder": "Z.B.: Monatsprämie × 16",
+    "deleteProduct": "Produkt löschen",
+    "deleteProductConfirm": "Sind Sie sicher, dass Sie löschen möchten",
+    "deleteProductWarning": "Diese Aktion ist unwiderruflich."
   },
   "smsComposer": {
     "title": "SMS verfassen",
@@ -614,6 +631,12 @@
     "contacts": "Kontakte",
     "products": "Produkte",
     "noCompanies": "Keine Gesellschaften gefunden"
+  },
+  "campaignStats": {
+    "emailsSent": "E-Mails gesendet",
+    "pending": "Ausstehend",
+    "smsSent": "SMS gesendet",
+    "successRate": "Erfolgsrate"
   },
   "settings": {
     "title": "Einstellungen",

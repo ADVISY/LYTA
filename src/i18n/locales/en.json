@@ -92,6 +92,7 @@
     "logoUrlPlaceholder": "https://...",
     "website": "Website",
     "websitePlaceholder": "https://www.example.ch",
+    "save": "Save",
     "deleteCompany": "Delete company",
     "deleteCompanyConfirm": "Are you sure you want to delete",
     "deleteCompanyWarning": "This action will also delete all associated products and is irreversible.",
@@ -99,7 +100,23 @@
     "companyUpdated": "Company updated",
     "companyDeleted": "Company deleted",
     "modifyCompany": "Edit company",
-    "noCommissionDefined": "No commission defined"
+    "addProduct": "Add product",
+    "editProduct": "Edit product",
+    "editCommission": "Edit commission",
+    "noCommissionDefined": "No commission defined",
+    "commissionConfig": "Commission configuration",
+    "calculationType": "Calculation type",
+    "fixed": "Fixed (CHF)",
+    "multiplier": "Multiplier (×)",
+    "percentage": "Percentage (%)",
+    "fixedAmount": "Amount (CHF)",
+    "multiplierValue": "Multiplier",
+    "percentageValue": "Percentage",
+    "formulaDesc": "Formula description (optional)",
+    "formulaPlaceholder": "Ex: Monthly premium × 16",
+    "deleteProduct": "Delete product",
+    "deleteProductConfirm": "Are you sure you want to delete",
+    "deleteProductWarning": "This action is irreversible."
   },
   "smsComposer": {
     "title": "Compose SMS",
@@ -615,6 +632,12 @@
     "contacts": "Contacts",
     "products": "Products",
     "noCompanies": "No companies found"
+  },
+  "campaignStats": {
+    "emailsSent": "Emails sent",
+    "pending": "Pending",
+    "smsSent": "SMS sent",
+    "successRate": "Success rate"
   },
   "settings": {
     "personalInfo": "Personal information",
