@@ -23,7 +23,8 @@ import {
   Calendar,
   RotateCcw,
   Download,
-  Upload
+  Upload,
+  BarChart3
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
+import { TenantConsumptionLimits } from "@/components/king/TenantConsumptionLimits";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -435,6 +437,10 @@ export default function KingTenantDetail() {
             <Building2 className="h-4 w-4" />
             Général
           </TabsTrigger>
+          <TabsTrigger value="consumption" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Consommation
+          </TabsTrigger>
           <TabsTrigger value="subscription" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Abonnement
@@ -448,6 +454,15 @@ export default function KingTenantDetail() {
             Sécurité
           </TabsTrigger>
         </TabsList>
+
+        {/* Consumption Tab */}
+        <TabsContent value="consumption">
+          <Card>
+            <CardContent className="pt-6">
+              <TenantConsumptionLimits tenantId={tenantId!} tenantName={tenant.name} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* General Tab */}
         <TabsContent value="general">

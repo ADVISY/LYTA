@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard } from "lucide-react";
+import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTenantConsumptionSummary, TenantConsumptionData } from "@/hooks/useTenantConsumption";
+import { TenantConsumptionRow } from "@/components/king/TenantConsumptionRow";
 
 interface TenantStats {
   clients: number;
@@ -55,6 +57,16 @@ export default function KingTenants() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
+
+  // Fetch consumption summary for accordion data
+  const { data: consumptionData } = useTenantConsumptionSummary();
+  
+  // Create a map for quick lookup
+  const consumptionMap = new Map<string, TenantConsumptionData>();
+  consumptionData?.forEach(item => {
+    consumptionMap.set(item.tenant_id, item);
+  });
 
   const { data: tenants, isLoading } = useQuery({
     queryKey: ['king-tenants'],
@@ -254,174 +266,205 @@ export default function KingTenants() {
                   : tenant.tenant_branding;
                 const logoUrl = branding?.logo_url;
                 const primaryColor = branding?.primary_color;
+                const isExpanded = expandedTenantId === tenant.id;
+                const consumption = consumptionMap.get(tenant.id);
                 
                 return (
                   <div
                     key={tenant.id}
-                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="border rounded-lg overflow-hidden transition-all"
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div 
-                          className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-muted/50"
-                          style={{ 
-                            backgroundColor: logoUrl 
-                              ? 'transparent' 
-                              : primaryColor 
-                                ? `${primaryColor}20` 
-                                : 'hsl(var(--primary) / 0.1)' 
-                          }}
-                        >
-                          {logoUrl ? (
-                            <img 
-                              src={logoUrl} 
-                              alt={tenant.name}
-                              className="w-full h-full object-contain p-1"
-                              onError={(e) => {
-                                // Hide broken image and show fallback
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  parent.style.backgroundColor = primaryColor 
-                                    ? `${primaryColor}20` 
-                                    : 'hsl(var(--primary) / 0.1)';
-                                  const fallback = parent.querySelector('.fallback-icon');
-                                  if (fallback) fallback.classList.remove('hidden');
-                                }
-                              }}
+                    {/* Clickable Header */}
+                    <div 
+                      className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          {/* Expand/Collapse indicator */}
+                          <div className="p-1 rounded hover:bg-muted">
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div 
+                            className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-muted/50"
+                            style={{ 
+                              backgroundColor: logoUrl 
+                                ? 'transparent' 
+                                : primaryColor 
+                                  ? `${primaryColor}20` 
+                                  : 'hsl(var(--primary) / 0.1)' 
+                            }}
+                          >
+                            {logoUrl ? (
+                              <img 
+                                src={logoUrl} 
+                                alt={tenant.name}
+                                className="w-full h-full object-contain p-1"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.style.backgroundColor = primaryColor 
+                                      ? `${primaryColor}20` 
+                                      : 'hsl(var(--primary) / 0.1)';
+                                    const fallback = parent.querySelector('.fallback-icon');
+                                    if (fallback) fallback.classList.remove('hidden');
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <Building2 
+                              className={`h-6 w-6 fallback-icon ${logoUrl ? 'hidden' : ''}`}
+                              style={{ color: primaryColor || 'hsl(var(--primary))' }}
                             />
-                          ) : null}
-                          <Building2 
-                            className={`h-6 w-6 fallback-icon ${logoUrl ? 'hidden' : ''}`}
-                            style={{ color: primaryColor || 'hsl(var(--primary))' }}
-                          />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-lg">{tenant.name}</p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>{tenant.slug}.lyta.ch</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-lg">{tenant.name}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{tenant.slug}.lyta.ch</span>
-                            <ExternalLink className="h-3 w-3" />
+                        <div className="flex items-center gap-4">
+                          {/* Plan Badge */}
+                          {tenant.plan && (
+                            <Badge className={`${PLAN_COLORS[tenant.plan as TenantPlan] || PLAN_COLORS.start}`}>
+                              {tenant.plan === 'founder' && <Crown className="h-3 w-3 mr-1" />}
+                              {tenant.plan === 'prime' && <Star className="h-3 w-3 mr-1" />}
+                              {tenant.plan === 'pro' && <Zap className="h-3 w-3 mr-1" />}
+                              {PLAN_CONFIGS[tenant.plan as TenantPlan]?.name || 'START'}
+                            </Badge>
+                          )}
+                          {/* Billing Status Badge */}
+                          {tenant.billing_status && (
+                            <Badge variant="outline" className={BILLING_COLORS[tenant.billing_status] || ''}>
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              {BILLING_LABELS[tenant.billing_status] || tenant.billing_status}
+                            </Badge>
+                          )}
+                          <Badge variant="secondary" className={
+                            tenant.status === 'active' 
+                              ? 'bg-primary/10 text-primary'
+                              : tenant.status === 'test'
+                              ? 'bg-secondary text-secondary-foreground'
+                              : tenant.status === 'pending'
+                              ? 'bg-accent text-accent-foreground'
+                              : 'bg-destructive/10 text-destructive'
+                          }>
+                            {tenant.status === 'active' ? 'Actif' : tenant.status === 'test' ? 'Test' : tenant.status === 'pending' ? 'En attente' : 'Suspendu'}
+                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => navigate(`/king/tenants/${tenant.id}`)}>
+                                <Settings className="h-4 w-4 mr-2" />
+                                Gérer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Voir le CRM
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      
+                      {/* Stats Row */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Users className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold">{stats.clients}</p>
+                            <p className="text-xs text-muted-foreground">Clients</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-secondary">
+                            <Briefcase className="h-4 w-4 text-secondary-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold">{stats.collaborateurs}</p>
+                            <p className="text-xs text-muted-foreground">Collaborateurs</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <FileText className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold">{stats.policies}</p>
+                            <p className="text-xs text-muted-foreground">Contrats</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-accent">
+                            <TrendingUp className="h-4 w-4 text-accent-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold">CHF {stats.commissions_total.toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground">Commissions</p>
+                          </div>
+                        </div>
+                        {/* Users count with seat info */}
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${stats.active_users > (tenant.seats_included || 1) ? 'bg-destructive/10' : 'bg-muted'}`}>
+                            <Users className={`h-4 w-4 ${stats.active_users > (tenant.seats_included || 1) ? 'text-destructive' : 'text-muted-foreground'}`} />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold">
+                              {stats.active_users}
+                              <span className="text-sm font-normal text-muted-foreground">/{tenant.seats_included || 1}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Utilisateurs
+                              {stats.active_users > (tenant.seats_included || 1) && (
+                                <span className="text-destructive ml-1">
+                                  (+{stats.active_users - (tenant.seats_included || 1)} supp.)
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        {/* Plan Badge */}
-                        {tenant.plan && (
-                          <Badge className={`${PLAN_COLORS[tenant.plan as TenantPlan] || PLAN_COLORS.start}`}>
-                            {tenant.plan === 'founder' && <Crown className="h-3 w-3 mr-1" />}
-                            {tenant.plan === 'prime' && <Star className="h-3 w-3 mr-1" />}
-                            {tenant.plan === 'pro' && <Zap className="h-3 w-3 mr-1" />}
-                            {PLAN_CONFIGS[tenant.plan as TenantPlan]?.name || 'START'}
-                          </Badge>
-                        )}
-                        {/* Billing Status Badge */}
-                        {tenant.billing_status && (
-                          <Badge variant="outline" className={BILLING_COLORS[tenant.billing_status] || ''}>
-                            <CreditCard className="h-3 w-3 mr-1" />
-                            {BILLING_LABELS[tenant.billing_status] || tenant.billing_status}
-                          </Badge>
-                        )}
-                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                          tenant.status === 'active' 
-                            ? 'bg-emerald-500/10 text-emerald-600'
-                            : tenant.status === 'test'
-                            ? 'bg-blue-500/10 text-blue-600'
-                            : tenant.status === 'pending'
-                            ? 'bg-orange-500/10 text-orange-600'
-                            : 'bg-red-500/10 text-red-600'
-                        }`}>
-                          {tenant.status === 'active' ? 'Actif' : tenant.status === 'test' ? 'Test' : tenant.status === 'pending' ? 'En attente' : 'Suspendu'}
+                      
+                      {/* Footer info */}
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t text-xs text-muted-foreground">
+                        <span>
+                          {tenant.status === 'pending' && tenant.contact_name 
+                            ? `Contact: ${tenant.contact_name}` 
+                            : `Email: ${tenant.email || tenant.admin_email || 'N/A'}`}
                         </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/king/tenants/${tenant.id}`)}>
-                              <Settings className="h-4 w-4 mr-2" />
-                              Gérer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              Voir le CRM
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <span>Créé le {new Date(tenant.created_at).toLocaleDateString('fr-CH')}</span>
                       </div>
                     </div>
+
+                    {/* Expandable Consumption Section */}
+                    {isExpanded && consumption && (
+                      <TenantConsumptionRow data={consumption} />
+                    )}
                     
-                    {/* Stats Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4 border-t">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-500/10">
-                          <Users className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-xl font-bold">{stats.clients}</p>
-                          <p className="text-xs text-muted-foreground">Clients</p>
-                        </div>
+                    {/* Show message if no consumption data yet */}
+                    {isExpanded && !consumption && (
+                      <div className="px-4 pb-4 pt-2 bg-muted/30 border-t text-center text-sm text-muted-foreground">
+                        Données de consommation non disponibles
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-purple-500/10">
-                          <Briefcase className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="text-xl font-bold">{stats.collaborateurs}</p>
-                          <p className="text-xs text-muted-foreground">Collaborateurs</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-emerald-500/10">
-                          <FileText className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        <div>
-                          <p className="text-xl font-bold">{stats.policies}</p>
-                          <p className="text-xs text-muted-foreground">Contrats</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-amber-500/10">
-                          <TrendingUp className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="text-xl font-bold">CHF {stats.commissions_total.toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">Commissions</p>
-                        </div>
-                      </div>
-                      {/* Users count with seat info */}
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${stats.active_users > (tenant.seats_included || 1) ? 'bg-orange-500/10' : 'bg-cyan-500/10'}`}>
-                          <Users className={`h-4 w-4 ${stats.active_users > (tenant.seats_included || 1) ? 'text-orange-600' : 'text-cyan-600'}`} />
-                        </div>
-                        <div>
-                          <p className="text-xl font-bold">
-                            {stats.active_users}
-                            <span className="text-sm font-normal text-muted-foreground">/{tenant.seats_included || 1}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Utilisateurs
-                            {stats.active_users > (tenant.seats_included || 1) && (
-                              <span className="text-orange-600 ml-1">
-                                (+{stats.active_users - (tenant.seats_included || 1)} supp.)
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Footer info */}
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t text-xs text-muted-foreground">
-                      <span>
-                        {tenant.status === 'pending' && tenant.contact_name 
-                          ? `Contact: ${tenant.contact_name}` 
-                          : `Email: ${tenant.email || tenant.admin_email || 'N/A'}`}
-                      </span>
-                      <span>Créé le {new Date(tenant.created_at).toLocaleDateString('fr-CH')}</span>
-                    </div>
+                    )}
                   </div>
                 );
               })}
