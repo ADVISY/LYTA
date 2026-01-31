@@ -280,7 +280,7 @@ export default function ClientsList() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                            onClick={() => navigate(`/crm/clients/${client.id}/modifier`)}
+                            onClick={() => navigate(`/crm/clients/${client.id}/edit`)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>

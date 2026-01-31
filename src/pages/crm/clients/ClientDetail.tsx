@@ -158,15 +158,42 @@ export default function ClientDetail() {
       // Get documents for this client and their policies
       const policyIds = policies.filter(p => p.client_id === id).map(p => p.id);
       
-      const { data, error } = await supabase
+      let data: Document[] = [];
+      
+      // First, always get documents owned by this client
+      const { data: clientDocs, error: clientError } = await supabase
         .from('documents')
         .select('*')
-        .or(`owner_id.eq.${id},owner_id.in.(${policyIds.join(',')})`)
+        .eq('owner_id', id)
         .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setClientDocuments(data as Document[]);
+      
+      if (!clientError && clientDocs) {
+        data = [...clientDocs as Document[]];
       }
+      
+      // Then, if there are policies, get their documents too
+      if (policyIds.length > 0) {
+        const { data: policyDocs, error: policyError } = await supabase
+          .from('documents')
+          .select('*')
+          .in('owner_id', policyIds)
+          .order('created_at', { ascending: false });
+        
+        if (!policyError && policyDocs) {
+          // Merge and deduplicate
+          const existingIds = new Set(data.map(d => d.id));
+          for (const doc of policyDocs as Document[]) {
+            if (!existingIds.has(doc.id)) {
+              data.push(doc);
+            }
+          }
+        }
+      }
+      
+      // Sort by created_at descending
+      data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setClientDocuments(data);
     } catch (error) {
       console.error('Error loading documents:', error);
     } finally {
@@ -174,9 +201,9 @@ export default function ClientDetail() {
     }
   };
 
-  // Reload documents when policies load (only once per policy count change)
+  // Reload documents when policies finish loading
   useEffect(() => {
-    if (id && !policiesLoading && policies.length > 0) {
+    if (id && !policiesLoading) {
       loadDocuments();
     }
   }, [policiesLoading, id]);
