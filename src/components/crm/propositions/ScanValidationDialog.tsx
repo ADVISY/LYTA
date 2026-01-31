@@ -258,6 +258,10 @@ export default function ScanValidationDialog({
   const hasFamilyMembers = scan.has_family_members || (scan.family_members_detected && scan.family_members_detected.length > 0);
   const oldProductsCount = scan.old_products_detected?.length || 0;
   const newProductsCount = scan.new_products_detected?.length || 0;
+  
+  // Calculate unique companies (contracts will be grouped by company)
+  const oldCompaniesCount = new Set(scan.old_products_detected?.map(p => (p.company || '').toLowerCase().trim()).filter(Boolean)).size;
+  const newCompaniesCount = new Set(scan.new_products_detected?.map(p => (p.company || '').toLowerCase().trim()).filter(Boolean)).size;
 
   const parseAmount = (value: string | null | undefined): number | null => {
     if (!value) return null;
@@ -396,27 +400,62 @@ export default function ScanValidationDialog({
         return anyProduct?.id || null;
       };
 
-      // 2. CREATE OLD POLICIES from old_products_detected (multi-product support)
+      // Helper to group products by company for multi-product contracts
+      const groupProductsByCompany = (products: ProductDetected[]): Map<string, ProductDetected[]> => {
+        const grouped = new Map<string, ProductDetected[]>();
+        for (const product of products) {
+          const companyKey = (product.company || 'Unknown').toLowerCase().trim();
+          if (!grouped.has(companyKey)) {
+            grouped.set(companyKey, []);
+          }
+          grouped.get(companyKey)!.push(product);
+        }
+        return grouped;
+      };
+
+      // 2. CREATE OLD POLICIES - Group by company for multi-product contracts
       if (createOldContract && scan.old_products_detected && scan.old_products_detected.length > 0) {
-        for (const oldProduct of scan.old_products_detected) {
-          const productId = await findProductId(oldProduct.company, oldProduct.product_category);
+        const groupedOldProducts = groupProductsByCompany(scan.old_products_detected);
+        
+        for (const [companyKey, products] of groupedOldProducts) {
+          const firstProduct = products[0];
+          const productId = await findProductId(firstProduct.company, firstProduct.product_category);
           
           if (productId) {
+            // Build products_data array with ALL product details
+            const productsData = products.map(p => ({
+              productId: '', // Will be resolved later if needed
+              name: p.product_name || 'Produit',
+              category: p.product_category || 'health',
+              premium: p.premium_monthly || 0,
+              deductible: p.franchise || null,
+              premiumYearly: p.premium_yearly || null,
+              notes: p.notes || null,
+            }));
+
+            // Calculate totals
+            const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
+            const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+            
+            // Get product names for display
+            const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+
             const policyData = {
               tenant_id: tenantId,
               client_id: newClient.id,
               product_id: productId,
-              policy_number: oldProduct.policy_number || null,
+              policy_number: firstProduct.policy_number || null,
               status: hasTermination ? 'resilie' : 'active',
-              start_date: parseDate(oldProduct.start_date) || new Date().toISOString().split('T')[0],
-              end_date: parseDate(oldProduct.end_date),
-              premium_monthly: oldProduct.premium_monthly || null,
-              premium_yearly: oldProduct.premium_yearly || null,
-              deductible: oldProduct.franchise || null,
+              start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
+              end_date: parseDate(firstProduct.end_date),
+              premium_monthly: totalPremiumMonthly || null,
+              premium_yearly: totalPremiumYearly || null,
+              deductible: products[0].franchise || null, // Main franchise
               currency: 'CHF',
-              company_name: oldProduct.company || null,
-              product_type: oldProduct.product_category || null,
-              notes: `${oldProduct.product_name} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
+              company_name: firstProduct.company || null,
+              product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+              products_data: productsData,
+              notes: `${productNames || 'Multi-produits'} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
             };
 
             const { data: oldPolicy, error: policyError } = await supabase
@@ -426,7 +465,11 @@ export default function ScanValidationDialog({
               .single();
 
             if (!policyError && oldPolicy) {
-              createdPolicies.push({ id: oldPolicy.id, type: 'old', productName: oldProduct.product_name });
+              createdPolicies.push({ 
+                id: oldPolicy.id, 
+                type: 'old', 
+                productName: productNames || firstProduct.company 
+              });
             }
           }
         }
@@ -465,27 +508,49 @@ export default function ScanValidationDialog({
         }
       }
 
-      // 3. CREATE NEW POLICIES from new_products_detected (multi-product support)
+      // 3. CREATE NEW POLICIES - Group by company for multi-product contracts
       if (createNewContract && scan.new_products_detected && scan.new_products_detected.length > 0) {
-        for (const newProduct of scan.new_products_detected) {
-          const productId = await findProductId(newProduct.company, newProduct.product_category);
+        const groupedNewProducts = groupProductsByCompany(scan.new_products_detected);
+        
+        for (const [companyKey, products] of groupedNewProducts) {
+          const firstProduct = products[0];
+          const productId = await findProductId(firstProduct.company, firstProduct.product_category);
           
           if (productId) {
+            // Build products_data array with ALL product details
+            const productsData = products.map(p => ({
+              productId: '', // Will be resolved later if needed
+              name: p.product_name || 'Produit',
+              category: p.product_category || 'health',
+              premium: p.premium_monthly || 0,
+              deductible: p.franchise || null,
+              premiumYearly: p.premium_yearly || null,
+              notes: p.notes || null,
+            }));
+
+            // Calculate totals
+            const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
+            const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+            
+            // Get product names for display
+            const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+
             const policyData = {
               tenant_id: tenantId,
               client_id: newClient.id,
               product_id: productId,
-              policy_number: newProduct.policy_number || null,
+              policy_number: firstProduct.policy_number || null,
               status: 'active',
-              start_date: parseDate(newProduct.start_date) || new Date().toISOString().split('T')[0],
-              end_date: parseDate(newProduct.end_date),
-              premium_monthly: newProduct.premium_monthly || null,
-              premium_yearly: newProduct.premium_yearly || null,
-              deductible: newProduct.franchise || null,
+              start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
+              end_date: parseDate(firstProduct.end_date),
+              premium_monthly: totalPremiumMonthly || null,
+              premium_yearly: totalPremiumYearly || null,
+              deductible: products[0].franchise || null, // Main franchise
               currency: 'CHF',
-              company_name: newProduct.company || null,
-              product_type: newProduct.product_category || null,
-              notes: `${newProduct.product_name} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
+              company_name: firstProduct.company || null,
+              product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+              products_data: productsData,
+              notes: `${productNames || 'Multi-produits'} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
             };
 
             const { data: createdPolicy, error: policyError } = await supabase
@@ -495,7 +560,11 @@ export default function ScanValidationDialog({
               .single();
 
             if (!policyError && createdPolicy) {
-              createdPolicies.push({ id: createdPolicy.id, type: 'new', productName: newProduct.product_name });
+              createdPolicies.push({ 
+                id: createdPolicy.id, 
+                type: 'new', 
+                productName: productNames || firstProduct.company 
+              });
             }
           }
         }
@@ -770,16 +839,31 @@ export default function ScanValidationDialog({
         },
       });
 
-      // Build success message
+      // Build success message - count contracts (grouped by company), not individual products
+      const oldContractsCount = createdPolicies.filter(p => p.type === 'old').length;
+      const newContractsCount = createdPolicies.filter(p => p.type === 'new' || p.type === 'standard').length;
+      const totalProductsInContracts = (scan.old_products_detected?.length || 0) + (scan.new_products_detected?.length || 0);
+      
       const createdItems = ['Client'];
-      if (createdPolicies.length > 0) createdItems.push(`${createdPolicies.length} Contrat(s)`);
+      if (oldContractsCount > 0) {
+        createdItems.push(`${oldContractsCount} Ancienne(s) police(s)`);
+      }
+      if (newContractsCount > 0) {
+        createdItems.push(`${newContractsCount} Nouvelle(s) police(s)`);
+      }
+      if (totalProductsInContracts > createdPolicies.length) {
+        createdItems.push(`(${totalProductsInContracts} produits au total)`);
+      }
       if (createdFamilyMembers.length > 0) createdItems.push(`${createdFamilyMembers.length} Membre(s) famille`);
       if (linkDocuments) createdItems.push('Document');
       if (createdSuivis.length > 0) createdItems.push(`${createdSuivis.length} Suivi(s)`);
 
+      const clientName = getClientValue('prenom', 'first_name') || '';
+      const clientLastName = getClientValue('nom', 'last_name') || '';
+
       toast({
         title: "Validation réussie ! 🎉",
-        description: `${createdItems.join(', ')} créé(s) pour ${getValue('prenom')} ${getValue('nom')}`,
+        description: `${createdItems.join(', ')} créé(s) pour ${clientName} ${clientLastName}`,
       });
 
       onValidated();
@@ -918,9 +1002,9 @@ export default function ScanValidationDialog({
                     <FileWarning className="h-4 w-4 text-orange-500" />
                     <span className="text-sm">
                       Ancienne(s) police(s)
-                      {oldProductsCount > 0 && (
-                        <span className="ml-1 text-xs text-muted-foreground">({oldProductsCount})</span>
-                      )}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({oldCompaniesCount || 1} contrat{oldCompaniesCount > 1 ? 's' : ''}{oldProductsCount > oldCompaniesCount ? `, ${oldProductsCount} produits` : ''})
+                      </span>
                     </span>
                   </label>
                 )}
@@ -935,9 +1019,9 @@ export default function ScanValidationDialog({
                     <FileCheck className="h-4 w-4 text-emerald-500" />
                     <span className="text-sm">
                       {hasNewContractData ? 'Nouvelle(s) police(s)' : 'Contrat'}
-                      {newProductsCount > 0 && (
-                        <span className="ml-1 text-xs text-muted-foreground">({newProductsCount})</span>
-                      )}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({newCompaniesCount || 1} contrat{newCompaniesCount > 1 ? 's' : ''}{newProductsCount > newCompaniesCount ? `, ${newProductsCount} produits` : ''})
+                      </span>
                     </span>
                   </label>
                 )}
@@ -988,39 +1072,126 @@ export default function ScanValidationDialog({
               </div>
             </div>
 
-            {/* Multi-products preview */}
+            {/* Multi-products preview - Grouped by company */}
             {(hasMultipleProducts || newProductsCount > 0 || oldProductsCount > 0) && (
               <div className="p-3 bg-muted/30 rounded-lg border">
-                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                <p className="text-sm font-medium mb-3 flex items-center gap-2">
                   <Package className="h-4 w-4" />
                   Produits détectés ({newProductsCount + oldProductsCount})
+                  {(newProductsCount > 1 || oldProductsCount > 1) && (
+                    <Badge variant="outline" className="text-xs bg-primary/10 text-primary">
+                      Multi-produits par compagnie
+                    </Badge>
+                  )}
                 </p>
-                <div className="space-y-2">
-                  {scan.old_products_detected?.map((product, i) => (
-                    <div key={`old-${i}`} className="flex items-center gap-2 text-sm p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
-                      <Badge variant="outline" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 text-xs">
-                        Ancienne
-                      </Badge>
-                      <span className="font-medium">{product.product_name}</span>
-                      <span className="text-muted-foreground">({product.company})</span>
-                      {product.premium_monthly && (
-                        <span className="ml-auto text-xs">CHF {product.premium_monthly}/mois</span>
-                      )}
-                    </div>
-                  ))}
-                  {scan.new_products_detected?.map((product, i) => (
-                    <div key={`new-${i}`} className="flex items-center gap-2 text-sm p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded">
-                      <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs">
-                        Nouvelle
-                      </Badge>
-                      <span className="font-medium">{product.product_name}</span>
-                      <span className="text-muted-foreground">({product.company})</span>
-                      {product.premium_monthly && (
-                        <span className="ml-auto text-xs">CHF {product.premium_monthly}/mois</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                
+                {/* Old products grouped by company */}
+                {scan.old_products_detected && scan.old_products_detected.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs font-medium text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-1">
+                      <FileWarning className="h-3 w-3" />
+                      Anciennes polices
+                    </p>
+                    {(() => {
+                      // Group old products by company
+                      const grouped = scan.old_products_detected.reduce((acc, p) => {
+                        const key = p.company || 'Inconnue';
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(p);
+                        return acc;
+                      }, {} as Record<string, ProductDetected[]>);
+                      
+                      return Object.entries(grouped).map(([company, products], ci) => (
+                        <div key={`old-company-${ci}`} className="mb-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">{company}</span>
+                            <Badge variant="outline" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 text-xs">
+                              {products.length} produit{products.length > 1 ? 's' : ''}
+                            </Badge>
+                          </div>
+                          <div className="space-y-1.5">
+                            {products.map((product, pi) => (
+                              <div key={`old-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5">
+                                <span className="font-medium">{product.product_name}</span>
+                                <div className="flex items-center gap-3 text-muted-foreground">
+                                  {product.premium_monthly && (
+                                    <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                      CHF {product.premium_monthly.toFixed(2)}/mois
+                                    </span>
+                                  )}
+                                  {product.franchise && (
+                                    <span>Franchise: CHF {product.franchise}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Total for this company */}
+                          <div className="mt-2 pt-2 border-t border-orange-200 dark:border-orange-700 flex justify-between text-xs">
+                            <span className="text-muted-foreground">Total mensuel</span>
+                            <span className="font-bold text-orange-700 dark:text-orange-300">
+                              CHF {products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0).toFixed(2)}/mois
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+
+                {/* New products grouped by company */}
+                {scan.new_products_detected && scan.new_products_detected.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1">
+                      <FileCheck className="h-3 w-3" />
+                      Nouvelles polices
+                    </p>
+                    {(() => {
+                      // Group new products by company
+                      const grouped = scan.new_products_detected.reduce((acc, p) => {
+                        const key = p.company || 'Inconnue';
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(p);
+                        return acc;
+                      }, {} as Record<string, ProductDetected[]>);
+                      
+                      return Object.entries(grouped).map(([company, products], ci) => (
+                        <div key={`new-company-${ci}`} className="mb-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">{company}</span>
+                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs">
+                              {products.length} produit{products.length > 1 ? 's' : ''}
+                            </Badge>
+                          </div>
+                          <div className="space-y-1.5">
+                            {products.map((product, pi) => (
+                              <div key={`new-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5">
+                                <span className="font-medium">{product.product_name}</span>
+                                <div className="flex items-center gap-3 text-muted-foreground">
+                                  {product.premium_monthly && (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                      CHF {product.premium_monthly.toFixed(2)}/mois
+                                    </span>
+                                  )}
+                                  {product.franchise && (
+                                    <span>Franchise: CHF {product.franchise}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Total for this company */}
+                          <div className="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-700 flex justify-between text-xs">
+                            <span className="text-muted-foreground">Total mensuel</span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                              CHF {products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0).toFixed(2)}/mois
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 
