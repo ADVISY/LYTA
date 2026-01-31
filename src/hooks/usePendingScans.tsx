@@ -17,6 +17,28 @@ export interface DocumentDetected {
   description: string;
 }
 
+export interface ProductDetected {
+  product_name: string;
+  product_category: string;
+  company: string;
+  premium_monthly?: number;
+  premium_yearly?: number;
+  franchise?: number;
+  start_date?: string;
+  end_date?: string;
+  policy_number?: string;
+  notes?: string;
+}
+
+export interface FamilyMemberDetected {
+  last_name: string;
+  first_name: string;
+  birthdate?: string;
+  relationship?: string;
+  gender?: string;
+  has_own_policy?: boolean;
+}
+
 export interface EngagementAnalysis {
   old_policy_end_date?: string;
   new_policy_start_date?: string;
@@ -43,10 +65,23 @@ export interface PendingScan {
   // Enhanced back-office data from AI analysis
   dossier_summary?: string;
   documents_detected?: DocumentDetected[];
+  // Multi-product support
+  products_detected?: ProductDetected[];
+  old_products_detected?: ProductDetected[];
+  new_products_detected?: ProductDetected[];
+  // Family members support
+  family_members_detected?: FamilyMemberDetected[];
+  primary_holder?: {
+    last_name: string;
+    first_name: string;
+    birthdate?: string;
+  };
   has_old_policy?: boolean;
   has_new_policy?: boolean;
   has_termination?: boolean;
   has_identity_doc?: boolean;
+  has_multiple_products?: boolean;
+  has_family_members?: boolean;
   engagement_analysis?: EngagementAnalysis;
   workflow_actions?: WorkflowAction[];
   inconsistencies?: string[];
@@ -139,10 +174,19 @@ export function usePendingScans() {
           // Enhanced back-office data from AI analysis
           dossier_summary: aiSnapshot.dossier_summary,
           documents_detected: aiSnapshot.documents_detected,
+          // Multi-product support
+          products_detected: aiSnapshot.products_detected,
+          old_products_detected: aiSnapshot.old_products_detected,
+          new_products_detected: aiSnapshot.new_products_detected,
+          // Family members support
+          family_members_detected: aiSnapshot.family_members_detected,
+          primary_holder: aiSnapshot.primary_holder,
           has_old_policy: aiSnapshot.has_old_policy,
           has_new_policy: aiSnapshot.has_new_policy,
           has_termination: aiSnapshot.has_termination,
           has_identity_doc: aiSnapshot.has_identity_doc,
+          has_multiple_products: aiSnapshot.has_multiple_products,
+          has_family_members: aiSnapshot.has_family_members,
           engagement_analysis: aiSnapshot.engagement_analysis,
           workflow_actions: aiSnapshot.workflow_actions,
           inconsistencies: aiSnapshot.inconsistencies,
