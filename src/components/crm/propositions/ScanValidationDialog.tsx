@@ -319,6 +319,29 @@ export default function ScanValidationDialog({
         return getValue(fieldName) || null;
       };
 
+      // Normalize gender value to database allowed values: 'homme', 'femme', 'enfant'
+      const normalizeGender = (rawGender: string | null): string | null => {
+        if (!rawGender) return null;
+        const lowerGender = rawGender.toLowerCase().trim();
+        
+        // Map various gender inputs to allowed values
+        if (['homme', 'male', 'masculin', 'h', 'm', 'mr', 'monsieur', 'herr', 'männlich'].includes(lowerGender)) {
+          return 'homme';
+        }
+        if (['femme', 'female', 'féminin', 'f', 'mme', 'madame', 'frau', 'weiblich', 'mademoiselle'].includes(lowerGender)) {
+          return 'femme';
+        }
+        if (['enfant', 'child', 'kid', 'e', 'kind'].includes(lowerGender)) {
+          return 'enfant';
+        }
+        
+        // If not a valid value, return null rather than an invalid value
+        return null;
+      };
+
+      const rawGender = getClientValue('genre', 'gender');
+      const normalizedGender = normalizeGender(rawGender);
+
       const clientData = {
         tenant_id: tenantId,
         last_name: getClientValue('nom', 'last_name'),
@@ -336,7 +359,7 @@ export default function ScanValidationDialog({
         profession: getClientValue('profession', 'profession'),
         employer: getClientValue('employeur', 'employeur'),
         permit_type: getClientValue('permis', 'permit_type'),
-        gender: getClientValue('genre', 'gender'),
+        gender: normalizedGender,
         status: 'prospect',
       };
 
