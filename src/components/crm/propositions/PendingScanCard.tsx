@@ -207,6 +207,7 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
             <Button
               variant="ghost"
               size="sm"
+              type="button"
               onClick={() => setExpanded(!expanded)}
               className="w-full justify-between text-muted-foreground hover:text-foreground"
             >
@@ -276,6 +277,7 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
             <Button
               variant="outline"
               size="sm"
+              type="button"
               onClick={() => onReject(scan.id)}
               disabled={isRejecting}
               className="text-destructive hover:text-destructive"
@@ -289,6 +291,7 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
             </Button>
             <Button
               size="sm"
+              type="button"
               onClick={() => onValidate(scan)}
               className="flex-1 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90"
             >
