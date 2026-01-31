@@ -226,6 +226,33 @@ export default function ScanValidationDialog({
     return isNaN(parsed) ? null : parsed;
   };
 
+  // Parse European date format (DD.MM.YYYY or DD/MM/YYYY) to ISO format (YYYY-MM-DD)
+  const parseDate = (value: string | null | undefined): string | null => {
+    if (!value) return null;
+    
+    // If already in ISO format (YYYY-MM-DD), return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+    
+    // Parse European format: DD.MM.YYYY or DD/MM/YYYY
+    const europeanMatch = value.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+    if (europeanMatch) {
+      const [, day, month, year] = europeanMatch;
+      const paddedDay = day.padStart(2, '0');
+      const paddedMonth = month.padStart(2, '0');
+      return `${year}-${paddedMonth}-${paddedDay}`;
+    }
+    
+    // Try parsing as a date string
+    const parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+    
+    return null;
+  };
+
   const handleValidate = async () => {
     if (!user || !tenantId) return;
 
@@ -236,7 +263,7 @@ export default function ScanValidationDialog({
         tenant_id: tenantId,
         last_name: getValue('nom') || null,
         first_name: getValue('prenom') || null,
-        birthdate: getValue('date_naissance') || null,
+        birthdate: parseDate(getValue('date_naissance')),
         email: getValue('email') || null,
         phone: getValue('telephone') || null,
         address: getValue('adresse') || null,
@@ -305,8 +332,8 @@ export default function ScanValidationDialog({
             product_id: productId,
             policy_number: getValue('ancien_numero_police') || getValue('numero_police') || null,
             status: hasTermination ? 'resilie' : 'active',
-            start_date: getValue('ancienne_date_debut') || getValue('date_debut') || new Date().toISOString().split('T')[0],
-            end_date: getValue('ancienne_date_fin') || getValue('date_fin') || null,
+            start_date: parseDate(getValue('ancienne_date_debut') || getValue('date_debut')) || new Date().toISOString().split('T')[0],
+            end_date: parseDate(getValue('ancienne_date_fin') || getValue('date_fin')),
             premium_monthly: parseAmount(getValue('ancienne_prime_mensuelle') || getValue('prime_mensuelle')),
             premium_yearly: parseAmount(getValue('ancienne_prime_annuelle') || getValue('prime_annuelle')),
             deductible: parseAmount(getValue('ancienne_franchise') || getValue('franchise')),
@@ -340,8 +367,8 @@ export default function ScanValidationDialog({
             product_id: productId,
             policy_number: getValue('nouveau_numero_police') || null,
             status: 'active',
-            start_date: getValue('nouvelle_date_debut') || new Date().toISOString().split('T')[0],
-            end_date: getValue('nouvelle_date_fin') || null,
+            start_date: parseDate(getValue('nouvelle_date_debut')) || new Date().toISOString().split('T')[0],
+            end_date: parseDate(getValue('nouvelle_date_fin')),
             premium_monthly: parseAmount(getValue('nouvelle_prime_mensuelle')),
             premium_yearly: parseAmount(getValue('nouvelle_prime_annuelle')),
             deductible: parseAmount(getValue('nouvelle_franchise')),
@@ -375,8 +402,8 @@ export default function ScanValidationDialog({
             product_id: productId,
             policy_number: getValue('numero_police') || null,
             status: getValue('statut_contrat') || 'active',
-            start_date: getValue('date_debut') || new Date().toISOString().split('T')[0],
-            end_date: getValue('date_fin') || null,
+            start_date: parseDate(getValue('date_debut')) || new Date().toISOString().split('T')[0],
+            end_date: parseDate(getValue('date_fin')),
             premium_monthly: parseAmount(getValue('prime_mensuelle')),
             premium_yearly: parseAmount(getValue('prime_annuelle')),
             deductible: parseAmount(getValue('franchise')),
