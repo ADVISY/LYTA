@@ -13,10 +13,12 @@ import {
   AlertCircle,
   Wand2,
   FolderOpen,
-  X
+  X,
+  Crown
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { ModuleGate } from "@/components/ModuleGate";
 
 interface IAScanUploadProps {
   formType: 'sana' | 'vita' | 'medio' | 'business';
@@ -292,8 +294,9 @@ export default function IAScanUpload({
   const isProcessing = status === 'uploading' || status === 'scanning';
 
   return (
-    <Card className="border-2 border-dashed transition-all hover:border-primary/50" 
-          style={{ borderColor: status === 'completed' ? '#10b981' : undefined }}>
+    <ModuleGate module="ia_scan">
+      <Card className="border-2 border-dashed transition-all hover:border-primary/50" 
+            style={{ borderColor: status === 'completed' ? '#10b981' : undefined }}>
       <CardContent className="p-6">
         <Input
           ref={fileInputRef}
@@ -426,6 +429,7 @@ export default function IAScanUpload({
           </p>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </ModuleGate>
   );
 }
