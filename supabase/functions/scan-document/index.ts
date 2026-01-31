@@ -66,6 +66,17 @@ interface ParsedResult {
   }>;
 }
 
+// Avoid `String.fromCharCode(...bytes)` on large buffers (causes RangeError: Maximum call stack size exceeded)
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 function buildSystemPrompt(fileCount: number): string {
   const today = new Date().toLocaleDateString('fr-CH');
   
@@ -240,11 +251,17 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Clone early: `req.json()` consumes the body; cloning later throws `Body is unusable`
+  const reqForErrorHandling = req.clone();
+  let scanIdForErrorHandling: string | undefined;
+
   const startTime = Date.now();
 
   try {
     const body = await req.json();
     const { scanId, formType, tenantId, batchMode, files, fileKey, fileName, mimeType } = body;
+
+    scanIdForErrorHandling = scanId;
 
     if (!scanId) {
       throw new Error("Missing required parameter: scanId");
@@ -287,7 +304,7 @@ serve(async (req) => {
       }
 
       const arrayBuffer = await fileData.arrayBuffer();
-      const base64File = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const base64File = arrayBufferToBase64(arrayBuffer);
       
       fileContents.push({
         fileName: fileInfo.fileName,
@@ -588,8 +605,17 @@ serve(async (req) => {
 
     // Try to update scan status to failed
     try {
-      const { scanId } = await req.clone().json();
-      if (scanId) {
+      let scanIdToUpdate = scanIdForErrorHandling;
+      if (!scanIdToUpdate) {
+        try {
+          const maybeBody = await reqForErrorHandling.json();
+          scanIdToUpdate = maybeBody?.scanId;
+        } catch {
+          // ignore: body might not be valid JSON
+        }
+      }
+
+      if (scanIdToUpdate) {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -601,7 +627,7 @@ serve(async (req) => {
             error_message: error instanceof Error ? error.message : "Unknown error",
             updated_at: new Date().toISOString(),
           })
-          .eq("id", scanId);
+          .eq("id", scanIdToUpdate);
       }
     } catch (e) {
       console.error("Failed to update scan status:", e);
