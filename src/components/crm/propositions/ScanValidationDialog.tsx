@@ -342,6 +342,10 @@ export default function ScanValidationDialog({
       const rawGender = getClientValue('genre', 'gender');
       const normalizedGender = normalizeGender(rawGender);
 
+      // Determine client status: if we're creating active policies, set as 'actif'
+      const willHaveActiveContract = (createNewContract && (hasNewContractData || (scan.new_products_detected && scan.new_products_detected.length > 0))) 
+        || (!hasNewContractData && createOldContract && hasOldContractData && !hasTermination);
+      
       const clientData = {
         tenant_id: tenantId,
         last_name: getClientValue('nom', 'last_name'),
@@ -360,7 +364,7 @@ export default function ScanValidationDialog({
         employer: getClientValue('employeur', 'employeur'),
         permit_type: getClientValue('permis', 'permit_type'),
         gender: normalizedGender,
-        status: 'prospect',
+        status: willHaveActiveContract ? 'actif' : 'prospect',
       };
 
       const { data: newClient, error: clientError } = await supabase
@@ -446,14 +450,30 @@ export default function ScanValidationDialog({
           
           if (productId) {
             // Build products_data array with ALL product details
-            const productsData = products.map(p => ({
-              productId: '', // Will be resolved later if needed
-              name: p.product_name || 'Produit',
-              category: p.product_category || 'health',
-              premium: p.premium_monthly || 0,
-              deductible: p.franchise || null,
-              premiumYearly: p.premium_yearly || null,
-              notes: p.notes || null,
+            // Try to find real product IDs for each product by name
+            const productsData = await Promise.all(products.map(async (p) => {
+              // Try to find a matching product in the database by name
+              let resolvedProductId = '';
+              if (p.product_name) {
+                const { data: matchingProduct } = await supabase
+                  .from('insurance_products')
+                  .select('id')
+                  .ilike('name', `%${p.product_name}%`)
+                  .limit(1)
+                  .maybeSingle();
+                if (matchingProduct) {
+                  resolvedProductId = matchingProduct.id;
+                }
+              }
+              return {
+                productId: resolvedProductId,
+                name: p.product_name || 'Produit',
+                category: p.product_category || 'health',
+                premium: p.premium_monthly || 0,
+                deductible: p.franchise || null,
+                premiumYearly: p.premium_yearly || null,
+                notes: p.notes || null,
+              };
             }));
 
             // Calculate totals
@@ -541,14 +561,30 @@ export default function ScanValidationDialog({
           
           if (productId) {
             // Build products_data array with ALL product details
-            const productsData = products.map(p => ({
-              productId: '', // Will be resolved later if needed
-              name: p.product_name || 'Produit',
-              category: p.product_category || 'health',
-              premium: p.premium_monthly || 0,
-              deductible: p.franchise || null,
-              premiumYearly: p.premium_yearly || null,
-              notes: p.notes || null,
+            // Try to find real product IDs for each product by name
+            const productsDataNew = await Promise.all(products.map(async (p) => {
+              // Try to find a matching product in the database by name
+              let resolvedProductId = '';
+              if (p.product_name) {
+                const { data: matchingProduct } = await supabase
+                  .from('insurance_products')
+                  .select('id')
+                  .ilike('name', `%${p.product_name}%`)
+                  .limit(1)
+                  .maybeSingle();
+                if (matchingProduct) {
+                  resolvedProductId = matchingProduct.id;
+                }
+              }
+              return {
+                productId: resolvedProductId,
+                name: p.product_name || 'Produit',
+                category: p.product_category || 'health',
+                premium: p.premium_monthly || 0,
+                deductible: p.franchise || null,
+                premiumYearly: p.premium_yearly || null,
+                notes: p.notes || null,
+              };
             }));
 
             // Calculate totals
@@ -572,7 +608,7 @@ export default function ScanValidationDialog({
               currency: 'CHF',
               company_name: firstProduct.company || null,
               product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
-              products_data: productsData,
+              products_data: productsDataNew,
               notes: `${productNames || 'Multi-produits'} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
             };
 

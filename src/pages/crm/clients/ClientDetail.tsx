@@ -167,7 +167,11 @@ export default function ClientDetail() {
         .eq('owner_id', id)
         .order('created_at', { ascending: false });
       
-      if (!clientError && clientDocs) {
+      if (clientError) {
+        console.error('Error loading client documents:', clientError);
+      }
+      
+      if (clientDocs) {
         data = [...clientDocs as Document[]];
       }
       
@@ -179,7 +183,11 @@ export default function ClientDetail() {
           .in('owner_id', policyIds)
           .order('created_at', { ascending: false });
         
-        if (!policyError && policyDocs) {
+        if (policyError) {
+          console.error('Error loading policy documents:', policyError);
+        }
+        
+        if (policyDocs) {
           // Merge and deduplicate
           const existingIds = new Set(data.map(d => d.id));
           for (const doc of policyDocs as Document[]) {

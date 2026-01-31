@@ -212,7 +212,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       
       if (productsData && productsData.length > 0) {
         // Load products from products_data
-        const loadedProducts: SelectedProduct[] = productsData.map(prod => {
+        // For products without productId, try to resolve by name
+        const loadedProducts: SelectedProduct[] = await Promise.all(productsData.map(async (prod) => {
           const isLamal = prod.category === 'health' && isLamalProduct(prod.name);
           
           // Set LAMal fields if applicable
@@ -221,16 +222,30 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             if (prod.deductible) setLamalFranchise(String(prod.deductible));
           }
           
+          // If productId is missing, try to find it by name
+          let resolvedProductId = prod.productId || '';
+          if (!resolvedProductId && prod.name) {
+            const { data: matchedProduct } = await supabase
+              .from('insurance_products')
+              .select('id')
+              .ilike('name', `%${prod.name}%`)
+              .limit(1)
+              .maybeSingle();
+            if (matchedProduct) {
+              resolvedProductId = matchedProduct.id;
+            }
+          }
+          
           return {
             id: generateId(),
-            productId: prod.productId,
+            productId: resolvedProductId,
             name: prod.name || 'Produit',
             category: prod.category || 'other',
             premium: String(prod.premium || ''),
             deductible: String(prod.deductible || ''),
             durationYears: String(prod.durationYears || ''),
           };
-        });
+        }));
         
         setSelectedProducts(loadedProducts);
       } else if (existingPolicy.product) {
