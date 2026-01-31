@@ -105,6 +105,30 @@ export function usePendingScans() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Some AI snapshots can contain strings/objects instead of arrays (e.g. "warnings" or "documents_detected").
+  // Normalize here to avoid runtime crashes (blank screens) in UI components that assume arrays.
+  const normalizeArray = <T,>(value: any): T[] => {
+    if (Array.isArray(value)) return value as T[];
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed as T[];
+      } catch {
+        // ignore
+      }
+      return [];
+    }
+    if (value && typeof value === 'object') return [value as T];
+    return [];
+  };
+
+  const normalizeStringArray = (value: any): string[] => {
+    const arr = normalizeArray<unknown>(value);
+    return arr.filter((x): x is string => typeof x === 'string');
+  };
+
   const fetchScans = async () => {
     if (!tenantId) {
       setScans([]);
@@ -158,6 +182,17 @@ export function usePendingScans() {
         const scanAudit = auditData.find(a => a.scan_id === scan.id);
         const aiSnapshot = scanAudit?.ai_response_snapshot as any || {};
 
+        const rawEngagement = (aiSnapshot.engagement_analysis && typeof aiSnapshot.engagement_analysis === 'object')
+          ? aiSnapshot.engagement_analysis
+          : undefined;
+
+        const engagement_analysis: EngagementAnalysis | undefined = rawEngagement
+          ? {
+              ...rawEngagement,
+              warnings: normalizeStringArray(rawEngagement.warnings),
+            }
+          : undefined;
+
         return {
           id: scan.id,
           created_at: scan.created_at,
@@ -173,13 +208,13 @@ export function usePendingScans() {
           error_message: scan.error_message,
           // Enhanced back-office data from AI analysis
           dossier_summary: aiSnapshot.dossier_summary,
-          documents_detected: aiSnapshot.documents_detected,
+          documents_detected: normalizeArray(aiSnapshot.documents_detected),
           // Multi-product support
-          products_detected: aiSnapshot.products_detected,
-          old_products_detected: aiSnapshot.old_products_detected,
-          new_products_detected: aiSnapshot.new_products_detected,
+          products_detected: normalizeArray(aiSnapshot.products_detected),
+          old_products_detected: normalizeArray(aiSnapshot.old_products_detected),
+          new_products_detected: normalizeArray(aiSnapshot.new_products_detected),
           // Family members support
-          family_members_detected: aiSnapshot.family_members_detected,
+          family_members_detected: normalizeArray(aiSnapshot.family_members_detected),
           primary_holder: aiSnapshot.primary_holder,
           has_old_policy: aiSnapshot.has_old_policy,
           has_new_policy: aiSnapshot.has_new_policy,
@@ -187,10 +222,10 @@ export function usePendingScans() {
           has_identity_doc: aiSnapshot.has_identity_doc,
           has_multiple_products: aiSnapshot.has_multiple_products,
           has_family_members: aiSnapshot.has_family_members,
-          engagement_analysis: aiSnapshot.engagement_analysis,
-          workflow_actions: aiSnapshot.workflow_actions,
-          inconsistencies: aiSnapshot.inconsistencies,
-          missing_documents: aiSnapshot.missing_documents,
+          engagement_analysis,
+          workflow_actions: normalizeArray(aiSnapshot.workflow_actions),
+          inconsistencies: normalizeStringArray(aiSnapshot.inconsistencies),
+          missing_documents: normalizeStringArray(aiSnapshot.missing_documents),
           fields: fieldsData
             .filter(f => f.scan_id === scan.id)
             .map(f => ({

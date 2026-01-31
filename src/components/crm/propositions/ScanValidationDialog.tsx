@@ -1576,7 +1576,7 @@ export default function ScanValidationDialog({
           <Button
             type="button"
             onClick={safeHandleValidate}
-            disabled={isSubmitting || tenantLoading || !tenantIdFromHook || !user}
+            disabled={isSubmitting || tenantLoading || !user}
             className="flex-1 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90"
           >
             {isSubmitting ? (
