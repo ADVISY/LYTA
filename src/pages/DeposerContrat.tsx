@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import SingleDocumentUpload from "@/components/crm/SingleDocumentUpload";
+import { IAScanUpload, IAScanValidation, type ScanResults } from "@/components/crm/ia-scan";
 import lytaLogoFallback from "@/assets/lyta-logo-full.svg";
 
 type UploadedDocument = {
@@ -274,6 +275,12 @@ export default function DeposerContrat() {
   const [medioDocuments, setMedioDocuments] = useState<UploadedDocument[]>([]);
   const [businessDocuments, setBusinessDocuments] = useState<UploadedDocument[]>([]);
 
+  // IA Scan state
+  const [sanaScanResults, setSanaScanResults] = useState<ScanResults | null>(null);
+  const [vitaScanResults, setVitaScanResults] = useState<ScanResults | null>(null);
+  const [medioScanResults, setMedioScanResults] = useState<ScanResults | null>(null);
+  const [businessScanResults, setBusinessScanResults] = useState<ScanResults | null>(null);
+
   // Required documents per form
   const sanaRequiredDocs = [
     t('depositContract.sana.docs.identity'),
@@ -314,6 +321,70 @@ export default function DeposerContrat() {
       setMedioForm(prev => ({ ...prev, agentName }));
     }
   }, [verifiedPartner]);
+
+  // Handle IA Scan results - prefill form with extracted data
+  const handleSanaScanValidate = (validatedFields: Record<string, string>) => {
+    setSanaForm(prev => ({
+      ...prev,
+      clientNom: validatedFields.nom || prev.clientNom,
+      clientPrenom: validatedFields.prenom || prev.clientPrenom,
+      clientEmail: validatedFields.email || prev.clientEmail,
+      clientTel: validatedFields.telephone || prev.clientTel,
+      dateNaissance: validatedFields.date_naissance || prev.dateNaissance,
+      adresse: validatedFields.adresse || prev.adresse,
+      npa: validatedFields.npa || prev.npa,
+      localite: validatedFields.localite || prev.localite,
+      assureurActuel: validatedFields.compagnie || prev.assureurActuel,
+    }));
+    setSanaScanResults(null);
+    toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire" });
+  };
+
+  const handleVitaScanValidate = (validatedFields: Record<string, string>) => {
+    setVitaForm(prev => ({
+      ...prev,
+      clientNom: validatedFields.nom || prev.clientNom,
+      clientPrenom: validatedFields.prenom || prev.clientPrenom,
+      clientEmail: validatedFields.email || prev.clientEmail,
+      clientTel: validatedFields.telephone || prev.clientTel,
+      vitaPrimeMensuelle: validatedFields.prime_mensuelle || prev.vitaPrimeMensuelle,
+      vitaDateEffet: validatedFields.date_debut || prev.vitaDateEffet,
+      vitaDureeContrat: validatedFields.duree_contrat || prev.vitaDureeContrat,
+    }));
+    setVitaScanResults(null);
+    toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire" });
+  };
+
+  const handleMedioScanValidate = (validatedFields: Record<string, string>) => {
+    setMedioForm(prev => ({
+      ...prev,
+      preneurNom: validatedFields.nom || prev.preneurNom,
+      preneurPrenom: validatedFields.prenom || prev.preneurPrenom,
+      preneurEmail: validatedFields.email || prev.preneurEmail,
+      preneurTel: validatedFields.telephone || prev.preneurTel,
+      preneurAdresse: validatedFields.adresse || prev.preneurAdresse,
+      preneurNpa: validatedFields.npa || prev.preneurNpa,
+      preneurLocalite: validatedFields.localite || prev.preneurLocalite,
+      dateEffet: validatedFields.date_debut || prev.dateEffet,
+    }));
+    setMedioScanResults(null);
+    toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire" });
+  };
+
+  const handleBusinessScanValidate = (validatedFields: Record<string, string>) => {
+    setBusinessForm(prev => ({
+      ...prev,
+      entrepriseNom: validatedFields.compagnie || prev.entrepriseNom,
+      chefNom: validatedFields.nom || prev.chefNom,
+      chefPrenom: validatedFields.prenom || prev.chefPrenom,
+      chefDateNaissance: validatedFields.date_naissance || prev.chefDateNaissance,
+      chefAdresse: validatedFields.adresse || prev.chefAdresse,
+      dateEffet: validatedFields.date_debut || prev.dateEffet,
+      emailRetour: validatedFields.email || prev.emailRetour,
+    }));
+    setBusinessScanResults(null);
+    toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire" });
+  };
 
   const handleVerifyEmail = async () => {
     if (!partnerEmail.trim()) {
@@ -661,6 +732,23 @@ export default function DeposerContrat() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* IA SCAN Section */}
+              {sanaScanResults ? (
+                <IAScanValidation
+                  results={sanaScanResults}
+                  onValidate={handleSanaScanValidate}
+                  onCancel={() => setSanaScanResults(null)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              ) : (
+                <IAScanUpload
+                  formType="sana"
+                  tenantId={tenant?.id}
+                  onScanComplete={(results) => setSanaScanResults(results)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              )}
+
               {/* Client info */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.common.clientInfo')}</h3>
@@ -781,6 +869,23 @@ export default function DeposerContrat() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* IA SCAN Section */}
+              {vitaScanResults ? (
+                <IAScanValidation
+                  results={vitaScanResults}
+                  onValidate={handleVitaScanValidate}
+                  onCancel={() => setVitaScanResults(null)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              ) : (
+                <IAScanUpload
+                  formType="vita"
+                  tenantId={tenant?.id}
+                  onScanComplete={(results) => setVitaScanResults(results)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              )}
+
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.common.clientInfo')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -895,6 +1000,23 @@ export default function DeposerContrat() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* IA SCAN Section */}
+              {medioScanResults ? (
+                <IAScanValidation
+                  results={medioScanResults}
+                  onValidate={handleMedioScanValidate}
+                  onCancel={() => setMedioScanResults(null)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              ) : (
+                <IAScanUpload
+                  formType="medio"
+                  tenantId={tenant?.id}
+                  onScanComplete={(results) => setMedioScanResults(results)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              )}
+
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.medio.policyholderInfo')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1060,6 +1182,23 @@ export default function DeposerContrat() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
+              {/* IA SCAN Section */}
+              {businessScanResults ? (
+                <IAScanValidation
+                  results={businessScanResults}
+                  onValidate={handleBusinessScanValidate}
+                  onCancel={() => setBusinessScanResults(null)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              ) : (
+                <IAScanUpload
+                  formType="business"
+                  tenantId={tenant?.id}
+                  onScanComplete={(results) => setBusinessScanResults(results)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              )}
+
               {/* Renseignements généraux */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2"><Building2 className="h-5 w-5" /> {t('depositContract.business.generalInfo')}</h3>

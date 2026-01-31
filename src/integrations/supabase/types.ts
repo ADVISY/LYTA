@@ -1310,6 +1310,206 @@ export type Database = {
           },
         ]
       }
+      document_scan_audit: {
+        Row: {
+          action: string
+          ai_response_snapshot: Json | null
+          field_name: string | null
+          id: string
+          ip_address: unknown
+          new_value: string | null
+          old_value: string | null
+          performed_at: string
+          performed_by: string | null
+          scan_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          ai_response_snapshot?: Json | null
+          field_name?: string | null
+          id?: string
+          ip_address?: unknown
+          new_value?: string | null
+          old_value?: string | null
+          performed_at?: string
+          performed_by?: string | null
+          scan_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          ai_response_snapshot?: Json | null
+          field_name?: string | null
+          id?: string
+          ip_address?: unknown
+          new_value?: string | null
+          old_value?: string | null
+          performed_at?: string
+          performed_by?: string | null
+          scan_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_scan_audit_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "document_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_scan_results: {
+        Row: {
+          bounding_box: Json | null
+          confidence: string
+          confidence_score: number | null
+          created_at: string
+          extracted_value: string | null
+          extraction_notes: string | null
+          field_category: string
+          field_name: string
+          id: string
+          page_number: number | null
+          scan_id: string
+          validated_value: string | null
+        }
+        Insert: {
+          bounding_box?: Json | null
+          confidence?: string
+          confidence_score?: number | null
+          created_at?: string
+          extracted_value?: string | null
+          extraction_notes?: string | null
+          field_category: string
+          field_name: string
+          id?: string
+          page_number?: number | null
+          scan_id: string
+          validated_value?: string | null
+        }
+        Update: {
+          bounding_box?: Json | null
+          confidence?: string
+          confidence_score?: number | null
+          created_at?: string
+          extracted_value?: string | null
+          extraction_notes?: string | null
+          field_category?: string
+          field_name?: string
+          id?: string
+          page_number?: number | null
+          scan_id?: string
+          validated_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_scan_results_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "document_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_scans: {
+        Row: {
+          ai_model_used: string | null
+          created_at: string
+          detected_doc_type: string | null
+          doc_type_confidence: number | null
+          document_id: string | null
+          error_message: string | null
+          id: string
+          mime_type: string | null
+          ocr_required: boolean | null
+          original_file_key: string
+          original_file_name: string
+          overall_confidence: number | null
+          processing_time_ms: number | null
+          quality_score: number | null
+          source_form_type: string | null
+          source_type: string
+          status: string
+          tenant_id: string | null
+          updated_at: string
+          uploaded_by: string | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          ai_model_used?: string | null
+          created_at?: string
+          detected_doc_type?: string | null
+          doc_type_confidence?: number | null
+          document_id?: string | null
+          error_message?: string | null
+          id?: string
+          mime_type?: string | null
+          ocr_required?: boolean | null
+          original_file_key: string
+          original_file_name: string
+          overall_confidence?: number | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          source_form_type?: string | null
+          source_type?: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          ai_model_used?: string | null
+          created_at?: string
+          detected_doc_type?: string | null
+          doc_type_confidence?: number | null
+          document_id?: string | null
+          error_message?: string | null
+          id?: string
+          mime_type?: string | null
+          ocr_required?: boolean | null
+          original_file_key?: string
+          original_file_name?: string
+          overall_confidence?: number | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          source_form_type?: string | null
+          source_type?: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_scans_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_scans_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents_expiring_soon"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_scans_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           category: string | null
@@ -4225,6 +4425,17 @@ export type Database = {
           p_priority?: string
           p_title: string
           p_user_id: string
+        }
+        Returns: string
+      }
+      create_scan_audit_log: {
+        Args: {
+          p_action: string
+          p_ai_snapshot?: Json
+          p_field_name?: string
+          p_new_value?: string
+          p_old_value?: string
+          p_scan_id: string
         }
         Returns: string
       }

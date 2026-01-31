@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.send-client-notification-email]
 verify_jwt = false
+
+[functions.scan-document]
+verify_jwt = false
