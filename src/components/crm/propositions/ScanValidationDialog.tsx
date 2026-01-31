@@ -568,8 +568,8 @@ export default function ScanValidationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[95vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[95vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-primary/10">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -581,277 +581,281 @@ export default function ScanValidationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Documents detected */}
-        {scan.documents_detected && scan.documents_detected.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {scan.documents_detected.map((doc, i) => {
-              const docConfig = DOC_TYPE_LABELS[doc.doc_type] || DOC_TYPE_LABELS.autre;
-              const DocIcon = docConfig.icon;
-              return (
-                <Badge key={i} variant="outline" className={cn("text-xs", docConfig.color)}>
-                  <DocIcon className="h-3 w-3 mr-1" />
-                  {doc.description || docConfig.label}
-                </Badge>
-              );
-            })}
-          </div>
-        )}
+        {/* Scrollable content area */}
+        <ScrollArea className="flex-1 px-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 180px)' }}>
+          <div className="space-y-4 pb-4">
+            {/* Documents detected */}
+            {scan.documents_detected && scan.documents_detected.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {scan.documents_detected.map((doc, i) => {
+                  const docConfig = DOC_TYPE_LABELS[doc.doc_type] || DOC_TYPE_LABELS.autre;
+                  const DocIcon = docConfig.icon;
+                  return (
+                    <Badge key={i} variant="outline" className={cn("text-xs", docConfig.color)}>
+                      <DocIcon className="h-3 w-3 mr-1" />
+                      {doc.description || docConfig.label}
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
 
-        {/* Alerts for termination or engagement issues */}
-        {(hasTermination || (scan.engagement_analysis?.warnings && scan.engagement_analysis.warnings.length > 0)) && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertOctagon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                  {hasTermination ? '⚠️ Résiliation détectée' : '⚠️ Attention aux dates'}
+            {/* Alerts for termination or engagement issues */}
+            {(hasTermination || (scan.engagement_analysis?.warnings && scan.engagement_analysis.warnings.length > 0)) && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertOctagon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                      {hasTermination ? '⚠️ Résiliation détectée' : '⚠️ Attention aux dates'}
+                    </p>
+                    {scan.engagement_analysis?.warnings?.map((warning, i) => (
+                      <p key={i} className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        • {warning}
+                      </p>
+                    ))}
+                    {scan.engagement_analysis?.termination_deadline && (
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        📅 Deadline résiliation: <strong>{scan.engagement_analysis.termination_deadline}</strong>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inconsistencies */}
+            {scan.inconsistencies && scan.inconsistencies.length > 0 && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                  ⚠️ Incohérences détectées
                 </p>
-                {scan.engagement_analysis?.warnings?.map((warning, i) => (
-                  <p key={i} className="text-sm text-red-700 dark:text-red-300 mt-1">
-                    • {warning}
-                  </p>
+                {scan.inconsistencies.map((inc, i) => (
+                  <p key={i} className="text-sm text-amber-700 dark:text-amber-300">• {inc}</p>
                 ))}
-                {scan.engagement_analysis?.termination_deadline && (
-                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                    📅 Deadline résiliation: <strong>{scan.engagement_analysis.termination_deadline}</strong>
-                  </p>
-                )}
+              </div>
+            )}
+
+            {/* Confidence meter */}
+            <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Confiance globale</span>
+                  <span className="font-medium">{overallPercent}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${overallPercent}%`,
+                      backgroundColor: overallPercent >= 70 ? '#10b981' : overallPercent >= 40 ? '#f59e0b' : '#ef4444',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {scan.fields.length} champs
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Inconsistencies */}
-        {scan.inconsistencies && scan.inconsistencies.length > 0 && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-              ⚠️ Incohérences détectées
-            </p>
-            {scan.inconsistencies.map((inc, i) => (
-              <p key={i} className="text-sm text-amber-700 dark:text-amber-300">• {inc}</p>
-            ))}
-          </div>
-        )}
-
-        {/* Confidence meter */}
-        <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-          <div className="flex-1">
-            <div className="flex items-center justify-between text-sm mb-1">
-              <span className="text-muted-foreground">Confiance globale</span>
-              <span className="font-medium">{overallPercent}%</span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${overallPercent}%`,
-                  backgroundColor: overallPercent >= 70 ? '#10b981' : overallPercent >= 40 ? '#f59e0b' : '#ef4444',
-                }}
-              />
-            </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {scan.fields.length} champs
-          </div>
-        </div>
-
-        {/* Creation options */}
-        <div className="p-4 bg-gradient-to-r from-primary/5 to-violet-500/5 rounded-lg border border-primary/10">
-          <p className="text-sm font-medium mb-3 flex items-center gap-2">
-            <FolderPlus className="h-4 w-4 text-primary" />
-            Éléments à créer
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
-              <Checkbox checked disabled className="data-[state=checked]:bg-blue-500" />
-              <User className="h-4 w-4 text-blue-500" />
-              <span className="text-sm">Client</span>
-              <Badge variant="outline" className="ml-auto text-xs">Requis</Badge>
-            </label>
-            
-            {hasOldContractData && (
-              <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
-                <Checkbox 
-                  checked={createOldContract} 
-                  onCheckedChange={(checked) => setCreateOldContract(checked as boolean)}
-                  className="data-[state=checked]:bg-orange-500"
-                />
-                <FileWarning className="h-4 w-4 text-orange-500" />
-                <span className="text-sm">Ancienne police</span>
-              </label>
-            )}
-            
-            {(hasNewContractData || hasContractData) && (
-              <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
-                <Checkbox 
-                  checked={createNewContract} 
-                  onCheckedChange={(checked) => setCreateNewContract(checked as boolean)}
-                  className="data-[state=checked]:bg-emerald-500"
-                />
-                <FileCheck className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm">{hasNewContractData ? 'Nouvelle police' : 'Contrat'}</span>
-              </label>
-            )}
-            
-            <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
-              <Checkbox 
-                checked={linkDocuments} 
-                onCheckedChange={(checked) => setLinkDocuments(checked as boolean)}
-                className="data-[state=checked]:bg-indigo-500"
-              />
-              <FileText className="h-4 w-4 text-indigo-500" />
-              <span className="text-sm">Lier documents</span>
-            </label>
-            
-            <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
-              <Checkbox 
-                checked={createSuivis} 
-                onCheckedChange={(checked) => setCreateSuivis(checked as boolean)}
-                className="data-[state=checked]:bg-amber-500"
-              />
-              <CalendarCheck className="h-4 w-4 text-amber-500" />
-              <span className="text-sm">
-                Créer suivis
-                {scan.workflow_actions && scan.workflow_actions.length > 0 && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({scan.workflow_actions.length} action{scan.workflow_actions.length > 1 ? 's' : ''})
-                  </span>
+            {/* Creation options */}
+            <div className="p-4 bg-gradient-to-r from-primary/5 to-violet-500/5 rounded-lg border border-primary/10">
+              <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                <FolderPlus className="h-4 w-4 text-primary" />
+                Éléments à créer
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                  <Checkbox checked disabled className="data-[state=checked]:bg-blue-500" />
+                  <User className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm">Client</span>
+                  <Badge variant="outline" className="ml-auto text-xs">Requis</Badge>
+                </label>
+                
+                {hasOldContractData && (
+                  <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                    <Checkbox 
+                      checked={createOldContract} 
+                      onCheckedChange={(checked) => setCreateOldContract(checked as boolean)}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                    <FileWarning className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm">Ancienne police</span>
+                  </label>
                 )}
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Workflow actions preview */}
-        {scan.workflow_actions && scan.workflow_actions.length > 0 && createSuivis && (
-          <div className="p-3 bg-muted/30 rounded-lg border">
-            <p className="text-sm font-medium mb-2 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Actions back-office à créer
-            </p>
-            <div className="space-y-2">
-              {scan.workflow_actions.map((action, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <Badge variant={action.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
-                    {action.priority === 'high' ? 'Urgent' : 'Normal'}
-                  </Badge>
-                  <span className="flex-1">{action.description}</span>
-                  {action.deadline && (
-                    <span className="text-xs text-muted-foreground">
-                      📅 {action.deadline}
-                    </span>
-                  )}
-                </div>
-              ))}
+                
+                {(hasNewContractData || hasContractData) && (
+                  <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                    <Checkbox 
+                      checked={createNewContract} 
+                      onCheckedChange={(checked) => setCreateNewContract(checked as boolean)}
+                      className="data-[state=checked]:bg-emerald-500"
+                    />
+                    <FileCheck className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm">{hasNewContractData ? 'Nouvelle police' : 'Contrat'}</span>
+                  </label>
+                )}
+                
+                <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                  <Checkbox 
+                    checked={linkDocuments} 
+                    onCheckedChange={(checked) => setLinkDocuments(checked as boolean)}
+                    className="data-[state=checked]:bg-indigo-500"
+                  />
+                  <FileText className="h-4 w-4 text-indigo-500" />
+                  <span className="text-sm">Lier documents</span>
+                </label>
+                
+                <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                  <Checkbox 
+                    checked={createSuivis} 
+                    onCheckedChange={(checked) => setCreateSuivis(checked as boolean)}
+                    className="data-[state=checked]:bg-amber-500"
+                  />
+                  <CalendarCheck className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm">
+                    Créer suivis
+                    {scan.workflow_actions && scan.workflow_actions.length > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({scan.workflow_actions.length} action{scan.workflow_actions.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
             </div>
-          </div>
-        )}
 
-        <ScrollArea className="max-h-[35vh] pr-4">
-          <div className="space-y-6">
-            {Object.entries(fieldsByCategory).map(([category, fields]) => {
-              const categoryConfig = CATEGORY_CONFIG[category] || {
-                label: category,
-                icon: FileText,
-                color: 'text-gray-500',
-              };
-              const CategoryIcon = categoryConfig.icon;
-
-              return (
-                <div key={category}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <CategoryIcon className={cn("h-4 w-4", categoryConfig.color)} />
-                    <span className="font-medium text-sm">{categoryConfig.label}</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {fields.map(field => (
-                      <div
-                        key={field.id}
-                        className={cn(
-                          "p-3 rounded-lg border transition-all",
-                          field.confidence === 'low'
-                            ? 'border-destructive/50 bg-destructive/5'
-                            : field.confidence === 'medium'
-                            ? 'border-amber-500/50 bg-amber-500/5'
-                            : 'border-border bg-muted/30'
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-sm font-medium flex items-center gap-1.5">
-                            {getConfidenceIcon(field.confidence)}
-                            {FIELD_LABELS[field.field_name] || field.field_name}
-                          </Label>
-                          {getConfidenceBadge(field.confidence)}
-                        </div>
-
-                        {editingField === field.field_name ? (
-                          <div className="flex gap-2">
-                            <Input
-                              value={getValue(field.field_name)}
-                              onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-                              className="h-9"
-                              autoFocus
-                            />
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingField(null)}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div
-                            className="flex items-center justify-between group cursor-pointer p-2 rounded hover:bg-muted/50"
-                            onClick={() => setEditingField(field.field_name)}
-                          >
-                            <span className={cn(
-                              "text-sm",
-                              !getValue(field.field_name) && 'text-muted-foreground italic'
-                            )}>
-                              {getValue(field.field_name) || 'Non détecté'}
-                            </span>
-                            <Edit2 className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        )}
-
-                        {field.extraction_notes && (
-                          <p className="text-xs text-muted-foreground mt-1 italic">
-                            💡 {field.extraction_notes}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <Separator className="mt-4" />
+            {/* Workflow actions preview */}
+            {scan.workflow_actions && scan.workflow_actions.length > 0 && createSuivis && (
+              <div className="p-3 bg-muted/30 rounded-lg border">
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Actions back-office à créer
+                </p>
+                <div className="space-y-2">
+                  {scan.workflow_actions.map((action, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <Badge variant={action.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                        {action.priority === 'high' ? 'Urgent' : 'Normal'}
+                      </Badge>
+                      <span className="flex-1">{action.description}</span>
+                      {action.deadline && (
+                        <span className="text-xs text-muted-foreground">
+                          📅 {action.deadline}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            )}
+
+            {/* Fields by category */}
+            <div className="space-y-6">
+              {Object.entries(fieldsByCategory).map(([category, fields]) => {
+                const categoryConfig = CATEGORY_CONFIG[category] || {
+                  label: category,
+                  icon: FileText,
+                  color: 'text-gray-500',
+                };
+                const CategoryIcon = categoryConfig.icon;
+
+                return (
+                  <div key={category}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CategoryIcon className={cn("h-4 w-4", categoryConfig.color)} />
+                      <span className="font-medium text-sm">{categoryConfig.label}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {fields.map(field => (
+                        <div
+                          key={field.id}
+                          className={cn(
+                            "p-3 rounded-lg border transition-all",
+                            field.confidence === 'low'
+                              ? 'border-destructive/50 bg-destructive/5'
+                              : field.confidence === 'medium'
+                              ? 'border-amber-500/50 bg-amber-500/5'
+                              : 'border-border bg-muted/30'
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-medium flex items-center gap-1.5">
+                              {getConfidenceIcon(field.confidence)}
+                              {FIELD_LABELS[field.field_name] || field.field_name}
+                            </Label>
+                            {getConfidenceBadge(field.confidence)}
+                          </div>
+
+                          {editingField === field.field_name ? (
+                            <div className="flex gap-2">
+                              <Input
+                                value={getValue(field.field_name)}
+                                onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
+                                className="h-9"
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingField(null)}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div
+                              className="flex items-center justify-between group cursor-pointer p-2 rounded hover:bg-muted/50"
+                              onClick={() => setEditingField(field.field_name)}
+                            >
+                              <span className={cn(
+                                "text-sm",
+                                !getValue(field.field_name) && 'text-muted-foreground italic'
+                              )}>
+                                {getValue(field.field_name) || 'Non détecté'}
+                              </span>
+                              <Edit2 className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          )}
+
+                          {field.extraction_notes && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">
+                              💡 {field.extraction_notes}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <Separator className="mt-4" />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Missing documents */}
+            {scan.missing_documents && scan.missing_documents.length > 0 && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                  📁 Documents à demander
+                </p>
+                {scan.missing_documents.map((doc, i) => (
+                  <p key={i} className="text-sm text-blue-700 dark:text-blue-300">• {doc}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Disclaimer */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                ⚠️ Les données ont été proposées par une IA. Vérifiez avant validation.
+              </p>
+            </div>
           </div>
         </ScrollArea>
 
-        {/* Missing documents */}
-        {scan.missing_documents && scan.missing_documents.length > 0 && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
-              📁 Documents à demander
-            </p>
-            {scan.missing_documents.map((doc, i) => (
-              <p key={i} className="text-sm text-blue-700 dark:text-blue-300">• {doc}</p>
-            ))}
-          </div>
-        )}
-
-        {/* Disclaimer */}
-        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p className="text-sm text-amber-800 dark:text-amber-200">
-            ⚠️ Les données ont été proposées par une IA. Vérifiez avant validation.
-          </p>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-3">
+        {/* Fixed action buttons at the bottom */}
+        <div className="flex gap-3 p-6 pt-4 border-t bg-background flex-shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
