@@ -26,6 +26,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -44,6 +45,7 @@ const AUTO_REFRESH_INTERVAL = 60000;
 
 export default function CRMDashboard() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { role, isAdmin, isManager, isAgent, isPartner, isClient } = useUserRole();
   const { can, dashboardScope, commissionScope, isLoading: permissionsLoading } = usePermissions();
@@ -816,7 +818,7 @@ export default function CRMDashboard() {
           {pendingScanCount > 0 && (
             <Card 
               className="border shadow-sm bg-gradient-to-br from-cyan-500/10 to-blue-600/5 cursor-pointer hover:shadow-md transition-all group"
-              onClick={() => window.location.href = '/crm/propositions'}
+              onClick={() => navigate('/crm/propositions')}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">

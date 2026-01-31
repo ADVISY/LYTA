@@ -1566,6 +1566,7 @@ export default function ScanValidationDialog({
         <div className="flex gap-3 p-6 pt-4 border-t bg-background flex-shrink-0">
           <Button
             variant="outline"
+            type="button"
             onClick={() => onOpenChange(false)}
             className="flex-1"
             disabled={isSubmitting}
@@ -1573,6 +1574,7 @@ export default function ScanValidationDialog({
             Annuler
           </Button>
           <Button
+            type="button"
             onClick={safeHandleValidate}
             disabled={isSubmitting || tenantLoading || !tenantIdFromHook || !user}
             className="flex-1 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90"
