@@ -4594,6 +4594,7 @@ export type Database = {
         Args: { p_amount?: number; p_tenant_id: string; p_type: string }
         Returns: boolean
       }
+      is_active_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       is_king: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_affiliate_eligible: {
