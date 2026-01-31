@@ -36,13 +36,50 @@ interface DocumentDetected {
   description: string;
 }
 
+// Represents a single insurance product detected in a proposal/policy
+interface ProductDetected {
+  product_name: string;           // e.g. "LAMal FAVORIT MEDPHARM", "COMPLETA TOP"
+  product_category: string;       // "LAMal" | "LCA" | "VIE" | "NON-VIE" | "LAA" | "LPP"
+  company: string;                // Insurance company name
+  premium_monthly?: number;
+  premium_yearly?: number;
+  franchise?: number;
+  start_date?: string;
+  end_date?: string;
+  policy_number?: string;
+  notes?: string;
+}
+
+// Represents a family member detected in documents
+interface FamilyMemberDetected {
+  last_name: string;
+  first_name: string;
+  birthdate?: string;
+  relationship?: string;         // "conjoint" | "enfant" | "parent" | "autre"
+  gender?: string;
+  has_own_policy?: boolean;      // Does this person have their own policy in the documents?
+}
+
 interface ParsedResult {
   dossier_summary?: string;
   documents_detected?: DocumentDetected[];
+  // Multi-product support
+  products_detected?: ProductDetected[];
+  old_products_detected?: ProductDetected[];      // Products from old/terminated policies
+  new_products_detected?: ProductDetected[];      // Products from new proposals
+  // Family members support
+  family_members_detected?: FamilyMemberDetected[];
+  primary_holder?: {
+    last_name: string;
+    first_name: string;
+    birthdate?: string;
+  };
   has_old_policy?: boolean;
   has_new_policy?: boolean;
   has_termination?: boolean;
   has_identity_doc?: boolean;
+  has_multiple_products?: boolean;
+  has_family_members?: boolean;
   engagement_analysis?: {
     old_policy_end_date?: string;
     new_policy_start_date?: string;
@@ -98,111 +135,168 @@ Pour chaque document, identifie son type parmi:
 - bulletin_salaire: Bulletin de salaire
 - autre: Autre document
 
-## 2. VÉRIFIER LES DATES D'ENGAGEMENT
-Pour chaque police détectée, vérifie:
-- Date de début de contrat
-- Date de fin/renouvellement
-- Durée d'engagement (notamment pour 3e pilier: durée en années)
-- Délai de résiliation (généralement 3 mois avant fin)
-- Date limite de résiliation
-- Si une résiliation est présente: est-elle dans les délais?
+## 2. DÉTECTER TOUS LES PRODUITS D'ASSURANCE (CRITIQUE!)
+⚠️ TRÈS IMPORTANT: Une proposition ou police peut contenir PLUSIEURS produits!
+Exemple: Une proposition Swica peut inclure:
+- LAMal FAVORIT MEDPHARM (assurance de base obligatoire)
+- LCA COMPLETA TOP (complémentaire ambulatoire)
+- HOSPITA FLEX (hospitalisation)
+- INFORTUNA (accidents)
 
-## 3. DÉTECTER LES INCOHÉRENCES
+Tu dois extraire CHAQUE produit séparément dans "products_detected" ou "new_products_detected".
+Chaque ligne de produit avec une prime = un produit séparé!
+
+## 3. DÉTECTER LES MEMBRES DE LA FAMILLE
+Si le dossier contient plusieurs personnes (conjoint, enfants):
+- Identifier le titulaire principal (primary_holder)
+- Lister chaque membre de famille dans "family_members_detected"
+- Indiquer si chaque membre a sa propre police ou est sur la police familiale
+
+## 4. VÉRIFIER LES DATES D'ENGAGEMENT
+Pour chaque police détectée:
+- Date de début et fin
+- Durée d'engagement (3e pilier: durée en années)
+- Délai de résiliation (3 mois avant fin)
+- Si résiliation présente: est-elle dans les délais?
+
+## 5. DÉTECTER LES INCOHÉRENCES
 - Comparer anciennes et nouvelles polices
-- Vérifier les chevauchements de dates
-- Signaler les doublons potentiels
+- Vérifier chevauchements de dates
+- Signaler doublons potentiels
 - Alerter si résiliation hors délai
 
-## 4. EXTRAIRE TOUTES LES INFORMATIONS CLIENT
-Depuis TOUS les documents (polices ET pièces d'identité):
+## 6. EXTRAIRE TOUTES LES INFORMATIONS CLIENT
+Depuis TOUS les documents:
 - Identité complète (nom, prénom, date naissance, nationalité)
 - Coordonnées (adresse, téléphone, email)
-- N° AVS si présent
-- État civil
-- Profession/Employeur si visible
+- N° AVS, état civil, profession
 
-## 5. EXTRAIRE LES INFORMATIONS CONTRAT
-Pour CHAQUE police détectée:
-- Compagnie d'assurance
-- Numéro de police
-- Type de produit (LAMal/LCA/VIE/NON-VIE/LAA/LPP)
-- Catégorie détaillée
-- Primes (mensuelle et annuelle)
-- Franchise
-- Garanties/couvertures
-- Statut (active, résiliée, en attente)
-
-## 6. CRÉER UN WORKFLOW BACK-OFFICE
-Suggérer les actions à effectuer:
-- Si résiliation: créer suivi de résiliation avec deadline
-- Si nouvelle police: créer suivi d'activation
-- Si ancienne + nouvelle: créer suivi de remplacement
-- Si documents manquants: lister ce qu'il faut demander
-
-Types de produits d'assurance suisses:
+Types de produits suisses:
 - LAMal: Assurance maladie obligatoire (résiliation au 30.11 pour 01.01)
 - LCA: Assurance complémentaire (délais variables)
-- VIE: Assurance vie/prévoyance/3e pilier (durée en années, engagement long)
-- NON-VIE: RC, ménage, auto, etc. (généralement annuel)
+- VIE: Assurance vie/prévoyance/3e pilier
+- NON-VIE: RC, ménage, auto, etc.
 - LAA: Assurance accidents
 - LPP: Prévoyance professionnelle
 
 IMPORTANT: Date du jour = ${today}
 
-Réponds UNIQUEMENT en JSON valide avec cette structure:
+Réponds UNIQUEMENT en JSON valide:
 {
-  "dossier_summary": "Résumé du dossier en 1-2 phrases",
+  "dossier_summary": "Résumé en 1-2 phrases",
   "documents_detected": [
     {
-      "file_name": "police.pdf",
-      "doc_type": "police_active|ancienne_police|nouvelle_police|resiliation|piece_identite|...",
+      "file_name": "proposition.pdf",
+      "doc_type": "nouvelle_police",
       "doc_type_confidence": 0.95,
-      "description": "Police LAMal CSS active depuis 2023"
+      "description": "Proposition Swica avec 4 produits"
+    }
+  ],
+  "primary_holder": {
+    "last_name": "Dupont",
+    "first_name": "Marie",
+    "birthdate": "1985-03-15"
+  },
+  "family_members_detected": [
+    {
+      "last_name": "Dupont",
+      "first_name": "Pierre",
+      "birthdate": "1982-07-20",
+      "relationship": "conjoint",
+      "gender": "M",
+      "has_own_policy": true
+    },
+    {
+      "last_name": "Dupont",
+      "first_name": "Lucas",
+      "birthdate": "2010-11-05",
+      "relationship": "enfant",
+      "gender": "M",
+      "has_own_policy": false
+    }
+  ],
+  "has_family_members": true,
+  "has_multiple_products": true,
+  "old_products_detected": [
+    {
+      "product_name": "LAMal BASIS",
+      "product_category": "LAMal",
+      "company": "Helsana",
+      "premium_monthly": 487.05,
+      "franchise": 2500,
+      "policy_number": "H123456"
+    }
+  ],
+  "new_products_detected": [
+    {
+      "product_name": "LAMal FAVORIT MEDPHARM",
+      "product_category": "LAMal",
+      "company": "Swica",
+      "premium_monthly": 429.50,
+      "franchise": 2500,
+      "start_date": "2024-01-01"
+    },
+    {
+      "product_name": "COMPLETA TOP",
+      "product_category": "LCA",
+      "company": "Swica",
+      "premium_monthly": 85.20,
+      "start_date": "2024-01-01"
+    },
+    {
+      "product_name": "HOSPITA FLEX",
+      "product_category": "LCA",
+      "company": "Swica",
+      "premium_monthly": 120.00,
+      "start_date": "2024-01-01"
+    },
+    {
+      "product_name": "INFORTUNA",
+      "product_category": "LAA",
+      "company": "Swica",
+      "premium_monthly": 15.50,
+      "start_date": "2024-01-01"
     }
   ],
   "has_old_policy": true,
   "has_new_policy": true,
-  "has_termination": false,
+  "has_termination": true,
   "has_identity_doc": true,
   "engagement_analysis": {
-    "old_policy_end_date": "2024-12-31",
-    "new_policy_start_date": "2025-01-01",
-    "termination_deadline": "2024-09-30",
+    "old_policy_end_date": "2023-12-31",
+    "new_policy_start_date": "2024-01-01",
+    "termination_deadline": "2023-09-30",
     "is_termination_on_time": true,
-    "days_until_deadline": 45,
-    "warnings": ["Résiliation doit être envoyée avant le 30.09.2024"]
+    "days_until_deadline": 0,
+    "warnings": []
   },
-  "inconsistencies": ["Adresse différente sur pièce identité et police"],
-  "missing_documents": ["Copie du permis de travail mentionné"],
+  "inconsistencies": [],
+  "missing_documents": [],
   "workflow_actions": [
     {
       "action_type": "create_termination_suivi",
       "priority": "high",
-      "description": "Créer suivi de résiliation pour ancienne police CSS",
-      "deadline": "2024-09-30",
-      "details": {
-        "company": "CSS",
-        "policy_number": "12345",
-        "reason": "Changement de compagnie vers Groupe Mutuel"
-      }
+      "description": "Envoyer résiliation Helsana",
+      "deadline": "2023-09-30",
+      "details": {"company": "Helsana", "policy_number": "H123456"}
     },
     {
       "action_type": "create_activation_suivi",
       "priority": "normal",
-      "description": "Activer nouvelle police Groupe Mutuel dès réception confirmation",
-      "deadline": "2025-01-01"
+      "description": "Activer 4 produits Swica",
+      "deadline": "2024-01-01",
+      "details": {"company": "Swica", "products_count": 4}
     }
   ],
   "quality_score": 0.9,
   "fields": [
     {
-      "category": "client|contract|premium|guarantees|identity|old_contract|new_contract",
+      "category": "client",
       "name": "nom",
       "value": "Dupont",
       "confidence": "high",
       "confidence_score": 0.95,
-      "source_document": "piece_identite.pdf",
-      "notes": "Confirmé sur pièce identité"
+      "source_document": "piece_identite.pdf"
     }
   ]
 }`;

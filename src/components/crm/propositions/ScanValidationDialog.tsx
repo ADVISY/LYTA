@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
-import { PendingScan, ScanField, WorkflowAction } from "@/hooks/usePendingScans";
+import { PendingScan, ScanField, WorkflowAction, ProductDetected, FamilyMemberDetected } from "@/hooks/usePendingScans";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -41,6 +41,8 @@ import {
   IdCard,
   FileWarning,
   AlertOctagon,
+  Users,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -149,6 +151,7 @@ export default function ScanValidationDialog({
   const [createNewContract, setCreateNewContract] = useState(true);
   const [createSuivis, setCreateSuivis] = useState(true);
   const [linkDocuments, setLinkDocuments] = useState(true);
+  const [createFamilyMembers, setCreateFamilyMembers] = useState(true);
 
   // Initialize edited values when scan changes
   useEffect(() => {
@@ -213,11 +216,15 @@ export default function ScanValidationDialog({
     return acc;
   }, {} as Record<string, ScanField[]>);
 
-  // Check what data we have
-  const hasOldContractData = scan.has_old_policy || scan.fields.some(f => f.field_category === 'old_contract');
-  const hasNewContractData = scan.has_new_policy || scan.fields.some(f => f.field_category === 'new_contract');
+  // Check what data we have - including new multi-product arrays
+  const hasOldContractData = scan.has_old_policy || scan.fields.some(f => f.field_category === 'old_contract') || (scan.old_products_detected && scan.old_products_detected.length > 0);
+  const hasNewContractData = scan.has_new_policy || scan.fields.some(f => f.field_category === 'new_contract') || (scan.new_products_detected && scan.new_products_detected.length > 0);
   const hasContractData = scan.fields.some(f => f.field_category === 'contract' || f.field_category === 'premium');
   const hasTermination = scan.has_termination || scan.fields.some(f => f.field_category === 'termination');
+  const hasMultipleProducts = scan.has_multiple_products || (scan.new_products_detected && scan.new_products_detected.length > 1);
+  const hasFamilyMembers = scan.has_family_members || (scan.family_members_detected && scan.family_members_detected.length > 0);
+  const oldProductsCount = scan.old_products_detected?.length || 0;
+  const newProductsCount = scan.new_products_detected?.length || 0;
 
   const parseAmount = (value: string | null | undefined): number | null => {
     if (!value) return null;
@@ -285,11 +292,12 @@ export default function ScanValidationDialog({
 
       if (clientError) throw clientError;
 
-      const createdPolicies: { id: string; type: 'old' | 'new' | 'standard' }[] = [];
+      const createdPolicies: { id: string; type: 'old' | 'new' | 'standard'; productName?: string }[] = [];
       const createdSuivis: string[] = [];
+      const createdFamilyMembers: { id: string; name: string }[] = [];
 
-      // Helper to find product ID
-      const findProductId = async (companyName: string | null): Promise<string | null> => {
+      // Helper to find product ID by company name
+      const findProductId = async (companyName: string | null, productCategory?: string): Promise<string | null> => {
         if (!companyName) return null;
         
         const { data: companies } = await supabase
@@ -299,15 +307,31 @@ export default function ScanValidationDialog({
           .limit(1);
 
         if (companies && companies.length > 0) {
-          const { data: products } = await supabase
+          // Try to find a product matching the category
+          let query = supabase
             .from('insurance_products')
             .select('id')
-            .eq('company_id', companies[0].id)
-            .limit(1);
+            .eq('company_id', companies[0].id);
+          
+          if (productCategory) {
+            query = query.ilike('category', `%${productCategory}%`);
+          }
+          
+          const { data: products } = await query.limit(1);
 
           if (products && products.length > 0) {
             return products[0].id;
           }
+          
+          // Fallback to any product from the company
+          const { data: anyCompanyProduct } = await supabase
+            .from('insurance_products')
+            .select('id')
+            .eq('company_id', companies[0].id)
+            .limit(1)
+            .single();
+          
+          return anyCompanyProduct?.id || null;
         }
 
         // Fallback to any product
@@ -320,8 +344,42 @@ export default function ScanValidationDialog({
         return anyProduct?.id || null;
       };
 
-      // 2. Create OLD contract/policy if requested and data available
-      if (createOldContract && hasOldContractData) {
+      // 2. CREATE OLD POLICIES from old_products_detected (multi-product support)
+      if (createOldContract && scan.old_products_detected && scan.old_products_detected.length > 0) {
+        for (const oldProduct of scan.old_products_detected) {
+          const productId = await findProductId(oldProduct.company, oldProduct.product_category);
+          
+          if (productId) {
+            const policyData = {
+              tenant_id: tenantId,
+              client_id: newClient.id,
+              product_id: productId,
+              policy_number: oldProduct.policy_number || null,
+              status: hasTermination ? 'resilie' : 'active',
+              start_date: parseDate(oldProduct.start_date) || new Date().toISOString().split('T')[0],
+              end_date: parseDate(oldProduct.end_date),
+              premium_monthly: oldProduct.premium_monthly || null,
+              premium_yearly: oldProduct.premium_yearly || null,
+              deductible: oldProduct.franchise || null,
+              currency: 'CHF',
+              company_name: oldProduct.company || null,
+              product_type: oldProduct.product_category || null,
+              notes: `${oldProduct.product_name} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
+            };
+
+            const { data: oldPolicy, error: policyError } = await supabase
+              .from('policies')
+              .insert(policyData)
+              .select()
+              .single();
+
+            if (!policyError && oldPolicy) {
+              createdPolicies.push({ id: oldPolicy.id, type: 'old', productName: oldProduct.product_name });
+            }
+          }
+        }
+      } else if (createOldContract && hasOldContractData) {
+        // Fallback to old single-product logic if no old_products_detected array
         const companyName = getValue('ancienne_compagnie') || getValue('compagnie');
         const productId = await findProductId(companyName);
 
@@ -355,8 +413,42 @@ export default function ScanValidationDialog({
         }
       }
 
-      // 3. Create NEW contract/policy if requested and data available
-      if (createNewContract && hasNewContractData) {
+      // 3. CREATE NEW POLICIES from new_products_detected (multi-product support)
+      if (createNewContract && scan.new_products_detected && scan.new_products_detected.length > 0) {
+        for (const newProduct of scan.new_products_detected) {
+          const productId = await findProductId(newProduct.company, newProduct.product_category);
+          
+          if (productId) {
+            const policyData = {
+              tenant_id: tenantId,
+              client_id: newClient.id,
+              product_id: productId,
+              policy_number: newProduct.policy_number || null,
+              status: 'active',
+              start_date: parseDate(newProduct.start_date) || new Date().toISOString().split('T')[0],
+              end_date: parseDate(newProduct.end_date),
+              premium_monthly: newProduct.premium_monthly || null,
+              premium_yearly: newProduct.premium_yearly || null,
+              deductible: newProduct.franchise || null,
+              currency: 'CHF',
+              company_name: newProduct.company || null,
+              product_type: newProduct.product_category || null,
+              notes: `${newProduct.product_name} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
+            };
+
+            const { data: createdPolicy, error: policyError } = await supabase
+              .from('policies')
+              .insert(policyData)
+              .select()
+              .single();
+
+            if (!policyError && createdPolicy) {
+              createdPolicies.push({ id: createdPolicy.id, type: 'new', productName: newProduct.product_name });
+            }
+          }
+        }
+      } else if (createNewContract && hasNewContractData) {
+        // Fallback to old single-product logic if no new_products_detected array
         const companyName = getValue('nouvelle_compagnie');
         const productId = await findProductId(companyName);
 
@@ -421,6 +513,68 @@ export default function ScanValidationDialog({
 
           if (!policyError && newPolicy) {
             createdPolicies.push({ id: newPolicy.id, type: 'standard' });
+          }
+        }
+      }
+
+      // 5. CREATE FAMILY MEMBERS as linked clients
+      if (createFamilyMembers && scan.family_members_detected && scan.family_members_detected.length > 0) {
+        for (const member of scan.family_members_detected) {
+          // Create family member as a new client
+          const familyClientData = {
+            tenant_id: tenantId,
+            last_name: member.last_name || getValue('nom'),
+            first_name: member.first_name,
+            birthdate: parseDate(member.birthdate),
+            gender: member.gender || null,
+            // Copy address from primary client
+            address: getValue('adresse') || null,
+            postal_code: getValue('npa') || null,
+            city: getValue('localite') || null,
+            canton: getValue('canton') || null,
+            nationality: getValue('nationalite') || null,
+            status: 'prospect',
+          };
+
+          const { data: familyClient, error: familyError } = await supabase
+            .from('clients')
+            .insert(familyClientData)
+            .select()
+            .single();
+
+          if (!familyError && familyClient) {
+            createdFamilyMembers.push({ 
+              id: familyClient.id, 
+              name: `${member.first_name} ${member.last_name || getValue('nom')}`
+            });
+
+            // Create family member record linking to the primary client
+            const relationship = member.relationship || 'autre';
+            
+            // Parent client -> Family member record
+            await supabase.from('family_members').insert({
+              client_id: newClient.id,
+              first_name: member.first_name,
+              last_name: member.last_name || getValue('nom'),
+              birth_date: parseDate(member.birthdate),
+              relation_type: relationship,
+              nationality: getValue('nationalite') || null,
+            });
+
+            // Also add reverse record on the family member client
+            const inverseRelationship = relationship === 'conjoint' ? 'conjoint' 
+              : relationship === 'enfant' ? 'parent'
+              : relationship === 'parent' ? 'enfant'
+              : 'autre';
+              
+            await supabase.from('family_members').insert({
+              client_id: familyClient.id,
+              first_name: getValue('prenom') || '',
+              last_name: getValue('nom') || '',
+              birth_date: parseDate(getValue('date_naissance')),
+              relation_type: inverseRelationship,
+              nationality: getValue('nationalite') || null,
+            });
           }
         }
       }
@@ -552,12 +706,14 @@ export default function ScanValidationDialog({
           validated_values: editedValues,
           client_id: newClient.id,
           policies: createdPolicies,
+          family_members: createdFamilyMembers,
           suivis: createdSuivis,
           options: {
             createOldContract,
             createNewContract,
             createSuivis,
             linkDocuments,
+            createFamilyMembers,
           },
         },
       });
@@ -565,6 +721,7 @@ export default function ScanValidationDialog({
       // Build success message
       const createdItems = ['Client'];
       if (createdPolicies.length > 0) createdItems.push(`${createdPolicies.length} Contrat(s)`);
+      if (createdFamilyMembers.length > 0) createdItems.push(`${createdFamilyMembers.length} Membre(s) famille`);
       if (linkDocuments) createdItems.push('Document');
       if (createdSuivis.length > 0) createdItems.push(`${createdSuivis.length} Suivi(s)`);
 
@@ -707,7 +864,12 @@ export default function ScanValidationDialog({
                       className="data-[state=checked]:bg-orange-500"
                     />
                     <FileWarning className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm">Ancienne police</span>
+                    <span className="text-sm">
+                      Ancienne(s) police(s)
+                      {oldProductsCount > 0 && (
+                        <span className="ml-1 text-xs text-muted-foreground">({oldProductsCount})</span>
+                      )}
+                    </span>
                   </label>
                 )}
                 
@@ -719,7 +881,29 @@ export default function ScanValidationDialog({
                       className="data-[state=checked]:bg-emerald-500"
                     />
                     <FileCheck className="h-4 w-4 text-emerald-500" />
-                    <span className="text-sm">{hasNewContractData ? 'Nouvelle police' : 'Contrat'}</span>
+                    <span className="text-sm">
+                      {hasNewContractData ? 'Nouvelle(s) police(s)' : 'Contrat'}
+                      {newProductsCount > 0 && (
+                        <span className="ml-1 text-xs text-muted-foreground">({newProductsCount})</span>
+                      )}
+                    </span>
+                  </label>
+                )}
+
+                {hasFamilyMembers && (
+                  <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                    <Checkbox 
+                      checked={createFamilyMembers} 
+                      onCheckedChange={(checked) => setCreateFamilyMembers(checked as boolean)}
+                      className="data-[state=checked]:bg-violet-500"
+                    />
+                    <Users className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm">
+                      Membres famille
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({scan.family_members_detected?.length || 0})
+                      </span>
+                    </span>
                   </label>
                 )}
                 
@@ -751,6 +935,65 @@ export default function ScanValidationDialog({
                 </label>
               </div>
             </div>
+
+            {/* Multi-products preview */}
+            {(hasMultipleProducts || newProductsCount > 0 || oldProductsCount > 0) && (
+              <div className="p-3 bg-muted/30 rounded-lg border">
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Produits détectés ({newProductsCount + oldProductsCount})
+                </p>
+                <div className="space-y-2">
+                  {scan.old_products_detected?.map((product, i) => (
+                    <div key={`old-${i}`} className="flex items-center gap-2 text-sm p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
+                      <Badge variant="outline" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 text-xs">
+                        Ancienne
+                      </Badge>
+                      <span className="font-medium">{product.product_name}</span>
+                      <span className="text-muted-foreground">({product.company})</span>
+                      {product.premium_monthly && (
+                        <span className="ml-auto text-xs">CHF {product.premium_monthly}/mois</span>
+                      )}
+                    </div>
+                  ))}
+                  {scan.new_products_detected?.map((product, i) => (
+                    <div key={`new-${i}`} className="flex items-center gap-2 text-sm p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded">
+                      <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs">
+                        Nouvelle
+                      </Badge>
+                      <span className="font-medium">{product.product_name}</span>
+                      <span className="text-muted-foreground">({product.company})</span>
+                      {product.premium_monthly && (
+                        <span className="ml-auto text-xs">CHF {product.premium_monthly}/mois</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Family members preview */}
+            {hasFamilyMembers && createFamilyMembers && (
+              <div className="p-3 bg-muted/30 rounded-lg border">
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Membres de famille à créer ({scan.family_members_detected?.length || 0})
+                </p>
+                <div className="space-y-2">
+                  {scan.family_members_detected?.map((member, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm p-2 bg-violet-50 dark:bg-violet-900/20 rounded">
+                      <Badge variant="outline" className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs capitalize">
+                        {member.relationship || 'Famille'}
+                      </Badge>
+                      <span className="font-medium">{member.first_name} {member.last_name}</span>
+                      {member.birthdate && (
+                        <span className="text-muted-foreground text-xs">({member.birthdate})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Workflow actions preview */}
             {scan.workflow_actions && scan.workflow_actions.length > 0 && createSuivis && (
