@@ -1,4 +1,4 @@
-import { Bell, FileText, Check } from 'lucide-react';
+import { Bell, FileText, Check, Sparkles, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
@@ -31,13 +31,29 @@ export const NotificationBell = () => {
   const handleNotificationClick = (notification: any) => {
     markAsRead(notification.id);
     
+    // Check for action_url first (used by IA Scan notifications)
+    if (notification.payload?.action_url) {
+      navigate(notification.payload.action_url);
+      return;
+    }
+    
+    // Fallback to client navigation for new_contract
     if (notification.kind === 'new_contract' && notification.payload?.client_id) {
       navigate(`/crm/clients/${notification.payload.client_id}`);
     }
   };
 
-  const getNotificationIcon = (kind: string) => {
-    switch (kind) {
+  const getNotificationIcon = (notification: any) => {
+    // IA Scan notifications have scan_id in payload
+    if (notification.payload?.scan_id) {
+      const hasTermination = notification.payload?.has_termination;
+      if (hasTermination) {
+        return <AlertTriangle className="h-4 w-4 text-destructive" />;
+      }
+      return <Sparkles className="h-4 w-4 text-primary" />;
+    }
+    
+    switch (notification.kind) {
       case 'new_contract':
         return <FileText className="h-4 w-4 text-primary" />;
       default:
@@ -51,7 +67,7 @@ export const NotificationBell = () => {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -89,7 +105,7 @@ export const NotificationBell = () => {
                 >
                   <div className="flex gap-3">
                     <div className="mt-0.5">
-                      {getNotificationIcon(notification.kind)}
+                      {getNotificationIcon(notification)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${!notification.read_at ? 'font-semibold' : ''}`}>
