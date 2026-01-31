@@ -6,24 +6,233 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Document types we can detect
-const DOC_TYPES = ['police', 'offre', 'avenant', 'resiliation', 'attestation', 'autre'] as const;
+// Document types we can detect with back-office logic
+const DOC_TYPES = [
+  'police_active',           // Current active policy
+  'ancienne_police',         // Old/previous policy (to replace)
+  'nouvelle_police',         // New policy proposal
+  'offre',                   // Offer/quote
+  'avenant',                 // Policy amendment
+  'resiliation',             // Cancellation letter
+  'attestation',             // Certificate/attestation
+  'piece_identite',          // ID document (passport, ID card, permit)
+  'justificatif_domicile',   // Proof of address
+  'bulletin_salaire',        // Salary slip
+  'autre'                    // Other document
+] as const;
 
-// Fields to extract based on form type
-const EXTRACTION_FIELDS = {
-  client: ['nom', 'prenom', 'date_naissance', 'email', 'telephone', 'adresse', 'npa', 'localite', 'canton', 'nationalite'],
-  contract: ['compagnie', 'numero_police', 'type_produit', 'categorie', 'date_debut', 'date_fin', 'duree_contrat'],
-  premium: ['prime_mensuelle', 'prime_annuelle', 'franchise'],
-  guarantees: ['garanties_principales'],
-};
+interface WorkflowAction {
+  action_type: string;
+  priority: 'high' | 'normal' | 'low';
+  description: string;
+  deadline?: string;
+  details?: Record<string, any>;
+}
 
-interface ExtractionResult {
-  field_category: string;
-  field_name: string;
-  extracted_value: string | null;
-  confidence: 'high' | 'medium' | 'low';
-  confidence_score: number;
-  extraction_notes?: string;
+interface DocumentDetected {
+  file_name: string;
+  doc_type: string;
+  doc_type_confidence: number;
+  description: string;
+}
+
+interface ParsedResult {
+  dossier_summary?: string;
+  documents_detected?: DocumentDetected[];
+  has_old_policy?: boolean;
+  has_new_policy?: boolean;
+  has_termination?: boolean;
+  has_identity_doc?: boolean;
+  engagement_analysis?: {
+    old_policy_end_date?: string;
+    new_policy_start_date?: string;
+    termination_deadline?: string;
+    is_termination_on_time?: boolean;
+    days_until_deadline?: number;
+    warnings?: string[];
+  };
+  inconsistencies?: string[];
+  missing_documents?: string[];
+  workflow_actions?: WorkflowAction[];
+  quality_score: number;
+  fields: Array<{
+    category: string;
+    name: string;
+    value: string;
+    confidence: 'high' | 'medium' | 'low';
+    confidence_score: number;
+    source_document?: string;
+    notes?: string;
+  }>;
+}
+
+function buildSystemPrompt(fileCount: number): string {
+  const today = new Date().toLocaleDateString('fr-CH');
+  
+  return `Tu es un RESPONSABLE BACK-OFFICE SENIOR d'une compagnie d'assurance suisse. Tu analyses des dossiers clients complets pour vérifier la conformité et extraire toutes les données.
+
+Tu reçois un dossier de ${fileCount} document(s). Tu dois:
+
+## 1. CLASSIFIER CHAQUE DOCUMENT
+Pour chaque document, identifie son type parmi:
+- police_active: Police d'assurance en cours (à garder)
+- ancienne_police: Ancienne police (à résilier/remplacer)
+- nouvelle_police: Nouvelle police ou proposition (à activer)
+- offre: Offre/devis
+- avenant: Avenant de modification
+- resiliation: Lettre de résiliation (du client ou de l'assureur)
+- attestation: Attestation d'affiliation/couverture
+- piece_identite: Pièce d'identité (passeport, carte ID, permis de séjour)
+- justificatif_domicile: Justificatif de domicile
+- bulletin_salaire: Bulletin de salaire
+- autre: Autre document
+
+## 2. VÉRIFIER LES DATES D'ENGAGEMENT
+Pour chaque police détectée, vérifie:
+- Date de début de contrat
+- Date de fin/renouvellement
+- Durée d'engagement (notamment pour 3e pilier: durée en années)
+- Délai de résiliation (généralement 3 mois avant fin)
+- Date limite de résiliation
+- Si une résiliation est présente: est-elle dans les délais?
+
+## 3. DÉTECTER LES INCOHÉRENCES
+- Comparer anciennes et nouvelles polices
+- Vérifier les chevauchements de dates
+- Signaler les doublons potentiels
+- Alerter si résiliation hors délai
+
+## 4. EXTRAIRE TOUTES LES INFORMATIONS CLIENT
+Depuis TOUS les documents (polices ET pièces d'identité):
+- Identité complète (nom, prénom, date naissance, nationalité)
+- Coordonnées (adresse, téléphone, email)
+- N° AVS si présent
+- État civil
+- Profession/Employeur si visible
+
+## 5. EXTRAIRE LES INFORMATIONS CONTRAT
+Pour CHAQUE police détectée:
+- Compagnie d'assurance
+- Numéro de police
+- Type de produit (LAMal/LCA/VIE/NON-VIE/LAA/LPP)
+- Catégorie détaillée
+- Primes (mensuelle et annuelle)
+- Franchise
+- Garanties/couvertures
+- Statut (active, résiliée, en attente)
+
+## 6. CRÉER UN WORKFLOW BACK-OFFICE
+Suggérer les actions à effectuer:
+- Si résiliation: créer suivi de résiliation avec deadline
+- Si nouvelle police: créer suivi d'activation
+- Si ancienne + nouvelle: créer suivi de remplacement
+- Si documents manquants: lister ce qu'il faut demander
+
+Types de produits d'assurance suisses:
+- LAMal: Assurance maladie obligatoire (résiliation au 30.11 pour 01.01)
+- LCA: Assurance complémentaire (délais variables)
+- VIE: Assurance vie/prévoyance/3e pilier (durée en années, engagement long)
+- NON-VIE: RC, ménage, auto, etc. (généralement annuel)
+- LAA: Assurance accidents
+- LPP: Prévoyance professionnelle
+
+IMPORTANT: Date du jour = ${today}
+
+Réponds UNIQUEMENT en JSON valide avec cette structure:
+{
+  "dossier_summary": "Résumé du dossier en 1-2 phrases",
+  "documents_detected": [
+    {
+      "file_name": "police.pdf",
+      "doc_type": "police_active|ancienne_police|nouvelle_police|resiliation|piece_identite|...",
+      "doc_type_confidence": 0.95,
+      "description": "Police LAMal CSS active depuis 2023"
+    }
+  ],
+  "has_old_policy": true,
+  "has_new_policy": true,
+  "has_termination": false,
+  "has_identity_doc": true,
+  "engagement_analysis": {
+    "old_policy_end_date": "2024-12-31",
+    "new_policy_start_date": "2025-01-01",
+    "termination_deadline": "2024-09-30",
+    "is_termination_on_time": true,
+    "days_until_deadline": 45,
+    "warnings": ["Résiliation doit être envoyée avant le 30.09.2024"]
+  },
+  "inconsistencies": ["Adresse différente sur pièce identité et police"],
+  "missing_documents": ["Copie du permis de travail mentionné"],
+  "workflow_actions": [
+    {
+      "action_type": "create_termination_suivi",
+      "priority": "high",
+      "description": "Créer suivi de résiliation pour ancienne police CSS",
+      "deadline": "2024-09-30",
+      "details": {
+        "company": "CSS",
+        "policy_number": "12345",
+        "reason": "Changement de compagnie vers Groupe Mutuel"
+      }
+    },
+    {
+      "action_type": "create_activation_suivi",
+      "priority": "normal",
+      "description": "Activer nouvelle police Groupe Mutuel dès réception confirmation",
+      "deadline": "2025-01-01"
+    }
+  ],
+  "quality_score": 0.9,
+  "fields": [
+    {
+      "category": "client|contract|premium|guarantees|identity|old_contract|new_contract",
+      "name": "nom",
+      "value": "Dupont",
+      "confidence": "high",
+      "confidence_score": 0.95,
+      "source_document": "piece_identite.pdf",
+      "notes": "Confirmé sur pièce identité"
+    }
+  ]
+}`;
+}
+
+function buildUserPrompt(documentsDescription: string, formType?: string): string {
+  return `Analyse ce dossier d'assurance complet${formType ? ` (formulaire ${formType.toUpperCase()})` : ''} et extrait TOUTES les informations.
+
+DOCUMENTS DU DOSSIER:
+${documentsDescription}
+
+Champs à extraire et consolider depuis TOUS les documents:
+
+INFORMATIONS CLIENT (priorité aux pièces d'identité):
+- nom, prenom, date_naissance, nationalite, etat_civil
+- adresse, npa, localite, canton, pays
+- telephone, email
+- numero_avs, profession, employeur
+
+ANCIENNE POLICE (si présente):
+- ancienne_compagnie, ancien_numero_police, ancien_type_produit
+- ancienne_date_debut, ancienne_date_fin
+- ancienne_prime_mensuelle, ancienne_prime_annuelle
+- ancienne_franchise
+
+NOUVELLE POLICE (si présente):
+- nouvelle_compagnie, nouveau_numero_police, nouveau_type_produit
+- nouvelle_date_debut, nouvelle_date_fin, duree_engagement
+- nouvelle_prime_mensuelle, nouvelle_prime_annuelle
+- nouvelle_franchise
+
+RÉSILIATION (si présente):
+- date_resiliation, motif_resiliation, compagnie_resiliee
+
+IMPORTANT:
+- Consolide les informations de TOUS les documents
+- Signale les incohérences entre documents
+- Vérifie les dates d'engagement et délais de résiliation
+- Suggère les actions back-office nécessaires
+
+Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 }
 
 serve(async (req) => {
@@ -91,72 +300,12 @@ serve(async (req) => {
       throw new Error("No files could be processed");
     }
 
-    // Build the prompt for document analysis
-    const systemPrompt = `Tu es un expert en analyse de documents d'assurance suisses. Tu reçois un dossier complet de ${fileContents.length} document(s). Tu dois:
-
-1. Analyser TOUS les documents ensemble comme un dossier unique
-2. Classifier le type principal de dossier parmi: ${DOC_TYPES.join(', ')}
-3. Extraire et CONSOLIDER toutes les informations de TOUS les documents
-4. Pour chaque champ, indiquer la source (quel document) si pertinent
-5. Retourner les données dans un format JSON structuré
-
-RÈGLES IMPORTANTES:
-- Si une information apparaît dans plusieurs documents, prendre la plus récente ou la plus complète
-- Croiser les informations pour valider (ex: nom du client doit être cohérent)
-- Signaler les incohérences détectées entre documents
-
-Pour chaque champ extrait, indique:
-- La valeur trouvée (consolidée si plusieurs sources)
-- Le niveau de confiance (high si clairement lisible et cohérent, medium si partiellement visible, low si incertain ou incohérent)
-- Le document source principal
-- Une note explicative si nécessaire
-
-Types de produits d'assurance suisses:
-- LAMal: Assurance maladie obligatoire
-- LCA: Assurance complémentaire
-- VIE: Assurance vie/prévoyance/3e pilier
-- NON-VIE: RC, ménage, auto, etc.
-- LAA: Assurance accidents
-- LPP: Prévoyance professionnelle
-
-Réponds UNIQUEMENT en JSON valide avec cette structure:
-{
-  "document_type": "police|offre|avenant|resiliation|attestation|autre",
-  "document_type_confidence": 0.95,
-  "quality_score": 0.9,
-  "documents_analyzed": ["police.pdf", "attestation.pdf"],
-  "inconsistencies": ["Adresse différente entre police et attestation"],
-  "fields": [
-    {
-      "category": "client|contract|premium|guarantees",
-      "name": "nom",
-      "value": "Dupont",
-      "confidence": "high",
-      "confidence_score": 0.95,
-      "source_document": "police.pdf",
-      "notes": "Nom confirmé sur 2 documents"
-    }
-  ]
-}`;
-
+    // Build prompts
+    const systemPrompt = buildSystemPrompt(fileContents.length);
     const documentsDescription = fileContents.map((f, i) => 
       `Document ${i + 1}: ${f.fileName}`
     ).join('\n');
-
-    const userPrompt = `Analyse ce dossier d'assurance complet${formType ? ` (formulaire ${formType.toUpperCase()})` : ''} et extrait TOUTES les informations en les consolidant.
-
-DOCUMENTS DU DOSSIER:
-${documentsDescription}
-
-Champs à extraire et consolider:
-- Client: nom, prénom, date de naissance, email, téléphone, adresse, NPA, localité, canton, nationalité
-- Contrat: compagnie d'assurance, numéro de police, type de produit (LAMal/LCA/VIE/NON-VIE/LAA/LPP), date début, date fin, durée
-- Primes: prime mensuelle, prime annuelle, franchise
-- Garanties: liste des garanties principales
-
-IMPORTANT: Consolide les informations de TOUS les documents. Signale les incohérences.
-
-Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
+    const userPrompt = buildUserPrompt(documentsDescription, formType);
 
     // Build messages with all document images
     const userContent: any[] = [
@@ -185,7 +334,7 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        max_tokens: 8000,
+        max_tokens: 12000,
         temperature: 0.1,
       }),
     });
@@ -211,22 +360,7 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
     }
 
     // Parse AI response
-    let parsedResult: {
-      document_type: string;
-      document_type_confidence: number;
-      quality_score: number;
-      documents_analyzed?: string[];
-      inconsistencies?: string[];
-      fields: Array<{
-        category: string;
-        name: string;
-        value: string;
-        confidence: 'high' | 'medium' | 'low';
-        confidence_score: number;
-        source_document?: string;
-        notes?: string;
-      }>;
-    };
+    let parsedResult: ParsedResult;
 
     try {
       // Extract JSON from response (handle markdown code blocks)
@@ -249,13 +383,16 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 
     const processingTime = Date.now() - startTime;
 
+    // Determine main document type from detected documents
+    const mainDocType = parsedResult.documents_detected?.[0]?.doc_type || 'autre';
+
     // Update scan record with results
     const { error: updateError } = await supabase
       .from("document_scans")
       .update({
         status: "completed",
-        detected_doc_type: parsedResult.document_type,
-        doc_type_confidence: parsedResult.document_type_confidence,
+        detected_doc_type: mainDocType,
+        doc_type_confidence: parsedResult.documents_detected?.[0]?.doc_type_confidence || 0,
         quality_score: parsedResult.quality_score,
         overall_confidence: overallConfidence,
         ocr_required: true,
@@ -293,7 +430,7 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
       }
     }
 
-    // Create audit log
+    // Create audit log with full analysis data
     await supabase.rpc("create_scan_audit_log", {
       p_scan_id: scanId,
       p_action: "extracted",
@@ -309,7 +446,7 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
       await supabase.rpc("increment_tenant_consumption", {
         p_tenant_id: tenantId,
         p_type: "ai_docs",
-        p_amount: fileContents.length, // Count each document
+        p_amount: fileContents.length,
       });
     }
 
@@ -320,26 +457,22 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
       .eq("id", scanId)
       .single();
 
-    // Send notification to tenant admins
+    // Send notification to tenant admins with enhanced info
     if (tenantId) {
-      // Get admin users for THIS SPECIFIC tenant via user_tenant_roles
-      const { data: tenantAdmins, error: adminError } = await supabase
+      const { data: tenantAdmins } = await supabase
         .from("user_tenant_roles")
         .select("user_id")
         .eq("tenant_id", tenantId)
         .eq("role", "admin");
 
-      // Also get global admins from user_roles who have access to this tenant
       const { data: globalAdmins } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "admin");
 
-      // Combine and deduplicate admin user IDs
       const adminUserIds = new Set<string>();
       tenantAdmins?.forEach(a => adminUserIds.add(a.user_id));
       
-      // For global admins, check if they have tenant access
       if (globalAdmins) {
         for (const admin of globalAdmins) {
           const { data: hasTenantAccess } = await supabase
@@ -358,7 +491,6 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
       const adminUsers = Array.from(adminUserIds).map(user_id => ({ user_id }));
 
       if (adminUsers.length > 0) {
-        // Build summary of fields to validate
         const fieldsSummary = parsedResult.fields.map(f => ({
           name: f.name,
           value: f.value,
@@ -368,30 +500,53 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 
         const lowConfidenceCount = parsedResult.fields.filter(f => f.confidence === 'low').length;
         const mediumConfidenceCount = parsedResult.fields.filter(f => f.confidence === 'medium').length;
+        const hasTermination = parsedResult.has_termination;
+        const hasOldPolicy = parsedResult.has_old_policy;
+        const hasNewPolicy = parsedResult.has_new_policy;
+        const warnings = parsedResult.engagement_analysis?.warnings || [];
 
-        // Create notification for each admin
+        // Build rich notification message
+        let notifTitle = `📄 Nouveau dépôt à valider`;
+        let notifMessage = `${fileContents.length} doc(s) - ${parsedResult.fields.length} champs extraits`;
+
+        if (hasTermination) {
+          notifTitle = `🚨 Dépôt avec RÉSILIATION à traiter`;
+          notifMessage = `Résiliation détectée. ${warnings.length > 0 ? warnings[0] : 'Vérifier les délais.'}`;
+        } else if (hasOldPolicy && hasNewPolicy) {
+          notifTitle = `🔄 Changement de police à valider`;
+          notifMessage = `Remplacement détecté: ancienne → nouvelle police. ${parsedResult.fields.length} champs.`;
+        }
+
         const notifications = adminUsers.map(admin => ({
           user_id: admin.user_id,
           tenant_id: tenantId,
           kind: 'new_contract',
-          priority: lowConfidenceCount > 0 ? 'high' : 'normal',
-          title: `📄 Nouveau dépôt à valider (${formType?.toUpperCase() || 'Document'})`,
-          message: `${fileContents.length} document(s) scanné(s) par ${scanData?.verified_partner_email || 'Partenaire'}. ${parsedResult.fields.length} champs extraits (${lowConfidenceCount} incertains, ${mediumConfidenceCount} moyens).`,
+          priority: hasTermination || lowConfidenceCount > 2 ? 'high' : 'normal',
+          title: notifTitle,
+          message: notifMessage,
           payload: {
             scan_id: scanId,
             form_type: formType,
             partner_email: scanData?.verified_partner_email,
-            document_type: parsedResult.document_type,
+            dossier_summary: parsedResult.dossier_summary,
+            documents_detected: parsedResult.documents_detected,
+            has_old_policy: hasOldPolicy,
+            has_new_policy: hasNewPolicy,
+            has_termination: hasTermination,
+            has_identity_doc: parsedResult.has_identity_doc,
+            engagement_analysis: parsedResult.engagement_analysis,
+            workflow_actions: parsedResult.workflow_actions,
+            inconsistencies: parsedResult.inconsistencies || [],
+            missing_documents: parsedResult.missing_documents || [],
             documents_count: fileContents.length,
             fields_count: parsedResult.fields.length,
             low_confidence_count: lowConfidenceCount,
             medium_confidence_count: mediumConfidenceCount,
             quality_score: parsedResult.quality_score,
-            inconsistencies: parsedResult.inconsistencies || [],
-            fields_preview: fieldsSummary.slice(0, 10), // First 10 fields as preview
+            fields_preview: fieldsSummary.slice(0, 15),
           },
           action_url: `/crm/propositions?scan=${scanId}`,
-          action_label: 'Valider le dépôt',
+          action_label: hasTermination ? 'Traiter la résiliation' : 'Valider le dépôt',
         }));
 
         const { error: notifError } = await supabase
@@ -410,12 +565,19 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
       JSON.stringify({
         success: true,
         scanId,
-        documentType: parsedResult.document_type,
-        documentTypeConfidence: parsedResult.document_type_confidence,
+        dossierSummary: parsedResult.dossier_summary,
+        documentsDetected: parsedResult.documents_detected,
+        hasOldPolicy: parsedResult.has_old_policy,
+        hasNewPolicy: parsedResult.has_new_policy,
+        hasTermination: parsedResult.has_termination,
+        hasIdentityDoc: parsedResult.has_identity_doc,
+        engagementAnalysis: parsedResult.engagement_analysis,
+        workflowActions: parsedResult.workflow_actions,
+        inconsistencies: parsedResult.inconsistencies || [],
+        missingDocuments: parsedResult.missing_documents || [],
         qualityScore: parsedResult.quality_score,
         overallConfidence,
         documentsProcessed: fileContents.length,
-        inconsistencies: parsedResult.inconsistencies || [],
         fieldsExtracted: fieldsToInsert.length,
         processingTimeMs: processingTime,
       }),

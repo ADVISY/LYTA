@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
-import { PendingScan, ScanField } from "@/hooks/usePendingScans";
+import { PendingScan, ScanField, WorkflowAction } from "@/hooks/usePendingScans";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -35,6 +35,12 @@ import {
   FolderPlus,
   CalendarCheck,
   FileCheck,
+  Clock,
+  XCircle,
+  ArrowRightLeft,
+  IdCard,
+  FileWarning,
+  AlertOctagon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +52,7 @@ interface ScanValidationDialogProps {
 }
 
 const FIELD_LABELS: Record<string, string> = {
+  // Client fields
   nom: 'Nom',
   prenom: 'Prénom',
   date_naissance: 'Date de naissance',
@@ -56,6 +63,30 @@ const FIELD_LABELS: Record<string, string> = {
   localite: 'Localité',
   canton: 'Canton',
   nationalite: 'Nationalité',
+  etat_civil: 'État civil',
+  numero_avs: 'N° AVS',
+  profession: 'Profession',
+  employeur: 'Employeur',
+  // Old contract fields
+  ancienne_compagnie: 'Ancienne compagnie',
+  ancien_numero_police: 'Ancien N° police',
+  ancien_type_produit: 'Ancien type produit',
+  ancienne_date_debut: 'Ancienne date début',
+  ancienne_date_fin: 'Ancienne date fin',
+  ancienne_prime_mensuelle: 'Ancienne prime/mois',
+  ancienne_prime_annuelle: 'Ancienne prime/an',
+  ancienne_franchise: 'Ancienne franchise',
+  // New contract fields
+  nouvelle_compagnie: 'Nouvelle compagnie',
+  nouveau_numero_police: 'Nouveau N° police',
+  nouveau_type_produit: 'Nouveau type produit',
+  nouvelle_date_debut: 'Nouvelle date début',
+  nouvelle_date_fin: 'Nouvelle date fin',
+  nouvelle_prime_mensuelle: 'Nouvelle prime/mois',
+  nouvelle_prime_annuelle: 'Nouvelle prime/an',
+  nouvelle_franchise: 'Nouvelle franchise',
+  duree_engagement: 'Durée engagement',
+  // Standard contract fields
   compagnie: 'Compagnie',
   numero_police: 'N° Police',
   type_produit: 'Type de produit',
@@ -68,13 +99,33 @@ const FIELD_LABELS: Record<string, string> = {
   franchise: 'Franchise',
   garanties_principales: 'Garanties',
   statut_contrat: 'Statut contrat',
+  // Termination fields
+  date_resiliation: 'Date résiliation',
+  motif_resiliation: 'Motif résiliation',
+  compagnie_resiliee: 'Compagnie résiliée',
 };
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
   client: { label: 'Informations client', icon: User, color: 'text-blue-500' },
+  identity: { label: 'Pièce d\'identité', icon: IdCard, color: 'text-indigo-500' },
   contract: { label: 'Contrat', icon: FileText, color: 'text-violet-500' },
-  premium: { label: 'Primes & Franchise', icon: CreditCard, color: 'text-emerald-500' },
+  old_contract: { label: 'Ancienne police', icon: FileWarning, color: 'text-orange-500' },
+  new_contract: { label: 'Nouvelle police', icon: FileCheck, color: 'text-emerald-500' },
+  premium: { label: 'Primes & Franchise', icon: CreditCard, color: 'text-cyan-500' },
   guarantees: { label: 'Garanties', icon: Shield, color: 'text-amber-500' },
+  termination: { label: 'Résiliation', icon: XCircle, color: 'text-red-500' },
+};
+
+const DOC_TYPE_LABELS: Record<string, { label: string; icon: any; color: string }> = {
+  police_active: { label: 'Police active', icon: FileCheck, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  ancienne_police: { label: 'Ancienne police', icon: FileWarning, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+  nouvelle_police: { label: 'Nouvelle police', icon: FileText, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  resiliation: { label: 'Résiliation', icon: XCircle, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  piece_identite: { label: 'Pièce d\'identité', icon: IdCard, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+  attestation: { label: 'Attestation', icon: FileCheck, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+  offre: { label: 'Offre', icon: FileText, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
+  avenant: { label: 'Avenant', icon: ArrowRightLeft, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  autre: { label: 'Autre', icon: FileText, color: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' },
 };
 
 export default function ScanValidationDialog({
@@ -94,9 +145,10 @@ export default function ScanValidationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Creation options
-  const [createContract, setCreateContract] = useState(true);
-  const [createSuivi, setCreateSuivi] = useState(true);
-  const [linkDocument, setLinkDocument] = useState(true);
+  const [createOldContract, setCreateOldContract] = useState(true);
+  const [createNewContract, setCreateNewContract] = useState(true);
+  const [createSuivis, setCreateSuivis] = useState(true);
+  const [linkDocuments, setLinkDocuments] = useState(true);
 
   // Initialize edited values when scan changes
   useEffect(() => {
@@ -161,10 +213,18 @@ export default function ScanValidationDialog({
     return acc;
   }, {} as Record<string, ScanField[]>);
 
-  // Check if we have contract data
-  const hasContractData = scan.fields.some(f => 
-    f.field_category === 'contract' || f.field_category === 'premium'
-  );
+  // Check what data we have
+  const hasOldContractData = scan.has_old_policy || scan.fields.some(f => f.field_category === 'old_contract');
+  const hasNewContractData = scan.has_new_policy || scan.fields.some(f => f.field_category === 'new_contract');
+  const hasContractData = scan.fields.some(f => f.field_category === 'contract' || f.field_category === 'premium');
+  const hasTermination = scan.has_termination || scan.fields.some(f => f.field_category === 'termination');
+
+  const parseAmount = (value: string | null | undefined): number | null => {
+    if (!value) return null;
+    const cleaned = value.replace(/[^0-9.,]/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? null : parsed;
+  };
 
   const handleValidate = async () => {
     if (!user || !tenantId) return;
@@ -184,6 +244,9 @@ export default function ScanValidationDialog({
         city: getValue('localite') || null,
         canton: getValue('canton') || null,
         nationality: getValue('nationalite') || null,
+        civil_status: getValue('etat_civil') || null,
+        profession: getValue('profession') || null,
+        employer: getValue('employeur') || null,
         status: 'prospect',
       };
 
@@ -195,72 +258,131 @@ export default function ScanValidationDialog({
 
       if (clientError) throw clientError;
 
-      let createdPolicyId: string | null = null;
+      const createdPolicies: { id: string; type: 'old' | 'new' | 'standard' }[] = [];
+      const createdSuivis: string[] = [];
 
-      // 2. Create contract/policy if requested and data available
-      if (createContract && hasContractData) {
-        const companyName = getValue('compagnie');
-        const productType = getValue('type_produit') || getValue('categorie');
-        const policyNumber = getValue('numero_police');
-        const startDate = getValue('date_debut');
-        const endDate = getValue('date_fin');
-        const premiumMonthly = getValue('prime_mensuelle');
-        const premiumYearly = getValue('prime_annuelle');
-        const deductible = getValue('franchise');
-        const status = getValue('statut_contrat') || 'active';
-
-        // Find or create a default product
-        let productId: string | null = null;
+      // Helper to find product ID
+      const findProductId = async (companyName: string | null): Promise<string | null> => {
+        if (!companyName) return null;
         
-        // Try to find matching product by company and type
-        if (companyName) {
-          const { data: companies } = await supabase
-            .from('insurance_companies')
-            .select('id')
-            .ilike('name', `%${companyName}%`)
-            .limit(1);
+        const { data: companies } = await supabase
+          .from('insurance_companies')
+          .select('id')
+          .ilike('name', `%${companyName}%`)
+          .limit(1);
 
-          if (companies && companies.length > 0) {
-            const { data: products } = await supabase
-              .from('insurance_products')
-              .select('id')
-              .eq('company_id', companies[0].id)
-              .limit(1);
-
-            if (products && products.length > 0) {
-              productId = products[0].id;
-            }
-          }
-        }
-
-        // If no product found, get any product as fallback
-        if (!productId) {
-          const { data: anyProduct } = await supabase
+        if (companies && companies.length > 0) {
+          const { data: products } = await supabase
             .from('insurance_products')
             .select('id')
-            .limit(1)
-            .single();
-          
-          if (anyProduct) {
-            productId = anyProduct.id;
+            .eq('company_id', companies[0].id)
+            .limit(1);
+
+          if (products && products.length > 0) {
+            return products[0].id;
           }
         }
+
+        // Fallback to any product
+        const { data: anyProduct } = await supabase
+          .from('insurance_products')
+          .select('id')
+          .limit(1)
+          .single();
+        
+        return anyProduct?.id || null;
+      };
+
+      // 2. Create OLD contract/policy if requested and data available
+      if (createOldContract && hasOldContractData) {
+        const companyName = getValue('ancienne_compagnie') || getValue('compagnie');
+        const productId = await findProductId(companyName);
 
         if (productId) {
           const policyData = {
             tenant_id: tenantId,
             client_id: newClient.id,
             product_id: productId,
-            policy_number: policyNumber || null,
-            status: status,
-            start_date: startDate || new Date().toISOString().split('T')[0],
-            end_date: endDate || null,
-            premium_monthly: premiumMonthly ? parseFloat(premiumMonthly.replace(/[^0-9.,]/g, '').replace(',', '.')) : null,
-            premium_yearly: premiumYearly ? parseFloat(premiumYearly.replace(/[^0-9.,]/g, '').replace(',', '.')) : null,
-            deductible: deductible ? parseFloat(deductible.replace(/[^0-9.,]/g, '').replace(',', '.')) : null,
+            policy_number: getValue('ancien_numero_police') || getValue('numero_police') || null,
+            status: hasTermination ? 'resilie' : 'active',
+            start_date: getValue('ancienne_date_debut') || getValue('date_debut') || new Date().toISOString().split('T')[0],
+            end_date: getValue('ancienne_date_fin') || getValue('date_fin') || null,
+            premium_monthly: parseAmount(getValue('ancienne_prime_mensuelle') || getValue('prime_mensuelle')),
+            premium_yearly: parseAmount(getValue('ancienne_prime_annuelle') || getValue('prime_annuelle')),
+            deductible: parseAmount(getValue('ancienne_franchise') || getValue('franchise')),
             currency: 'CHF',
             company_name: companyName || null,
-            product_type: productType || null,
+            product_type: getValue('ancien_type_produit') || getValue('type_produit') || null,
+            notes: `Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
+          };
+
+          const { data: oldPolicy, error: policyError } = await supabase
+            .from('policies')
+            .insert(policyData)
+            .select()
+            .single();
+
+          if (!policyError && oldPolicy) {
+            createdPolicies.push({ id: oldPolicy.id, type: 'old' });
+          }
+        }
+      }
+
+      // 3. Create NEW contract/policy if requested and data available
+      if (createNewContract && hasNewContractData) {
+        const companyName = getValue('nouvelle_compagnie');
+        const productId = await findProductId(companyName);
+
+        if (productId) {
+          const policyData = {
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            product_id: productId,
+            policy_number: getValue('nouveau_numero_police') || null,
+            status: 'active',
+            start_date: getValue('nouvelle_date_debut') || new Date().toISOString().split('T')[0],
+            end_date: getValue('nouvelle_date_fin') || null,
+            premium_monthly: parseAmount(getValue('nouvelle_prime_mensuelle')),
+            premium_yearly: parseAmount(getValue('nouvelle_prime_annuelle')),
+            deductible: parseAmount(getValue('nouvelle_franchise')),
+            currency: 'CHF',
+            company_name: companyName || null,
+            product_type: getValue('nouveau_type_produit') || null,
+            notes: `Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
+          };
+
+          const { data: newPolicy, error: policyError } = await supabase
+            .from('policies')
+            .insert(policyData)
+            .select()
+            .single();
+
+          if (!policyError && newPolicy) {
+            createdPolicies.push({ id: newPolicy.id, type: 'new' });
+          }
+        }
+      }
+
+      // 4. Create standard contract if no old/new specific data but has contract data
+      if (!hasOldContractData && !hasNewContractData && hasContractData && createNewContract) {
+        const companyName = getValue('compagnie');
+        const productId = await findProductId(companyName);
+
+        if (productId) {
+          const policyData = {
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            product_id: productId,
+            policy_number: getValue('numero_police') || null,
+            status: getValue('statut_contrat') || 'active',
+            start_date: getValue('date_debut') || new Date().toISOString().split('T')[0],
+            end_date: getValue('date_fin') || null,
+            premium_monthly: parseAmount(getValue('prime_mensuelle')),
+            premium_yearly: parseAmount(getValue('prime_annuelle')),
+            deductible: parseAmount(getValue('franchise')),
+            currency: 'CHF',
+            company_name: companyName || null,
+            product_type: getValue('type_produit') || null,
             notes: `Contrat importé via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
           };
 
@@ -270,16 +392,14 @@ export default function ScanValidationDialog({
             .select()
             .single();
 
-          if (policyError) {
-            console.error('Policy creation error:', policyError);
-          } else {
-            createdPolicyId = newPolicy.id;
+          if (!policyError && newPolicy) {
+            createdPolicies.push({ id: newPolicy.id, type: 'standard' });
           }
         }
       }
 
-      // 3. Link scanned document to client
-      if (linkDocument && scan.original_file_key) {
+      // 5. Link scanned documents to client
+      if (linkDocuments && scan.original_file_key) {
         const documentData = {
           tenant_id: tenantId,
           owner_type: 'client',
@@ -289,7 +409,7 @@ export default function ScanValidationDialog({
           mime_type: 'application/pdf',
           doc_kind: scan.detected_doc_type || 'police',
           created_by: user.id,
-          category: 'Contrats',
+          category: 'Dossier IA Scan',
           metadata: {
             source: 'ia_scan',
             scan_id: scan.id,
@@ -298,37 +418,83 @@ export default function ScanValidationDialog({
           },
         };
 
-        const { error: docError } = await supabase
-          .from('documents')
-          .insert(documentData);
+        await supabase.from('documents').insert([documentData]);
+      }
 
-        if (docError) {
-          console.error('Document linking error:', docError);
+      // 6. Create workflow-based follow-ups (suivis)
+      if (createSuivis) {
+        // Process workflow actions from AI analysis
+        if (scan.workflow_actions && scan.workflow_actions.length > 0) {
+          for (const action of scan.workflow_actions) {
+            let suiviType = 'autre';
+            let title = action.description;
+            
+            switch (action.action_type) {
+              case 'create_termination_suivi':
+                suiviType = 'resiliation';
+                title = `🚨 Résiliation à envoyer: ${action.details?.company || 'Ancienne police'}`;
+                break;
+              case 'create_activation_suivi':
+                suiviType = 'activation';
+                title = `✅ Activer nouvelle police: ${action.details?.company || 'Nouvelle police'}`;
+                break;
+              case 'create_replacement_suivi':
+                suiviType = 'changement';
+                title = `🔄 Remplacement de police: ${action.details?.old_company} → ${action.details?.new_company}`;
+                break;
+              case 'request_documents':
+                suiviType = 'documents';
+                title = `📁 Documents manquants à demander`;
+                break;
+            }
+
+            const { data: suiviData } = await supabase.from('suivis').insert([{
+              tenant_id: tenantId,
+              client_id: newClient.id,
+              title,
+              description: action.description + (action.details ? `\n\nDétails: ${JSON.stringify(action.details, null, 2)}` : ''),
+              type: suiviType,
+              status: 'ouvert',
+              reminder_date: action.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            }]).select('id').single();
+            
+            if (suiviData?.id) createdSuivis.push(suiviData.id);
+          }
+        }
+
+        // If termination detected but no specific workflow action, create one
+        if (hasTermination && (!scan.workflow_actions || !scan.workflow_actions.some(a => a.action_type === 'create_termination_suivi'))) {
+          const terminationDeadline = scan.engagement_analysis?.termination_deadline;
+          const { data: termSuivi } = await supabase.from('suivis').insert([{
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            title: `🚨 Résiliation détectée - ${getValue('compagnie_resiliee') || getValue('ancienne_compagnie') || 'Compagnie'}`,
+            description: `Lettre de résiliation détectée dans le dossier.\n\nDate résiliation: ${getValue('date_resiliation') || 'Non spécifiée'}\nMotif: ${getValue('motif_resiliation') || 'Non spécifié'}`,
+            type: 'resiliation',
+            status: 'ouvert',
+            reminder_date: terminationDeadline || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          }]).select('id').single();
+          
+          if (termSuivi?.id) createdSuivis.push(termSuivi.id);
+        }
+
+        // Create general follow-up for new client if no other suivis created
+        if (createdSuivis.length === 0) {
+          const { data: generalSuivi } = await supabase.from('suivis').insert([{
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            title: `📋 Nouveau client - ${getValue('prenom')} ${getValue('nom')}`,
+            description: `Client créé via IA Scan.\n\n${scan.dossier_summary || 'Vérifier les informations du dossier.'}`,
+            type: 'activation',
+            status: 'ouvert',
+            reminder_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          }]).select('id').single();
+          
+          if (generalSuivi?.id) createdSuivis.push(generalSuivi.id);
         }
       }
 
-      // 4. Create follow-up (suivi)
-      if (createSuivi) {
-        const suiviData = {
-          tenant_id: tenantId,
-          client_id: newClient.id,
-          title: `Nouveau client - ${getValue('prenom')} ${getValue('nom')}`,
-          description: `Client créé via IA Scan.\n${hasContractData ? 'Contrat importé: ' + (getValue('compagnie') || 'N/A') + ' - ' + (getValue('type_produit') || 'N/A') : 'Aucun contrat détecté.'}\n\nVérifier les informations et contacter le client.`,
-          type: 'activation',
-          status: 'ouvert',
-          reminder_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +2 days
-        };
-
-        const { error: suiviError } = await supabase
-          .from('suivis')
-          .insert(suiviData);
-
-        if (suiviError) {
-          console.error('Suivi creation error:', suiviError);
-        }
-      }
-
-      // 5. Mark scan as validated
+      // 7. Mark scan as validated
       const { error: scanError } = await supabase
         .from('document_scans')
         .update({
@@ -340,7 +506,7 @@ export default function ScanValidationDialog({
 
       if (scanError) throw scanError;
 
-      // 6. Update scan results with validated values
+      // 8. Update scan results with validated values
       for (const [fieldName, value] of Object.entries(editedValues)) {
         if (value !== undefined) {
           await supabase
@@ -351,27 +517,29 @@ export default function ScanValidationDialog({
         }
       }
 
-      // 7. Create audit log
+      // 9. Create audit log
       await supabase.rpc('create_scan_audit_log', {
         p_scan_id: scan.id,
         p_action: 'validated',
         p_ai_snapshot: {
           validated_values: editedValues,
           client_id: newClient.id,
-          policy_id: createdPolicyId,
+          policies: createdPolicies,
+          suivis: createdSuivis,
           options: {
-            createContract,
-            createSuivi,
-            linkDocument,
+            createOldContract,
+            createNewContract,
+            createSuivis,
+            linkDocuments,
           },
         },
       });
 
       // Build success message
       const createdItems = ['Client'];
-      if (createContract && createdPolicyId) createdItems.push('Contrat');
-      if (linkDocument) createdItems.push('Document');
-      if (createSuivi) createdItems.push('Suivi');
+      if (createdPolicies.length > 0) createdItems.push(`${createdPolicies.length} Contrat(s)`);
+      if (linkDocuments) createdItems.push('Document');
+      if (createdSuivis.length > 0) createdItems.push(`${createdSuivis.length} Suivi(s)`);
 
       toast({
         title: "Validation réussie ! 🎉",
@@ -400,18 +568,70 @@ export default function ScanValidationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="max-w-3xl max-h-[95vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-primary/10">
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
-            Validation du pré-remplissage IA
+            Validation du dossier IA Scan
           </DialogTitle>
           <DialogDescription>
-            Vérifiez les données extraites et choisissez ce que vous souhaitez créer
+            {scan.dossier_summary || 'Vérifiez les données extraites et choisissez ce que vous souhaitez créer'}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Documents detected */}
+        {scan.documents_detected && scan.documents_detected.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {scan.documents_detected.map((doc, i) => {
+              const docConfig = DOC_TYPE_LABELS[doc.doc_type] || DOC_TYPE_LABELS.autre;
+              const DocIcon = docConfig.icon;
+              return (
+                <Badge key={i} variant="outline" className={cn("text-xs", docConfig.color)}>
+                  <DocIcon className="h-3 w-3 mr-1" />
+                  {doc.description || docConfig.label}
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Alerts for termination or engagement issues */}
+        {(hasTermination || (scan.engagement_analysis?.warnings && scan.engagement_analysis.warnings.length > 0)) && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertOctagon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {hasTermination ? '⚠️ Résiliation détectée' : '⚠️ Attention aux dates'}
+                </p>
+                {scan.engagement_analysis?.warnings?.map((warning, i) => (
+                  <p key={i} className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    • {warning}
+                  </p>
+                ))}
+                {scan.engagement_analysis?.termination_deadline && (
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    📅 Deadline résiliation: <strong>{scan.engagement_analysis.termination_deadline}</strong>
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inconsistencies */}
+        {scan.inconsistencies && scan.inconsistencies.length > 0 && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+              ⚠️ Incohérences détectées
+            </p>
+            {scan.inconsistencies.map((inc, i) => (
+              <p key={i} className="text-sm text-amber-700 dark:text-amber-300">• {inc}</p>
+            ))}
+          </div>
+        )}
 
         {/* Confidence meter */}
         <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
@@ -441,7 +661,7 @@ export default function ScanValidationDialog({
             <FolderPlus className="h-4 w-4 text-primary" />
             Éléments à créer
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
               <Checkbox checked disabled className="data-[state=checked]:bg-blue-500" />
               <User className="h-4 w-4 text-blue-500" />
@@ -449,43 +669,85 @@ export default function ScanValidationDialog({
               <Badge variant="outline" className="ml-auto text-xs">Requis</Badge>
             </label>
             
+            {hasOldContractData && (
+              <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                <Checkbox 
+                  checked={createOldContract} 
+                  onCheckedChange={(checked) => setCreateOldContract(checked as boolean)}
+                  className="data-[state=checked]:bg-orange-500"
+                />
+                <FileWarning className="h-4 w-4 text-orange-500" />
+                <span className="text-sm">Ancienne police</span>
+              </label>
+            )}
+            
+            {(hasNewContractData || hasContractData) && (
+              <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
+                <Checkbox 
+                  checked={createNewContract} 
+                  onCheckedChange={(checked) => setCreateNewContract(checked as boolean)}
+                  className="data-[state=checked]:bg-emerald-500"
+                />
+                <FileCheck className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm">{hasNewContractData ? 'Nouvelle police' : 'Contrat'}</span>
+              </label>
+            )}
+            
             <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
               <Checkbox 
-                checked={createContract} 
-                onCheckedChange={(checked) => setCreateContract(checked as boolean)}
-                disabled={!hasContractData}
-                className="data-[state=checked]:bg-violet-500"
+                checked={linkDocuments} 
+                onCheckedChange={(checked) => setLinkDocuments(checked as boolean)}
+                className="data-[state=checked]:bg-indigo-500"
               />
-              <FileCheck className="h-4 w-4 text-violet-500" />
-              <span className="text-sm">Contrat</span>
-              {!hasContractData && (
-                <Badge variant="secondary" className="ml-auto text-xs">Aucune donnée</Badge>
-              )}
+              <FileText className="h-4 w-4 text-indigo-500" />
+              <span className="text-sm">Lier documents</span>
             </label>
             
             <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors">
               <Checkbox 
-                checked={linkDocument} 
-                onCheckedChange={(checked) => setLinkDocument(checked as boolean)}
-                className="data-[state=checked]:bg-emerald-500"
-              />
-              <FileText className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm">Document</span>
-            </label>
-            
-            <label className="flex items-center gap-2 p-2 rounded-md bg-background/50 cursor-pointer hover:bg-background transition-colors sm:col-span-3">
-              <Checkbox 
-                checked={createSuivi} 
-                onCheckedChange={(checked) => setCreateSuivi(checked as boolean)}
+                checked={createSuivis} 
+                onCheckedChange={(checked) => setCreateSuivis(checked as boolean)}
                 className="data-[state=checked]:bg-amber-500"
               />
               <CalendarCheck className="h-4 w-4 text-amber-500" />
-              <span className="text-sm">Suivi de rappel (dans 2 jours)</span>
+              <span className="text-sm">
+                Créer suivis
+                {scan.workflow_actions && scan.workflow_actions.length > 0 && (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({scan.workflow_actions.length} action{scan.workflow_actions.length > 1 ? 's' : ''})
+                  </span>
+                )}
+              </span>
             </label>
           </div>
         </div>
 
-        <ScrollArea className="max-h-[40vh] pr-4">
+        {/* Workflow actions preview */}
+        {scan.workflow_actions && scan.workflow_actions.length > 0 && createSuivis && (
+          <div className="p-3 bg-muted/30 rounded-lg border">
+            <p className="text-sm font-medium mb-2 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Actions back-office à créer
+            </p>
+            <div className="space-y-2">
+              {scan.workflow_actions.map((action, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <Badge variant={action.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                    {action.priority === 'high' ? 'Urgent' : 'Normal'}
+                  </Badge>
+                  <span className="flex-1">{action.description}</span>
+                  {action.deadline && (
+                    <span className="text-xs text-muted-foreground">
+                      📅 {action.deadline}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <ScrollArea className="max-h-[35vh] pr-4">
           <div className="space-y-6">
             {Object.entries(fieldsByCategory).map(([category, fields]) => {
               const categoryConfig = CATEGORY_CONFIG[category] || {
@@ -568,6 +830,18 @@ export default function ScanValidationDialog({
             })}
           </div>
         </ScrollArea>
+
+        {/* Missing documents */}
+        {scan.missing_documents && scan.missing_documents.length > 0 && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+              📁 Documents à demander
+            </p>
+            {scan.missing_documents.map((doc, i) => (
+              <p key={i} className="text-sm text-blue-700 dark:text-blue-300">• {doc}</p>
+            ))}
+          </div>
+        )}
 
         {/* Disclaimer */}
         <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">

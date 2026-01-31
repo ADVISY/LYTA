@@ -2,6 +2,30 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserTenant } from './useUserTenant';
 
+export interface WorkflowAction {
+  action_type: string;
+  priority: 'high' | 'normal' | 'low';
+  description: string;
+  deadline?: string;
+  details?: Record<string, any>;
+}
+
+export interface DocumentDetected {
+  file_name: string;
+  doc_type: string;
+  doc_type_confidence: number;
+  description: string;
+}
+
+export interface EngagementAnalysis {
+  old_policy_end_date?: string;
+  new_policy_start_date?: string;
+  termination_deadline?: string;
+  is_termination_on_time?: boolean;
+  days_until_deadline?: number;
+  warnings?: string[];
+}
+
 export interface PendingScan {
   id: string;
   created_at: string;
@@ -16,6 +40,17 @@ export interface PendingScan {
   verified_partner_email: string | null;
   error_message: string | null;
   fields: ScanField[];
+  // Enhanced back-office data from AI analysis
+  dossier_summary?: string;
+  documents_detected?: DocumentDetected[];
+  has_old_policy?: boolean;
+  has_new_policy?: boolean;
+  has_termination?: boolean;
+  has_identity_doc?: boolean;
+  engagement_analysis?: EngagementAnalysis;
+  workflow_actions?: WorkflowAction[];
+  inconsistencies?: string[];
+  missing_documents?: string[];
 }
 
 export interface ScanField {
@@ -60,43 +95,72 @@ export function usePendingScans() {
       const scanIds = (scanData || []).map(s => s.id);
       
       let fieldsData: any[] = [];
+      let auditData: any[] = [];
+      
       if (scanIds.length > 0) {
-        const { data: fields, error: fieldsError } = await supabase
-          .from('document_scan_results')
-          .select('*')
-          .in('scan_id', scanIds);
+        // Fetch fields and audit logs in parallel
+        const [fieldsResult, auditResult] = await Promise.all([
+          supabase
+            .from('document_scan_results')
+            .select('*')
+            .in('scan_id', scanIds),
+          supabase
+            .from('document_scan_audit')
+            .select('*')
+            .in('scan_id', scanIds)
+            .eq('action', 'extracted')
+            .order('performed_at', { ascending: false })
+        ]);
 
-        if (fieldsError) throw fieldsError;
-        fieldsData = fields || [];
+        if (fieldsResult.error) throw fieldsResult.error;
+        fieldsData = fieldsResult.data || [];
+        auditData = auditResult.data || [];
       }
 
-      // Map fields to scans
-      const scansWithFields: PendingScan[] = (scanData || []).map(scan => ({
-        id: scan.id,
-        created_at: scan.created_at,
-        source_form_type: scan.source_form_type,
-        original_file_name: scan.original_file_name,
-        original_file_key: scan.original_file_key,
-        detected_doc_type: scan.detected_doc_type,
-        doc_type_confidence: scan.doc_type_confidence,
-        quality_score: scan.quality_score,
-        overall_confidence: scan.overall_confidence,
-        status: scan.status,
-        verified_partner_email: scan.verified_partner_email,
-        error_message: scan.error_message,
-        fields: fieldsData
-          .filter(f => f.scan_id === scan.id)
-          .map(f => ({
-            id: f.id,
-            field_category: f.field_category,
-            field_name: f.field_name,
-            extracted_value: f.extracted_value,
-            confidence: f.confidence as 'high' | 'medium' | 'low',
-            confidence_score: f.confidence_score,
-            extraction_notes: f.extraction_notes,
-            validated_value: f.validated_value,
-          })),
-      }));
+      // Map fields to scans with enriched audit data
+      const scansWithFields: PendingScan[] = (scanData || []).map(scan => {
+        // Find the audit log for this scan to get workflow info
+        const scanAudit = auditData.find(a => a.scan_id === scan.id);
+        const aiSnapshot = scanAudit?.ai_response_snapshot as any || {};
+
+        return {
+          id: scan.id,
+          created_at: scan.created_at,
+          source_form_type: scan.source_form_type,
+          original_file_name: scan.original_file_name,
+          original_file_key: scan.original_file_key,
+          detected_doc_type: scan.detected_doc_type,
+          doc_type_confidence: scan.doc_type_confidence,
+          quality_score: scan.quality_score,
+          overall_confidence: scan.overall_confidence,
+          status: scan.status,
+          verified_partner_email: scan.verified_partner_email,
+          error_message: scan.error_message,
+          // Enhanced back-office data from AI analysis
+          dossier_summary: aiSnapshot.dossier_summary,
+          documents_detected: aiSnapshot.documents_detected,
+          has_old_policy: aiSnapshot.has_old_policy,
+          has_new_policy: aiSnapshot.has_new_policy,
+          has_termination: aiSnapshot.has_termination,
+          has_identity_doc: aiSnapshot.has_identity_doc,
+          engagement_analysis: aiSnapshot.engagement_analysis,
+          workflow_actions: aiSnapshot.workflow_actions,
+          inconsistencies: aiSnapshot.inconsistencies,
+          missing_documents: aiSnapshot.missing_documents,
+          fields: fieldsData
+            .filter(f => f.scan_id === scan.id)
+            .map(f => ({
+              id: f.id,
+              field_category: f.field_category,
+              field_name: f.field_name,
+              extracted_value: f.extracted_value,
+              confidence: f.confidence as 'high' | 'medium' | 'low',
+              confidence_score: f.confidence_score,
+              extraction_notes: f.extraction_notes,
+              validated_value: f.validated_value,
+            })),
+        };
+      });
 
       setScans(scansWithFields);
       setError(null);
