@@ -322,13 +322,42 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 
     // Send notification to tenant admins
     if (tenantId) {
-      // Get admin users for this tenant
-      const { data: adminUsers, error: adminError } = await supabase
+      // Get admin users for THIS SPECIFIC tenant via user_tenant_roles
+      const { data: tenantAdmins, error: adminError } = await supabase
+        .from("user_tenant_roles")
+        .select("user_id")
+        .eq("tenant_id", tenantId)
+        .eq("role", "admin");
+
+      // Also get global admins from user_roles who have access to this tenant
+      const { data: globalAdmins } = await supabase
         .from("user_roles")
         .select("user_id")
         .eq("role", "admin");
 
-      if (!adminError && adminUsers && adminUsers.length > 0) {
+      // Combine and deduplicate admin user IDs
+      const adminUserIds = new Set<string>();
+      tenantAdmins?.forEach(a => adminUserIds.add(a.user_id));
+      
+      // For global admins, check if they have tenant access
+      if (globalAdmins) {
+        for (const admin of globalAdmins) {
+          const { data: hasTenantAccess } = await supabase
+            .from("user_tenant_roles")
+            .select("id")
+            .eq("user_id", admin.user_id)
+            .eq("tenant_id", tenantId)
+            .maybeSingle();
+          
+          if (hasTenantAccess) {
+            adminUserIds.add(admin.user_id);
+          }
+        }
+      }
+
+      const adminUsers = Array.from(adminUserIds).map(user_id => ({ user_id }));
+
+      if (adminUsers.length > 0) {
         // Build summary of fields to validate
         const fieldsSummary = parsedResult.fields.map(f => ({
           name: f.name,
