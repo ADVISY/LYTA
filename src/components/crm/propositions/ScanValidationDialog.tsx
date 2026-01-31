@@ -298,7 +298,17 @@ export default function ScanValidationDialog({
   };
 
   const handleValidate = async () => {
-    if (!user || !tenantId) return;
+    console.log('[ScanValidation] Starting validation...', { userId: user?.id, tenantId });
+    
+    if (!user || !tenantId) {
+      console.error('[ScanValidation] Missing user or tenantId', { user: !!user, tenantId: !!tenantId });
+      toast({
+        title: "Erreur",
+        description: "Session expirée. Veuillez vous reconnecter.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -367,13 +377,24 @@ export default function ScanValidationDialog({
         status: willHaveActiveContract ? 'actif' : 'prospect',
       };
 
+      console.log('[ScanValidation] Creating client with data:', clientData);
+
       const { data: newClient, error: clientError } = await supabase
         .from('clients')
         .insert(clientData)
         .select()
         .single();
 
-      if (clientError) throw clientError;
+      console.log('[ScanValidation] Client creation result:', { newClient, clientError });
+
+      if (clientError) {
+        console.error('[ScanValidation] Client creation failed:', clientError);
+        throw clientError;
+      }
+
+      if (!newClient || !newClient.id) {
+        throw new Error("Le client n'a pas pu être créé. Veuillez réessayer.");
+      }
 
       const createdPolicies: { id: string; type: 'old' | 'new' | 'standard'; productName?: string }[] = [];
       const createdSuivis: string[] = [];
@@ -925,19 +946,38 @@ export default function ScanValidationDialog({
       const clientName = getClientValue('prenom', 'first_name') || '';
       const clientLastName = getClientValue('nom', 'last_name') || '';
 
+      console.log('[ScanValidation] Validation complete!', { clientId: newClient.id, createdItems });
+
       toast({
         title: "Validation réussie ! 🎉",
         description: `${createdItems.join(', ')} créé(s) pour ${clientName} ${clientLastName}`,
       });
 
-      onValidated();
+      // Close dialog first
       onOpenChange(false);
+      
+      // Then refresh parent data
+      onValidated();
 
-      // Navigate to client detail
-      navigate(`/crm/clients/${newClient.id}`);
+      // Navigate to client detail after a small delay to ensure state is updated
+      setTimeout(() => {
+        navigate(`/crm/clients/${newClient.id}`);
+      }, 100);
 
     } catch (error: any) {
-      console.error('Validation error:', error);
+      console.error('[ScanValidation] Validation error:', error);
+      
+      // Check if it's an auth error
+      if (error.message?.includes('JWT') || error.message?.includes('token') || error.code === 'PGRST301') {
+        toast({
+          title: "Session expirée",
+          description: "Votre session a expiré. Veuillez vous reconnecter.",
+          variant: "destructive",
+        });
+        navigate('/connexion');
+        return;
+      }
+      
       toast({
         title: "Erreur",
         description: error.message || "Impossible de créer le client",
