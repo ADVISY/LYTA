@@ -948,26 +948,40 @@ export default function ScanValidationDialog({
 
       console.log('[ScanValidation] Validation complete!', { clientId: newClient.id, createdItems });
 
+      // Store the client ID before any state changes
+      const createdClientId = newClient.id;
+
       toast({
         title: "Validation réussie ! 🎉",
         description: `${createdItems.join(', ')} créé(s) pour ${clientName} ${clientLastName}`,
       });
 
-      // Close dialog first
-      onOpenChange(false);
+      // IMPORTANT: Navigate FIRST before closing dialog and refreshing
+      // This prevents race conditions where the component is unmounted mid-navigation
+      setIsSubmitting(false);
       
-      // Then refresh parent data
+      // Navigate to the client page
+      navigate(`/crm/clients/${createdClientId}`);
+      
+      // Then close the dialog and refresh (these happen after navigation starts)
+      onOpenChange(false);
       onValidated();
-
-      // Navigate to client detail after a small delay to ensure state is updated
-      setTimeout(() => {
-        navigate(`/crm/clients/${newClient.id}`);
-      }, 100);
 
     } catch (error: any) {
       console.error('[ScanValidation] Validation error:', error);
+      setIsSubmitting(false);
       
-      // Check if it's an auth error
+      // Check for RLS policy errors
+      if (error.message?.includes('row-level security policy') || error.code === '42501') {
+        toast({
+          title: "Erreur de permissions",
+          description: "Vous n'avez pas les permissions pour créer un client. Contactez votre administrateur.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if it's an auth/session error
       if (error.message?.includes('JWT') || error.message?.includes('token') || error.code === 'PGRST301') {
         toast({
           title: "Session expirée",
@@ -983,8 +997,6 @@ export default function ScanValidationDialog({
         description: error.message || "Impossible de créer le client",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
