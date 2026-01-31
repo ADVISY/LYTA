@@ -798,15 +798,23 @@ export default function ClientDetail() {
                         // Calculate totals from products_data
                         const totalFromProducts = productsData.reduce((sum: number, p: any) => sum + (p.premium || 0), 0);
                         
+                        // Extract real product name from IA Scan notes (format: "PRODUCT_NAME - Nouvelle/Ancienne police importée via IA Scan")
+                        const iaScanProductMatch = notes.match(/^([^-]+)\s*-\s*(?:Nouvelle|Ancienne)\s*police\s*importée\s*via\s*IA\s*Scan/i);
+                        const iaScanProductName = iaScanProductMatch ? iaScanProductMatch[1].trim() : null;
+                        
+                        // Determine the display name for the product
+                        const displayProductName = iaScanProductName 
+                          || (hasMultipleProducts 
+                              ? `${t('clientDetail.multiProductContract')} (${productsData.length})`
+                              : (policy.product?.name || t('clientDetail.unknownProduct')));
+                        
                         return (
                             <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
                             <div className="flex items-start justify-between">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold">
-                                    {hasMultipleProducts 
-                                      ? `${t('clientDetail.multiProductContract')} (${productsData.length})`
-                                      : (policy.product?.name || t('clientDetail.unknownProduct'))}
+                                    {displayProductName}
                                   </span>
                                   <Badge
                                     variant="outline"

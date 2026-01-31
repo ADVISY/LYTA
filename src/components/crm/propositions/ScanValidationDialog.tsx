@@ -166,12 +166,45 @@ export default function ScanValidationDialog({
 
   if (!scan) return null;
 
+  // Map of alternative field names (AI may return different naming conventions)
+  const FIELD_NAME_ALIASES: Record<string, string[]> = {
+    nom: ['nom', 'last_name', 'lastname', 'family_name'],
+    prenom: ['prenom', 'first_name', 'firstname', 'given_name'],
+    date_naissance: ['date_naissance', 'birthdate', 'birth_date', 'date_of_birth'],
+    email: ['email', 'e-mail', 'courriel'],
+    telephone: ['telephone', 'phone', 'tel'],
+    mobile: ['mobile', 'portable', 'cell_phone'],
+    adresse: ['adresse', 'address', 'rue'],
+    npa: ['npa', 'postal_code', 'zip_code', 'code_postal'],
+    localite: ['localite', 'city', 'ville', 'locality'],
+    canton: ['canton', 'state', 'region'],
+    nationalite: ['nationalite', 'nationality', 'nation'],
+    etat_civil: ['etat_civil', 'civil_status', 'marital_status'],
+    profession: ['profession', 'job', 'occupation'],
+    employeur: ['employeur', 'employer', 'company'],
+    permis: ['permis', 'permit', 'permit_type', 'type_permis'],
+    numero_avs: ['numero_avs', 'avs_number', 'ahv_number', 'social_security'],
+  };
+
   const getValue = (fieldName: string) => {
-    if (editedValues[fieldName] !== undefined) {
+    // Check editedValues first
+    if (editedValues[fieldName] !== undefined && editedValues[fieldName] !== '') {
       return editedValues[fieldName];
     }
-    const field = scan.fields.find(f => f.field_name === fieldName);
-    return field?.extracted_value || '';
+    
+    // Check for alternative names
+    const aliases = FIELD_NAME_ALIASES[fieldName] || [fieldName];
+    for (const alias of aliases) {
+      if (editedValues[alias] !== undefined && editedValues[alias] !== '') {
+        return editedValues[alias];
+      }
+      const field = scan.fields.find(f => f.field_name === alias);
+      if (field?.extracted_value) {
+        return field.extracted_value;
+      }
+    }
+    
+    return '';
   };
 
   const handleFieldChange = (fieldName: string, value: string) => {
@@ -265,22 +298,41 @@ export default function ScanValidationDialog({
 
     setIsSubmitting(true);
     try {
-      // 1. Create the client
+      // 1. Create the client - PRIORITIZE primary_holder from AI analysis, then fall back to fields
+      const primaryHolder = scan.primary_holder;
+      
+      // Helper to get value with primary_holder as priority source
+      const getClientValue = (fieldName: string, primaryHolderKey?: string): string | null => {
+        // First check if we have a value from primary_holder
+        if (primaryHolderKey && primaryHolder && (primaryHolder as any)[primaryHolderKey]) {
+          return (primaryHolder as any)[primaryHolderKey];
+        }
+        // Then check editedValues (user corrections)
+        if (editedValues[fieldName]) {
+          return editedValues[fieldName];
+        }
+        // Finally check extracted fields
+        return getValue(fieldName) || null;
+      };
+
       const clientData = {
         tenant_id: tenantId,
-        last_name: getValue('nom') || null,
-        first_name: getValue('prenom') || null,
-        birthdate: parseDate(getValue('date_naissance')),
-        email: getValue('email') || null,
-        phone: getValue('telephone') || null,
-        address: getValue('adresse') || null,
-        postal_code: getValue('npa') || null,
-        city: getValue('localite') || null,
-        canton: getValue('canton') || null,
-        nationality: getValue('nationalite') || null,
-        civil_status: getValue('etat_civil') || null,
-        profession: getValue('profession') || null,
-        employer: getValue('employeur') || null,
+        last_name: getClientValue('nom', 'last_name'),
+        first_name: getClientValue('prenom', 'first_name'),
+        birthdate: parseDate(getClientValue('date_naissance', 'birthdate')),
+        email: getClientValue('email', 'email'),
+        phone: getClientValue('telephone', 'phone'),
+        mobile: getClientValue('mobile', 'mobile'),
+        address: getClientValue('adresse', 'address'),
+        postal_code: getClientValue('npa', 'npa'),
+        city: getClientValue('localite', 'localite'),
+        canton: getClientValue('canton', 'canton'),
+        nationality: getClientValue('nationalite', 'nationality'),
+        civil_status: getClientValue('etat_civil', 'civil_status'),
+        profession: getClientValue('profession', 'profession'),
+        employer: getClientValue('employeur', 'employeur'),
+        permit_type: getClientValue('permis', 'permit_type'),
+        gender: getClientValue('genre', 'gender'),
         status: 'prospect',
       };
 
