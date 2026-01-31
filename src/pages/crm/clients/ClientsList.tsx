@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
+import { usePendingScans } from "@/hooks/usePendingScans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
@@ -53,14 +54,20 @@ export default function ClientsList() {
     dormant: { label: t('clients.dormant'), color: "text-amber-700", bgColor: "bg-amber-100" },
   };
 
+  const { scans: pendingScans } = usePendingScans();
+  const pendingScanCount = pendingScans.filter(s => s.status === 'completed' || s.status === 'processing').length;
+
   const typeConfig = [
     { value: "client", label: t('clients.clients'), icon: Users, color: "from-blue-500 to-blue-600" },
     { value: "collaborateur", label: t('collaborators.title'), icon: Briefcase, color: "from-emerald-500 to-emerald-600" },
     { value: "partenaire", label: t('clients.partners'), icon: Building2, color: "from-violet-500 to-purple-600" },
+    { value: "ia-scan", label: "Dépôts IA", icon: Sparkles, color: "from-cyan-500 to-blue-600", badge: pendingScanCount },
   ];
 
   useEffect(() => {
-    fetchClients(typeFilter);
+    if (typeFilter !== 'ia-scan') {
+      fetchClients(typeFilter);
+    }
   }, [typeFilter]);
 
   const filteredClients = clients.filter((client) => {
@@ -133,14 +140,20 @@ export default function ClientsList() {
       </div>
 
       {/* Type Filter Tabs */}
-      <div className="flex gap-2 p-1 bg-muted/50 rounded-xl w-fit">
+      <div className="flex gap-2 p-1 bg-muted/50 rounded-xl w-fit flex-wrap">
         {typeConfig.map((type) => (
           <Button
             key={type.value}
             variant="ghost"
-            onClick={() => setTypeFilter(type.value)}
+            onClick={() => {
+              if (type.value === 'ia-scan') {
+                navigate('/crm/propositions');
+              } else {
+                setTypeFilter(type.value);
+              }
+            }}
             className={cn(
-              "rounded-lg transition-all duration-300",
+              "rounded-lg transition-all duration-300 relative",
               typeFilter === type.value
                 ? "bg-card shadow-md text-foreground"
                 : "hover:bg-card/50 text-muted-foreground"
@@ -148,6 +161,14 @@ export default function ClientsList() {
           >
             <type.icon className="h-4 w-4 mr-2" />
             {type.label}
+            {type.badge && type.badge > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center text-xs px-1.5"
+              >
+                {type.badge}
+              </Badge>
+            )}
           </Button>
         ))}
       </div>

@@ -7,6 +7,7 @@ import { useCommissionParts } from "@/hooks/useCommissionParts";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
+import { usePendingScans } from "@/hooks/usePendingScans";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,7 +19,7 @@ import {
   Loader2, BarChart3, Heart, Shield,
   Trophy, Star, Crown, Target, Zap, Award,
   Calendar, Filter, Bell, Medal, Flame,
-  CheckCircle, Clock, AlertCircle, ChevronRight, RefreshCw
+  CheckCircle, Clock, AlertCircle, ChevronRight, RefreshCw, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
@@ -52,6 +53,8 @@ export default function CRMDashboard() {
   const { loading: performanceLoading, companyTotals, myPerformance, myTeam, individualPerformance, teamPerformance } = usePerformance();
   const { fetchAllParts, fetchPartsForAgent } = useCommissionParts();
   const { notifications, unreadCount, markAsRead } = useNotifications();
+  const { scans: pendingScans } = usePendingScans();
+  const pendingScanCount = pendingScans.filter(s => s.status === 'completed' || s.status === 'processing').length;
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
@@ -808,6 +811,32 @@ export default function CRMDashboard() {
               </Card>
             )}
           </div>
+
+          {/* Pending Scans Widget */}
+          {pendingScanCount > 0 && (
+            <Card 
+              className="border shadow-sm bg-gradient-to-br from-cyan-500/10 to-blue-600/5 cursor-pointer hover:shadow-md transition-all group"
+              onClick={() => window.location.href = '/crm/propositions'}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Dépôts IA à valider</p>
+                    <p className="text-3xl font-bold">{pendingScanCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Dossiers scannés en attente
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-cyan-500/20 group-hover:scale-110 transition-transform">
+                      <Sparkles className="h-6 w-6 text-cyan-600" />
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Commissions by Period */}
           {commissionScope !== 'none' && commissionsByPeriod.list.length > 0 && (
