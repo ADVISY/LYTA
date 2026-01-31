@@ -7,6 +7,7 @@ export interface PendingScan {
   created_at: string;
   source_form_type: string | null;
   original_file_name: string;
+  original_file_key: string;
   detected_doc_type: string | null;
   doc_type_confidence: number | null;
   quality_score: number | null;
@@ -75,6 +76,7 @@ export function usePendingScans() {
         created_at: scan.created_at,
         source_form_type: scan.source_form_type,
         original_file_name: scan.original_file_name,
+        original_file_key: scan.original_file_key,
         detected_doc_type: scan.detected_doc_type,
         doc_type_confidence: scan.doc_type_confidence,
         quality_score: scan.quality_score,
