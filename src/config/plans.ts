@@ -18,7 +18,8 @@ export type PlanModule =
   | 'client_portal'
   | 'advanced_dashboard'
   | 'advanced_settings'
-  | 'qr_invoice';
+  | 'qr_invoice'
+  | 'ia_scan';
 
 export interface PlanConfig {
   name: string;
@@ -62,7 +63,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'prime',
     displayName: 'Prime',
     description: 'L\'expérience complète',
-    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice', 'ia_scan'],
     monthlyPrice: 250,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -73,7 +74,7 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
     name: 'founder',
     displayName: 'Prime Founder',
     description: 'Offre de lancement 6 mois',
-    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice'],
+    modules: ['clients', 'contracts', 'commissions', 'statements', 'membership', 'payroll', 'emailing', 'automation', 'mandate_automation', 'client_portal', 'advanced_dashboard', 'advanced_settings', 'qr_invoice', 'ia_scan'],
     monthlyPrice: 150,
     seatsIncluded: 1,
     extraSeatPrice: 20,
@@ -99,6 +100,7 @@ export const MODULE_DISPLAY_NAMES: Record<PlanModule, string> = {
   advanced_dashboard: 'Dashboard avancé',
   advanced_settings: 'Paramètres avancés',
   qr_invoice: 'Factures QR',
+  ia_scan: 'IA Scan Documents',
 };
 
 /**
@@ -118,6 +120,7 @@ export const MODULE_ICONS: Record<PlanModule, string> = {
   advanced_dashboard: 'LayoutDashboard',
   advanced_settings: 'Settings',
   qr_invoice: 'QrCode',
+  ia_scan: 'Sparkles',
 };
 
 /**
