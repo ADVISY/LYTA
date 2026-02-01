@@ -1837,14 +1837,22 @@ export type Database = {
           commission_value: number | null
           company_id: string
           created_at: string
+          created_by: string | null
           description: string | null
+          detected_name: string | null
           id: string
           is_active: boolean | null
           main_category:
             | Database["public"]["Enums"]["product_main_category"]
             | null
+          merged_into_product_id: string | null
           name: string
+          source: string | null
+          source_scan_id: string | null
+          status: string | null
           subcategory: string | null
+          validated_at: string | null
+          validated_by: string | null
         }
         Insert: {
           category: string
@@ -1853,14 +1861,22 @@ export type Database = {
           commission_value?: number | null
           company_id: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
+          detected_name?: string | null
           id?: string
           is_active?: boolean | null
           main_category?:
             | Database["public"]["Enums"]["product_main_category"]
             | null
+          merged_into_product_id?: string | null
           name: string
+          source?: string | null
+          source_scan_id?: string | null
+          status?: string | null
           subcategory?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Update: {
           category?: string
@@ -1869,14 +1885,22 @@ export type Database = {
           commission_value?: number | null
           company_id?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
+          detected_name?: string | null
           id?: string
           is_active?: boolean | null
           main_category?:
             | Database["public"]["Enums"]["product_main_category"]
             | null
+          merged_into_product_id?: string | null
           name?: string
+          source?: string | null
+          source_scan_id?: string | null
+          status?: string | null
           subcategory?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
         }
         Relationships: [
           {
@@ -1884,6 +1908,20 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_products_merged_into_product_id_fkey"
+            columns: ["merged_into_product_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_products_source_scan_id_fkey"
+            columns: ["source_scan_id"]
+            isOneToOne: false
+            referencedRelation: "document_scans"
             referencedColumns: ["id"]
           },
         ]
@@ -4602,6 +4640,16 @@ export type Database = {
         Args: { p_reason?: string; p_transaction_id: string }
         Returns: string
       }
+      create_candidate_product: {
+        Args: {
+          p_company_name?: string
+          p_detected_name: string
+          p_main_category?: string
+          p_scan_id?: string
+          p_subcategory?: string
+        }
+        Returns: string
+      }
       create_king_notification: {
         Args: {
           p_action_label?: string
@@ -4639,15 +4687,29 @@ export type Database = {
         }
         Returns: string
       }
-      find_product_by_alias: {
-        Args: { search_term: string }
-        Returns: {
-          company_id: string
-          confidence: number
-          product_id: string
-          product_name: string
-        }[]
-      }
+      find_product_by_alias:
+        | {
+            Args: { search_term: string }
+            Returns: {
+              company_id: string
+              confidence: number
+              product_id: string
+              product_name: string
+            }[]
+          }
+        | {
+            Args: {
+              category_hint?: string
+              company_name?: string
+              search_term: string
+            }
+            Returns: {
+              match_score: number
+              match_type: string
+              product_id: string
+              product_name: string
+            }[]
+          }
       generate_affiliate_commission: {
         Args: {
           p_payment_amount: number
@@ -4823,6 +4885,18 @@ export type Database = {
         }
         Returns: string
       }
+      merge_candidate_product: {
+        Args: {
+          p_candidate_id: string
+          p_target_product_id: string
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      reject_candidate_product: {
+        Args: { p_product_id: string; p_user_id?: string }
+        Returns: boolean
+      }
       requires_sms_verification: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -4836,6 +4910,15 @@ export type Database = {
       update_tenant_storage_usage: {
         Args: { p_tenant_id: string }
         Returns: number
+      }
+      validate_candidate_product: {
+        Args: {
+          p_add_alias?: boolean
+          p_new_name?: string
+          p_product_id: string
+          p_user_id?: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

@@ -48,6 +48,11 @@ interface ProductDetected {
   end_date?: string;
   policy_number?: string;
   notes?: string;
+  // Added for smart product matching
+  matched_product_id?: string;
+  match_type?: string;
+  match_score?: number;
+  is_candidate?: boolean;
 }
 
 // Represents a family member detected in documents
@@ -485,6 +490,113 @@ serve(async (req) => {
       console.error("Failed to parse AI response:", aiContent);
       throw new Error("Failed to parse AI analysis result");
     }
+
+    // ============================================
+    // SMART PRODUCT MATCHING
+    // ============================================
+    // For each detected product, try to match with existing catalog
+    // If no match found, create a candidate product
+    
+    const matchedProducts: ProductDetected[] = [];
+    const allDetectedProducts = [
+      ...(parsedResult.new_products_detected || []),
+      ...(parsedResult.old_products_detected || []),
+      ...(parsedResult.products_detected || [])
+    ];
+
+    for (const product of allDetectedProducts) {
+      if (!product.product_name || product.product_name.toLowerCase() === 'autres assurances') {
+        continue; // Skip empty or fallback products
+      }
+
+      try {
+        // Try to find a matching product using fuzzy matching
+        const { data: matches, error: matchError } = await supabase.rpc('find_product_by_alias', {
+          search_term: product.product_name,
+          company_name: product.company || null,
+          category_hint: product.product_category || null
+        });
+
+        if (matchError) {
+          console.error('Product matching error:', matchError);
+        }
+
+        if (matches && matches.length > 0) {
+          // Found a match! Use the best one
+          const bestMatch = matches[0];
+          product.matched_product_id = bestMatch.product_id;
+          product.match_type = bestMatch.match_type;
+          product.match_score = parseFloat(bestMatch.match_score);
+          product.is_candidate = false;
+          
+          console.log(`Matched "${product.product_name}" → "${bestMatch.product_name}" (${bestMatch.match_type}, score: ${bestMatch.match_score})`);
+        } else {
+          // No match found - create a candidate product
+          console.log(`No match for "${product.product_name}" - creating candidate product`);
+          
+          // Map category to main_category
+          let mainCategory = 'NON_VIE';
+          const cat = (product.product_category || '').toUpperCase();
+          if (cat.includes('VIE') || cat.includes('3') || cat.includes('PILIER') || cat.includes('LPP')) {
+            mainCategory = 'VIE';
+          } else if (cat.includes('LCA') || cat.includes('COMPLÉ') || cat.includes('HOSP') || cat.includes('AMBUL')) {
+            mainCategory = 'LCA';
+          } else if (cat.includes('HYPO') || cat.includes('CRÉDIT') || cat.includes('CREDIT')) {
+            mainCategory = 'HYPO';
+          }
+          
+          const { data: candidateId, error: candidateError } = await supabase.rpc('create_candidate_product', {
+            p_detected_name: product.product_name,
+            p_company_name: product.company || null,
+            p_main_category: mainCategory,
+            p_subcategory: null,
+            p_scan_id: scanId
+          });
+
+          if (candidateError) {
+            console.error('Failed to create candidate product:', candidateError);
+          } else if (candidateId) {
+            product.matched_product_id = candidateId;
+            product.match_type = 'candidate';
+            product.match_score = 0;
+            product.is_candidate = true;
+            
+            console.log(`Created candidate product: ${candidateId} for "${product.product_name}"`);
+          }
+        }
+      } catch (e) {
+        console.error(`Error matching product "${product.product_name}":`, e);
+      }
+
+      matchedProducts.push(product);
+    }
+
+    // Update parsed result with matched products
+    if (parsedResult.new_products_detected) {
+      parsedResult.new_products_detected = parsedResult.new_products_detected.map(p => {
+        const matched = matchedProducts.find(m => m.product_name === p.product_name);
+        return matched || p;
+      });
+    }
+    if (parsedResult.old_products_detected) {
+      parsedResult.old_products_detected = parsedResult.old_products_detected.map(p => {
+        const matched = matchedProducts.find(m => m.product_name === p.product_name);
+        return matched || p;
+      });
+    }
+    if (parsedResult.products_detected) {
+      parsedResult.products_detected = parsedResult.products_detected.map(p => {
+        const matched = matchedProducts.find(m => m.product_name === p.product_name);
+        return matched || p;
+      });
+    }
+
+    // Count candidate products for notification
+    const candidateCount = matchedProducts.filter(p => p.is_candidate).length;
+    
+    // ============================================
+    // END SMART PRODUCT MATCHING
+    // ============================================
 
     // Calculate overall confidence
     const confidenceScores = parsedResult.fields.map(f => f.confidence_score);

@@ -57,6 +57,7 @@ export function useProductCatalog(companyId?: string) {
             created_at
           )
         `)
+        .eq('status', 'active') // Only show active products in catalog
         .order('name', { ascending: true });
 
       if (companyId) {
