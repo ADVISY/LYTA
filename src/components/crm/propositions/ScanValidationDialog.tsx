@@ -932,13 +932,17 @@ export default function ScanValidationDialog({
             const ext = doc.file_name?.split('.').pop()?.toLowerCase() || 'pdf';
             const smartName = count > 0 ? `${baseName} (${count + 1}).${ext}` : `${baseName}.${ext}`;
 
+            // CRITICAL FIX: Use individual file_key from document if available, 
+            // otherwise fall back to scan.original_file_key
+            const documentFileKey = doc.file_key || scan.original_file_key;
+
             const documentData = {
               tenant_id: tenantId,
               owner_type: 'client',
               owner_id: newClient.id,
               file_name: smartName,
-              file_key: scan.original_file_key, // Main file key (batch file)
-              mime_type: 'application/pdf',
+              file_key: documentFileKey,  // Use the correct individual file key
+              mime_type: doc.file_key ? (doc.file_name?.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream') : 'application/pdf',
               doc_kind: docType,
               created_by: user.id,
               category: docType,
@@ -948,6 +952,7 @@ export default function ScanValidationDialog({
                 original_name: doc.file_name,
                 description: doc.description,
                 doc_type_confidence: doc.doc_type_confidence,
+                original_file_key: doc.file_key,  // Store original key for reference
               },
             };
 
