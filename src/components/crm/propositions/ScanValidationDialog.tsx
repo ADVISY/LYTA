@@ -573,23 +573,14 @@ export default function ScanValidationDialog({
         
         for (const [companyKey, products] of groupedOldProducts) {
           const firstProduct = products[0];
-          const productId = await findProductId(firstProduct.company, firstProduct.product_category);
           
-          if (productId) {
-            // Build products_data array with ALL product details
-            // Use the new resolveOrCreateProduct for each product
-            const productsData = await Promise.all(products.map(async (p) => {
-              let resolvedProductId = '';
-              if (p.product_name) {
-                try {
-                  const result = await resolveOrCreateProduct(p.product_name, firstProduct.company, p.product_category);
-                  resolvedProductId = result.productId;
-                } catch (e) {
-                  console.warn(`Could not resolve product ${p.product_name}:`, e);
-                }
-              }
+          // Build products_data array with ALL product details - use resolveOrCreateProduct for each
+          const productsData = await Promise.all(products.map(async (p) => {
+            const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
+            try {
+              const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
-                productId: resolvedProductId,
+                productId: result.productId,
                 name: p.product_name || 'Produit',
                 category: p.product_category || 'health',
                 premium: p.premium_monthly || 0,
@@ -597,46 +588,67 @@ export default function ScanValidationDialog({
                 premiumYearly: p.premium_yearly || null,
                 notes: p.notes || null,
               };
-            }));
-
-            // Calculate totals
-            const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-            const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
-            
-            // Get product names for display
-            const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
-
-            const policyData = {
-              tenant_id: tenantId,
-              client_id: newClient.id,
-              product_id: productId,
-              policy_number: firstProduct.policy_number || null,
-              status: hasTermination ? 'resilie' : 'active',
-              start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
-              end_date: parseDate(firstProduct.end_date),
-              premium_monthly: totalPremiumMonthly || null,
-              premium_yearly: totalPremiumYearly || null,
-              deductible: products[0].franchise || null, // Main franchise
-              currency: 'CHF',
-              company_name: firstProduct.company || null,
-              product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
-              products_data: productsData,
-              notes: `${productNames || 'Multi-produits'} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
-            };
-
-            const { data: oldPolicy, error: policyError } = await supabase
-              .from('policies')
-              .insert(policyData)
-              .select()
-              .single();
-
-            if (!policyError && oldPolicy) {
-              createdPolicies.push({ 
-                id: oldPolicy.id, 
-                type: 'old', 
-                productName: productNames || firstProduct.company 
-              });
+            } catch (e) {
+              console.warn(`Could not resolve product ${productNameToSearch}:`, e);
+              return {
+                productId: '',
+                name: p.product_name || 'Produit',
+                category: p.product_category || 'health',
+                premium: p.premium_monthly || 0,
+                deductible: p.franchise || null,
+                premiumYearly: p.premium_yearly || null,
+                notes: p.notes || null,
+              };
             }
+          }));
+
+          // Use the first resolved product's ID as the main policy product_id
+          const mainProductId = productsData.find(p => p.productId)?.productId;
+          
+          if (!mainProductId) {
+            console.warn(`[ScanValidation] No valid product ID found for old policy group: ${companyKey}`);
+            continue;
+          }
+
+          // Calculate totals
+          const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
+          const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+          
+          // Get product names for display
+          const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+
+          const policyData = {
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            product_id: mainProductId,
+            policy_number: firstProduct.policy_number || null,
+            status: hasTermination ? 'resilie' : 'active',
+            start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
+            end_date: parseDate(firstProduct.end_date),
+            premium_monthly: totalPremiumMonthly || null,
+            premium_yearly: totalPremiumYearly || null,
+            deductible: products[0].franchise || null,
+            currency: 'CHF',
+            company_name: firstProduct.company || null,
+            product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+            products_data: productsData,
+            notes: `${productNames || 'Multi-produits'} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
+          };
+
+          const { data: oldPolicy, error: policyError } = await supabase
+            .from('policies')
+            .insert(policyData)
+            .select()
+            .single();
+
+          if (!policyError && oldPolicy) {
+            createdPolicies.push({ 
+              id: oldPolicy.id, 
+              type: 'old', 
+              productName: productNames || firstProduct.company 
+            });
+          } else if (policyError) {
+            console.error(`[ScanValidation] Failed to create old policy for ${companyKey}:`, policyError);
           }
         }
       } else if (createOldContract && hasOldContractData) {
@@ -680,23 +692,14 @@ export default function ScanValidationDialog({
         
         for (const [companyKey, products] of groupedNewProducts) {
           const firstProduct = products[0];
-          const productId = await findProductId(firstProduct.company, firstProduct.product_category);
           
-          if (productId) {
-            // Build products_data array with ALL product details
-            // Use the new resolveOrCreateProduct for each product
-            const productsDataNew = await Promise.all(products.map(async (p) => {
-              let resolvedProductId = '';
-              if (p.product_name) {
-                try {
-                  const result = await resolveOrCreateProduct(p.product_name, firstProduct.company, p.product_category);
-                  resolvedProductId = result.productId;
-                } catch (e) {
-                  console.warn(`Could not resolve product ${p.product_name}:`, e);
-                }
-              }
+          // Build products_data array with ALL product details - use resolveOrCreateProduct for each
+          const productsDataNew = await Promise.all(products.map(async (p) => {
+            const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
+            try {
+              const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
-                productId: resolvedProductId,
+                productId: result.productId,
                 name: p.product_name || 'Produit',
                 category: p.product_category || 'health',
                 premium: p.premium_monthly || 0,
@@ -704,46 +707,67 @@ export default function ScanValidationDialog({
                 premiumYearly: p.premium_yearly || null,
                 notes: p.notes || null,
               };
-            }));
-
-            // Calculate totals
-            const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-            const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
-            
-            // Get product names for display
-            const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
-
-            const policyData = {
-              tenant_id: tenantId,
-              client_id: newClient.id,
-              product_id: productId,
-              policy_number: firstProduct.policy_number || null,
-              status: 'active',
-              start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
-              end_date: parseDate(firstProduct.end_date),
-              premium_monthly: totalPremiumMonthly || null,
-              premium_yearly: totalPremiumYearly || null,
-              deductible: products[0].franchise || null, // Main franchise
-              currency: 'CHF',
-              company_name: firstProduct.company || null,
-              product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
-              products_data: productsDataNew,
-              notes: `${productNames || 'Multi-produits'} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
-            };
-
-            const { data: createdPolicy, error: policyError } = await supabase
-              .from('policies')
-              .insert(policyData)
-              .select()
-              .single();
-
-            if (!policyError && createdPolicy) {
-              createdPolicies.push({ 
-                id: createdPolicy.id, 
-                type: 'new', 
-                productName: productNames || firstProduct.company 
-              });
+            } catch (e) {
+              console.warn(`Could not resolve product ${productNameToSearch}:`, e);
+              return {
+                productId: '',
+                name: p.product_name || 'Produit',
+                category: p.product_category || 'health',
+                premium: p.premium_monthly || 0,
+                deductible: p.franchise || null,
+                premiumYearly: p.premium_yearly || null,
+                notes: p.notes || null,
+              };
             }
+          }));
+
+          // Use the first resolved product's ID as the main policy product_id
+          const mainProductId = productsDataNew.find(p => p.productId)?.productId;
+          
+          if (!mainProductId) {
+            console.warn(`[ScanValidation] No valid product ID found for new policy group: ${companyKey}`);
+            continue;
+          }
+
+          // Calculate totals
+          const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
+          const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+          
+          // Get product names for display
+          const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+
+          const policyData = {
+            tenant_id: tenantId,
+            client_id: newClient.id,
+            product_id: mainProductId,
+            policy_number: firstProduct.policy_number || null,
+            status: 'active',
+            start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
+            end_date: parseDate(firstProduct.end_date),
+            premium_monthly: totalPremiumMonthly || null,
+            premium_yearly: totalPremiumYearly || null,
+            deductible: products[0].franchise || null,
+            currency: 'CHF',
+            company_name: firstProduct.company || null,
+            product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+            products_data: productsDataNew,
+            notes: `${productNames || 'Multi-produits'} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
+          };
+
+          const { data: createdPolicy, error: policyError } = await supabase
+            .from('policies')
+            .insert(policyData)
+            .select()
+            .single();
+
+          if (!policyError && createdPolicy) {
+            createdPolicies.push({ 
+              id: createdPolicy.id, 
+              type: 'new', 
+              productName: productNames || firstProduct.company 
+            });
+          } else if (policyError) {
+            console.error(`[ScanValidation] Failed to create new policy for ${companyKey}:`, policyError);
           }
         }
       } else if (createNewContract && hasNewContractData) {
