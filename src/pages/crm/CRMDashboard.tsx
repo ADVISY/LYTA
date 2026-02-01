@@ -329,8 +329,8 @@ export default function CRMDashboard() {
     return { lca: lcaTotal, vie: vieTotal, nonVie: nonVieTotal, hypo: hypoTotal, total: lcaTotal + vieTotal + nonVieTotal + hypoTotal };
   }, [periodPolicies, commissions]);
 
-  // Calculate CA en vigueur (from active contracts only) using real commissions
-  const calculateCAEnVigueur = useMemo(() => {
+  // Calculate CA estimé (from ALL active contracts) - this is the automatic estimated turnover
+  const calculateCAEstime = useMemo(() => {
     const activePolices = filteredPolicies.filter(p => p.status === 'active');
     let lcaTotal = 0;
     let vieTotal = 0;
@@ -340,23 +340,59 @@ export default function CRMDashboard() {
     activePolices.forEach(p => {
       const category = getPolicyCategory(p);
       const monthlyPremium = p.premium_monthly || (p.premium_yearly || 0) / 12;
+      const yearlyPremium = p.premium_yearly || monthlyPremium * 12;
 
       if (category === 'vie') {
+        // VIE: use commission if available, otherwise estimate 5% of yearly premium
         const policyCommission = commissions.find(c => c.policy_id === p.id);
-        if (policyCommission) {
-          vieTotal += policyCommission.amount || 0;
-        }
+        vieTotal += policyCommission?.amount || (yearlyPremium * 0.05);
       } else if (category === 'lca') {
+        // LCA/Health: monthly * 16 formula
         lcaTotal += monthlyPremium * 16;
       } else if (category === 'hypo') {
-        hypoTotal += monthlyPremium * 16;
+        // HYPO: 1% of yearly
+        hypoTotal += yearlyPremium * 0.01;
       } else {
-        nonVieTotal += monthlyPremium * 16;
+        // NON-VIE: 15% of yearly
+        nonVieTotal += yearlyPremium * 0.15;
       }
     });
 
     return { lca: lcaTotal, vie: vieTotal, nonVie: nonVieTotal, hypo: hypoTotal, total: lcaTotal + vieTotal + nonVieTotal + hypoTotal };
   }, [filteredPolicies, commissions]);
+
+  // Calculate CA réalisé (CA en vigueur) = ONLY paid commissions - this is actual realized turnover
+  const calculateCARealise = useMemo(() => {
+    const paidCommissions = commissions.filter(c => c.status === 'paid');
+    let lcaTotal = 0;
+    let vieTotal = 0;
+    let nonVieTotal = 0;
+    let hypoTotal = 0;
+
+    paidCommissions.forEach(c => {
+      // Find the policy to determine category
+      const policy = filteredPolicies.find(p => p.id === c.policy_id);
+      if (!policy) return;
+
+      const category = getPolicyCategory(policy);
+      const amount = Number(c.amount || 0);
+
+      if (category === 'vie') {
+        vieTotal += amount;
+      } else if (category === 'lca') {
+        lcaTotal += amount;
+      } else if (category === 'hypo') {
+        hypoTotal += amount;
+      } else {
+        nonVieTotal += amount;
+      }
+    });
+
+    return { lca: lcaTotal, vie: vieTotal, nonVie: nonVieTotal, hypo: hypoTotal, total: lcaTotal + vieTotal + nonVieTotal + hypoTotal };
+  }, [filteredPolicies, commissions]);
+
+  // Backward compatible alias
+  const calculateCAEnVigueur = calculateCAEstime;
 
   // Commissions by period (for display)
   const commissionsByPeriod = useMemo(() => {
@@ -1032,7 +1068,7 @@ export default function CRMDashboard() {
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        CA réalisé
+                        CA réalisé (payé)
                       </button>
                     </div>
                   </div>
@@ -1109,31 +1145,55 @@ export default function CRMDashboard() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Summary Stats */}
+                  {/* Summary Stats - shows TOTALS based on mode */}
                   {canSeeFinancials && (
                     <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t">
                       <div className="text-center p-2.5 rounded-xl bg-rose-500/10">
                         <p className="text-[9px] text-muted-foreground">LCA</p>
                         <p className="text-sm font-bold text-rose-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.lca, 0))} CHF
+                          {formatCurrency(
+                            chartViewMode === 'prime'
+                              ? monthlyChartData.reduce((s, m) => s + m.lcaPrime, 0)
+                              : chartViewMode === 'ca_estime'
+                                ? calculateCAEstime.lca
+                                : calculateCARealise.lca
+                          )} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-blue-500/10">
                         <p className="text-[9px] text-muted-foreground">VIE</p>
                         <p className="text-sm font-bold text-blue-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.vie, 0))} CHF
+                          {formatCurrency(
+                            chartViewMode === 'prime'
+                              ? monthlyChartData.reduce((s, m) => s + m.viePrime, 0)
+                              : chartViewMode === 'ca_estime'
+                                ? calculateCAEstime.vie
+                                : calculateCARealise.vie
+                          )} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-emerald-500/10">
                         <p className="text-[9px] text-muted-foreground">NON-VIE</p>
                         <p className="text-sm font-bold text-emerald-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.nonVie, 0))} CHF
+                          {formatCurrency(
+                            chartViewMode === 'prime'
+                              ? monthlyChartData.reduce((s, m) => s + m.nonViePrime, 0)
+                              : chartViewMode === 'ca_estime'
+                                ? calculateCAEstime.nonVie
+                                : calculateCARealise.nonVie
+                          )} CHF
                         </p>
                       </div>
                       <div className="text-center p-2.5 rounded-xl bg-violet-500/10">
                         <p className="text-[9px] text-muted-foreground">HYPO</p>
                         <p className="text-sm font-bold text-violet-600">
-                          {formatCurrency(monthlyChartData.reduce((s, m) => s + m.hypo, 0))} CHF
+                          {formatCurrency(
+                            chartViewMode === 'prime'
+                              ? monthlyChartData.reduce((s, m) => s + m.hypoPrime, 0)
+                              : chartViewMode === 'ca_estime'
+                                ? calculateCAEstime.hypo
+                                : calculateCARealise.hypo
+                          )} CHF
                         </p>
                       </div>
                     </div>
