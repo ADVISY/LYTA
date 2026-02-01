@@ -34,6 +34,7 @@ const menuItems = [
   { to: "/king/tenants", icon: Building2, label: "Clients SaaS" },
   { to: "/king/wizard", icon: Wand2, label: "Nouveau Client" },
   { to: "/king/affiliates", icon: Handshake, label: "Affiliation" },
+  { to: "/king/catalog", icon: Package, label: "Référentiels" },
   { to: "/king/onboarding", icon: BookOpen, label: "Guide Onboarding" },
   { to: "/king/users", icon: Users, label: "Utilisateurs" },
   { to: "/king/plans", icon: Package, label: "Offres & Plans" },

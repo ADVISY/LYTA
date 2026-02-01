@@ -1839,7 +1839,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_active: boolean | null
+          main_category:
+            | Database["public"]["Enums"]["product_main_category"]
+            | null
           name: string
+          subcategory: string | null
         }
         Insert: {
           category: string
@@ -1850,7 +1855,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
+          main_category?:
+            | Database["public"]["Enums"]["product_main_category"]
+            | null
           name: string
+          subcategory?: string | null
         }
         Update: {
           category?: string
@@ -1861,7 +1871,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
+          main_category?:
+            | Database["public"]["Enums"]["product_main_category"]
+            | null
           name?: string
+          subcategory?: string | null
         }
         Relationships: [
           {
@@ -2461,6 +2476,38 @@ export type Database = {
           },
         ]
       }
+      product_aliases: {
+        Row: {
+          alias: string
+          created_at: string | null
+          id: string
+          language: string | null
+          product_id: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          product_id: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_aliases_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -2968,6 +3015,126 @@ export type Database = {
           },
         ]
       }
+      scan_batch_documents: {
+        Row: {
+          batch_id: string
+          classification_confidence: number | null
+          classification_corrected: boolean | null
+          created_at: string | null
+          document_classification: string | null
+          extracted_data: Json | null
+          file_key: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          scan_id: string | null
+          sort_order: number | null
+          status: string | null
+        }
+        Insert: {
+          batch_id: string
+          classification_confidence?: number | null
+          classification_corrected?: boolean | null
+          created_at?: string | null
+          document_classification?: string | null
+          extracted_data?: Json | null
+          file_key: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          scan_id?: string | null
+          sort_order?: number | null
+          status?: string | null
+        }
+        Update: {
+          batch_id?: string
+          classification_confidence?: number | null
+          classification_corrected?: boolean | null
+          created_at?: string | null
+          document_classification?: string | null
+          extracted_data?: Json | null
+          file_key?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          scan_id?: string | null
+          sort_order?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_batch_documents_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "scan_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_batch_documents_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "document_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_batches: {
+        Row: {
+          consolidation_summary: Json | null
+          created_at: string | null
+          created_by: string | null
+          documents_classified: number | null
+          id: string
+          status: string | null
+          tenant_id: string | null
+          total_documents: number | null
+          updated_at: string | null
+          verified_partner_email: string | null
+          verified_partner_id: string | null
+        }
+        Insert: {
+          consolidation_summary?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          documents_classified?: number | null
+          id?: string
+          status?: string | null
+          tenant_id?: string | null
+          total_documents?: number | null
+          updated_at?: string | null
+          verified_partner_email?: string | null
+          verified_partner_id?: string | null
+        }
+        Update: {
+          consolidation_summary?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          documents_classified?: number | null
+          id?: string
+          status?: string | null
+          tenant_id?: string | null
+          total_documents?: number | null
+          updated_at?: string | null
+          verified_partner_email?: string | null
+          verified_partner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_emails: {
         Row: {
           created_at: string
@@ -3127,6 +3294,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      swiss_postal_codes: {
+        Row: {
+          canton: string | null
+          city: string
+          id: string
+          is_primary: boolean | null
+          language: string | null
+          npa: string
+        }
+        Insert: {
+          canton?: string | null
+          city: string
+          id?: string
+          is_primary?: boolean | null
+          language?: string | null
+          npa: string
+        }
+        Update: {
+          canton?: string | null
+          city?: string
+          id?: string
+          is_primary?: boolean | null
+          language?: string | null
+          npa?: string
+        }
+        Relationships: []
       }
       tenant_branding: {
         Row: {
@@ -4445,6 +4639,15 @@ export type Database = {
         }
         Returns: string
       }
+      find_product_by_alias: {
+        Args: { search_term: string }
+        Returns: {
+          company_id: string
+          confidence: number
+          product_id: string
+          product_name: string
+        }[]
+      }
       generate_affiliate_commission: {
         Args: {
           p_payment_amount: number
@@ -4674,6 +4877,7 @@ export type Database = {
         | "dashboard"
         | "settings"
       plan_status: "active" | "suspended"
+      product_main_category: "VIE" | "LCA" | "NON_VIE" | "HYPO"
       tenant_plan: "start" | "pro" | "prime" | "founder"
       tenant_status: "pending_setup" | "active" | "suspended" | "cancelled"
     }
@@ -4844,6 +5048,7 @@ export const Constants = {
         "settings",
       ],
       plan_status: ["active", "suspended"],
+      product_main_category: ["VIE", "LCA", "NON_VIE", "HYPO"],
       tenant_plan: ["start", "pro", "prime", "founder"],
       tenant_status: ["pending_setup", "active", "suspended", "cancelled"],
     },
