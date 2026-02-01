@@ -56,6 +56,7 @@ import TenantOnboarding from "./pages/king/TenantOnboarding";
 import KingTenantImport from "./pages/king/KingTenantImport";
 import KingAffiliates from "./pages/king/KingAffiliates";
 import KingAffiliateDetail from "./pages/king/KingAffiliateDetail";
+import KingCatalog from "./pages/king/KingCatalog";
 import FontPreview from "./pages/FontPreview";
 
 const queryClient = new QueryClient();
@@ -109,6 +110,7 @@ const App = () => (
                 <Route path="wizard" element={<KingWizard />} />
                 <Route path="affiliates" element={<KingAffiliates />} />
                 <Route path="affiliates/:id" element={<KingAffiliateDetail />} />
+                <Route path="catalog" element={<KingCatalog />} />
                 <Route path="users" element={<KingUsers />} />
                 <Route path="plans" element={<KingPlans />} />
                 <Route path="security" element={<KingSecurity />} />

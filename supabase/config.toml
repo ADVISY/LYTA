@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.scan-document]
 verify_jwt = false
+
+[functions.classify-batch-documents]
+verify_jwt = false

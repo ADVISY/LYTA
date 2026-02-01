@@ -8,7 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePendingScans, PendingScan } from "@/hooks/usePendingScans";
+import { useScanBatches } from "@/hooks/useScanBatches";
 import { PendingScanCard, ScanValidationDialog } from "@/components/crm/propositions";
+import { ScanBatchUpload, ScanBatchReview } from "@/components/crm/ia-scan";
 import {
   FileText,
   Plus,
@@ -20,6 +22,7 @@ import {
   Sparkles,
   Inbox,
   Loader2,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,10 +33,15 @@ export default function CRMPropositions() {
   const highlightedScanId = searchParams.get('scan');
 
   const { scans, loading, error, refresh, rejectScan } = usePendingScans();
+  const { batches, loading: batchesLoading, fetchBatches } = useScanBatches();
   const [selectedScan, setSelectedScan] = useState<PendingScan | null>(null);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending');
+  const [activeTab, setActiveTab] = useState<'scans' | 'batches'>('scans');
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
+
+  // Filter batches - only show classified ones
+  const pendingBatches = batches.filter(b => b.status === 'classified');
 
   // Filter scans by status
   const pendingScans = scans.filter(s => s.status === 'completed' || s.status === 'processing');
@@ -151,79 +159,190 @@ export default function CRMPropositions() {
         ))}
       </div>
 
-      {/* Main content */}
-      <Card className="border-0 shadow-xl overflow-hidden">
-        <CardHeader className="border-b bg-muted/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Inbox className="h-5 w-5 text-primary" />
-                Dossiers à valider
-              </CardTitle>
-              <CardDescription>
-                {pendingScans.length} dossier(s) en attente de validation
-              </CardDescription>
-            </div>
-            {pendingScans.length > 0 && (
-              <Badge variant="secondary" className="bg-primary/10 text-primary">
-                {pendingScans.length} nouveau(x)
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
+      {/* Main content with tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'scans' | 'batches')}>
+        <div className="flex items-center justify-between mb-4">
+          <TabsList>
+            <TabsTrigger value="scans" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Scans individuels
+              {pendingScans.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{pendingScans.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="batches" className="gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Dossiers multi-docs
+              {pendingBatches.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{pendingBatches.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        <CardContent className="p-6">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-32 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="text-center py-12 text-destructive">
-              <FileX className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Erreur de chargement: {error}</p>
-              <Button variant="outline" onClick={refresh} className="mt-4">
-                Réessayer
-              </Button>
-            </div>
-          ) : pendingScans.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="relative inline-block mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl blur-2xl opacity-30 animate-pulse" />
-                <div className="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-500/10 to-blue-600/10 border border-cyan-500/20 flex items-center justify-center">
-                  <Inbox className="h-12 w-12 text-cyan-600" />
+          {activeTab === 'batches' && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowBatchUpload(!showBatchUpload)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nouveau dossier
+            </Button>
+          )}
+        </div>
+
+        {/* Batch upload section */}
+        {showBatchUpload && activeTab === 'batches' && (
+          <div className="mb-6">
+            <ScanBatchUpload
+              onBatchCreated={(batchId) => {
+                setShowBatchUpload(false);
+                fetchBatches();
+              }}
+            />
+          </div>
+        )}
+
+        <TabsContent value="scans">
+          <Card className="border-0 shadow-xl overflow-hidden">
+            <CardHeader className="border-b bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Inbox className="h-5 w-5 text-primary" />
+                    Scans à valider
+                  </CardTitle>
+                  <CardDescription>
+                    {pendingScans.length} scan(s) en attente de validation
+                  </CardDescription>
                 </div>
               </div>
-              <p className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                Aucun dossier en attente
-              </p>
-              <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                Les nouveaux dossiers scannés via le formulaire de dépôt apparaîtront ici pour validation.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {pendingScans.map(scan => (
-                <div
-                  key={scan.id}
-                  className={cn(
-                    "transition-all",
-                    highlightedScanId === scan.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
-                  )}
-                >
-                  <PendingScanCard
-                    scan={scan}
-                    onValidate={handleValidate}
-                    onReject={handleReject}
-                    isRejecting={rejectingId === scan.id}
-                  />
+            </CardHeader>
+
+            <CardContent className="p-6">
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-32 w-full rounded-lg" />
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : error ? (
+                <div className="text-center py-12 text-destructive">
+                  <FileX className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Erreur de chargement: {error}</p>
+                  <Button type="button" variant="outline" onClick={refresh} className="mt-4">
+                    Réessayer
+                  </Button>
+                </div>
+              ) : pendingScans.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="relative inline-block mb-6">
+                    <div className="absolute inset-0 bg-primary/30 rounded-3xl blur-2xl opacity-30 animate-pulse" />
+                    <div className="relative w-24 h-24 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                      <Inbox className="h-12 w-12 text-primary" />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-foreground">
+                    Aucun scan en attente
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                    Les nouveaux dossiers scannés via le formulaire de dépôt apparaîtront ici.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingScans.map(scan => (
+                    <div
+                      key={scan.id}
+                      className={cn(
+                        "transition-all",
+                        highlightedScanId === scan.id && "ring-2 ring-primary ring-offset-2 rounded-lg"
+                      )}
+                    >
+                      <PendingScanCard
+                        scan={scan}
+                        onValidate={handleValidate}
+                        onReject={handleReject}
+                        isRejecting={rejectingId === scan.id}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="batches">
+          <Card className="border-0 shadow-xl overflow-hidden">
+            <CardHeader className="border-b bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-primary" />
+                    Dossiers Multi-Documents
+                  </CardTitle>
+                  <CardDescription>
+                    {pendingBatches.length} dossier(s) classifié(s) en attente de consolidation
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              {batchesLoading ? (
+                <div className="space-y-4">
+                  {[1, 2].map(i => (
+                    <Skeleton key={i} className="h-48 w-full rounded-lg" />
+                  ))}
+                </div>
+              ) : pendingBatches.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="relative inline-block mb-6">
+                    <div className="absolute inset-0 bg-primary/30 rounded-3xl blur-2xl opacity-30 animate-pulse" />
+                    <div className="relative w-24 h-24 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                      <FolderOpen className="h-12 w-12 text-primary" />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-foreground">
+                    Aucun dossier multi-documents
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                    Utilisez "Nouveau dossier" pour uploader plusieurs documents à la fois.
+                    L'IA classifiera automatiquement chaque pièce.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowBatchUpload(true)}
+                    className="mt-6 gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Créer un dossier
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {pendingBatches.map(batch => (
+                    <ScanBatchReview
+                      key={batch.id}
+                      batch={batch}
+                      onValidate={() => {
+                        // TODO: Open consolidation dialog
+                        toast({
+                          title: "Consolidation",
+                          description: "La consolidation multi-documents sera implémentée prochainement",
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Validation Dialog */}
       <ScanValidationDialog
