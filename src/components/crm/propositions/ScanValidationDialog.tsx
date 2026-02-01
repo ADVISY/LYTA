@@ -456,11 +456,40 @@ export default function ScanValidationDialog({
       const createdFamilyMembers: { id: string; name: string }[] = [];
 
       // Helper to resolve product using RPC or auto-create if not found
+      // Returns the product's catalog category (health, life, auto, etc.) for proper display
       const resolveOrCreateProduct = async (
         productName: string | null,
         companyName: string | null,
         categoryHint?: string
-      ): Promise<{ productId: string; wasCreated: boolean }> => {
+      ): Promise<{ productId: string; wasCreated: boolean; category: string }> => {
+        // Helper to normalize AI category to catalog category values (health, life, auto, home, legal, other)
+        const normalizeCategoryToDisplay = (rawCategory: string | null): string => {
+          if (!rawCategory) return 'health';
+          const lower = rawCategory.toLowerCase().trim();
+          
+          // Map various AI/scan category values to display values
+          if (['health', 'santé', 'sante', 'maladie', 'lamal', 'lca', 'kranken', 'malattia'].includes(lower)) {
+            return 'health';
+          }
+          if (['life', 'vie', 'leben', 'vita', '3e pilier', '3a', '3b', 'pilier', 'prévoyance', 'prevoyance'].includes(lower)) {
+            return 'life';
+          }
+          if (['auto', 'voiture', 'véhicule', 'vehicule', 'fahrzeug', 'automobile', 'rc auto'].includes(lower)) {
+            return 'auto';
+          }
+          if (['home', 'ménage', 'menage', 'habitation', 'haushalt', 'rc privée', 'rc privee', 'economia domestica'].includes(lower)) {
+            return 'home';
+          }
+          if (['legal', 'juridique', 'protection juridique', 'rechtsschutz', 'protezione giuridica'].includes(lower)) {
+            return 'legal';
+          }
+          if (['property', 'immobilier', 'bâtiment', 'batiment', 'gebäude', 'edificio'].includes(lower)) {
+            return 'property';
+          }
+          // Default to health for Swiss insurance context (most common)
+          return 'health';
+        };
+
         // 1. Try the RPC function first
         if (productName) {
           const { data: matches, error: rpcError } = await supabase.rpc('find_product_by_alias', {
@@ -473,7 +502,16 @@ export default function ScanValidationDialog({
             // Return the best match (first result, highest score)
             const bestMatch = matches.sort((a: any, b: any) => b.match_score - a.match_score)[0];
             console.log(`[resolveOrCreateProduct] Found match for "${productName}": ${bestMatch.product_name} (score: ${bestMatch.match_score})`);
-            return { productId: bestMatch.product_id, wasCreated: false };
+            
+            // Fetch the actual product to get its category from the catalog
+            const { data: productData } = await supabase
+              .from('insurance_products')
+              .select('category')
+              .eq('id', bestMatch.product_id)
+              .single();
+            
+            const catalogCategory = productData?.category || normalizeCategoryToDisplay(categoryHint);
+            return { productId: bestMatch.product_id, wasCreated: false, category: catalogCategory };
           }
         }
 
@@ -508,6 +546,7 @@ export default function ScanValidationDialog({
         }
 
         // 3. Auto-create the product (status='active' as requested)
+        const normalizedCategory = normalizeCategoryToDisplay(categoryHint);
         const finalProductName = productName || `Produit ${companyName || 'Inconnu'}`;
         const { data: newProduct, error: productError } = await supabase
           .from('insurance_products')
@@ -516,28 +555,28 @@ export default function ScanValidationDialog({
             company_id: companyId,
             status: 'active',
             source: 'ia_scan',
-            category: categoryHint || 'LAMal',
+            category: normalizedCategory,
             subcategory: categoryHint || 'base',
           })
           .select('id')
           .single();
 
         if (!productError && newProduct) {
-          console.log(`[resolveOrCreateProduct] Created new product: ${finalProductName}`);
-          return { productId: newProduct.id, wasCreated: true };
+          console.log(`[resolveOrCreateProduct] Created new product: ${finalProductName} with category: ${normalizedCategory}`);
+          return { productId: newProduct.id, wasCreated: true, category: normalizedCategory };
         }
 
         // 4. Ultimate fallback - get any existing product
         const { data: anyProduct } = await supabase
           .from('insurance_products')
-          .select('id')
+          .select('id, category')
           .eq('status', 'active')
           .limit(1)
           .single();
 
         if (anyProduct) {
           console.warn(`[resolveOrCreateProduct] Using fallback product for "${productName}"`);
-          return { productId: anyProduct.id, wasCreated: false };
+          return { productId: anyProduct.id, wasCreated: false, category: anyProduct.category || 'health' };
         }
 
         throw new Error(`Impossible de créer ou trouver un produit pour "${productName || companyName}"`);
@@ -582,7 +621,7 @@ export default function ScanValidationDialog({
               return {
                 productId: result.productId,  // camelCase like ContractForm
                 name: p.product_name || 'Produit',
-                category: p.product_category || 'health',
+                category: result.category,  // Use catalog category for proper display (health, life, auto, etc.)
                 premium: p.premium_monthly || 0,  // monthly premium like ContractForm
                 deductible: p.franchise || null,
                 durationYears: null,  // For life insurance compatibility with ContractForm
@@ -592,7 +631,7 @@ export default function ScanValidationDialog({
               return {
                 productId: '',
                 name: p.product_name || 'Produit',
-                category: p.product_category || 'health',
+                category: 'health',  // Default to health on error
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
                 durationYears: null,
@@ -616,8 +655,10 @@ export default function ScanValidationDialog({
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
           
           // Determine product_type EXACTLY like ContractForm: 'multi' for multiple, category for single
+          // Use the resolved category from catalog, not the raw AI value
+          const firstResolvedCategory = productsData.find(p => p.category)?.category || 'health';
           const mainCategory = products.length === 1 
-            ? (firstProduct.product_category || 'health')
+            ? firstResolvedCategory
             : 'multi';
 
           // Build notes similar to ContractForm format
@@ -710,7 +751,7 @@ export default function ScanValidationDialog({
               return {
                 productId: result.productId,  // camelCase like ContractForm
                 name: p.product_name || 'Produit',
-                category: p.product_category || 'health',
+                category: result.category,  // Use catalog category for proper display (health, life, auto, etc.)
                 premium: p.premium_monthly || 0,  // monthly premium like ContractForm
                 deductible: p.franchise || null,
                 durationYears: null,  // For life insurance compatibility with ContractForm
@@ -720,7 +761,7 @@ export default function ScanValidationDialog({
               return {
                 productId: '',
                 name: p.product_name || 'Produit',
-                category: p.product_category || 'health',
+                category: 'health',  // Default to health on error
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
                 durationYears: null,
@@ -744,8 +785,10 @@ export default function ScanValidationDialog({
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
           
           // Determine product_type EXACTLY like ContractForm: 'multi' for multiple, category for single
+          // Use the resolved category from catalog, not the raw AI value
+          const firstResolvedCategoryNew = productsDataNew.find(p => p.category)?.category || 'health';
           const mainCategory = products.length === 1 
-            ? (firstProduct.product_category || 'health')
+            ? firstResolvedCategoryNew
             : 'multi';
 
           // Build notes similar to ContractForm format
