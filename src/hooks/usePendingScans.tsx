@@ -12,6 +12,7 @@ export interface WorkflowAction {
 
 export interface DocumentDetected {
   file_name: string;
+  file_key?: string;  // Individual file storage key (for batch uploads)
   doc_type: string;
   doc_type_confidence: number;
   description: string;

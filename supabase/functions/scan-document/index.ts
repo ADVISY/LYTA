@@ -31,6 +31,7 @@ interface WorkflowAction {
 
 interface DocumentDetected {
   file_name: string;
+  file_key?: string;  // Individual file storage key (for batch uploads)
   doc_type: string;
   doc_type_confidence: number;
   description: string;
@@ -389,8 +390,8 @@ serve(async (req) => {
 
     console.log(`Processing ${filesToProcess.length} files in ${batchMode ? 'batch' : 'single'} mode`);
 
-    // Download and encode all files
-    const fileContents: { fileName: string; base64: string; mimeType: string }[] = [];
+    // Download and encode all files - preserve file_key for document mapping
+    const fileContents: { fileName: string; fileKey: string; base64: string; mimeType: string }[] = [];
     
     for (const fileInfo of filesToProcess) {
       const { data: fileData, error: downloadError } = await supabase.storage
@@ -407,6 +408,7 @@ serve(async (req) => {
       
       fileContents.push({
         fileName: fileInfo.fileName,
+        fileKey: fileInfo.path,  // Preserve the storage path for document mapping
         base64: base64File,
         mimeType: fileInfo.mimeType || 'application/pdf'
       });
@@ -489,6 +491,43 @@ serve(async (req) => {
     } catch (parseError) {
       console.error("Failed to parse AI response:", aiContent);
       throw new Error("Failed to parse AI analysis result");
+    }
+
+    // ============================================
+    // MAP FILE KEYS TO DOCUMENTS DETECTED
+    // ============================================
+    // When processing multiple files, map file_key from uploaded files to documents detected by AI
+    if (parsedResult.documents_detected && parsedResult.documents_detected.length > 0) {
+      parsedResult.documents_detected = parsedResult.documents_detected.map((doc, index) => {
+        // Try to match by file_name first
+        const matchedFile = fileContents.find(f => 
+          f.fileName.toLowerCase() === doc.file_name?.toLowerCase() ||
+          f.fileName.toLowerCase().includes(doc.file_name?.toLowerCase() || '') ||
+          doc.file_name?.toLowerCase().includes(f.fileName.toLowerCase())
+        );
+        
+        if (matchedFile) {
+          return { ...doc, file_key: matchedFile.fileKey };
+        }
+        
+        // Fallback: use index-based mapping if same count
+        if (fileContents.length === parsedResult.documents_detected!.length && fileContents[index]) {
+          return { ...doc, file_key: fileContents[index].fileKey };
+        }
+        
+        // Ultimate fallback: use first file if single file uploaded (multi-page PDF scenario)
+        if (fileContents.length === 1) {
+          return { ...doc, file_key: fileContents[0].fileKey };
+        }
+        
+        return doc;
+      });
+      
+      console.log('Documents with mapped file_keys:', parsedResult.documents_detected.map(d => ({ 
+        file_name: d.file_name, 
+        file_key: d.file_key,
+        doc_type: d.doc_type 
+      })));
     }
 
     // ============================================
