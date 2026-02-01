@@ -510,7 +510,9 @@ export default function ScanValidationDialog({
               .eq('id', bestMatch.product_id)
               .single();
             
-            const catalogCategory = productData?.category || normalizeCategoryToDisplay(categoryHint);
+            // Always normalize the category to ensure consistency (catalog may have legacy values)
+            const rawCatalogCategory = productData?.category || categoryHint;
+            const catalogCategory = normalizeCategoryToDisplay(rawCatalogCategory);
             return { productId: bestMatch.product_id, wasCreated: false, category: catalogCategory };
           }
         }

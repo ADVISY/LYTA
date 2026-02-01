@@ -107,6 +107,33 @@ const isLamalProduct = (productName: string | null | undefined): boolean => {
   return name.includes('lamal') || name.includes('base') || name.includes('obligatoire');
 };
 
+// Helper to normalize category from database (handles legacy IA Scan values like 'LAMal', 'LCA')
+const normalizeCategoryFromDB = (rawCategory: string | null | undefined): string => {
+  if (!rawCategory) return 'other';
+  const lower = rawCategory.toLowerCase().trim();
+  
+  // Map IA Scan categories (LAMal, LCA, etc.) to display categories
+  if (['health', 'santé', 'sante', 'maladie', 'lamal', 'lca', 'kranken', 'malattia'].includes(lower)) {
+    return 'health';
+  }
+  if (['life', 'vie', 'leben', 'vita', '3e pilier', '3a', '3b', 'pilier', 'prévoyance', 'prevoyance'].includes(lower)) {
+    return 'life';
+  }
+  if (['auto', 'voiture', 'véhicule', 'vehicule', 'fahrzeug', 'automobile', 'rc auto'].includes(lower)) {
+    return 'auto';
+  }
+  if (['home', 'ménage', 'menage', 'habitation', 'haushalt', 'rc privée', 'rc privee', 'economia domestica'].includes(lower)) {
+    return 'home';
+  }
+  if (['legal', 'juridique', 'protection juridique', 'rechtsschutz', 'protezione giuridica'].includes(lower)) {
+    return 'legal';
+  }
+  if (['property', 'immobilier', 'bâtiment', 'batiment', 'gebäude', 'edificio'].includes(lower)) {
+    return 'property';
+  }
+  return 'other';
+};
+
 export default function ContractForm({ clientId, open, onOpenChange, onSuccess, editMode = false, policyId }: ContractFormProps) {
   const { t } = useTranslation();
   const { createDocument } = useDocuments();
@@ -214,7 +241,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // Load products from products_data
         // For products without productId, try to resolve by name
         const loadedProducts: SelectedProduct[] = await Promise.all(productsData.map(async (prod) => {
-          const isLamal = prod.category === 'health' && isLamalProduct(prod.name);
+          // Normalize category to handle legacy IA Scan values (LAMal, LCA -> health)
+          const normalizedCategory = normalizeCategoryFromDB(prod.category);
+          const isLamal = normalizedCategory === 'health' && isLamalProduct(prod.name);
           
           // Set LAMal fields if applicable
           if (isLamal && prod.premium) {
@@ -240,7 +269,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             id: generateId(),
             productId: resolvedProductId,
             name: prod.name || 'Produit',
-            category: prod.category || 'other',
+            category: normalizedCategory,  // Use normalized category for proper display
             premium: String(prod.premium || ''),
             deductible: String(prod.deductible || ''),
             durationYears: String(prod.durationYears || ''),
@@ -250,7 +279,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         setSelectedProducts(loadedProducts);
       } else if (existingPolicy.product) {
         // Fallback: single product from product relation
-        const category = existingPolicy.product.category || 'other';
+        const category = normalizeCategoryFromDB(existingPolicy.product.category);
         const isLamal = category === 'health' && isLamalProduct(existingPolicy.product.name);
         
         if (isLamal) {
