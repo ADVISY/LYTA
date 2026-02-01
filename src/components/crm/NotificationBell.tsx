@@ -74,7 +74,10 @@ export const NotificationBell = () => {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 z-50" align="end">
+      <PopoverContent
+        className="w-[min(24rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] p-0 z-50"
+        align="end"
+      >
         <div className="flex items-center justify-between p-3 border-b bg-background">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />

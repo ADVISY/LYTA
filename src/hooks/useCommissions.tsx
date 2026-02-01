@@ -83,10 +83,15 @@ export function useCommissions() {
       }
 
       // Include tenant_id
-      const dataWithTenant = {
+      const dataWithTenant: any = {
         ...commissionData,
         tenant_id: effectiveTenantId
       };
+
+      // If created as paid, ensure paid_at is set for consistency
+      if (dataWithTenant.status === 'paid' && dataWithTenant.paid_at == null) {
+        dataWithTenant.paid_at = new Date().toISOString();
+      }
 
       const { data, error } = await supabase
         .from('commissions')
@@ -115,9 +120,24 @@ export function useCommissions() {
 
   const updateCommission = async (id: string, updates: any) => {
     try {
+      const updatesWithPaidAt: any = { ...updates };
+
+      // Keep paid_at in sync when status is changed
+      if (Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'status')) {
+        if (updatesWithPaidAt.status === 'paid') {
+          if (!Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'paid_at')) {
+            updatesWithPaidAt.paid_at = new Date().toISOString();
+          }
+        } else {
+          if (!Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'paid_at')) {
+            updatesWithPaidAt.paid_at = null;
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('commissions')
-        .update(updates)
+        .update(updatesWithPaidAt)
         .eq('id', id);
 
       if (error) throw error;

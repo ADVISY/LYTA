@@ -500,12 +500,10 @@ export default function CRMDashboard() {
     const years = new Set<number>();
     const currentYear = new Date().getFullYear();
     
-    // Add years from all policies
+    // Add years from all policies (use creation date to reflect entries made this year)
     policies.forEach(p => {
-      if (p.start_date) {
-        const year = new Date(p.start_date).getFullYear();
-        years.add(year);
-      }
+      const year = new Date(p.created_at).getFullYear();
+      years.add(year);
     });
     
     // Always include current year
@@ -521,19 +519,22 @@ export default function CRMDashboard() {
 
     // Include all active contracts for the selected year
     const activePolicies = filteredPolicies.filter(p => p.status === 'active');
+    const activePoliciesById = new Map(activePolicies.map(p => [p.id, p] as const));
 
     return months.map((month, i) => {
       // Match contracts for this month in selected year
       const monthPolicies = activePolicies.filter(p => {
-        const date = new Date(p.start_date);
+        // Use creation date so newly entered contracts impact the current year's performance
+        const date = new Date(p.created_at);
         return date.getFullYear() === chartYear && date.getMonth() === i;
       });
 
       // Real commissions for this month in selected year
       const monthCommissions = commissions.filter(c => {
-        const date = new Date(c.created_at);
+        const date = new Date((c as any).date || c.created_at);
         return date.getFullYear() === chartYear && date.getMonth() === i;
       });
+      const monthPaidCommissions = monthCommissions.filter(c => c.status === 'paid');
 
       // Initialize values for each product category
       let lcaPrime = 0, viePrime = 0, nonViePrime = 0, hypoPrime = 0;
@@ -554,22 +555,37 @@ export default function CRMDashboard() {
           // HYPO - Hypothèques
           hypoPrime += yearlyPremium;
           hypoCAEstime += yearlyPremium * 0.01; // Estimation 1%
-          hypoCARealise += commissionAmount;
         } else if (category === 'vie') {
           // VIE - Life insurance
           viePrime += yearlyPremium;
           vieCAEstime += commissionAmount || yearlyPremium * 0.05; // Use real or estimate 5%
-          vieCARealise += commissionAmount;
         } else if (category === 'lca') {
           // LCA - Health insurance (uses monthly * 16 formula)
           lcaPrime += yearlyPremium;
           lcaCAEstime += monthlyPremium * 16; // LCA formula: monthly * 16
-          lcaCARealise += commissionAmount;
         } else {
           // NON-VIE - All other (auto, property, liability, legal, etc.)
           nonViePrime += yearlyPremium;
           nonVieCAEstime += yearlyPremium * 0.15; // Estimation 15%
-          nonVieCARealise += commissionAmount;
+        }
+      });
+
+      // CA réalisé: bucket by commission date (and only paid commissions)
+      monthPaidCommissions.forEach(c => {
+        const policy = activePoliciesById.get(c.policy_id);
+        if (!policy) return;
+
+        const category = getPolicyCategory(policy);
+        const amount = Number(c.amount || 0);
+
+        if (category === 'hypo') {
+          hypoCARealise += amount;
+        } else if (category === 'vie') {
+          vieCARealise += amount;
+        } else if (category === 'lca') {
+          lcaCARealise += amount;
+        } else {
+          nonVieCARealise += amount;
         }
       });
 
