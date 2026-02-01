@@ -277,6 +277,128 @@ export function useScanBatches() {
     }
   };
 
+  // Mapping classification -> document name
+  const getDocumentName = (
+    classification: DocClassification | null,
+    originalName: string,
+    index: number
+  ): string => {
+    const baseName: Record<DocClassification, string> = {
+      identity_doc: 'Pièce d\'identité',
+      old_policy: 'Ancienne police',
+      new_contract: 'Nouveau contrat',
+      termination: 'Lettre de résiliation',
+      article_45: 'Art. 45 - Libre passage',
+      other: 'Document annexe',
+      unknown: 'Document',
+    };
+    
+    const ext = originalName.split('.').pop()?.toLowerCase() || 'pdf';
+    const name = baseName[classification || 'unknown'];
+    
+    // Add index if multiple docs of same type
+    return `${name}${index > 0 ? ` (${index + 1})` : ''}.${ext}`;
+  };
+
+  const validateBatchAndImportDocuments = async (
+    batchId: string,
+    clientId: string
+  ): Promise<boolean> => {
+    try {
+      // Get batch with documents
+      const batch = batches.find(b => b.id === batchId);
+      if (!batch || !batch.documents) {
+        throw new Error("Dossier non trouvé");
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Group documents by classification to handle naming
+      const classificationCounts: Record<string, number> = {};
+      
+      // Import each document
+      for (const doc of batch.documents) {
+        const classification = doc.document_classification || 'unknown';
+        
+        // Track count for naming
+        const count = classificationCounts[classification] || 0;
+        classificationCounts[classification] = count + 1;
+        
+        // Generate smart name
+        const smartName = getDocumentName(classification, doc.file_name, count);
+        
+        // Map classification to doc_kind for document table
+        const docKindMap: Record<DocClassification, string> = {
+          identity_doc: 'identity',
+          old_policy: 'policy',
+          new_contract: 'contract',
+          termination: 'termination',
+          article_45: 'article_45',
+          other: 'other',
+          unknown: 'other',
+        };
+
+        // Create document entry linked to client
+        const { error: docError } = await supabase
+          .from('documents')
+          .insert({
+            tenant_id: tenantId,
+            owner_type: 'client',
+            owner_id: clientId,
+            file_key: doc.file_key,
+            file_name: smartName,
+            mime_type: doc.mime_type,
+            doc_kind: docKindMap[classification],
+            category: classification,
+            created_by: user?.id,
+            metadata: {
+              original_name: doc.file_name,
+              source_batch_id: batchId,
+              classification,
+              classification_confidence: doc.classification_confidence,
+              extracted_data: doc.extracted_data,
+            }
+          });
+
+        if (docError) {
+          console.error(`Failed to import document ${doc.file_name}:`, docError);
+        }
+
+        // Link scan_batch_document to a document_scan if it exists
+        if (doc.scan_id) {
+          await supabase
+            .from('document_scans')
+            .update({ validated_at: new Date().toISOString(), validated_by: user?.id })
+            .eq('id', doc.scan_id);
+        }
+      }
+
+      // Mark batch as validated
+      const { error: updateError } = await supabase
+        .from('scan_batches' as any)
+        .update({ status: 'validated' })
+        .eq('id', batchId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Documents importés",
+        description: `${batch.documents.length} documents ajoutés au dossier client`,
+      });
+
+      await fetchBatches();
+      return true;
+    } catch (err: any) {
+      console.error('Error validating batch:', err);
+      toast({
+        title: "Erreur d'import",
+        description: err.message,
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
   return {
     batches,
     loading,
@@ -286,5 +408,6 @@ export function useScanBatches() {
     classifyBatch,
     updateDocumentClassification,
     deleteBatch,
+    validateBatchAndImportDocuments,
   };
 }

@@ -22,7 +22,9 @@ import {
 
 interface ScanBatchReviewProps {
   batch: ScanBatch;
-  onValidate?: () => void;
+  clientId?: string; // If provided, documents will be imported to this client
+  onValidate?: (batchId: string) => void;
+  onImportSuccess?: () => void;
   primaryColor?: string;
 }
 
@@ -76,11 +78,18 @@ const CLASSIFICATION_CONFIG: Record<DocClassification, {
   },
 };
 
-export default function ScanBatchReview({ batch, onValidate, primaryColor }: ScanBatchReviewProps) {
+export default function ScanBatchReview({ 
+  batch, 
+  clientId,
+  onValidate, 
+  onImportSuccess,
+  primaryColor 
+}: ScanBatchReviewProps) {
   const { toast } = useToast();
-  const { updateDocumentClassification, deleteBatch } = useScanBatches();
+  const { updateDocumentClassification, deleteBatch, validateBatchAndImportDocuments } = useScanBatches();
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const documents = batch.documents || [];
   const sortedDocs = [...documents].sort((a, b) => a.sort_order - b.sort_order);
@@ -96,6 +105,24 @@ export default function ScanBatchReview({ batch, onValidate, primaryColor }: Sca
     setIsDeleting(true);
     await deleteBatch(batch.id);
     setIsDeleting(false);
+  };
+
+  const handleImportDocuments = async () => {
+    if (!clientId) {
+      // If no client ID provided, use onValidate callback to let parent handle it
+      if (onValidate) {
+        onValidate(batch.id);
+      }
+      return;
+    }
+
+    setIsImporting(true);
+    const success = await validateBatchAndImportDocuments(batch.id, clientId);
+    setIsImporting(false);
+
+    if (success && onImportSuccess) {
+      onImportSuccess();
+    }
   };
 
   const getConfidenceBadge = (confidence: number | null) => {
@@ -243,16 +270,28 @@ export default function ScanBatchReview({ batch, onValidate, primaryColor }: Sca
         </div>
 
         {/* Actions */}
-        {batch.status === 'classified' && onValidate && (
+        {batch.status === 'classified' && (onValidate || clientId) && (
           <div className="flex justify-end pt-2">
             <Button
               type="button"
-              onClick={onValidate}
+              onClick={handleImportDocuments}
+              disabled={isImporting}
               style={primaryColor ? { backgroundColor: primaryColor } : undefined}
               className="gap-2"
             >
-              Consolider et créer client
-              <ArrowRight className="h-4 w-4" />
+              {isImporting ? (
+                <>Importation en cours...</>
+              ) : clientId ? (
+                <>
+                  Importer les documents
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Consolider et créer client
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           </div>
         )}
