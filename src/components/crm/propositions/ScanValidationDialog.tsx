@@ -574,19 +574,18 @@ export default function ScanValidationDialog({
         for (const [companyKey, products] of groupedOldProducts) {
           const firstProduct = products[0];
           
-          // Build products_data array with ALL product details - use resolveOrCreateProduct for each
+          // Build products_data array EXACTLY like ContractForm (same structure)
           const productsData = await Promise.all(products.map(async (p) => {
             const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
             try {
               const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
-                productId: result.productId,
+                productId: result.productId,  // camelCase like ContractForm
                 name: p.product_name || 'Produit',
                 category: p.product_category || 'health',
-                premium: p.premium_monthly || 0,
+                premium: p.premium_monthly || 0,  // monthly premium like ContractForm
                 deductible: p.franchise || null,
-                premiumYearly: p.premium_yearly || null,
-                notes: p.notes || null,
+                durationYears: null,  // For life insurance compatibility with ContractForm
               };
             } catch (e) {
               console.warn(`Could not resolve product ${productNameToSearch}:`, e);
@@ -596,8 +595,7 @@ export default function ScanValidationDialog({
                 category: p.product_category || 'health',
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
-                premiumYearly: p.premium_yearly || null,
-                notes: p.notes || null,
+                durationYears: null,
               };
             }
           }));
@@ -610,12 +608,23 @@ export default function ScanValidationDialog({
             continue;
           }
 
-          // Calculate totals
+          // Calculate totals like ContractForm
           const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-          const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+          const totalPremiumYearly = totalPremiumMonthly * 12;  // Calculate from monthly like ContractForm
           
           // Get product names for display
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+          
+          // Determine product_type EXACTLY like ContractForm: 'multi' for multiple, category for single
+          const mainCategory = products.length === 1 
+            ? (firstProduct.product_category || 'health')
+            : 'multi';
+
+          // Build notes similar to ContractForm format
+          const notesParts: string[] = [];
+          if (productNames) notesParts.push(productNames);
+          notesParts.push(`Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`);
+          if (hasTermination) notesParts.push('À RÉSILIER');
 
           const policyData = {
             tenant_id: tenantId,
@@ -630,9 +639,9 @@ export default function ScanValidationDialog({
             deductible: products[0].franchise || null,
             currency: 'CHF',
             company_name: firstProduct.company || null,
-            product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+            product_type: mainCategory,  // 'multi' for multiple products, like ContractForm
             products_data: productsData,
-            notes: `${productNames || 'Multi-produits'} - Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
+            notes: notesParts.join(' - '),
           };
 
           const { data: oldPolicy, error: policyError } = await supabase
@@ -693,19 +702,18 @@ export default function ScanValidationDialog({
         for (const [companyKey, products] of groupedNewProducts) {
           const firstProduct = products[0];
           
-          // Build products_data array with ALL product details - use resolveOrCreateProduct for each
+          // Build products_data array EXACTLY like ContractForm (same structure)
           const productsDataNew = await Promise.all(products.map(async (p) => {
             const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
             try {
               const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
-                productId: result.productId,
+                productId: result.productId,  // camelCase like ContractForm
                 name: p.product_name || 'Produit',
                 category: p.product_category || 'health',
-                premium: p.premium_monthly || 0,
+                premium: p.premium_monthly || 0,  // monthly premium like ContractForm
                 deductible: p.franchise || null,
-                premiumYearly: p.premium_yearly || null,
-                notes: p.notes || null,
+                durationYears: null,  // For life insurance compatibility with ContractForm
               };
             } catch (e) {
               console.warn(`Could not resolve product ${productNameToSearch}:`, e);
@@ -715,8 +723,7 @@ export default function ScanValidationDialog({
                 category: p.product_category || 'health',
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
-                premiumYearly: p.premium_yearly || null,
-                notes: p.notes || null,
+                durationYears: null,
               };
             }
           }));
@@ -729,12 +736,22 @@ export default function ScanValidationDialog({
             continue;
           }
 
-          // Calculate totals
+          // Calculate totals like ContractForm
           const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-          const totalPremiumYearly = products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0);
+          const totalPremiumYearly = totalPremiumMonthly * 12;  // Calculate from monthly like ContractForm
           
           // Get product names for display
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
+          
+          // Determine product_type EXACTLY like ContractForm: 'multi' for multiple, category for single
+          const mainCategory = products.length === 1 
+            ? (firstProduct.product_category || 'health')
+            : 'multi';
+
+          // Build notes similar to ContractForm format
+          const notesParts: string[] = [];
+          if (productNames) notesParts.push(productNames);
+          notesParts.push(`Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`);
 
           const policyData = {
             tenant_id: tenantId,
@@ -749,9 +766,9 @@ export default function ScanValidationDialog({
             deductible: products[0].franchise || null,
             currency: 'CHF',
             company_name: firstProduct.company || null,
-            product_type: products.length > 1 ? 'multi-produits' : firstProduct.product_category || null,
+            product_type: mainCategory,  // 'multi' for multiple products, like ContractForm
             products_data: productsDataNew,
-            notes: `${productNames || 'Multi-produits'} - Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
+            notes: notesParts.join(' - '),
           };
 
           const { data: createdPolicy, error: policyError } = await supabase
