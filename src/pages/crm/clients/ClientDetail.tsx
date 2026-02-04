@@ -67,11 +67,14 @@ const statusColors: Record<string, string> = {
   dormant: "bg-orange-500",
 };
 
-const statusLabels: Record<string, string> = {
-  prospect: "Prospect",
-  actif: "Actif",
-  résilié: "Résilié",
-  dormant: "Dormant",
+const getStatusLabel = (status: string, t: (key: string) => string): string => {
+  const labels: Record<string, string> = {
+    prospect: t('clients.prospect'),
+    actif: t('clients.active'),
+    résilié: t('clients.terminated'),
+    dormant: t('clients.dormant'),
+  };
+  return labels[status] || status;
 };
 
 const policyStatusColors: Record<string, string> = {
@@ -81,11 +84,14 @@ const policyStatusColors: Record<string, string> = {
   cancelled: "bg-red-500",
 };
 
-const policyStatusLabels: Record<string, string> = {
-  pending: "En attente",
-  active: "Actif",
-  expired: "Expiré",
-  cancelled: "Annulé",
+const getPolicyStatusLabel = (status: string, t: (key: string) => string): string => {
+  const labels: Record<string, string> = {
+    pending: t('contracts.pending'),
+    active: t('contracts.active'),
+    expired: t('contracts.expired'),
+    cancelled: t('contracts.cancelled'),
+  };
+  return labels[status] || status;
 };
 
 export default function ClientDetail() {
@@ -436,7 +442,7 @@ export default function ClientDetail() {
                   variant="outline"
                   className={`${statusColors[client.status]} text-white`}
                 >
-                  {statusLabels[client.status] || client.status}
+                  {getStatusLabel(client.status, t)}
                 </Badge>
               )}
               {client.tags && client.tags.length > 0 && (
@@ -855,7 +861,7 @@ export default function ClientDetail() {
                                     variant="outline"
                                     className={`${policyStatusColors[policy.status] || 'bg-gray-500'} text-white text-xs`}
                                   >
-                                    {policyStatusLabels[policy.status] || policy.status}
+                                    {getPolicyStatusLabel(policy.status, t)}
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground">

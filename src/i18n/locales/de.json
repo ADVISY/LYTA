@@ -1267,6 +1267,39 @@
   "forms": {
     "newCollaborator": "Neuer Mitarbeiter",
     "editCollaborator": "Mitarbeiter bearbeiten",
+    "familyMember": {
+      "addTitle": "Familienmitglied hinzufügen",
+      "editTitle": "Familienmitglied bearbeiten",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "relationType": "Beziehungstyp",
+      "relationTypes": {
+        "spouse": "Ehepartner(in)",
+        "child": "Kind",
+        "other": "Andere"
+      },
+      "birthDate": "Geburtsdatum",
+      "permitType": "Aufenthaltstyp",
+      "permits": {
+        "none": "Keine",
+        "b": "Ausweis B",
+        "c": "Ausweis C",
+        "g": "Ausweis G",
+        "l": "Ausweis L",
+        "other": "Andere"
+      },
+      "nationality": "Nationalität",
+      "errors": {
+        "firstNameRequired": "Vorname ist erforderlich",
+        "lastNameRequired": "Nachname ist erforderlich",
+        "createClientError": "Fehler beim Erstellen des Kunden",
+        "genericError": "Ein Fehler ist aufgetreten"
+      },
+      "success": {
+        "added": "Mitglied hinzugefügt",
+        "addedDescription": "{{name}} wurde der Familie und Adressliste hinzugefügt"
+      }
+    },
     "newFollowup": "Neue Nachverfolgung",
     "editFollowup": "Nachverfolgung bearbeiten",
     "newContract": "Neue Verträge",
@@ -1823,6 +1856,35 @@
       "medio": { "title": "MEDIO", "subtitle": "Privatversicherungen", "description": "Haftpflicht, Haushalt, Auto" },
       "business": { "title": "BUSINESS", "subtitle": "Unternehmensversicherung", "description": "Berufshaftpflicht, UVG, Sachen" }
     },
+    "common": {
+      "clientInfo": "Kundeninformationen",
+      "lastName": "Nachname",
+      "lastNamePlaceholder": "Familienname",
+      "firstName": "Vorname",
+      "firstNamePlaceholder": "Vorname",
+      "email": "E-Mail",
+      "emailPlaceholder": "email@beispiel.com",
+      "phone": "Telefon",
+      "phonePlaceholder": "+41 79 000 00 00",
+      "birthDate": "Geburtsdatum",
+      "currentInsurer": "Aktueller Versicherer",
+      "currentInsurerPlaceholder": "Name der aktuellen Krankenkasse",
+      "address": "Adresse",
+      "streetPlaceholder": "Strasse und Nummer",
+      "postalCode": "PLZ",
+      "city": "Ort",
+      "cityPlaceholder": "Stadt",
+      "agentName": "Agentenname",
+      "comments": "Kommentare",
+      "additionalInfo": "Zusätzliche Informationen...",
+      "additionalDocs": "Zusätzliche Dokumente",
+      "documentsToProvide": "Erforderliche Dokumente",
+      "confirmUpload": "Ich bestätige, alle erforderlichen Dokumente hochgeladen zu haben",
+      "documentsAdded": "Sie haben {{count}} Dokument(e) hinzugefügt",
+      "sending": "Wird gesendet...",
+      "submitForm": "Formular absenden",
+      "effectDate": "Gewünschtes Wirksamkeitsdatum"
+    },
     "clientInfo": "Kundeninformationen",
     "lastName": "Nachname",
     "lastNamePlaceholder": "Familienname",
@@ -1848,7 +1910,15 @@
       "lamalEffectDate": "KVG Wirksamkeitsdatum",
       "lcaEffectDate": "VVG Wirksamkeitsdatum",
       "lcaProduction": "VVG Produktion (CHF)",
-      "lcaProductionPlaceholder": "0.00"
+      "lcaProductionPlaceholder": "0.00",
+      "currentInsurer": "Aktueller Versicherer",
+      "currentInsurerPlaceholder": "Name der aktuellen Krankenkasse",
+      "docs": {
+        "identity": "Ausweis (Vorder-/Rückseite) *",
+        "residence": "Wohnsitzbescheinigung / Aufenthaltsbewilligung *",
+        "insuranceCard": "Versicherungskarte",
+        "additional": "Zusätzliche Dokumente"
+      }
     },
     "vita": {
       "formTitle": "VITA Formular",
@@ -1857,9 +1927,23 @@
       "effectDate": "Wirksamkeitsdatum",
       "contractDuration": "Vertragsdauer",
       "selectDuration": "Dauer auswählen",
-      "years": "Jahre",
+      "years": "{{count}} Jahre",
+      "untilRetirement": "Bis zur Pensionierung",
       "monthlyPremium": "Monatsprämie (CHF)",
-      "monthlyPremiumPlaceholder": "200"
+      "monthlyPremiumPlaceholder": "200",
+      "divideByTwelve": "Jahresprämie / 12",
+      "requiredDocsTitle": "Erforderliche Dokumente",
+      "docProposal": "Antrag mit Gesundheitserklärung (obligatorisch)",
+      "docIdentity": "Ausweisdokument / Wohnsitznachweis",
+      "docAdequacy": "Angemessenheitsprotokoll",
+      "docDirectDebit": "Lastschriftformular",
+      "docMinutes": "Beratungsprotokoll (obligatorisch)",
+      "docs": {
+        "proposal": "Antrag mit Gesundheitserklärung *",
+        "identityDomicile": "Ausweis / Wohnsitznachweis *",
+        "minutes": "Beratungsprotokoll *",
+        "additional": "Zusätzliche Dokumente"
+      }
     },
     "medio": {
       "formTitle": "MEDIO Formular",
@@ -1881,7 +1965,14 @@
       "vehicleYear": "Jahr",
       "vehicleYearPlaceholder": "2024",
       "vehiclePlate": "Kennzeichen",
-      "vehiclePlatePlaceholder": "ZH 123456"
+      "vehiclePlatePlaceholder": "ZH 123456",
+      "docs": {
+        "identity": "Ausweisdokument (Vorder-/Rückseite) *",
+        "domicile": "Wohnsitznachweis *",
+        "vehicleRegistration": "Fahrzeugausweis (bei Auto)",
+        "currentPolicy": "Aktuelle Versicherungspolice",
+        "additional": "Zusätzliche Dokumente"
+      }
     },
     "business": {
       "formTitle": "BUSINESS Formular",
@@ -1951,7 +2042,13 @@
       "french": "Französisch",
       "german": "Deutsch",
       "italian": "Italienisch",
-      "english": "Englisch"
+      "english": "Englisch",
+      "docs": {
+        "commerceExtract": "Handelsregisterauszug (Zefix) *",
+        "ceoIdentity": "Ausweis des Geschäftsinhabers *",
+        "staffList": "Personalliste mit Gehältern (bei UVG)",
+        "additional": "Zusätzliche Dokumente"
+      }
     },
     "agentName": "Agentenname",
     "comments": "Kommentare",
