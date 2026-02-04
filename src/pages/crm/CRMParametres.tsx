@@ -1406,15 +1406,15 @@ export default function CRMParametres() {
                       </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Catégorie</Label>
+                      <Label>{t('settingsExtended.category')}</Label>
                       <Select 
                         value={newProduct.category}
                         onValueChange={(v) => setNewProduct({ ...newProduct, category: v })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner..." />
+                          <SelectValue placeholder={t('settingsExtended.selectPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {productCategories.map(cat => (
@@ -1424,7 +1424,7 @@ export default function CRMParametres() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Description (optionnel)</Label>
+                      <Label>{t('settingsExtended.descriptionOptional')}</Label>
                       <Input 
                         value={newProduct.description}
                         onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
@@ -1432,8 +1432,8 @@ export default function CRMParametres() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={handleAddProduct}>Ajouter</Button>
-                    <Button size="sm" variant="outline" onClick={() => setIsAddingProduct(false)}>Annuler</Button>
+                    <Button size="sm" onClick={handleAddProduct}>{t('settingsExtended.add')}</Button>
+                    <Button size="sm" variant="outline" onClick={() => setIsAddingProduct(false)}>{t('common.cancel')}</Button>
                   </div>
                 </div>
               )}
@@ -1441,10 +1441,10 @@ export default function CRMParametres() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Compagnie</TableHead>
-                    <TableHead>Catégorie</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('settingsExtended.name')}</TableHead>
+                    <TableHead>{t('settingsExtended.company')}</TableHead>
+                    <TableHead>{t('settingsExtended.category')}</TableHead>
+                    <TableHead className="text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1473,7 +1473,7 @@ export default function CRMParametres() {
               </Table>
               {products.length > 20 && (
                 <p className="text-sm text-muted-foreground text-center mt-4">
-                  Affichage de 20 produits sur {products.length}
+                  {t('settingsExtended.productsDisplayCount', { count: products.length })}
                 </p>
               )}
             </CardContent>
@@ -1483,19 +1483,19 @@ export default function CRMParametres() {
           <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Modifier le produit</DialogTitle>
+                <DialogTitle>{t('settingsExtended.editProduct')}</DialogTitle>
               </DialogHeader>
               {editingProduct && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Nom</Label>
+                    <Label>{t('settingsExtended.name')}</Label>
                     <Input 
                       value={editingProduct.name}
                       onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Compagnie</Label>
+                    <Label>{t('settingsExtended.company')}</Label>
                     <Select 
                       value={editingProduct.company_id}
                       onValueChange={(v) => setEditingProduct({ ...editingProduct, company_id: v })}
@@ -1511,7 +1511,7 @@ export default function CRMParametres() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Catégorie</Label>
+                    <Label>{t('settingsExtended.category')}</Label>
                     <Select 
                       value={editingProduct.category}
                       onValueChange={(v) => setEditingProduct({ ...editingProduct, category: v })}
@@ -1527,8 +1527,8 @@ export default function CRMParametres() {
                     </Select>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleUpdateProduct}>Enregistrer</Button>
-                    <Button variant="outline" onClick={() => setEditingProduct(null)}>Annuler</Button>
+                    <Button onClick={handleUpdateProduct}>{t('common.save')}</Button>
+                    <Button variant="outline" onClick={() => setEditingProduct(null)}>{t('common.cancel')}</Button>
                   </div>
                 </div>
               )}
@@ -1540,15 +1540,15 @@ export default function CRMParametres() {
         <TabsContent value="commissions" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Taux de commission par défaut</CardTitle>
+              <CardTitle className="text-lg">{t('settingsExtended.commissionRates')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="font-medium">Taux agents</h4>
+                  <h4 className="font-medium">{t('settingsExtended.agentRates')}</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label>Commission LCA (santé complémentaire)</Label>
+                      <Label>{t('settingsExtended.lcaCommission')}</Label>
                       <div className="flex items-center gap-2">
                         <Input 
                           type="number"
@@ -1560,7 +1560,7 @@ export default function CRMParametres() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label>Commission VIE (3e pilier)</Label>
+                      <Label>{t('settingsExtended.vieCommission')}</Label>
                       <div className="flex items-center gap-2">
                         <Input 
                           type="number"
@@ -1575,10 +1575,10 @@ export default function CRMParametres() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="font-medium">Taux managers</h4>
+                  <h4 className="font-medium">{t('settingsExtended.managerRates')}</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label>Part manager LCA</Label>
+                      <Label>{t('settingsExtended.managerLcaShare')}</Label>
                       <div className="flex items-center gap-2">
                         <Input 
                           type="number"
@@ -1590,7 +1590,7 @@ export default function CRMParametres() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label>Part manager VIE</Label>
+                      <Label>{t('settingsExtended.managerVieShare')}</Label>
                       <div className="flex items-center gap-2">
                         <Input 
                           type="number"
@@ -1607,7 +1607,7 @@ export default function CRMParametres() {
 
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between max-w-md">
-                  <Label>Taux de réserve par défaut</Label>
+                  <Label>{t('settingsExtended.defaultReserveRate')}</Label>
                   <div className="flex items-center gap-2">
                     <Input 
                       type="number"
@@ -1622,7 +1622,7 @@ export default function CRMParametres() {
 
               <Button onClick={saveSettings}>
                 <Save className="h-4 w-4 mr-2" />
-                Enregistrer les taux
+                {t('settingsExtended.saveRates')}
               </Button>
             </CardContent>
           </Card>
@@ -1632,15 +1632,15 @@ export default function CRMParametres() {
         <TabsContent value="apparence" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Thème</CardTitle>
+              <CardTitle className="text-lg">{t('settingsExtended.themeSection')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                   <div>
-                    <p className="font-medium">Mode sombre</p>
-                    <p className="text-sm text-muted-foreground">Basculer entre mode jour et mode nuit</p>
+                    <p className="font-medium">{t('settingsExtended.darkModeToggle')}</p>
+                    <p className="text-sm text-muted-foreground">{t('settingsExtended.darkModeDescription')}</p>
                   </div>
                 </div>
                 <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
@@ -1650,7 +1650,7 @@ export default function CRMParametres() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Couleur principale</CardTitle>
+              <CardTitle className="text-lg">{t('settingsExtended.primaryColor')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
@@ -1659,7 +1659,7 @@ export default function CRMParametres() {
                     key={color.id}
                     onClick={() => {
                       setSelectedColor(color.id);
-                      toast.success(`Couleur ${color.label} sélectionnée`);
+                      toast.success(t('settingsExtended.colorSelected', { name: color.label }));
                     }}
                     className={cn(
                       "w-12 h-12 rounded-full transition-all",
@@ -1677,11 +1677,11 @@ export default function CRMParametres() {
                 ))}
               </div>
               <p className="text-sm text-muted-foreground mt-4">
-                Note: Le changement de couleur nécessite un rechargement de la page.
+                {t('settingsExtended.colorChangeNote')}
               </p>
               <Button className="mt-4" onClick={saveSettings}>
                 <Save className="h-4 w-4 mr-2" />
-                Enregistrer
+                {t('common.save')}
               </Button>
             </CardContent>
           </Card>
@@ -1698,18 +1698,17 @@ export default function CRMParametres() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-primary" />
-                {t('common.technicalSupport')} LYTA
+                {t('settingsExtended.supportTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Pour toute question, problème technique, bug, demande d'upgrade ou autre besoin, 
-                notre équipe support est à votre disposition.
+                {t('settingsExtended.supportDescription')}
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1 p-4 bg-background rounded-lg border">
-                  <h4 className="font-medium mb-2">Email de support</h4>
+                  <h4 className="font-medium mb-2">{t('settingsExtended.supportEmail')}</h4>
                   <a 
                     href="mailto:support@lyta.ch"
                     className="text-lg font-mono text-primary hover:underline"
@@ -1717,16 +1716,16 @@ export default function CRMParametres() {
                     support@lyta.ch
                   </a>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Réponse sous 24-48h ouvrées
+                    {t('settingsExtended.responseTime')}
                   </p>
                 </div>
                 
                 <div className="flex-1 p-4 bg-background rounded-lg border">
-                  <h4 className="font-medium mb-2">Horaires</h4>
-                  <p className="text-sm">Lundi - Vendredi</p>
+                  <h4 className="font-medium mb-2">{t('settingsExtended.hours')}</h4>
+                  <p className="text-sm">{t('settingsExtended.mondayFriday')}</p>
                   <p className="text-lg font-medium">09:00 - 18:00</p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Fuseau horaire: Europe/Zurich
+                    {t('settingsExtended.timezone')}
                   </p>
                 </div>
               </div>
@@ -1737,14 +1736,14 @@ export default function CRMParametres() {
                   onClick={() => window.open("mailto:support@lyta.ch?subject=Question technique", "_blank")}
                 >
                   <Mail className="h-4 w-4 mr-2" />
-                  Poser une question
+                  {t('settingsExtended.askQuestion')}
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={() => window.open("mailto:support@lyta.ch?subject=Signaler un bug", "_blank")}
                 >
                   <AlertCircle className="h-4 w-4 mr-2" />
-                  Signaler un bug
+                  {t('settingsExtended.reportBug')}
                 </Button>
               </div>
             </CardContent>
@@ -1752,32 +1751,32 @@ export default function CRMParametres() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Types de demandes</CardTitle>
+              <CardTitle>{t('settingsExtended.requestTypes')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="font-medium text-sm mb-1">🐛 Bugs & Problèmes</h4>
+                  <h4 className="font-medium text-sm mb-1">{t('settingsExtended.bugsProblems')}</h4>
                   <p className="text-xs text-muted-foreground">
-                    Dysfonctionnements, erreurs, comportements inattendus
+                    {t('settingsExtended.bugsDesc')}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="font-medium text-sm mb-1">❓ Questions</h4>
+                  <h4 className="font-medium text-sm mb-1">{t('settingsExtended.questions')}</h4>
                   <p className="text-xs text-muted-foreground">
-                    Utilisation, fonctionnalités, bonnes pratiques
+                    {t('settingsExtended.questionsDesc')}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="font-medium text-sm mb-1">🚀 Demandes d'évolution</h4>
+                  <h4 className="font-medium text-sm mb-1">{t('settingsExtended.evolutionRequests')}</h4>
                   <p className="text-xs text-muted-foreground">
-                    Nouvelles fonctionnalités, améliorations
+                    {t('settingsExtended.evolutionDesc')}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <h4 className="font-medium text-sm mb-1">⬆️ Upgrades</h4>
+                  <h4 className="font-medium text-sm mb-1">{t('settingsExtended.upgrades')}</h4>
                   <p className="text-xs text-muted-foreground">
-                    Changement de plan, ajout de sièges, options
+                    {t('settingsExtended.upgradesDesc')}
                   </p>
                 </div>
               </div>

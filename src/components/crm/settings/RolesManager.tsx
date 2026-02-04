@@ -142,13 +142,13 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Shield className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Aucun rôle configuré</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('rolesManager.noRoles')}</h3>
           <p className="text-muted-foreground text-center mb-6 max-w-md">
-            Initialisez les rôles par défaut pour commencer à gérer les permissions de votre cabinet.
+            {t('rolesManager.noRolesDescription')}
           </p>
           <Button onClick={handleInitializeRoles} className="gap-2">
             <Plus className="h-4 w-4" />
-            Créer les rôles par défaut
+            {t('rolesManager.createDefaultRoles')}
           </Button>
         </CardContent>
       </Card>
@@ -162,10 +162,10 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Gestion des rôles
+            {t('rolesManager.title')}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Définissez les rôles et permissions pour votre cabinet
+            {t('rolesManager.description')}
           </p>
         </div>
         <div className="flex gap-2">
@@ -174,7 +174,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
           </Button>
           <Button size="sm" onClick={() => setIsCreating(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Nouveau rôle
+            {t('rolesManager.newRole')}
           </Button>
         </div>
       </div>
@@ -183,7 +183,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
         {/* Roles List */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Rôles ({roles.length})</CardTitle>
+            <CardTitle className="text-base">{t('rolesManager.rolesCount', { count: roles.length })}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <ScrollArea className="h-[500px]">
@@ -220,7 +220,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                     </div>
                     {!role.is_active && (
                       <Badge variant="outline" className="text-xs">
-                        Inactif
+                        {t('rolesManager.inactive')}
                       </Badge>
                     )}
                   </button>
@@ -267,8 +267,8 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
               <CardContent>
                 <Tabs defaultValue="permissions">
                   <TabsList className="mb-4">
-                    <TabsTrigger value="permissions">Permissions</TabsTrigger>
-                    <TabsTrigger value="visibility">Visibilité</TabsTrigger>
+                    <TabsTrigger value="permissions">{t('rolesManager.permissions')}</TabsTrigger>
+                    <TabsTrigger value="visibility">{t('rolesManager.visibility')}</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="permissions">
@@ -279,22 +279,22 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-4 rounded-lg border">
-                          <Label className="text-sm font-medium">Scope Dashboard</Label>
+                          <Label className="text-sm font-medium">{t('rolesManager.dashboardScope')}</Label>
                           <p className="text-2xl font-bold capitalize mt-1">
-                            {selectedRole.dashboard_scope === 'personal' ? 'Personnel' :
-                             selectedRole.dashboard_scope === 'team' ? 'Équipe' : 'Global'}
+                            {selectedRole.dashboard_scope === 'personal' ? t('rolesManager.personal') :
+                             selectedRole.dashboard_scope === 'team' ? t('rolesManager.team') : t('rolesManager.global')}
                           </p>
                         </div>
                         <div className="p-4 rounded-lg border">
-                          <Label className="text-sm font-medium">Statut</Label>
+                          <Label className="text-sm font-medium">{t('rolesManager.status')}</Label>
                           <p className="text-2xl font-bold mt-1">
-                            {selectedRole.is_active ? 'Actif' : 'Inactif'}
+                            {selectedRole.is_active ? t('rolesManager.active') : t('rolesManager.inactive')}
                           </p>
                         </div>
                       </div>
                       
                       <div className="p-4 rounded-lg border space-y-3">
-                        <Label className="text-sm font-medium">Visibilité Commissions</Label>
+                        <Label className="text-sm font-medium">{t('rolesManager.commissionVisibility')}</Label>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             {selectedRole.can_see_own_commissions ? (
@@ -302,7 +302,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                             ) : (
                               <X className="h-4 w-4 text-red-500" />
                             )}
-                            <span className="text-sm">Ses propres commissions</span>
+                            <span className="text-sm">{t('rolesManager.canSeeOwnCommissions')}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             {selectedRole.can_see_team_commissions ? (
@@ -310,7 +310,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                             ) : (
                               <X className="h-4 w-4 text-red-500" />
                             )}
-                            <span className="text-sm">Commissions de son équipe</span>
+                            <span className="text-sm">{t('rolesManager.canSeeTeamCommissions')}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             {selectedRole.can_see_all_commissions ? (
@@ -318,7 +318,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
                             ) : (
                               <X className="h-4 w-4 text-red-500" />
                             )}
-                            <span className="text-sm">Toutes les commissions</span>
+                            <span className="text-sm">{t('rolesManager.canSeeAllCommissions')}</span>
                           </div>
                         </div>
                       </div>
@@ -330,7 +330,7 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
           ) : (
             <CardContent className="flex flex-col items-center justify-center py-20">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Sélectionnez un rôle pour voir ses permissions</p>
+              <p className="text-muted-foreground">{t('rolesManager.selectRolePrompt')}</p>
             </CardContent>
           )}
         </Card>
@@ -340,12 +340,12 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
       <Dialog open={isCreating} onOpenChange={setIsCreating}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Créer un nouveau rôle</DialogTitle>
+            <DialogTitle>{t('rolesManager.createRole')}</DialogTitle>
           </DialogHeader>
           <RoleForm formData={formData} setFormData={setFormData} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreating(false)}>Annuler</Button>
-            <Button onClick={handleCreate}>Créer</Button>
+            <Button variant="outline" onClick={() => setIsCreating(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleCreate}>{t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -354,12 +354,12 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Modifier le rôle</DialogTitle>
+            <DialogTitle>{t('rolesManager.editRole')}</DialogTitle>
           </DialogHeader>
           <RoleForm formData={formData} setFormData={setFormData} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>Annuler</Button>
-            <Button onClick={handleUpdate}>Enregistrer</Button>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleUpdate}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -368,21 +368,21 @@ export function RolesManager({ onInitializeRoles }: RolesManagerProps) {
       <Dialog open={isDuplicating} onOpenChange={setIsDuplicating}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Dupliquer le rôle</DialogTitle>
+            <DialogTitle>{t('rolesManager.duplicateRole')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Nom du nouveau rôle</Label>
+              <Label>{t('rolesManager.duplicateRoleName')}</Label>
               <Input
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="Nom du rôle"
+                placeholder={t('rolesManager.roleNamePlaceholder')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDuplicating(false)}>Annuler</Button>
-            <Button onClick={handleDuplicate}>Dupliquer</Button>
+            <Button variant="outline" onClick={() => setIsDuplicating(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleDuplicate}>{t('rolesManager.duplicate')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -406,27 +406,29 @@ interface RoleFormProps {
 }
 
 function RoleForm({ formData, setFormData }: RoleFormProps) {
+  const { t } = useTranslation();
+  
   return (
     <div className="space-y-4">
       <div>
-        <Label>Nom du rôle</Label>
+        <Label>{t('rolesManager.roleName')}</Label>
         <Input
           value={formData.name}
           onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
-          placeholder="Ex: Commercial Senior"
+          placeholder={t('rolesManager.roleNamePlaceholder')}
         />
       </div>
       <div>
-        <Label>Description</Label>
+        <Label>{t('common.description')}</Label>
         <Textarea
           value={formData.description}
           onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
-          placeholder="Description du rôle..."
+          placeholder={t('rolesManager.roleDescriptionPlaceholder')}
           rows={2}
         />
       </div>
       <div>
-        <Label>Scope Dashboard</Label>
+        <Label>{t('rolesManager.dashboardScope')}</Label>
         <Select
           value={formData.dashboard_scope}
           onValueChange={(v) => setFormData(f => ({ ...f, dashboard_scope: v as any }))}
@@ -435,31 +437,31 @@ function RoleForm({ formData, setFormData }: RoleFormProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="personal">Personnel (ses données uniquement)</SelectItem>
-            <SelectItem value="team">Équipe (son équipe)</SelectItem>
-            <SelectItem value="global">Global (tout le cabinet)</SelectItem>
+            <SelectItem value="personal">{t('rolesManager.personal')} ({t('rolesManager.personalDesc')})</SelectItem>
+            <SelectItem value="team">{t('rolesManager.team')} ({t('rolesManager.teamDesc')})</SelectItem>
+            <SelectItem value="global">{t('rolesManager.global')} ({t('rolesManager.globalDesc')})</SelectItem>
           </SelectContent>
         </Select>
       </div>
       <div className="space-y-3">
-        <Label>Visibilité Commissions</Label>
+        <Label>{t('rolesManager.commissionVisibility')}</Label>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm">Voir ses commissions</span>
+            <span className="text-sm">{t('rolesManager.canSeeOwnCommissions')}</span>
             <Switch
               checked={formData.can_see_own_commissions}
               onCheckedChange={(c) => setFormData(f => ({ ...f, can_see_own_commissions: c }))}
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm">Voir commissions équipe</span>
+            <span className="text-sm">{t('rolesManager.canSeeTeamCommissions')}</span>
             <Switch
               checked={formData.can_see_team_commissions}
               onCheckedChange={(c) => setFormData(f => ({ ...f, can_see_team_commissions: c }))}
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm">Voir toutes les commissions</span>
+            <span className="text-sm">{t('rolesManager.canSeeAllCommissions')}</span>
             <Switch
               checked={formData.can_see_all_commissions}
               onCheckedChange={(c) => setFormData(f => ({ ...f, can_see_all_commissions: c }))}
