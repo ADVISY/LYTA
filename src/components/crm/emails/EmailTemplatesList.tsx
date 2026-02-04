@@ -281,13 +281,13 @@ export const EmailTemplatesList = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={() => createMutation.mutate(formData)}
                 disabled={createMutation.isPending || !formData.name || !formData.subject}
               >
-                {createMutation.isPending ? "Création..." : "Créer"}
+                {createMutation.isPending ? t('templates.creating') : t('templates.create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -430,13 +430,13 @@ export const EmailTemplatesList = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={() => selectedTemplate && updateMutation.mutate({ id: selectedTemplate.id, data: formData })}
               disabled={updateMutation.isPending}
             >
-              {updateMutation.isPending ? "Mise à jour..." : "Enregistrer"}
+              {updateMutation.isPending ? t('templates.updating') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
