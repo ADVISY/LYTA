@@ -61,7 +61,7 @@ export default function ClientsList() {
     { value: "client", label: t('clients.clients'), icon: Users, color: "from-blue-500 to-blue-600" },
     { value: "collaborateur", label: t('collaborators.title'), icon: Briefcase, color: "from-emerald-500 to-emerald-600" },
     { value: "partenaire", label: t('clients.partners'), icon: Building2, color: "from-violet-500 to-purple-600" },
-    { value: "ia-scan", label: "Dépôts IA", icon: Sparkles, color: "from-cyan-500 to-blue-600", badge: pendingScanCount },
+    { value: "ia-scan", label: t('propositions.iaScanDeposits', 'Dépôts IA'), icon: Sparkles, color: "from-cyan-500 to-blue-600", badge: pendingScanCount },
   ];
 
   useEffect(() => {

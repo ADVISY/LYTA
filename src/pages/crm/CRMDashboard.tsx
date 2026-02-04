@@ -928,10 +928,10 @@ export default function CRMDashboard() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Dépôts IA à valider</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t('dashboard.iaScanDeposits')}</p>
                     <p className="text-3xl font-bold">{pendingScanCount}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Dossiers scannés en attente
+                      {t('dashboard.pendingScans')}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

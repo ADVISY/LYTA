@@ -382,7 +382,7 @@
     "advertising": "Werbung",
     "subscription": "Abonnement"
   },
-  "dashboard": {
+"dashboard": {
     "title": "Dashboard",
     "globalView": "Gesamtansicht",
     "depositedContracts": "Eingereichte Verträge",
@@ -418,7 +418,12 @@
     "monthlyEvolution": "Monatliche Entwicklung",
     "recentNotifications": "Aktuelle Benachrichtigungen",
     "noNotifications": "Keine neuen Benachrichtigungen",
-    "markAsRead": "Als gelesen markieren"
+    "markAsRead": "Als gelesen markieren",
+    "iaScanDeposits": "KI-Einreichungen zu validieren",
+    "pendingScans": "Gescannte Dossiers in Wartestellung",
+    "premium": "Prämie",
+    "estimatedRevenue": "Geschätzter Umsatz",
+    "realizedRevenue": "Realisierter Umsatz (bezahlt)"
   },
   "clients": {
     "title": "Adressen",
@@ -930,7 +935,7 @@
     "birthdayThanks": "Wir danken Ihnen für Ihr Vertrauen und stehen Ihnen für alle Fragen zu Ihren Versicherungen zur Verfügung.",
     "birthdayWish": "Einen wunderschönen Tag! 🎉"
   },
-  "propositions": {
+"propositions": {
     "title": "Vorschläge",
     "subtitle": "Verwalten Sie Ihre kommerziellen Vorschläge",
     "newProposition": "Neuer Vorschlag",
@@ -939,7 +944,12 @@
     "accepted": "Akzeptiert",
     "rejected": "Abgelehnt",
     "moduleInConstruction": "Modul in Entwicklung",
-    "comingSoonDesc": "Die Erstellung und Verfolgung kommerzieller Vorschläge wird bald verfügbar sein"
+    "comingSoonDesc": "Die Erstellung und Verfolgung kommerzieller Vorschläge wird bald verfügbar sein",
+    "iaScanDeposits": "KI-Einreichungen zu validieren",
+    "pendingScans": "Gescannte Dossiers in Wartestellung",
+    "individualScans": "Einzelne Scans",
+    "batchScans": "Dossier-Scans",
+    "pendingValidation": "Scan(s) zur Validierung ausstehend"
   },
   "subscription": {
     "title": "Abonnement",
@@ -2338,7 +2348,73 @@
     "descriptionOptional": "Beschreibung (optional)",
     "add": "Hinzufügen",
     "name": "Name",
-    "company": "Gesellschaft",
+"company": "Gesellschaft",
     "selectPlaceholder": "Auswählen..."
+  },
+  "iaScan": {
+    "title": "KI SCAN DOSSIER",
+    "beta": "BETA",
+    "depositFullFolder": "Laden Sie Ihr vollständiges Dossier hoch (mehrere Dokumente)",
+    "selectDocuments": "Dokumente auswählen",
+    "depositAllDocuments": "Laden Sie alle Dossier-Dokumente hoch (Police, Offerte, Bescheinigung...). Die KI wird die Informationen automatisch konsolidieren.",
+    "scannerTitle": "Intelligenter Dokumentenscanner",
+    "scannerDesc": "Extrahiert und klassifiziert automatisch Kundeninformationen",
+    "fileTooLarge": "Datei zu gross",
+    "fileSizeLimit": "{{name}} überschreitet die 20MB-Grenze",
+    "unsupportedType": "Typ nicht unterstützt",
+    "supportedFormats": "{{name}}: akzeptierte Formate PDF, JPG, PNG, WEBP",
+    "addDocuments": "Dokumente hinzufügen",
+    "classifyDocuments": "{{count}} Dokument(e) klassifizieren",
+    "classificationDone": "Klassifizierung abgeschlossen!",
+    "newFolder": "Neues Dossier",
+    "documentInfo": "Personalausweis, alte Police, neuer Vertrag, Kündigung, Art.45... Die KI klassifiziert jedes Dokument automatisch.",
+    "verifyEmailFirst": "Bitte überprüfen Sie zuerst Ihre Mitarbeiter-E-Mail, bevor Sie den Scan verwenden.",
+    "uploadingDocuments": "Dokumente werden hochgeladen...",
+    "classifyingDocuments": "KI-Klassifizierung läuft...",
+    "processingComplete": "Verarbeitung abgeschlossen",
+    "processingError": "Verarbeitungsfehler"
+  },
+  "planModules": {
+    "clientManagement": "Kundenverwaltung",
+    "contractManagement": "Vertragsverwaltung",
+    "commissions": "Provisionen",
+    "statements": "Abrechnungen",
+    "memberships": "Mitgliedschaften",
+    "payroll": "Lohnbuchhaltung",
+    "emailCampaigns": "E-Mail & Kampagnen",
+    "automations": "Automatisierungen",
+    "mandateAutomation": "Mandat-Automatisierung",
+    "clientPortal": "Kundenportal",
+    "iaScan": "KI-Scan",
+    "qrInvoices": "QR-Rechnungen",
+    "reports": "Berichte",
+    "multipleAgents": "Mehrere Berater",
+    "teamManagement": "Teamverwaltung"
+  },
+  "rolePermissions": {
+    "modules": {
+      "clients": "Kunden",
+      "contracts": "Verträge",
+      "partners": "Partner",
+      "products": "Produkte",
+      "collaborators": "Mitarbeiter",
+      "commissions": "Provisionen",
+      "decomptes": "Abrechnungen",
+      "payout": "Auszahlung",
+      "dashboard": "Dashboard",
+      "settings": "Einstellungen"
+    },
+    "actions": {
+      "view": "Anzeigen",
+      "create": "Erstellen",
+      "update": "Bearbeiten",
+      "delete": "Löschen",
+      "export": "Exportieren",
+      "deposit": "Einreichen",
+      "cancel": "Stornieren",
+      "generate": "Generieren",
+      "validate": "Validieren",
+      "modify_rules": "Regeln bearbeiten"
+    }
   }
 }

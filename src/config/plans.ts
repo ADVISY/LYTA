@@ -84,7 +84,8 @@ export const PLAN_CONFIGS: Record<TenantPlan, PlanConfig> = {
 };
 
 /**
- * Module display names for UI
+ * Module display names for UI (fallback values - prefer translated keys)
+ * These are fallback values used when translations are not available
  */
 export const MODULE_DISPLAY_NAMES: Record<PlanModule, string> = {
   clients: 'Gestion des clients',
@@ -101,6 +102,26 @@ export const MODULE_DISPLAY_NAMES: Record<PlanModule, string> = {
   advanced_settings: 'Paramètres avancés',
   qr_invoice: 'Factures QR',
   ia_scan: 'IA Scan Documents',
+};
+
+/**
+ * Translation keys for modules - to be used with i18n t() function
+ */
+export const MODULE_TRANSLATION_KEYS: Record<PlanModule, string> = {
+  clients: 'planModules.clientManagement',
+  contracts: 'planModules.contractManagement',
+  commissions: 'planModules.commissions',
+  statements: 'planModules.statements',
+  membership: 'planModules.memberships',
+  payroll: 'planModules.payroll',
+  emailing: 'planModules.emailCampaigns',
+  automation: 'planModules.automations',
+  mandate_automation: 'planModules.mandateAutomation',
+  client_portal: 'planModules.clientPortal',
+  advanced_dashboard: 'dashboard.title',
+  advanced_settings: 'settings.title',
+  qr_invoice: 'planModules.qrInvoices',
+  ia_scan: 'planModules.iaScan',
 };
 
 /**

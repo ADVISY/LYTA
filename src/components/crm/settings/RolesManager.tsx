@@ -475,6 +475,7 @@ function RoleForm({ formData, setFormData }: RoleFormProps) {
 
 // Permissions Matrix Component
 function PermissionsMatrix({ roleId }: { roleId: string }) {
+  const { t } = useTranslation();
   const { permissions, isLoading, setPermission, hasPermission } = useRolePermissions(roleId);
 
   if (isLoading) {
@@ -486,7 +487,21 @@ function PermissionsMatrix({ roleId }: { roleId: string }) {
   }
 
   const getActionLabel = (actionId: string) => {
+    const translatedLabel = t(`rolePermissions.actions.${actionId}`);
+    // Return translated label if exists, otherwise fallback to static label
+    if (translatedLabel !== `rolePermissions.actions.${actionId}`) {
+      return translatedLabel;
+    }
     return PERMISSION_ACTIONS.find(a => a.id === actionId)?.label || actionId;
+  };
+
+  const getModuleLabel = (moduleId: string) => {
+    const translatedLabel = t(`rolePermissions.modules.${moduleId}`);
+    // Return translated label if exists, otherwise fallback to static label
+    if (translatedLabel !== `rolePermissions.modules.${moduleId}`) {
+      return translatedLabel;
+    }
+    return PERMISSION_MODULES.find(m => m.id === moduleId)?.label || moduleId;
   };
 
   return (
@@ -497,7 +512,7 @@ function PermissionsMatrix({ roleId }: { roleId: string }) {
           
           return (
             <div key={module.id} className="border rounded-lg p-4">
-              <h4 className="font-medium mb-3">{module.label}</h4>
+              <h4 className="font-medium mb-3">{getModuleLabel(module.id)}</h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                 {moduleActions.map((action) => {
                   const isAllowed = hasPermission(module.id, action);

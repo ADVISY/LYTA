@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { usePlanFeatures, useTenantSeats } from '@/hooks/usePlanFeatures';
-import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, getPlansInOrder, PlanModule } from '@/config/plans';
+import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, MODULE_TRANSLATION_KEYS, getPlansInOrder, PlanModule } from '@/config/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -207,6 +207,11 @@ export default function CRMAbonnement() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {allModules.map((module) => {
               const isEnabled = enabledModules.includes(module);
+              // Try to get translated label, fallback to static display name
+              const translationKey = MODULE_TRANSLATION_KEYS[module];
+              const translatedLabel = t(translationKey);
+              const displayLabel = translatedLabel !== translationKey ? translatedLabel : MODULE_DISPLAY_NAMES[module];
+              
               return (
                 <div 
                   key={module} 
@@ -220,7 +225,7 @@ export default function CRMAbonnement() {
                     <X className="h-4 w-4 text-muted-foreground shrink-0" />
                   )}
                   <span className={isEnabled ? 'text-foreground' : 'text-muted-foreground'}>
-                    {MODULE_DISPLAY_NAMES[module]}
+                    {displayLabel}
                   </span>
                 </div>
               );
