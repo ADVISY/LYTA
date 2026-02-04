@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Wand2,
-  FolderOpen,
   X,
   Crown,
   Lock
@@ -20,6 +20,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TenantPlan, isModuleEnabled, PLAN_CONFIGS } from "@/config/plans";
+import lytaSmartFlowLogo from "@/assets/lyta-smartflow-logo.png";
 
 interface IAScanUploadProps {
   formType: 'sana' | 'vita' | 'medio' | 'business';
@@ -70,6 +71,7 @@ export default function IAScanUpload({
   verifiedPartnerEmail,
   verifiedPartnerId,
 }: IAScanUploadProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<ScanStatus>('idle');
@@ -324,14 +326,13 @@ export default function IAScanUpload({
     return (
       <Card className="border-dashed border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
-            <Lock className="h-7 w-7 text-primary" />
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <img src={lytaSmartFlowLogo} alt="LYTA Smart Flow" className="h-10 w-auto" />
           </div>
-          <CardTitle className="text-lg">IA Scan Dossier</CardTitle>
           <CardDescription className="space-y-1">
-            <span className="font-medium text-foreground">Scanner intelligent de documents</span>
+            <span className="font-medium text-foreground">{t('iaScan.intelligentScanner', 'Scanner intelligent de documents')}</span>
             <br />
-            Disponible avec les offres{' '}
+            {t('iaScan.availableWith', 'Disponible avec les offres')}{' '}
             <Badge variant="secondary" className="ml-1">Prime</Badge>{' '}
             <Badge variant="secondary" className="ml-1">Prime Founder</Badge>
           </CardDescription>
@@ -371,13 +372,12 @@ export default function IAScanUpload({
 
           {/* Title */}
           <div>
-            <h3 className="font-semibold flex items-center justify-center gap-2">
-              <FolderOpen className="h-4 w-4" style={{ color: primaryColor || 'hsl(var(--primary))' }} />
-              IA SCAN DOSSIER
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img src={lytaSmartFlowLogo} alt="LYTA Smart Flow" className="h-8 w-auto" />
               <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
                 BETA
               </span>
-            </h3>
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {getStatusText()}
             </p>

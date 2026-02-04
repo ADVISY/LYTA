@@ -2263,7 +2263,9 @@
     "uploadingDocuments": "Caricamento documenti...",
     "classifyingDocuments": "Classificazione IA in corso...",
     "processingComplete": "Elaborazione completata",
-    "processingError": "Errore di elaborazione"
+    "processingError": "Errore di elaborazione",
+    "intelligentScanner": "Scanner intelligente di documenti",
+    "availableWith": "Disponibile con gli abbonamenti"
   },
   "planModules": {
     "clientManagement": "Gestione clienti",

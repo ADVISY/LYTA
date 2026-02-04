@@ -2372,7 +2372,9 @@
     "uploadingDocuments": "Dokumente werden hochgeladen...",
     "classifyingDocuments": "KI-Klassifizierung läuft...",
     "processingComplete": "Verarbeitung abgeschlossen",
-    "processingError": "Verarbeitungsfehler"
+    "processingError": "Verarbeitungsfehler",
+    "intelligentScanner": "Intelligenter Dokumentenscanner",
+    "availableWith": "Verfügbar mit den Abonnements"
   },
   "planModules": {
     "clientManagement": "Kundenverwaltung",

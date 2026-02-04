@@ -2320,7 +2320,9 @@
     "uploadingDocuments": "Upload des documents...",
     "classifyingDocuments": "Classification IA en cours...",
     "processingComplete": "Traitement terminé",
-    "processingError": "Erreur de traitement"
+    "processingError": "Erreur de traitement",
+    "intelligentScanner": "Scanner intelligent de documents",
+    "availableWith": "Disponible avec les offres"
   },
   "planModules": {
     "clientManagement": "Gestion des clients",

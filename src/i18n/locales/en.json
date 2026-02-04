@@ -2273,7 +2273,9 @@
     "uploadingDocuments": "Uploading documents...",
     "classifyingDocuments": "AI classification in progress...",
     "processingComplete": "Processing complete",
-    "processingError": "Processing error"
+    "processingError": "Processing error",
+    "intelligentScanner": "Intelligent document scanner",
+    "availableWith": "Available with"
   },
   "planModules": {
     "clientManagement": "Client management",
