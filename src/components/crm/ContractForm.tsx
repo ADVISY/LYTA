@@ -519,13 +519,13 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         if (lamalFranchise) notesParts.push(`Franchise LAMal: ${lamalFranchise} CHF`);
       }
       if (totals.lcaTotal > 0) {
-        notesParts.push(`LCA: ${totals.lcaTotal.toFixed(2)} CHF/mois`);
+        notesParts.push(`LCA: ${totals.lcaTotal.toFixed(2)} CHF/${t('common.month')}`);
       }
       if (totals.lifeTotal > 0) {
-        notesParts.push(`Vie/Prévoyance: ${totals.lifeTotal.toFixed(2)} CHF/mois`);
+        notesParts.push(`${t('forms.contract.categories.life')}: ${totals.lifeTotal.toFixed(2)} CHF/${t('common.month')}`);
       }
       if (totals.otherTotal > 0) {
-        notesParts.push(`Autres: ${totals.otherTotal.toFixed(2)} CHF/mois`);
+        notesParts.push(`${t('forms.contract.otherInsurance')}: ${totals.otherTotal.toFixed(2)} CHF/${t('common.month')}`);
       }
       if (notes) notesParts.push(notes);
 
@@ -981,7 +981,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             <div className="p-4 rounded-xl border-2 bg-slate-50 border-slate-200">
                               <div className="flex items-center gap-2 mb-4">
                                 <Shield className="h-4 w-4" />
-                                <h3 className="font-bold">Autres assurances</h3>
+                                <h3 className="font-bold">{t('forms.contract.otherInsurance')}</h3>
                               </div>
                               <div className="space-y-3">
                                 {categorizedSelection.other.map((product) => {
@@ -1039,7 +1039,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                               {totals.otherTotal > 0 && (
                                 <div className="mt-4 pt-3 border-t border-slate-300">
                                   <div className="flex justify-between items-center">
-                                    <span className="font-semibold">Total Autres mensuel</span>
+                                    <span className="font-semibold">{t('forms.contract.otherTotal')}</span>
                                     <span className="text-lg font-bold">{totals.otherTotal.toFixed(2)} CHF</span>
                                   </div>
                                 </div>
@@ -1052,22 +1052,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             <div className="p-4 bg-primary/5 rounded-xl border-2 border-primary/20">
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <span className="font-bold text-lg">Total mensuel global</span>
-                                  <p className="text-xs text-muted-foreground">{selectedProducts.length} produit(s)</p>
+                                  <span className="font-bold text-lg">{t('forms.contract.grandTotal')}</span>
+                                  <p className="text-xs text-muted-foreground">{t('forms.contract.productCount', { count: selectedProducts.length })}</p>
                                 </div>
                                 <span className="text-2xl font-bold text-primary">{totals.grandTotal.toFixed(2)} CHF</span>
                               </div>
                               <p className="text-sm text-muted-foreground mt-1">
-                                ≈ {(totals.grandTotal * 12).toLocaleString('fr-CH')} CHF/an
+                                {t('forms.contract.yearlyEstimate', { amount: (totals.grandTotal * 12).toLocaleString('fr-CH') })}
                               </p>
                             </div>
                           )}
 
                           {/* Notes */}
                           <div className="space-y-2">
-                            <Label>Notes</Label>
+                            <Label>{t('forms.contract.notes')}</Label>
                             <Textarea
-                              placeholder="Informations complémentaires..."
+                              placeholder={t('forms.contract.notesPlaceholder')}
                               value={notes}
                               onChange={(e) => setNotes(e.target.value)}
                               maxLength={500}
@@ -1094,11 +1094,11 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               </div>
               <div className="flex gap-3">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button type="submit" disabled={submitting || selectedProducts.length === 0 || hasExistingContractWithCompany}>
                   {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {editMode ? "Enregistrer" : `Créer le contrat (${selectedProducts.length} produit${selectedProducts.length > 1 ? 's' : ''})`}
+                  {editMode ? t('common.save') : t('forms.contract.createContract')}
                 </Button>
               </div>
             </div>
