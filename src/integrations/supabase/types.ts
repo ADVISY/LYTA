@@ -249,6 +249,33 @@ export type Database = {
         }
         Relationships: []
       }
+      api_rate_limits: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          identifier: string
+          request_count: number | null
+          window_hour: string
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          identifier: string
+          request_count?: number | null
+          window_hour?: string
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          identifier?: string
+          request_count?: number | null
+          window_hour?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -4734,6 +4761,10 @@ export type Database = {
           label: string
           value: string
         }[]
+      }
+      get_deposit_scan_status: {
+        Args: { p_partner_email: string; p_scan_id: string }
+        Returns: Json
       }
       get_document_versions: {
         Args: { p_document_id: string }
