@@ -4808,6 +4808,15 @@ export type Database = {
           status: string
         }[]
       }
+      get_public_tenant_branding: {
+        Args: { p_slug: string }
+        Returns: {
+          display_name: string
+          logo_url: string
+          primary_color: string
+          secondary_color: string
+        }[]
+      }
       get_tenant_branding_by_slug: {
         Args: { p_slug: string }
         Returns: {

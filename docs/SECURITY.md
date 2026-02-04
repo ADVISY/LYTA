@@ -1,8 +1,9 @@
 # 🔐 Document de Sécurité LYTA
 
-> **Version:** 2.0  
+> **Version:** 2.1  
 > **Dernière mise à jour:** 4 février 2026  
-> **Conformité:** RGPD (UE), nLPD (Suisse)
+> **Conformité:** RGPD (UE), nLPD (Suisse)  
+> **Audit de sécurité:** ✅ Complété
 
 ---
 
