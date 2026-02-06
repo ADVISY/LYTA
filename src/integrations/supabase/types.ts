@@ -4449,40 +4449,40 @@ export type Database = {
           zip_code: string | null
         }
         Insert: {
-          address?: string | null
+          address?: never
           assigned_agent_id?: string | null
           bank_name?: never
-          birthdate?: string | null
+          birthdate?: never
           bonus_rate?: never
-          canton?: string | null
-          city?: string | null
-          civil_status?: string | null
+          canton?: never
+          city?: never
+          civil_status?: never
           commission_rate?: never
           commission_rate_lca?: never
           commission_rate_vie?: never
           company_name?: string | null
           contract_type?: string | null
-          country?: string | null
+          country?: never
           created_at?: string | null
-          email?: string | null
-          employer?: string | null
+          email?: never
+          employer?: never
           external_ref?: string | null
           first_name?: string | null
           fixed_salary?: never
-          hire_date?: string | null
+          hire_date?: never
           iban?: never
           id?: string | null
           is_company?: boolean | null
           last_name?: string | null
           manager_commission_rate_lca?: never
           manager_commission_rate_vie?: never
-          manager_id?: string | null
-          mobile?: string | null
-          nationality?: string | null
-          permit_type?: string | null
-          phone?: string | null
-          postal_code?: string | null
-          profession?: string | null
+          manager_id?: never
+          mobile?: never
+          nationality?: never
+          permit_type?: never
+          phone?: never
+          postal_code?: never
+          profession?: never
           reserve_rate?: never
           status?: string | null
           tags?: string[] | null
@@ -4490,44 +4490,44 @@ export type Database = {
           type_adresse?: string | null
           updated_at?: string | null
           user_id?: string | null
-          work_percentage?: number | null
-          zip_code?: string | null
+          work_percentage?: never
+          zip_code?: never
         }
         Update: {
-          address?: string | null
+          address?: never
           assigned_agent_id?: string | null
           bank_name?: never
-          birthdate?: string | null
+          birthdate?: never
           bonus_rate?: never
-          canton?: string | null
-          city?: string | null
-          civil_status?: string | null
+          canton?: never
+          city?: never
+          civil_status?: never
           commission_rate?: never
           commission_rate_lca?: never
           commission_rate_vie?: never
           company_name?: string | null
           contract_type?: string | null
-          country?: string | null
+          country?: never
           created_at?: string | null
-          email?: string | null
-          employer?: string | null
+          email?: never
+          employer?: never
           external_ref?: string | null
           first_name?: string | null
           fixed_salary?: never
-          hire_date?: string | null
+          hire_date?: never
           iban?: never
           id?: string | null
           is_company?: boolean | null
           last_name?: string | null
           manager_commission_rate_lca?: never
           manager_commission_rate_vie?: never
-          manager_id?: string | null
-          mobile?: string | null
-          nationality?: string | null
-          permit_type?: string | null
-          phone?: string | null
-          postal_code?: string | null
-          profession?: string | null
+          manager_id?: never
+          mobile?: never
+          nationality?: never
+          permit_type?: never
+          phone?: never
+          postal_code?: never
+          profession?: never
           reserve_rate?: never
           status?: string | null
           tags?: string[] | null
@@ -4535,24 +4535,10 @@ export type Database = {
           type_adresse?: string | null
           updated_at?: string | null
           user_id?: string | null
-          work_percentage?: number | null
-          zip_code?: string | null
+          work_percentage?: never
+          zip_code?: never
         }
         Relationships: [
-          {
-            foreignKeyName: "clients_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "clients_safe"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "clients_tenant_id_fkey"
             columns: ["tenant_id"]
