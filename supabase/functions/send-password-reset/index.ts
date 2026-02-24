@@ -483,8 +483,10 @@ const handler = async (req: Request): Promise<Response> => {
     `, branding, tenantName);
 
     // Determine sender
+    // Always send password reset emails from LYTA domain (verified on Resend)
+    // Use tenant name in the "from" name for branding, but lyta.ch as sender domain
     const senderName = branding?.email_sender_name || displayName;
-    const senderEmail = branding?.email_sender_address || "support@lyta.ch";
+    const senderEmail = "no-reply@lyta.ch";
 
     // Send email via Resend
     const resendResponse = await fetch("https://api.resend.com/emails", {
