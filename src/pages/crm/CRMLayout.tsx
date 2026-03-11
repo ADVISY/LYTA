@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { useLytaToolsEnabled } from "@/hooks/useLytaTools";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
 import { PlanModule } from "@/config/plans";
