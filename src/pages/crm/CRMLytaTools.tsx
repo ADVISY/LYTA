@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useLytaTools, AppWithConnection } from '@/hooks/useLytaTools';
 import { useUserRole } from '@/hooks/useUserRole';
-import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolsAdminPanel, ToolTabsManager } from '@/components/crm/lyta-tools';
+import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolConfigDialog, ToolsAdminPanel, ToolTabsManager } from '@/components/crm/lyta-tools';
 import type { OpenTab } from '@/components/crm/lyta-tools';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
