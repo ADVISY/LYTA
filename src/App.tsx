@@ -30,6 +30,7 @@ import CRMCompagnies from "./pages/crm/CRMCompagnies";
 import CRMCompta from "./pages/crm/CRMCompta";
 import CRMPublicite from "./pages/crm/CRMPublicite";
 import CRMAbonnement from "./pages/crm/CRMAbonnement";
+import CRMLytaTools from "./pages/crm/CRMLytaTools";
 
 // Client Portal
 import ClientLayout from "./pages/client/ClientLayout";
