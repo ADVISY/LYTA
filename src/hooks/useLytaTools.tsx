@@ -298,6 +298,7 @@ export function useLytaTools() {
     disconnectApp,
     openApp,
     toggleTenantApp,
+    updateTenantAppConfig,
     refetch: fetchApps,
   };
 }
