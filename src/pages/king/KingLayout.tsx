@@ -19,6 +19,7 @@ import {
   BookOpen,
   Package,
   Handshake,
+  AppWindow,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -35,6 +36,7 @@ const menuItems = [
   { to: "/king/wizard", icon: Wand2, label: "Nouveau Client" },
   { to: "/king/affiliates", icon: Handshake, label: "Affiliation" },
   { to: "/king/catalog", icon: Package, label: "Référentiels" },
+  { to: "/king/apps", icon: AppWindow, label: "LYTA Tools" },
   { to: "/king/onboarding", icon: BookOpen, label: "Guide Onboarding" },
   { to: "/king/users", icon: Users, label: "Utilisateurs" },
   { to: "/king/plans", icon: Package, label: "Offres & Plans" },
