@@ -41,6 +41,7 @@ export interface TenantAppSetting {
   app_id: string;
   is_enabled: boolean;
   is_visible: boolean;
+  config_json: Record<string, unknown>;
 }
 
 export type AppWithConnection = ExternalApp & {
