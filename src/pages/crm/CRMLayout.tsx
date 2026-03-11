@@ -43,6 +43,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageSelector } from "@/components/ui/language-selector";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
+import { ConnectedAppsDock } from "@/components/crm/ConnectedAppsDock";
 
 
 interface MenuItem {
@@ -446,6 +447,7 @@ export default function CRMLayout() {
           />
         )}
         <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1 relative z-10">
+          <ConnectedAppsDock />
           <Outlet />
         </div>
         
