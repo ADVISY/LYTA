@@ -30,6 +30,7 @@ import {
   LucideIcon,
   Lock,
   Crown,
+  Puzzle,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
