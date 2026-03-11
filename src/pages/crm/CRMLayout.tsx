@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { useLytaToolsEnabled } from "@/hooks/useLytaTools";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
 import { PlanModule } from "@/config/plans";
@@ -29,6 +30,7 @@ import {
   LucideIcon,
   Lock,
   Crown,
+  Puzzle,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -71,6 +73,7 @@ export default function CRMLayout() {
   const { role, loading } = useUserRole();
   const { tenant } = useTenant();
   const { hasModule, loading: planLoading } = usePlanFeatures();
+  const { enabled: lytaToolsEnabled } = useLytaToolsEnabled();
   const { theme } = useTheme();
   useLanguage(); // Initialize language based on user/tenant preferences
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -80,8 +83,26 @@ export default function CRMLayout() {
 
   const navigate = useNavigate();
   
-  // Get all menu items (don't filter, we'll show locked ones differently)
-  const allMenuItems = useMemo(() => getMenuItems(t), [t]);
+  // Get all menu items + conditionally add LYTA Tools (Pilot: Advisy only)
+  const allMenuItems = useMemo(() => {
+    const items = getMenuItems(t);
+    if (lytaToolsEnabled) {
+      // Insert LYTA Tools before settings (second to last)
+      const settingsIndex = items.findIndex(i => i.to === '/crm/parametres');
+      const toolsItem: MenuItem = {
+        to: '/crm/tools',
+        icon: Puzzle,
+        label: 'LYTA Tools',
+        color: 'from-cyan-500 to-teal-500',
+      };
+      if (settingsIndex >= 0) {
+        items.splice(settingsIndex, 0, toolsItem);
+      } else {
+        items.push(toolsItem);
+      }
+    }
+    return items;
+  }, [t, lytaToolsEnabled]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {

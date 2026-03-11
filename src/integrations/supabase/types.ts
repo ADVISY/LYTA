@@ -276,6 +276,51 @@ export type Database = {
         }
         Relationships: []
       }
+      app_usage_logs: {
+        Row: {
+          action_type: string
+          app_id: string
+          created_at: string
+          id: string
+          metadata_json: Json | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          action_type?: string
+          app_id: string
+          created_at?: string
+          id?: string
+          metadata_json?: Json | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          app_id?: string
+          created_at?: string
+          id?: string
+          metadata_json?: Json | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_usage_logs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "external_apps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_usage_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1756,6 +1801,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      external_apps: {
+        Row: {
+          category: string
+          config_schema: Json | null
+          connection_type: string
+          created_at: string
+          description_long: string | null
+          description_short: string | null
+          embed_allowed: boolean
+          id: string
+          integration_level: number
+          is_active: boolean
+          is_beta: boolean
+          is_premium: boolean
+          launch_mode: string
+          launch_url: string | null
+          logo_url: string | null
+          name: string
+          oauth_supported: boolean
+          slug: string
+          smartflow_compatible: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          config_schema?: Json | null
+          connection_type?: string
+          created_at?: string
+          description_long?: string | null
+          description_short?: string | null
+          embed_allowed?: boolean
+          id?: string
+          integration_level?: number
+          is_active?: boolean
+          is_beta?: boolean
+          is_premium?: boolean
+          launch_mode?: string
+          launch_url?: string | null
+          logo_url?: string | null
+          name: string
+          oauth_supported?: boolean
+          slug: string
+          smartflow_compatible?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          config_schema?: Json | null
+          connection_type?: string
+          created_at?: string
+          description_long?: string | null
+          description_short?: string | null
+          embed_allowed?: boolean
+          id?: string
+          integration_level?: number
+          is_active?: boolean
+          is_beta?: boolean
+          is_premium?: boolean
+          launch_mode?: string
+          launch_url?: string | null
+          logo_url?: string | null
+          name?: string
+          oauth_supported?: boolean
+          slug?: string
+          smartflow_compatible?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       family_members: {
         Row: {
@@ -3387,6 +3504,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_app_settings: {
+        Row: {
+          app_id: string
+          config_json: Json | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          is_visible: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          config_json?: Json | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_visible?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          config_json?: Json | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_visible?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_app_settings_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "external_apps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_app_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_branding: {
         Row: {
           claims_notification_email: string | null
@@ -3563,6 +3728,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tenant_email_automation_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_feature_flags: {
+        Row: {
+          created_at: string
+          id: string
+          lyta_tools_enabled: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lyta_tools_enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lyta_tools_enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_feature_flags_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: true
             referencedRelation: "tenants"
@@ -4016,6 +4213,66 @@ export type Database = {
           },
           {
             foreignKeyName: "transactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_app_connections: {
+        Row: {
+          access_token_encrypted: string | null
+          app_id: string
+          connected_at: string | null
+          connection_status: string
+          created_at: string
+          id: string
+          last_used_at: string | null
+          metadata_json: Json | null
+          refresh_token_encrypted: string | null
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          app_id: string
+          connected_at?: string | null
+          connection_status?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          metadata_json?: Json | null
+          refresh_token_encrypted?: string | null
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          app_id?: string
+          connected_at?: string | null
+          connection_status?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          metadata_json?: Json | null
+          refresh_token_encrypted?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_app_connections_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "external_apps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_app_connections_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
