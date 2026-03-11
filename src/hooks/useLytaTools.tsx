@@ -251,8 +251,8 @@ export function useLytaTools() {
           app_id: appId,
           is_enabled: true,
           is_visible: true,
-          config_json: config,
-        }, { onConflict: 'tenant_id,app_id' });
+          config_json: config as any,
+        } as any, { onConflict: 'tenant_id,app_id' });
 
       if (error) throw error;
       toast({ title: 'Configuration sauvegardée', description: 'Les paramètres de l\'application ont été mis à jour.' });
