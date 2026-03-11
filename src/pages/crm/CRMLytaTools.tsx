@@ -1,9 +1,10 @@
 // Pilot feature restricted to Advisy tenant until validation.
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useLytaTools, AppWithConnection } from '@/hooks/useLytaTools';
 import { useUserRole } from '@/hooks/useUserRole';
-import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolEmbedViewer, ToolsAdminPanel } from '@/components/crm/lyta-tools';
+import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolsAdminPanel, ToolTabsManager } from '@/components/crm/lyta-tools';
+import type { OpenTab } from '@/components/crm/lyta-tools';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,11 +18,11 @@ import {
   List, 
   Puzzle, 
   Link2, 
-  ExternalLink, 
   Monitor,
   Zap,
   FlaskConical,
   Settings,
+  AppWindow,
 } from 'lucide-react';
 
 const categoryLabels: Record<string, string> = {
@@ -59,8 +60,39 @@ export default function CRMLytaTools() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [detailApp, setDetailApp] = useState<AppWithConnection | null>(null);
   const [connectDialogApp, setConnectDialogApp] = useState<AppWithConnection | null>(null);
-  const [embedApp, setEmbedApp] = useState<AppWithConnection | null>(null);
   const [activeTab, setActiveTab] = useState('catalog');
+
+  // --- Embedded tabs state ---
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeEmbedTabId, setActiveEmbedTabId] = useState<string | null>(null);
+
+  const openInTab = useCallback((app: AppWithConnection) => {
+    const existing = openTabs.find(t => t.app.id === app.id);
+    if (existing) {
+      setActiveEmbedTabId(existing.id);
+      setActiveTab('workspace');
+      return;
+    }
+    const newTab: OpenTab = {
+      id: `tab-${app.id}-${Date.now()}`,
+      app,
+      hasError: false,
+    };
+    setOpenTabs(prev => [...prev, newTab]);
+    setActiveEmbedTabId(newTab.id);
+    setActiveTab('workspace');
+  }, [openTabs]);
+
+  const closeTab = useCallback((tabId: string) => {
+    setOpenTabs(prev => {
+      const next = prev.filter(t => t.id !== tabId);
+      if (activeEmbedTabId === tabId) {
+        setActiveEmbedTabId(next.length > 0 ? next[next.length - 1].id : null);
+        if (next.length === 0) setActiveTab('catalog');
+      }
+      return next;
+    });
+  }, [activeEmbedTabId]);
 
   // KPIs
   const totalApps = apps.length;
@@ -70,27 +102,20 @@ export default function CRMLytaTools() {
 
   const handleConnect = (appId: string) => {
     const app = apps.find(a => a.id === appId);
-    if (app) {
-      setConnectDialogApp(app);
-    }
+    if (app) setConnectDialogApp(app);
   };
 
   const handleConfirmConnect = async (appId: string) => {
     await connectApp(appId);
   };
 
-  // If viewing embed
-  if (embedApp) {
-    return (
-      <div>
-        <ToolEmbedViewer
-          app={embedApp}
-          onBack={() => setEmbedApp(null)}
-          onOpenExternal={openApp}
-        />
-      </div>
-    );
-  }
+  const handleOpenApp = useCallback((app: AppWithConnection) => {
+    if (app.embed_allowed) {
+      openInTab(app);
+    } else {
+      openApp(app);
+    }
+  }, [openInTab, openApp]);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -170,6 +195,15 @@ export default function CRMLytaTools() {
               <Link2 className="w-4 h-4 mr-1.5" />
               Connectées ({connectedCount})
             </TabsTrigger>
+            {openTabs.length > 0 && (
+              <TabsTrigger value="workspace" className="relative">
+                <AppWindow className="w-4 h-4 mr-1.5" />
+                Workspace
+                <Badge variant="secondary" className="ml-1.5 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                  {openTabs.length}
+                </Badge>
+              </TabsTrigger>
+            )}
             {(isAdmin || isManager) && (
               <TabsTrigger value="admin">
                 <Settings className="w-4 h-4 mr-1.5" />
@@ -177,63 +211,67 @@ export default function CRMLytaTools() {
               </TabsTrigger>
             )}
           </TabsList>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="w-4 h-4" />
-            </Button>
-          </div>
+          {activeTab !== 'workspace' && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher une application..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+        {/* Search & Filters (hidden in workspace) */}
+        {activeTab !== 'workspace' && (
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une application..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                {categories.map(cat => (
+                  <SelectItem key={cat} value={cat}>
+                    {categoryLabels[cat] || cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous statuts</SelectItem>
+                <SelectItem value="connected">Connectées</SelectItem>
+                <SelectItem value="available">Disponibles</SelectItem>
+                <SelectItem value="premium">Premium</SelectItem>
+                <SelectItem value="beta">Bêta</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-44">
-              <SelectValue placeholder="Catégorie" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes catégories</SelectItem>
-              {categories.map(cat => (
-                <SelectItem key={cat} value={cat}>
-                  {categoryLabels[cat] || cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous statuts</SelectItem>
-              <SelectItem value="connected">Connectées</SelectItem>
-              <SelectItem value="available">Disponibles</SelectItem>
-              <SelectItem value="premium">Premium</SelectItem>
-              <SelectItem value="beta">Bêta</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        )}
 
         {/* Catalog Tab */}
         <TabsContent value="catalog" className="mt-4">
@@ -259,7 +297,7 @@ export default function CRMLytaTools() {
                   app={app}
                   onConnect={handleConnect}
                   onDisconnect={disconnectApp}
-                  onOpen={openApp}
+                  onOpen={handleOpenApp}
                   onViewDetails={setDetailApp}
                 />
               ))}
@@ -272,7 +310,7 @@ export default function CRMLytaTools() {
                   app={app}
                   onConnect={handleConnect}
                   onDisconnect={disconnectApp}
-                  onOpen={openApp}
+                  onOpen={handleOpenApp}
                   onViewDetails={setDetailApp}
                 />
               ))}
@@ -306,12 +344,24 @@ export default function CRMLytaTools() {
                   app={app}
                   onConnect={handleConnect}
                   onDisconnect={disconnectApp}
-                  onOpen={openApp}
+                  onOpen={handleOpenApp}
                   onViewDetails={setDetailApp}
                 />
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Workspace Tab - Embedded apps */}
+        <TabsContent value="workspace" className="mt-4">
+          <ToolTabsManager
+            tabs={openTabs}
+            activeTabId={activeEmbedTabId}
+            onSetActiveTab={setActiveEmbedTabId}
+            onCloseTab={closeTab}
+            onOpenExternal={openApp}
+            onShowCatalog={() => setActiveTab('catalog')}
+          />
         </TabsContent>
 
         {/* Admin Tab */}
@@ -329,8 +379,8 @@ export default function CRMLytaTools() {
         onOpenChange={(open) => !open && setDetailApp(null)}
         onConnect={handleConnect}
         onDisconnect={disconnectApp}
-        onOpen={openApp}
-        onEmbed={setEmbedApp}
+        onOpen={handleOpenApp}
+        onEmbed={openInTab}
       />
       <ToolConnectDialog
         app={connectDialogApp}
