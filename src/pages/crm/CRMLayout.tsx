@@ -446,6 +446,7 @@ export default function CRMLayout() {
           />
         )}
         <div className="lg:p-6 p-4 pt-20 lg:pt-6 w-full flex-1 relative z-10">
+          <ConnectedAppsDock />
           <Outlet />
         </div>
         
