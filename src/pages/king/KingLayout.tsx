@@ -19,6 +19,7 @@ import {
   BookOpen,
   Package,
   Handshake,
+  AppWindow,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";

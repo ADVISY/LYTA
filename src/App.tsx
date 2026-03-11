@@ -114,6 +114,7 @@ const App = () => (
                 <Route path="affiliates" element={<KingAffiliates />} />
                 <Route path="affiliates/:id" element={<KingAffiliateDetail />} />
                 <Route path="catalog" element={<KingCatalog />} />
+                <Route path="apps" element={<KingAppsManager />} />
                 <Route path="users" element={<KingUsers />} />
                 <Route path="plans" element={<KingPlans />} />
                 <Route path="security" element={<KingSecurity />} />
