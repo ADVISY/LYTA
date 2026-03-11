@@ -116,9 +116,8 @@ export function ConnectedAppsDock() {
         .eq('app_id', app.id);
     }
 
-    if (app.launch_url) {
-      window.open(app.launch_url, '_blank', 'noopener,noreferrer');
-    }
+    // Navigate to LYTA Tools workspace instead of opening external URL
+    navigate('/crm/tools');
   };
 
   const scroll = (direction: 'left' | 'right') => {
