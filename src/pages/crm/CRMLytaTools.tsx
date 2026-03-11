@@ -374,7 +374,7 @@ export default function CRMLytaTools() {
         {/* Admin Tab */}
         {(isAdmin || isManager) && (
           <TabsContent value="admin" className="mt-4">
-            <ToolsAdminPanel apps={apps} onToggleApp={toggleTenantApp} />
+            <ToolsAdminPanel apps={apps} onToggleApp={toggleTenantApp} onConfigureApp={setConfigApp} />
           </TabsContent>
         )}
       </Tabs>
