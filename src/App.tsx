@@ -58,6 +58,7 @@ import KingTenantImport from "./pages/king/KingTenantImport";
 import KingAffiliates from "./pages/king/KingAffiliates";
 import KingAffiliateDetail from "./pages/king/KingAffiliateDetail";
 import KingCatalog from "./pages/king/KingCatalog";
+import KingAppsManager from "./pages/king/KingAppsManager";
 import FontPreview from "./pages/FontPreview";
 
 const queryClient = new QueryClient();
