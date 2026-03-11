@@ -170,7 +170,7 @@ export function ToolDetailDialog({ app, open, onOpenChange, onConnect, onDisconn
                   Ouvrir dans LYTA
                 </Button>
               )}
-              <Button variant="destructive" variant-size="sm" onClick={() => { onDisconnect(app.id); onOpenChange(false); }}>
+              <Button variant="destructive" size="sm" onClick={() => { onDisconnect(app.id); onOpenChange(false); }}>
                 <Unlink className="w-4 h-4 mr-2" />
                 Déconnecter
               </Button>
