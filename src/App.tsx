@@ -100,6 +100,7 @@ const App = () => (
                 <Route path="compta" element={<CRMCompta />} />
                 <Route path="publicite" element={<CRMPublicite />} />
                 <Route path="abonnement" element={<CRMAbonnement />} />
+                <Route path="tools" element={<CRMLytaTools />} />
               </Route>
               
               {/* KING Platform Routes */}
