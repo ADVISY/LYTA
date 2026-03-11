@@ -112,10 +112,15 @@ export default function CRMLytaTools() {
   };
 
   const handleOpenApp = useCallback((app: AppWithConnection) => {
+    // Use tenant's custom URL if configured
+    const tenantConfig = (app.tenantSetting as any)?.config_json as Record<string, unknown> | undefined;
+    const customUrl = tenantConfig?.custom_launch_url as string | undefined;
+    const appWithCustomUrl = customUrl ? { ...app, launch_url: customUrl } : app;
+
     if (app.embed_allowed) {
-      openInTab(app);
+      openInTab(appWithCustomUrl);
     } else {
-      openApp(app);
+      openApp(appWithCustomUrl);
     }
   }, [openInTab, openApp]);
 
