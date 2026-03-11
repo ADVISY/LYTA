@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useLytaTools, AppWithConnection } from '@/hooks/useLytaTools';
 import { useUserRole } from '@/hooks/useUserRole';
-import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolsAdminPanel, ToolTabsManager } from '@/components/crm/lyta-tools';
+import { ToolCard, ToolDetailDialog, ToolConnectDialog, ToolConfigDialog, ToolsAdminPanel, ToolTabsManager } from '@/components/crm/lyta-tools';
 import type { OpenTab } from '@/components/crm/lyta-tools';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ export default function CRMLytaTools() {
     disconnectApp,
     openApp,
     toggleTenantApp,
+    updateTenantAppConfig,
   } = useLytaTools();
   
   const { isAdmin, isManager } = useUserRole();
@@ -61,6 +62,7 @@ export default function CRMLytaTools() {
   const [detailApp, setDetailApp] = useState<AppWithConnection | null>(null);
   const [connectDialogApp, setConnectDialogApp] = useState<AppWithConnection | null>(null);
   const [activeTab, setActiveTab] = useState('catalog');
+  const [configApp, setConfigApp] = useState<AppWithConnection | null>(null);
 
   // --- Embedded tabs state ---
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
@@ -110,10 +112,15 @@ export default function CRMLytaTools() {
   };
 
   const handleOpenApp = useCallback((app: AppWithConnection) => {
+    // Use tenant's custom URL if configured
+    const tenantConfig = (app.tenantSetting as any)?.config_json as Record<string, unknown> | undefined;
+    const customUrl = tenantConfig?.custom_launch_url as string | undefined;
+    const appWithCustomUrl = customUrl ? { ...app, launch_url: customUrl } : app;
+
     if (app.embed_allowed) {
-      openInTab(app);
+      openInTab(appWithCustomUrl);
     } else {
-      openApp(app);
+      openApp(appWithCustomUrl);
     }
   }, [openInTab, openApp]);
 
@@ -367,7 +374,7 @@ export default function CRMLytaTools() {
         {/* Admin Tab */}
         {(isAdmin || isManager) && (
           <TabsContent value="admin" className="mt-4">
-            <ToolsAdminPanel apps={apps} onToggleApp={toggleTenantApp} />
+            <ToolsAdminPanel apps={apps} onToggleApp={toggleTenantApp} onConfigureApp={setConfigApp} />
           </TabsContent>
         )}
       </Tabs>
@@ -387,6 +394,12 @@ export default function CRMLytaTools() {
         open={!!connectDialogApp}
         onOpenChange={(open) => !open && setConnectDialogApp(null)}
         onConfirm={handleConfirmConnect}
+      />
+      <ToolConfigDialog
+        app={configApp}
+        open={!!configApp}
+        onOpenChange={(open) => !open && setConfigApp(null)}
+        onSave={updateTenantAppConfig}
       />
     </div>
   );
