@@ -55,8 +55,8 @@ export function ToolConfigDialog({ app, open, onOpenChange, onSave }: ToolConfig
 
   useEffect(() => {
     if (app) {
-      const existingConfig = app.tenantSetting?.config_json as Record<string, unknown> | undefined;
-      setCustomUrl((existingConfig?.custom_launch_url as string) || '');
+      const tenantConfig = (app.tenantSetting as any)?.config_json as Record<string, unknown> | undefined;
+      setCustomUrl((tenantConfig?.custom_launch_url as string) || '');
       setUrlError('');
     }
   }, [app]);

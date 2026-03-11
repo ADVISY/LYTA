@@ -62,6 +62,7 @@ export default function CRMLytaTools() {
   const [detailApp, setDetailApp] = useState<AppWithConnection | null>(null);
   const [connectDialogApp, setConnectDialogApp] = useState<AppWithConnection | null>(null);
   const [activeTab, setActiveTab] = useState('catalog');
+  const [configApp, setConfigApp] = useState<AppWithConnection | null>(null);
 
   // --- Embedded tabs state ---
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
