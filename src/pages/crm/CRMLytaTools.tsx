@@ -395,6 +395,12 @@ export default function CRMLytaTools() {
         onOpenChange={(open) => !open && setConnectDialogApp(null)}
         onConfirm={handleConfirmConnect}
       />
+      <ToolConfigDialog
+        app={configApp}
+        open={!!configApp}
+        onOpenChange={(open) => !open && setConfigApp(null)}
+        onSave={updateTenantAppConfig}
+      />
     </div>
   );
 }
