@@ -73,6 +73,7 @@ export default function CRMLayout() {
   const { role, loading } = useUserRole();
   const { tenant } = useTenant();
   const { hasModule, loading: planLoading } = usePlanFeatures();
+  const { enabled: lytaToolsEnabled } = useLytaToolsEnabled();
   const { theme } = useTheme();
   useLanguage(); // Initialize language based on user/tenant preferences
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -82,7 +83,7 @@ export default function CRMLayout() {
 
   const navigate = useNavigate();
   
-  // Get all menu items (don't filter, we'll show locked ones differently)
+  // Get all menu items + conditionally add LYTA Tools (Pilot: Advisy only)
   const allMenuItems = useMemo(() => getMenuItems(t), [t]);
 
   // Check if we should show welcome message (on first load after login)
