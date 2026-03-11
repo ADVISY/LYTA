@@ -53,6 +53,7 @@ export default function CRMLytaTools() {
     disconnectApp,
     openApp,
     toggleTenantApp,
+    updateTenantAppConfig,
   } = useLytaTools();
   
   const { isAdmin, isManager } = useUserRole();
