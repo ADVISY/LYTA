@@ -84,7 +84,25 @@ export default function CRMLayout() {
   const navigate = useNavigate();
   
   // Get all menu items + conditionally add LYTA Tools (Pilot: Advisy only)
-  const allMenuItems = useMemo(() => getMenuItems(t), [t]);
+  const allMenuItems = useMemo(() => {
+    const items = getMenuItems(t);
+    if (lytaToolsEnabled) {
+      // Insert LYTA Tools before settings (second to last)
+      const settingsIndex = items.findIndex(i => i.to === '/crm/parametres');
+      const toolsItem: MenuItem = {
+        to: '/crm/tools',
+        icon: Puzzle,
+        label: 'LYTA Tools',
+        color: 'from-cyan-500 to-teal-500',
+      };
+      if (settingsIndex >= 0) {
+        items.splice(settingsIndex, 0, toolsItem);
+      } else {
+        items.push(toolsItem);
+      }
+    }
+    return items;
+  }, [t, lytaToolsEnabled]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {
