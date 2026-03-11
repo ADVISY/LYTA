@@ -240,6 +240,29 @@ export function useLytaTools() {
     }
   }, [tenantId, fetchApps]);
 
+  const updateTenantAppConfig = useCallback(async (appId: string, config: Record<string, unknown>) => {
+    if (!tenantId) return;
+
+    try {
+      const { error } = await supabase
+        .from('tenant_app_settings')
+        .upsert({
+          tenant_id: tenantId,
+          app_id: appId,
+          is_enabled: true,
+          is_visible: true,
+          config_json: config,
+        }, { onConflict: 'tenant_id,app_id' });
+
+      if (error) throw error;
+      toast({ title: 'Configuration sauvegardée', description: 'Les paramètres de l\'application ont été mis à jour.' });
+      await fetchApps();
+    } catch (err) {
+      console.error('Error updating tenant app config:', err);
+      toast({ title: 'Erreur', description: 'Impossible de sauvegarder la configuration.', variant: 'destructive' });
+    }
+  }, [tenantId, fetchApps, toast]);
+
   // Filtered apps
   const filteredApps = apps.filter(app => {
     if (searchQuery) {
