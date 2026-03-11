@@ -109,6 +109,14 @@ export default function CRMLytaTools() {
 
   const handleConfirmConnect = async (appId: string) => {
     await connectApp(appId);
+    // After connecting, auto-open the app in the workspace
+    const app = apps.find(a => a.id === appId);
+    if (app) {
+      const tenantConfig = (app.tenantSetting as any)?.config_json as Record<string, unknown> | undefined;
+      const customUrl = tenantConfig?.custom_launch_url as string | undefined;
+      const appWithCustomUrl = customUrl ? { ...app, launch_url: customUrl } : app;
+      openInTab(appWithCustomUrl);
+    }
   };
 
   const handleOpenApp = useCallback((app: AppWithConnection) => {
