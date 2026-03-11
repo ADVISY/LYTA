@@ -121,11 +121,7 @@ export function ToolCard({ app, onConnect, onDisconnect, onOpen, onViewDetails }
                 className="flex-1 h-8 text-xs"
                 onClick={() => onOpen(app)}
               >
-                {app.embed_allowed ? (
-                  <><Monitor className="w-3.5 h-3.5 mr-1" /> Ouvrir dans LYTA</>
-                ) : (
-                  <><ExternalLink className="w-3.5 h-3.5 mr-1" /> Ouvrir</>
-                )}
+                <Monitor className="w-3.5 h-3.5 mr-1" /> Ouvrir dans LYTA
               </Button>
               <Button 
                 size="sm" 

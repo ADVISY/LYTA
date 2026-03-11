@@ -13,7 +13,7 @@ interface ToolEmbedViewerProps {
 export function ToolEmbedViewer({ app, onBack, onOpenExternal }: ToolEmbedViewerProps) {
   const [embedError, setEmbedError] = useState(false);
 
-  if (!app.embed_allowed || embedError) {
+  if (embedError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4">
         <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center mb-4">
@@ -28,11 +28,8 @@ export function ToolEmbedViewer({ app, onBack, onOpenExternal }: ToolEmbedViewer
         <Alert className="max-w-md mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {embedError 
-              ? "L'ouverture intégrée a échoué. Cette application bloque l'affichage en iframe."
-              : "Cette application ne permet pas l'ouverture intégrée pour des raisons de sécurité."
-            }
-            <br />Ouvrez-la dans un nouvel onglet pour y accéder.
+            Cette application bloque l'affichage intégré (protection iframe).
+            <br />Vous pouvez y accéder dans un nouvel onglet tout en restant dans LYTA.
           </AlertDescription>
         </Alert>
 

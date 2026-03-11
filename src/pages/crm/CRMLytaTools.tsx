@@ -117,12 +117,9 @@ export default function CRMLytaTools() {
     const customUrl = tenantConfig?.custom_launch_url as string | undefined;
     const appWithCustomUrl = customUrl ? { ...app, launch_url: customUrl } : app;
 
-    if (app.embed_allowed) {
-      openInTab(appWithCustomUrl);
-    } else {
-      openApp(appWithCustomUrl);
-    }
-  }, [openInTab, openApp]);
+    // Always open in the Workspace tab first
+    openInTab(appWithCustomUrl);
+  }, [openInTab]);
 
   return (
     <div className="space-y-6 max-w-7xl">
