@@ -43,6 +43,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageSelector } from "@/components/ui/language-selector";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
+import { ConnectedAppsDock } from "@/components/crm/ConnectedAppsDock";
 
 
 interface MenuItem {
