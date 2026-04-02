@@ -30,6 +30,40 @@ import {
 import { cn } from "@/lib/utils";
 import lytaSmartFlowLogo from "@/assets/lyta-smartflow-logo.png";
 
+interface ClassificationResult {
+  product_type?: string;
+  company_name?: string | null;
+  premiums?: {
+    monthly?: number | null;
+    annual?: number | null;
+  };
+}
+
+interface DocumentScanWithClassification {
+  id: string;
+  client_id?: string | null;
+  batch_id?: string | null;
+  status: string;
+  classification_result?: ClassificationResult | null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 export default function CRMPropositions() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -80,10 +114,10 @@ export default function CRMPropositions() {
         title: "Dossier rejeté",
         description: "Le dossier a été marqué comme rejeté",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Erreur",
-        description: err.message || "Impossible de rejeter le dossier",
+        description: getErrorMessage(err, "Impossible de rejeter le dossier"),
         variant: "destructive",
       });
     } finally {
@@ -339,7 +373,7 @@ export default function CRMPropositions() {
                         try {
                           // Fetch classified scans for this batch
                           const { data: scansData, error: scansErr } = await supabase
-                            .from("document_scans" as any)
+                            .from("document_scans")
                             .select("*")
                             .eq("batch_id", batchId)
                             .eq("status", "classified")
@@ -347,7 +381,7 @@ export default function CRMPropositions() {
 
                           if (scansErr) throw scansErr;
 
-                          const validScans = (scansData || []) as any[];
+                          const validScans = (scansData || []) as DocumentScanWithClassification[];
                           let createdCount = 0;
 
                           for (const scan of validScans) {
@@ -373,7 +407,7 @@ export default function CRMPropositions() {
 
                             // Mark scan as processed
                             await supabase
-                              .from("document_scans" as any)
+                              .from("document_scans")
                               .update({ status: "processed" })
                               .eq("id", scan.id);
                           }
@@ -381,7 +415,7 @@ export default function CRMPropositions() {
                           // Update batch status to validated
                           await supabase
                             .from("scan_batches")
-                            .update({ status: "validated" as any })
+                            .update({ status: "validated" })
                             .eq("id", batchId);
 
                           toast({
@@ -392,10 +426,10 @@ export default function CRMPropositions() {
                           // Refresh data
                           fetchBatches();
                           refresh();
-                        } catch (err: any) {
+                        } catch (err: unknown) {
                           toast({
                             title: "Erreur de consolidation",
-                            description: err.message || "Impossible de valider le dossier",
+                            description: getErrorMessage(err, "Impossible de valider le dossier"),
                             variant: "destructive",
                           });
                         }

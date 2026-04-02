@@ -44,6 +44,7 @@ const TenantContext = createContext<TenantContextType>({
   hasClientPortal: false,
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTenant = () => useContext(TenantContext);
 
 /**
@@ -54,9 +55,9 @@ function hexToHsl(hex: string): string {
   hex = hex.replace(/^#/, '');
   
   // Parse hex
-  let r = parseInt(hex.substring(0, 2), 16) / 255;
-  let g = parseInt(hex.substring(2, 4), 16) / 255;
-  let b = parseInt(hex.substring(4, 6), 16) / 255;
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);

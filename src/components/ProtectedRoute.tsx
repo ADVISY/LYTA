@@ -10,6 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 // How long a SMS verification is considered valid (in minutes)
 const SMS_VERIFICATION_VALIDITY_MINUTES = 120; // 2 hours
 
+interface TenantRelation {
+  slug: string | null;
+}
+
+interface TenantCheckResult {
+  tenant_id: string | null;
+  tenants: TenantRelation | TenantRelation[] | null;
+}
+
 /**
  * Check if we're on a tenant subdomain (e.g., advisy.lyta.ch)
  * Returns the tenant slug or null if on main platform
@@ -204,8 +213,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
             .eq('user_id', user.id)
             .not('tenant_id', 'is', null)
             .maybeSingle();
-          
-          const userTenantSlug = (tenantCheck?.tenants as any)?.slug;
+
+          const tenantData = tenantCheck as TenantCheckResult | null;
+          const userTenantSlug = Array.isArray(tenantData?.tenants)
+            ? (tenantData.tenants[0]?.slug ?? null)
+            : (tenantData?.tenants?.slug ?? null);
           
           if (!userTenantSlug || userTenantSlug !== currentTenantSlug) {
             console.error(`[ProtectedRoute] SECURITY: User tenant (${userTenantSlug}) does not match domain tenant (${currentTenantSlug})`);
@@ -362,7 +374,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           }
 
           // Platform admins are allowed regardless of tenant role assignment
-          if (!(assignment as any).is_platform_admin) {
+          if (!assignment.is_platform_admin) {
             const { data: tenantRoles, error: tenantRolesError } = await supabase
               .from('user_tenant_roles')
               .select('id')

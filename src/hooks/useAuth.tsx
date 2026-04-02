@@ -3,6 +3,73 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
+interface AuthActionError {
+  message: string;
+}
+
+interface PendingSmsVerificationState {
+  userId: string;
+  phoneNumber: string;
+}
+
+interface LoginData {
+  role: string;
+  tenant_slug: string | null;
+  requires_sms: boolean;
+  phone: string | null;
+}
+
+interface AuthActionResult {
+  error: AuthActionError | null;
+}
+
+interface SignInResult extends AuthActionResult {
+  requiresSmsVerification?: boolean;
+  userId?: string;
+  phoneNumber?: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function parseLoginData(value: unknown): LoginData | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  if (
+    typeof data.role !== "string" ||
+    (data.tenant_slug !== null && typeof data.tenant_slug !== "string") ||
+    typeof data.requires_sms !== "boolean" ||
+    (data.phone !== null && typeof data.phone !== "string")
+  ) {
+    return null;
+  }
+
+  return {
+    role: data.role,
+    tenant_slug: data.tenant_slug,
+    requires_sms: data.requires_sms,
+    phone: data.phone,
+  };
+}
+
 /**
  * Check if a password has been exposed in known data breaches
  * Uses HaveIBeenPwned API with k-anonymity
@@ -46,17 +113,14 @@ async function checkPasswordCompromised(password: string): Promise<{ isCompromis
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signIn: (email: string, password: string) => Promise<{ error: any; requiresSmsVerification?: boolean; userId?: string; phoneNumber?: string }>;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<AuthActionResult>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
-  updatePassword: (newPassword: string) => Promise<{ error: any }>;
-  completeSmsVerification: () => void;
+  resetPassword: (email: string) => Promise<AuthActionResult>;
+  updatePassword: (newPassword: string) => Promise<AuthActionResult>;
+  completeSmsVerification: () => Promise<void>;
   loading: boolean;
-  pendingSmsVerification: {
-    userId: string;
-    phoneNumber: string;
-  } | null;
+  pendingSmsVerification: PendingSmsVerificationState | null;
   clearPendingVerification: () => void;
 }
 
@@ -66,10 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pendingSmsVerification, _setPendingSmsVerification] = useState<{
-    userId: string;
-    phoneNumber: string;
-  } | null>(() => {
+  const [pendingSmsVerification, _setPendingSmsVerification] = useState<PendingSmsVerificationState | null>(() => {
     // Restore from sessionStorage to survive page refresh
     try {
       const stored = sessionStorage.getItem('pendingSmsVerification');
@@ -80,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Wrapper that syncs to sessionStorage
-  const setPendingSmsVerification = useCallback((value: { userId: string; phoneNumber: string } | null) => {
+  const setPendingSmsVerification = useCallback((value: PendingSmsVerificationState | null) => {
     _setPendingSmsVerification(value);
     if (value) {
       sessionStorage.setItem('pendingSmsVerification', JSON.stringify(value));
@@ -134,13 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: "Erreur de vérification. Veuillez réessayer." } };
       }
 
-      // Cast to expected shape
-      const parsedData = loginData as {
-        role: string;
-        tenant_slug: string | null;
-        requires_sms: boolean;
-        phone: string | null;
-      } | null;
+      const parsedData = parseLoginData(loginData);
 
       // Store login data for redirect logic
       if (parsedData) {
@@ -212,11 +267,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session.user);
     }
-  }, [pendingSmsVerification]);
+  }, [pendingSmsVerification, setPendingSmsVerification]);
 
   const clearPendingVerification = useCallback(() => {
     setPendingSmsVerification(null);
-  }, []);
+  }, [setPendingSmsVerification]);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     // Check if password has been compromised (HaveIBeenPwned)
@@ -281,7 +336,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (response.error) {
         console.error("Password reset error:", response.error);
-        return { error: response.error };
+        return {
+          error: {
+            message: getErrorMessage(
+              response.error,
+              "Erreur lors de l'envoi du mail de réinitialisation."
+            ),
+          },
+        };
       }
 
       if (response.data?.error) {
@@ -289,7 +351,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       return { error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Password reset exception:", err);
       // Fallback to Supabase default if edge function fails
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -325,6 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

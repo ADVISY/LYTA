@@ -46,11 +46,12 @@ export function SmsVerificationDialog({
   const [sending, setSending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   // Send code on open
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sendCode is stable via useCallback, avoid re-trigger loop
   useEffect(() => {
     if (open && userId && phoneNumber) {
       sendCode();
     }
-  }, [open, phoneNumber, sendCode, userId]);
+  }, [open, phoneNumber, userId]);
 
   // Countdown timer
   useEffect(() => {

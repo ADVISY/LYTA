@@ -1,9 +1,9 @@
 import { useUserRole } from "@/hooks/useUserRole";
-import { useClients } from "@/hooks/useClients";
-import { usePolicies } from "@/hooks/usePolicies";
+import { useClients, type Client } from "@/hooks/useClients";
+import { usePolicies, type Policy } from "@/hooks/usePolicies";
 import { useCommissions } from "@/hooks/useCommissions";
 import { usePerformance } from "@/hooks/usePerformance";
-import { useCommissionParts } from "@/hooks/useCommissionParts";
+import { useCommissionParts, type CommissionPart } from "@/hooks/useCommissionParts";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -39,6 +39,34 @@ import {
 
 type PeriodFilter = 'all' | 'week' | 'month' | 'quarter' | 'year';
 type ChartViewMode = 'prime' | 'ca_estime' | 'ca_realise';
+type ProductDataItem = NonNullable<Policy["products_data"]>[number];
+
+interface MonthlyChartDatum {
+  month: string;
+  lcaPrime: number;
+  viePrime: number;
+  nonViePrime: number;
+  hypoPrime: number;
+  lcaCAEstime: number;
+  vieCAEstime: number;
+  nonVieCAEstime: number;
+  hypoCAEstime: number;
+  lcaCARealise: number;
+  vieCARealise: number;
+  nonVieCARealise: number;
+  hypoCARealise: number;
+  lca: number;
+  vie: number;
+  nonVie: number;
+  hypo: number;
+  total: number;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: MonthlyChartDatum }>;
+  label?: string;
+}
 
 // Auto-refresh interval in milliseconds (60 seconds)
 const AUTO_REFRESH_INTERVAL = 60000;
@@ -63,13 +91,13 @@ export default function CRMDashboard() {
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [chartYear, setChartYear] = useState<number>(new Date().getFullYear());
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('prime');
-  const [allCommissionParts, setAllCommissionParts] = useState<any[]>([]);
-  const [myCommissionParts, setMyCommissionParts] = useState<any[]>([]);
+  const [allCommissionParts, setAllCommissionParts] = useState<CommissionPart[]>([]);
+  const [myCommissionParts, setMyCommissionParts] = useState<CommissionPart[]>([]);
   const [partsLoading, setPartsLoading] = useState(true);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   
   // Auto-refresh ref
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Manual refresh function
   const handleRefresh = useCallback(async () => {
@@ -89,12 +117,16 @@ export default function CRMDashboard() {
   const fetchClientsRef = useRef(fetchClients);
   const fetchPoliciesRef = useRef(fetchPolicies);
   const fetchCommissionsRef = useRef(fetchCommissions);
+  const fetchAllPartsRef = useRef(fetchAllParts);
+  const fetchPartsForAgentRef = useRef(fetchPartsForAgent);
   
   // Keep refs updated
   useEffect(() => {
     fetchClientsRef.current = fetchClients;
     fetchPoliciesRef.current = fetchPolicies;
     fetchCommissionsRef.current = fetchCommissions;
+    fetchAllPartsRef.current = fetchAllParts;
+    fetchPartsForAgentRef.current = fetchPartsForAgent;
   });
   
   // Setup auto-refresh with stable interval
@@ -126,17 +158,17 @@ export default function CRMDashboard() {
       setPartsLoading(true);
       
       if (dashboardScope === 'global' || commissionScope === 'all') {
-        const parts = await fetchAllParts();
+        const parts = await fetchAllPartsRef.current();
         setAllCommissionParts(parts);
         setMyCommissionParts(parts);
       } else if (myCollaborator) {
-        const parts = await fetchPartsForAgent(myCollaborator.id);
+        const parts = await fetchPartsForAgentRef.current(myCollaborator.id);
         setMyCommissionParts(parts);
         
         if (dashboardScope === 'team' && myTeam) {
           const teamParts = [...parts];
           for (const member of myTeam.teamMembers) {
-            const memberParts = await fetchPartsForAgent(member.id);
+            const memberParts = await fetchPartsForAgentRef.current(member.id);
             teamParts.push(...memberParts);
           }
           setAllCommissionParts(teamParts);
@@ -165,30 +197,34 @@ export default function CRMDashboard() {
           start: new Date(2000, 0, 1), 
           end: new Date(2100, 11, 31, 23, 59, 59, 999) 
         };
-      case 'week':
+      case 'week': {
         const weekStart = startOfWeek(now, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
         weekEnd.setHours(23, 59, 59, 999);
         return { start: weekStart, end: weekEnd };
-      case 'month':
+      }
+      case 'month': {
         const monthStart = startOfMonth(now);
         const monthEnd = endOfMonth(now);
         monthEnd.setHours(23, 59, 59, 999);
         return { start: monthStart, end: monthEnd };
-      case 'quarter':
+      }
+      case 'quarter': {
         const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
         const quarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0, 23, 59, 59, 999);
         return { start: quarterStart, end: quarterEnd };
+      }
       case 'year':
         return { 
           start: new Date(now.getFullYear(), 0, 1), 
           end: new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999) 
         };
-      default:
+      default: {
         const defaultStart = startOfMonth(now);
         const defaultEnd = endOfMonth(now);
         defaultEnd.setHours(23, 59, 59, 999);
         return { start: defaultStart, end: defaultEnd };
+      }
     }
   }, [periodFilter]);
 
@@ -252,7 +288,7 @@ export default function CRMDashboard() {
 
   // Helper function to determine product category for CA calculation
   // Analyzes both product_type and products_data for multi-product contracts
-  const getPolicyCategory = (p: any): 'lca' | 'vie' | 'non_vie' | 'hypo' => {
+  const getPolicyCategory = (p: Policy): 'lca' | 'vie' | 'non_vie' | 'hypo' => {
     const type = (p.product_type || '').toLowerCase();
     
     // Direct VIE detection
@@ -268,7 +304,7 @@ export default function CRMDashboard() {
     
     // For 'multi' contracts, analyze products_data to determine category
     if (type === 'multi' && p.products_data && Array.isArray(p.products_data) && p.products_data.length > 0) {
-      const categories = p.products_data.map((prod: any) => (prod.category || '').toLowerCase());
+      const categories = p.products_data.map((prod: ProductDataItem) => (prod.category || '').toLowerCase());
       
       // Check if any product is health/LCA
       const hasHealth = categories.some((cat: string) => 
@@ -486,7 +522,7 @@ export default function CRMDashboard() {
       return {
         id: agent.id,
         name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || 'Agent',
-        photoUrl: (agent as any).photo_url || null,
+        photoUrl: agent.photo_url || null,
         monthContracts,
         totalCommission,
         initials: `${(agent.first_name || 'A')[0]}${(agent.last_name || 'G')[0]}`.toUpperCase(),
@@ -516,14 +552,14 @@ export default function CRMDashboard() {
                date.getFullYear() === currentYear;
       }).length;
 
-      const manager = clients.find(c => c.id === team.managerId);
+      const manager = clients.find((c): c is Client => c.id === team.managerId);
 
       return {
         name: team.managerName,
         id: team.managerId,
         monthContracts,
         teamSize: team.teamMembers.length,
-        photoUrl: (manager as any)?.photo_url || null,
+        photoUrl: manager?.photo_url || null,
         initials: team.managerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
       };
     }).filter(m => m.monthContracts > 0);
@@ -567,7 +603,7 @@ export default function CRMDashboard() {
 
       // Real commissions for this month in selected year
       const monthCommissions = commissions.filter(c => {
-        const date = new Date((c as any).date || c.created_at);
+        const date = new Date(c.date || c.created_at);
         return date.getFullYear() === chartYear && date.getMonth() === i;
       });
       const monthPaidCommissions = monthCommissions.filter(c => c.status === 'paid');
@@ -659,7 +695,7 @@ export default function CRMDashboard() {
   }, [filteredPolicies, commissions, chartYear, chartViewMode]);
 
   // Custom tooltip for stacked bar chart
-  const CustomStackedTooltip = ({ active, payload, label }: any) => {
+  const CustomStackedTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
       const total = (data?.lca || 0) + (data?.vie || 0) + (data?.nonVie || 0) + (data?.hypo || 0);

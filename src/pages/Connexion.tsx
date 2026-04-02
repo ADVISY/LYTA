@@ -29,6 +29,23 @@ interface FieldErrors {
   password?: string;
 }
 
+function getErrorMessage(error: unknown, fallback = "Une erreur est survenue.") {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 interface LoginFormProps {
   title: string;
   subtitle: string;
@@ -732,7 +749,7 @@ const Connexion = () => {
     };
 
     handleRedirect();
-  }, [user?.id, loading, showSmsVerification, smsVerificationData]);
+  }, [user, loading, showSmsVerification, smsVerificationData]);
 
   // Ensure SMS dialog stays open if data exists
   useEffect(() => {
@@ -827,10 +844,10 @@ const Connexion = () => {
         });
         setIsResetPassword(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue.",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -900,13 +917,13 @@ const Connexion = () => {
           description: `Bienvenue sur votre espace ${displayName}.`,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       sessionStorage.removeItem('loginTarget');
       sessionStorage.removeItem('lyta_login_space');
       smsFlowActive.current = false;
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue.",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {

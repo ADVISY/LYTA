@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,60 @@ import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomati
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
 import { CabinetInfoSettings } from "@/components/crm/settings/CabinetInfoSettings";
 import CRMAbonnement from "@/pages/crm/CRMAbonnement";
+import type { Tables } from "@/integrations/supabase/types";
+
+type InsuranceCompany = Tables<"insurance_companies">;
+type InsuranceProduct = Tables<"insurance_products">;
+type ClientRow = Tables<"clients">;
+type ProfileRow = Tables<"profiles">;
+type UserRoleRow = Tables<"user_roles">;
+
+type CompanyOption = Pick<InsuranceCompany, "id" | "name" | "logo_url">;
+type CollaboratorLink = Pick<ClientRow, "id" | "user_id" | "first_name" | "last_name">;
+type CollaboratorOption = Pick<ClientRow, "id" | "first_name" | "last_name" | "email">;
+type UserProfile = Pick<ProfileRow, "id" | "email" | "first_name" | "last_name">;
+type ClientProfile = Pick<ProfileRow, "id" | "email">;
+type ClientAccountRow = Pick<
+  ClientRow,
+  "id" | "first_name" | "last_name" | "email" | "user_id" | "created_at" | "status"
+>;
+
+interface ProductOption extends Pick<InsuranceProduct, "id" | "name" | "category" | "company_id" | "description"> {
+  company?: { name: string } | null;
+}
+
+interface UserAccountRole extends Pick<UserRoleRow, "id" | "user_id" | "role" | "created_at"> {
+  profiles: UserProfile | null;
+}
+
+interface UserAccount extends UserAccountRole {
+  roles: string[];
+  collaborateur: CollaboratorLink | null;
+}
+
+interface ClientAccount extends ClientAccountRow {
+  profile: ClientProfile | null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 // Couleurs disponibles pour le thème - needs to be inside component to use translations
-const getThemeColors = (t: any) => [
+const getThemeColors = (t: TFunction) => [
   { id: "blue", label: t('settings.blue'), color: "hsl(221, 83%, 53%)", class: "bg-blue-600" },
   { id: "violet", label: t('settings.violet'), color: "hsl(262, 83%, 58%)", class: "bg-violet-600" },
   { id: "green", label: t('settings.green'), color: "hsl(142, 76%, 36%)", class: "bg-green-600" },
@@ -43,7 +95,7 @@ const getThemeColors = (t: any) => [
   { id: "indigo", label: t('settings.indigo'), color: "hsl(239, 84%, 67%)", class: "bg-indigo-500" },
 ];
 
-const getRoleLabels = (t: any): Record<string, string> => ({
+const getRoleLabels = (t: TFunction): Record<string, string> => ({
   admin: t('settings.admin'),
   manager: t('settings.manager'),
   agent: t('settings.agent'),
@@ -97,16 +149,16 @@ export default function CRMParametres() {
   const [showPasswords, setShowPasswords] = useState(false);
 
   // Compagnies
-  const [companies, setCompanies] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [newCompany, setNewCompany] = useState({ name: "", logo_url: "" });
-  const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [editingCompany, setEditingCompany] = useState<CompanyOption | null>(null);
 
   // Produits
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: "", category: "", company_id: "", description: "" });
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductOption | null>(null);
 
   // Taux de commission par défaut
   const [defaultRates, setDefaultRates] = useState({
@@ -122,9 +174,9 @@ export default function CRMParametres() {
   const [selectedColor, setSelectedColor] = useState("blue");
 
   // Gestion des comptes
-  const [userAccounts, setUserAccounts] = useState<any[]>([]);
-  const [clientAccounts, setClientAccounts] = useState<any[]>([]);
-  const [collaborateurs, setCollaborateurs] = useState<any[]>([]);
+  const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
+  const [clientAccounts, setClientAccounts] = useState<ClientAccount[]>([]);
+  const [collaborateurs, setCollaborateurs] = useState<CollaboratorOption[]>([]);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [accountSubTab, setAccountSubTab] = useState<"collaborateurs" | "clients">("collaborateurs");
@@ -141,7 +193,7 @@ export default function CRMParametres() {
   const [deletingClientAccountId, setDeletingClientAccountId] = useState<string | null>(null);
   const [resettingPasswordClientId, setResettingPasswordClientId] = useState<string | null>(null);
   const [confirmDeleteClientDialog, setConfirmDeleteClientDialog] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<any>(null);
+  const [clientToDelete, setClientToDelete] = useState<ClientAccount | null>(null);
 
   // Handler pour cliquer sur "Créer un compte"
   const handleAddUserClick = () => {
@@ -162,6 +214,7 @@ export default function CRMParametres() {
   };
 
   // Charger les données
+  // These loaders intentionally refresh when auth or tenant context changes.
   useEffect(() => {
     loadProfile();
     loadCompanies();
@@ -172,6 +225,7 @@ export default function CRMParametres() {
       loadCollaborateurs();
       loadClientAccounts();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, tenantId]);
 
   const loadProfile = async () => {
@@ -193,7 +247,7 @@ export default function CRMParametres() {
 
   const loadCompanies = async () => {
     const { data } = await supabase.from("insurance_companies").select("*").order("name");
-    if (data) setCompanies(data);
+    if (data) setCompanies(data as CompanyOption[]);
   };
 
   const loadProducts = async () => {
@@ -201,7 +255,7 @@ export default function CRMParametres() {
       .from("insurance_products")
       .select("*, company:insurance_companies(name)")
       .order("name");
-    if (data) setProducts(data);
+    if (data) setProducts(data as ProductOption[]);
   };
 
   const loadSettings = () => {
@@ -233,7 +287,10 @@ export default function CRMParametres() {
       return;
     }
 
-    const tenantUserIds = tenantUsers?.map(tu => tu.user_id) || [];
+    const tenantUserIds =
+      tenantUsers
+        ?.map((tenantUser) => tenantUser.user_id)
+        .filter((userId): userId is string => Boolean(userId)) || [];
     
     if (tenantUserIds.length === 0) {
       setUserAccounts([]);
@@ -271,26 +328,28 @@ export default function CRMParametres() {
       .eq("tenant_id", tenantId)
       .not("user_id", "is", null);
 
-    const collabMap = new Map();
-    linkedCollabs?.forEach(c => {
-      collabMap.set(c.user_id, c);
+    const collabMap = new Map<string, CollaboratorLink>();
+    (linkedCollabs as CollaboratorLink[] | null)?.forEach((collaborateur) => {
+      if (collaborateur.user_id) {
+        collabMap.set(collaborateur.user_id, collaborateur);
+      }
     });
 
     // Group roles by user_id to avoid duplicate entries
-    const userMap = new Map<string, any>();
-    roles?.forEach(r => {
-      const userId = r.user_id;
+    const userMap = new Map<string, UserAccount>();
+    (roles as UserAccountRole[] | null)?.forEach((userRole) => {
+      const userId = userRole.user_id;
       if (!userMap.has(userId)) {
         userMap.set(userId, {
-          ...r,
-          roles: [r.role],
+          ...userRole,
+          roles: [userRole.role],
           collaborateur: collabMap.get(userId) || null,
         });
       } else {
         // Add role to existing user
         const existing = userMap.get(userId);
-        if (!existing.roles.includes(r.role)) {
-          existing.roles.push(r.role);
+        if (existing && !existing.roles.includes(userRole.role)) {
+          existing.roles.push(userRole.role);
         }
       }
     });
@@ -312,7 +371,7 @@ export default function CRMParametres() {
       .is("user_id", null)
       .order("last_name");
     
-    setCollaborateurs(data || []);
+    setCollaborateurs((data || []) as CollaboratorOption[]);
   };
 
   const loadClientAccounts = async () => {
@@ -334,18 +393,22 @@ export default function CRMParametres() {
 
     // Get user profiles for emails
     if (data && data.length > 0) {
-      const userIds = data.map(c => c.user_id).filter(Boolean);
+      const userIds = data
+        .map((client) => client.user_id)
+        .filter((userId): userId is string => Boolean(userId));
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, email")
         .in("id", userIds);
 
-      const profileMap = new Map();
-      profiles?.forEach(p => profileMap.set(p.id, p));
+      const profileMap = new Map<string, ClientProfile>();
+      (profiles as ClientProfile[] | null)?.forEach((profileItem) => {
+        profileMap.set(profileItem.id, profileItem);
+      });
 
-      const clientsWithProfiles = data.map(c => ({
-        ...c,
-        profile: profileMap.get(c.user_id) || null,
+      const clientsWithProfiles: ClientAccount[] = (data as ClientAccountRow[]).map((client) => ({
+        ...client,
+        profile: client.user_id ? profileMap.get(client.user_id) || null : null,
       }));
 
       setClientAccounts(clientsWithProfiles);
@@ -579,16 +642,16 @@ export default function CRMParametres() {
       });
       loadUserAccounts();
       loadCollaborateurs();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating account:", error);
-      toast.error(t('settings.accountCreationError'));
+      toast.error(getErrorMessage(error, t('settings.accountCreationError')));
     } finally {
       setIsCreatingAccount(false);
     }
   };
 
   // Supprimer le compte client (retirer user_id et supprimer l'utilisateur auth)
-  const handleDeleteClientAccount = async (client: any) => {
+  const handleDeleteClientAccount = async (client: ClientAccount) => {
     setDeletingClientAccountId(client.id);
     try {
       // Retirer le user_id du client
@@ -603,16 +666,16 @@ export default function CRMParametres() {
       setConfirmDeleteClientDialog(false);
       setClientToDelete(null);
       loadClientAccounts();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting client account:", error);
-      toast.error(t('common.error'));
+      toast.error(getErrorMessage(error, t('common.error')));
     } finally {
       setDeletingClientAccountId(null);
     }
   };
 
   // Renvoyer un nouveau mot de passe au client
-  const handleResendPassword = async (client: any) => {
+  const handleResendPassword = async (client: ClientAccount) => {
     const clientEmail = client.profile?.email || client.email;
     if (!clientEmail) {
       toast.error(t('settings.noEmailForClient') || "Aucun email trouvé pour ce client");
@@ -644,9 +707,9 @@ export default function CRMParametres() {
       }
 
       toast.success(t('settings.passwordResent'));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error resending password:", error);
-      toast.error(error.message || t('common.error'));
+      toast.error(getErrorMessage(error, t('common.error')));
     } finally {
       setResettingPasswordClientId(null);
     }
