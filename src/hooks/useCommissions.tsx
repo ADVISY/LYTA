@@ -1,0 +1,210 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useUserTenant } from '@/hooks/useUserTenant';
+import { translateError } from '@/lib/errorTranslations';
+import { usePaginatedQuery } from './usePaginatedQuery';
+
+export type Commission = {
+  id: string;
+  policy_id: string;
+  partner_id?: string | null;
+  amount: number;
+  status: string;
+  type?: string | null;
+  date?: string | null;
+  total_amount?: number | null;
+  period_month?: number | null;
+  period_year?: number | null;
+  paid_at?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  policy?: any;
+  tenant_id?: string | null;
+};
+
+export function useCommissions() {
+  const { toast } = useToast();
+  const { tenantId: effectiveTenantId, loading: tenantLoading } = useUserTenant();
+
+  const { data: commissions, page, totalCount, totalPages, goToPage, nextPage, prevPage, isLoading: loading, isError, refetch } = usePaginatedQuery<Commission>({
+    queryKey: ['commissions', effectiveTenantId ?? ''],
+    buildQuery: (client) =>
+      client
+        .from('commissions')
+        .select(`
+          *,
+          policy:policies!policy_id (
+            id,
+            policy_number,
+            client_id,
+            product:insurance_products!product_id (
+              name,
+              category
+            ),
+            client:clients!client_id (
+              id,
+              first_name,
+              last_name,
+              company_name
+            )
+          )
+        `)
+        .eq('tenant_id', effectiveTenantId ?? '')
+        .order('created_at', { ascending: false }),
+    pageSize: 50,
+    enabled: !tenantLoading && !!effectiveTenantId,
+  });
+
+  const createCommission = async (commissionData: any) => {
+    try {
+      if (!effectiveTenantId) {
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
+      }
+
+      // Include tenant_id
+      const dataWithTenant: any = {
+        ...commissionData,
+        tenant_id: effectiveTenantId
+      };
+
+      // If created as paid, ensure paid_at is set for consistency
+      if (dataWithTenant.status === 'paid' && dataWithTenant.paid_at == null) {
+        dataWithTenant.paid_at = new Date().toISOString();
+      }
+
+      const { data, error } = await supabase
+        .from('commissions')
+        .insert([dataWithTenant])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Commission créée",
+        description: "La commission a été créée avec succès"
+      });
+
+      refetch();
+      return data;
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: translateError(error.message),
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const updateCommission = async (id: string, updates: any) => {
+    try {
+      const updatesWithPaidAt: any = { ...updates };
+
+      // Keep paid_at in sync when status is changed
+      if (Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'status')) {
+        if (updatesWithPaidAt.status === 'paid') {
+          if (!Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'paid_at')) {
+            updatesWithPaidAt.paid_at = new Date().toISOString();
+          }
+        } else {
+          if (!Object.prototype.hasOwnProperty.call(updatesWithPaidAt, 'paid_at')) {
+            updatesWithPaidAt.paid_at = null;
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('commissions')
+        .update(updatesWithPaidAt)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Commission mise à jour",
+        description: "Les modifications ont été enregistrées"
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: translateError(error.message),
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const markAsPaid = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .update({
+          status: 'paid',
+          paid_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Commission marquée comme payée",
+        description: "Le statut a été mis à jour"
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: translateError(error.message),
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const deleteCommission = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Commission supprimée",
+        description: "La commission a été supprimée avec succès"
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: translateError(error.message),
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  return {
+    commissions,
+    loading,
+    page,
+    totalCount,
+    totalPages,
+    goToPage,
+    nextPage,
+    prevPage,
+    fetchCommissions: refetch,
+    createCommission,
+    updateCommission,
+    markAsPaid,
+    deleteCommission
+  };
+}

@@ -1,0 +1,501 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import Stripe from "https://esm.sh/stripe@18.5.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { createLogger } from "../_shared/logger.ts";
+
+const log = createLogger("stripe-webhook");
+
+// Stripe product IDs mapped to plans (fallback if DB unavailable)
+const FALLBACK_PRODUCT_TO_PLAN: Record<string, string> = {
+  'prod_TjgUGx2FNdlhas': 'start',
+  'prod_TjgmLXohud7WAb': 'pro',
+  'prod_TjgrBLxInrbnSd': 'prime',
+  'prod_Tk0TPGFCuYQu3Q': 'founder',
+};
+
+async function getProductToPlanMap(supabaseAdmin: ReturnType<typeof createClient>): Promise<Record<string, string>> {
+  const { data, error } = await supabaseAdmin
+    .from('platform_plans')
+    .select('id, stripe_product_id')
+    .eq('is_active', true);
+
+  if (error || !data || data.length === 0) {
+    log.warn("Failed to fetch plan mapping from DB, using fallback", { error: error?.message });
+    return FALLBACK_PRODUCT_TO_PLAN;
+  }
+
+  return Object.fromEntries(
+    data
+      .filter((p: any) => p.stripe_product_id)
+      .map((p: any) => [p.stripe_product_id, p.id])
+  );
+}
+
+// --- Plan pricing from DB (with hardcoded fallback) ---
+
+interface PlanPricing {
+  monthlyPrices: Record<string, number>;
+  extraSeatPrices: Record<string, number>;
+}
+
+const FALLBACK_PRICING: PlanPricing = {
+  monthlyPrices: { start: 69, pro: 150, prime: 250, founder: 150 },
+  extraSeatPrices: { start: 20, pro: 20, prime: 20, founder: 20 },
+};
+
+async function getPlanPricing(supabaseAdmin: ReturnType<typeof createClient>): Promise<PlanPricing> {
+  const { data, error } = await supabaseAdmin
+    .from('platform_plans')
+    .select('id, monthly_price, extra_seat_price')
+    .eq('is_active', true);
+
+  if (error || !data || data.length === 0) {
+    log.warn("Failed to fetch plan pricing from DB, using fallback", { error: error?.message });
+    return FALLBACK_PRICING;
+  }
+
+  return {
+    monthlyPrices: Object.fromEntries(data.map((p: { id: string; monthly_price: number }) => [p.id, Number(p.monthly_price)])),
+    extraSeatPrices: Object.fromEntries(data.map((p: { id: string; extra_seat_price: number }) => [p.id, Number(p.extra_seat_price)])),
+  };
+}
+
+
+serve(async (req) => {
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!stripeKey) {
+    log.error("STRIPE_SECRET_KEY not configured");
+    return new Response(
+      JSON.stringify({ error: "Stripe not configured" }),
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+    );
+  }
+  const stripe = new Stripe(stripeKey, {
+    apiVersion: "2025-08-27.basil",
+  });
+
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } }
+  );
+
+  const PRODUCT_TO_PLAN = await getProductToPlanMap(supabaseAdmin);
+
+  try {
+    const body = await req.text();
+    const signature = req.headers.get("stripe-signature");
+
+    const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    if (!endpointSecret) {
+      log.error("STRIPE_WEBHOOK_SECRET not configured");
+      return new Response(
+        JSON.stringify({ error: "Webhook not configured" }),
+        { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!signature) {
+      return new Response(
+        JSON.stringify({ error: "Missing stripe-signature header" }),
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+    } catch (err) {
+      log.error("Signature verification failed", { error: err.message });
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+    log.info("Event received", { type: event.type, id: event.id });
+
+    // Handle different event types
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        log.info("Checkout completed", {
+          customerId: session.customer,
+          email: session.customer_email,
+          subscriptionId: session.subscription
+        });
+
+        // Get customer email
+        const customerEmail = session.customer_email || session.customer_details?.email;
+        
+        if (customerEmail) {
+          // Find tenant by email
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('id, name, email, admin_email')
+            .or(`email.eq.${customerEmail},admin_email.eq.${customerEmail}`)
+            .single();
+
+          if (tenant) {
+            // Update tenant with Stripe info
+            await supabaseAdmin
+              .from('tenants')
+              .update({
+                stripe_customer_id: session.customer,
+                stripe_subscription_id: session.subscription,
+                payment_status: 'paid',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', tenant.id);
+
+            log.info("Tenant updated with Stripe info", { tenantId: tenant.id });
+          }
+
+          // Create KING notification
+          await supabaseAdmin
+            .from('king_notifications')
+            .insert({
+              title: '💳 Paiement reçu',
+              message: `Paiement de ${customerEmail} traité avec succès`,
+              kind: 'payment_received',
+              priority: 'normal',
+              tenant_id: tenant?.id,
+              tenant_name: tenant?.name,
+              action_url: tenant ? `/king/tenants/${tenant.id}` : '/king/tenants',
+              action_label: 'Voir le tenant',
+              metadata: {
+                customer_id: session.customer,
+                subscription_id: session.subscription,
+                amount: session.amount_total,
+                customer_email: customerEmail,
+              }
+            });
+        }
+        break;
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object;
+        log.info("Invoice paid", {
+          customerId: invoice.customer,
+          amount: invoice.amount_paid,
+          subscriptionId: invoice.subscription
+        });
+
+        // Find tenant by Stripe customer ID
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name')
+          .eq('stripe_customer_id', invoice.customer)
+          .single();
+
+        if (tenant) {
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              payment_status: 'paid',
+              billing_status: 'paid',
+              current_period_end: invoice.lines?.data?.[0]?.period?.end 
+                ? new Date(invoice.lines.data[0].period.end * 1000).toISOString()
+                : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tenant.id);
+
+          await supabaseAdmin
+            .from('king_notifications')
+            .insert({
+              title: '✅ Facture payée',
+              message: `Facture de ${(invoice.amount_paid / 100).toFixed(2)} CHF payée`,
+              kind: 'payment_received',
+              priority: 'low',
+              tenant_id: tenant.id,
+              tenant_name: tenant.name,
+              action_url: `/king/tenants/${tenant.id}`,
+              action_label: 'Voir le tenant',
+              metadata: {
+                invoice_id: invoice.id,
+                amount: invoice.amount_paid,
+              }
+            });
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        log.warn("Invoice payment failed", {
+          customerId: invoice.customer,
+          amount: invoice.amount_due
+        });
+
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name')
+          .eq('stripe_customer_id', invoice.customer)
+          .single();
+
+        if (tenant) {
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              payment_status: 'past_due',
+              billing_status: 'past_due',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tenant.id);
+
+          await supabaseAdmin
+            .from('king_notifications')
+            .insert({
+              title: '⚠️ Paiement échoué',
+              message: `Le paiement de ${(invoice.amount_due / 100).toFixed(2)} CHF a échoué pour ${tenant.name}`,
+              kind: 'payment_failed',
+              priority: 'high',
+              tenant_id: tenant.id,
+              tenant_name: tenant.name,
+              action_url: `/king/tenants/${tenant.id}`,
+              action_label: 'Voir le tenant',
+              metadata: {
+                invoice_id: invoice.id,
+                amount: invoice.amount_due,
+                attempt_count: invoice.attempt_count,
+              }
+            });
+        }
+        break;
+      }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object;
+        log.info("Subscription updated", {
+          customerId: subscription.customer,
+          status: subscription.status
+        });
+
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name')
+          .eq('stripe_customer_id', subscription.customer)
+          .single();
+
+        if (tenant) {
+          // Fetch plan pricing from DB (with hardcoded fallback)
+          const pricing = await getPlanPricing(supabaseAdmin);
+
+          // Determine plan from subscription items
+          let planName = 'start';
+          let extraUsers = 0;
+          let mrr = 0;
+
+          for (const item of subscription.items.data) {
+            const productId = typeof item.price.product === 'string'
+              ? item.price.product
+              : item.price.product?.id;
+
+            if (productId && PRODUCT_TO_PLAN[productId]) {
+              planName = PRODUCT_TO_PLAN[productId];
+              mrr += pricing.monthlyPrices[planName] || 0;
+            }
+
+            // Check for extra users (quantity > 1 on user seat item)
+            if (item.price.id === 'price_1SmZtZF7ZITS358Au3FHsdBA') {
+              extraUsers = (item.quantity || 1) - 1;
+              mrr += extraUsers * (pricing.extraSeatPrices[planName] || 20);
+            }
+          }
+
+          const paymentStatus = subscription.status === 'active' ? 'paid' 
+            : subscription.status === 'past_due' ? 'past_due'
+            : subscription.status === 'trialing' ? 'trialing'
+            : 'unpaid';
+
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              stripe_subscription_id: subscription.id,
+              plan: planName,
+              extra_users: extraUsers,
+              payment_status: paymentStatus,
+              billing_status: paymentStatus,
+              mrr_amount: mrr,
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tenant.id);
+
+          log.info("Tenant subscription updated", { tenantId: tenant.id, plan: planName, mrr });
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        log.warn("Subscription deleted", {
+          customerId: subscription.customer
+        });
+
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name')
+          .eq('stripe_customer_id', subscription.customer)
+          .single();
+
+        if (tenant) {
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              payment_status: 'canceled',
+              billing_status: 'canceled',
+              tenant_status: 'suspended',
+              mrr_amount: 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tenant.id);
+
+          await supabaseAdmin
+            .from('king_notifications')
+            .insert({
+              title: '🚫 Abonnement annulé',
+              message: `L'abonnement de ${tenant.name} a été annulé`,
+              kind: 'subscription_cancelled',
+              priority: 'high',
+              tenant_id: tenant.id,
+              tenant_name: tenant.name,
+              action_url: `/king/tenants/${tenant.id}`,
+              action_label: 'Voir le tenant',
+              metadata: {
+                subscription_id: subscription.id,
+              }
+            });
+        }
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        log.info("Payment intent succeeded", {
+          customerId: paymentIntent.customer,
+          amount: paymentIntent.amount
+        });
+
+        // Try to find tenant by customer ID
+        if (paymentIntent.customer) {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('id, name, stripe_customer_id')
+            .eq('stripe_customer_id', paymentIntent.customer)
+            .single();
+
+          if (tenant) {
+            // Update payment status
+            await supabaseAdmin
+              .from('tenants')
+              .update({
+                payment_status: 'paid',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', tenant.id);
+
+            log.info("Tenant payment updated via payment_intent", { tenantId: tenant.id });
+          } else {
+            // Customer exists but no tenant linked - try to find by receipt_email
+            const receiptEmail = paymentIntent.receipt_email;
+            if (receiptEmail) {
+              const { data: tenantByEmail } = await supabaseAdmin
+                .from('tenants')
+                .select('id, name')
+                .or(`email.eq.${receiptEmail},admin_email.eq.${receiptEmail}`)
+                .single();
+
+              if (tenantByEmail) {
+                await supabaseAdmin
+                  .from('tenants')
+                  .update({
+                    stripe_customer_id: paymentIntent.customer,
+                    payment_status: 'paid',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', tenantByEmail.id);
+
+                log.info("Tenant linked and updated via email", { tenantId: tenantByEmail.id });
+
+                await supabaseAdmin
+                  .from('king_notifications')
+                  .insert({
+                    title: '💳 Nouveau paiement',
+                    message: `Paiement de ${(paymentIntent.amount / 100).toFixed(2)} CHF reçu`,
+                    kind: 'payment_received',
+                    priority: 'normal',
+                    tenant_id: tenantByEmail.id,
+                    tenant_name: tenantByEmail.name,
+                    action_url: `/king/tenants/${tenantByEmail.id}`,
+                    action_label: 'Voir le tenant',
+                    metadata: {
+                      payment_intent_id: paymentIntent.id,
+                      amount: paymentIntent.amount,
+                    }
+                  });
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case 'subscription_schedule.canceled': {
+        const schedule = event.data.object;
+        log.warn("Subscription schedule canceled", {
+          customerId: schedule.customer
+        });
+
+        if (schedule.customer) {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('id, name')
+            .eq('stripe_customer_id', schedule.customer)
+            .single();
+
+          if (tenant) {
+            await supabaseAdmin
+              .from('king_notifications')
+              .insert({
+                title: '⚠️ Abonnement programmé annulé',
+                message: `Le schedule d'abonnement de ${tenant.name} a été annulé`,
+                kind: 'subscription_cancelled',
+                priority: 'normal',
+                tenant_id: tenant.id,
+                tenant_name: tenant.name,
+                action_url: `/king/tenants/${tenant.id}`,
+                action_label: 'Voir le tenant',
+                metadata: {
+                  schedule_id: schedule.id,
+                }
+              });
+          }
+        }
+        break;
+      }
+
+      default:
+        log.info("Unhandled event type", { type: event.type });
+    }
+
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error("Webhook handler failed", { error: errorMessage });
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      // 500 so Stripe retries on transient failures (Stripe does not retry 4xx)
+      status: 500,
+    });
+  }
+});

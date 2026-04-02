@@ -1,0 +1,394 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Advisy Brand Colors - Premium Background */
+    --background: 240 20% 96%;
+    --foreground: 246 100% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 246 100% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 246 100% 12%;
+
+    /* Primary: Advisy Blue #1800AD */
+    --primary: 246 100% 34%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 246 100% 50%;
+    --primary-dark: 246 100% 25%;
+    --primary-glow: 246 100% 70%;
+
+    /* Secondary: Premium Grays */
+    --secondary: 240 15% 92%;
+    --secondary-foreground: 246 100% 12%;
+    
+    --neutral-light: 240 10% 88%;
+    --neutral-mid: 240 8% 60%;
+    --neutral-dark: 240 10% 40%;
+
+    --muted: 240 12% 94%;
+    --muted-foreground: 240 8% 45%;
+
+    --accent: 246 80% 97%;
+    --accent-foreground: 246 100% 34%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 15% 88%;
+    --input: 240 12% 92%;
+    --ring: 246 100% 50%;
+
+    --radius: 1rem;
+
+    /* Advanced Design Tokens - Premium */
+    --gradient-primary: linear-gradient(135deg, hsl(246 100% 34%) 0%, hsl(246 100% 50%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(246 100% 34%) 0%, hsl(246 100% 45%) 50%, hsl(270 100% 55%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(240 20% 98%) 0%, hsl(246 40% 98%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(246 40% 98%) 100%);
+    
+    --shadow-xs: 0 2px 4px rgba(24, 0, 173, 0.08);
+    --shadow-soft: 0 8px 20px rgba(24, 0, 173, 0.12);
+    --shadow-medium: 0 12px 32px rgba(24, 0, 173, 0.18);
+    --shadow-strong: 0 20px 60px rgba(24, 0, 173, 0.25);
+    --shadow-glow: 0 0 40px rgba(100, 50, 255, 0.4), 0 0 80px rgba(100, 50, 255, 0.15);
+    
+    --blur-glass: blur(12px);
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* CRM Specific Tokens */
+    --crm-sidebar: 246 50% 98%;
+    --crm-sidebar-active: 246 100% 34%;
+    --crm-card: 0 0% 100%;
+    --crm-card-hover: 246 50% 99%;
+    --crm-success: 142 76% 36%;
+    --crm-warning: 38 92% 50%;
+    --crm-info: 199 89% 48%;
+    --crm-danger: 0 84% 60%;
+
+    /* King Gold Color */
+    --king-gold: 45 93% 47%;
+    --king-gold-light: 45 93% 60%;
+    --king-gold-dark: 40 90% 40%;
+    --king-gold-glow: 45 93% 70%;
+  }
+
+  .dark {
+    /* Dark Mode - Advisy Brand */
+    --background: 240 15% 8%;
+    --foreground: 240 10% 95%;
+
+    --card: 240 12% 12%;
+    --card-foreground: 240 10% 95%;
+
+    --popover: 240 12% 10%;
+    --popover-foreground: 240 10% 95%;
+
+    /* Primary: Advisy Blue - lighter for dark mode */
+    --primary: 246 100% 60%;
+    --primary-foreground: 240 15% 8%;
+    --primary-light: 246 100% 70%;
+    --primary-dark: 246 100% 50%;
+    --primary-glow: 246 100% 75%;
+
+    /* Secondary */
+    --secondary: 240 12% 18%;
+    --secondary-foreground: 240 10% 95%;
+    
+    --neutral-light: 240 10% 25%;
+    --neutral-mid: 240 8% 50%;
+    --neutral-dark: 240 10% 70%;
+
+    --muted: 240 12% 16%;
+    --muted-foreground: 240 8% 65%;
+
+    --accent: 246 50% 20%;
+    --accent-foreground: 246 100% 70%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 12% 20%;
+    --input: 240 12% 18%;
+    --ring: 246 100% 60%;
+
+    /* Dark Mode Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(246 100% 50%) 0%, hsl(246 100% 65%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(246 100% 40%) 0%, hsl(246 100% 55%) 50%, hsl(270 100% 60%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(240 15% 10%) 0%, hsl(246 30% 12%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(240 12% 14%) 0%, hsl(246 20% 16%) 100%);
+    
+    --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.4);
+    --shadow-medium: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 40px rgba(100, 50, 255, 0.3), 0 0 80px rgba(100, 50, 255, 0.1);
+
+    /* CRM Specific Tokens - Dark */
+    --crm-sidebar: 240 12% 10%;
+    --crm-sidebar-active: 246 100% 60%;
+    --crm-card: 240 12% 12%;
+    --crm-card-hover: 246 30% 15%;
+    --crm-success: 142 60% 45%;
+    --crm-warning: 38 80% 55%;
+    --crm-info: 199 80% 55%;
+    --crm-danger: 0 70% 55%;
+
+    /* King Gold Color - Dark Mode */
+    --king-gold: 45 90% 55%;
+    --king-gold-light: 45 90% 65%;
+    --king-gold-dark: 40 85% 45%;
+    --king-gold-glow: 45 90% 70%;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--neutral-light));
+  border-radius: 6px;
+  border: 3px solid hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background-image: url('/images/bg-pattern-gray.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  /* Typography: Poppins for headings, Outfit for body */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+}
+
+/* Advanced scroll animations */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(24, 0, 173, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(24, 0, 173, 0.6);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(-20px);
+  }
+  50% {
+    transform: scale(1.05) translateY(-5px);
+  }
+  70% {
+    transform: scale(0.9) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.8s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.8s ease-out forwards;
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+/* Scroll-triggered animations */
+@keyframes parallax-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-15px) translateX(5px);
+  }
+}
+
+.animate-parallax {
+  animation: parallax-float 6s ease-in-out infinite;
+}
+
+/* Clean Utility Classes */
+.card-clean {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+
+.card-clean:hover {
+  box-shadow: var(--shadow-soft);
+}
+
+/* Clean table styles */
+.table-clean {
+  background: hsl(var(--card));
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+}
+
+.table-clean thead {
+  background: hsl(var(--muted));
+}
+
+.table-clean tbody tr {
+  transition: background 0.15s ease;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.table-clean tbody tr:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.table-clean tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* Mobile-specific utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area padding for devices with notches/home indicators */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Touch-friendly tap targets */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Smooth momentum scrolling on iOS */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

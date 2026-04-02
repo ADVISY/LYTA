@@ -1,0 +1,1 @@
+UPDATE tenants SET tenant_status = 'active', activated_at = now(), admin_email = 'lchampagnac@jcg-consulting.ch' WHERE id = '7af2904e-a965-443b-9e21-7b7136cc0eaa' AND tenant_status = 'pending_setup';

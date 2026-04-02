@@ -1,0 +1,83 @@
+project_id = "hjedkkpmfzhtdzotskiv"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.create-user-account]
+verify_jwt = false
+
+[functions.verify-partner-email]
+verify_jwt = false
+
+[functions.send-crm-email]
+verify_jwt = false
+
+[functions.send-contract-deposit-email]
+verify_jwt = false
+
+[functions.deposit-contract]
+verify_jwt = false
+
+[functions.process-scheduled-emails]
+verify_jwt = false
+
+[functions.send-claim-notification]
+verify_jwt = false
+
+[functions.tenant-onboarding]
+verify_jwt = false
+
+[functions.send-client-notification-email]
+verify_jwt = false
+
+[functions.scan-document]
+verify_jwt = false
+
+[functions.classify-batch-documents]
+verify_jwt = false
+
+# --- KING admin functions (auth via requireAuth) ---
+
+[functions.activate-tenant]
+verify_jwt = false
+
+[functions.add-user-seat]
+verify_jwt = false
+
+[functions.create-tenant-admin]
+verify_jwt = false
+
+[functions.delete-tenant]
+verify_jwt = false
+
+[functions.export-tenant-data]
+verify_jwt = false
+
+[functions.king-stripe-stats]
+verify_jwt = false
+
+[functions.reset-tenant-data]
+verify_jwt = false
+
+# --- Public / webhook functions (auth handled internally) ---
+
+[functions.health-check]
+verify_jwt = false
+
+[functions.receive-tenant-request]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
+
+[functions.send-sms]
+verify_jwt = false
+
+[functions.send-verification-sms]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.verify-sms-code]
+verify_jwt = false
