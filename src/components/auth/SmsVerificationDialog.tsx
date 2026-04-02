@@ -1,20 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { supabaseConfig } from "@/integrations/supabase/config";
 
 async function invokePublicFunction(name: string, body: Record<string, unknown>) {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+  const response = await fetch(`${supabaseConfig.url}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": SUPABASE_ANON_KEY,
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "apikey": supabaseConfig.publishableKey,
+      "Authorization": `Bearer ${supabaseConfig.publishableKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -52,7 +50,7 @@ export function SmsVerificationDialog({
     if (open && userId && phoneNumber) {
       sendCode();
     }
-  }, [open, userId, phoneNumber]);
+  }, [open, phoneNumber, sendCode, userId]);
 
   // Countdown timer
   useEffect(() => {
@@ -62,7 +60,7 @@ export function SmsVerificationDialog({
     }
   }, [countdown]);
 
-  const sendCode = async () => {
+  const sendCode = useCallback(async () => {
     setSending(true);
     try {
       const data = await invokePublicFunction("send-verification-sms", {
@@ -84,7 +82,7 @@ export function SmsVerificationDialog({
     } finally {
       setSending(false);
     }
-  };
+  }, [phoneNumber, t, userId, verificationType]);
 
   const verifyCode = async () => {
     if (code.length !== 6) {
@@ -111,9 +109,9 @@ export function SmsVerificationDialog({
         toast.error(data.error || t('smsVerification.invalidCode'));
         setCode("");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error verifying code:", error);
-      const message = error?.message || t('smsVerification.verifyError');
+      const message = error instanceof Error ? error.message : t('smsVerification.verifyError');
       toast.error(message);
       setCode("");
     } finally {

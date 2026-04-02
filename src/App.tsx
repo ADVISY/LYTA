@@ -14,6 +14,7 @@ const DeposerContrat = lazy(() => import("./pages/DeposerContrat"));
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { TenantGate } from "./components/TenantGate";
 
 // CRM (lazy loaded)
 const CRMLayout = lazy(() => import("./pages/crm/CRMLayout"));
@@ -83,9 +84,10 @@ const App = () => (
           <BrowserRouter>
             <AuthProvider>
               <TenantProvider>
-                <ErrorBoundary>
-                <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div style={{ width: "2rem", height: "2rem", border: "3px solid #e5e7eb", borderTopColor: "#1800AD", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /></div>}>
-                <Routes>
+                <TenantGate>
+                  <ErrorBoundary>
+                  <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div style={{ width: "2rem", height: "2rem", border: "3px solid #e5e7eb", borderTopColor: "#1800AD", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /></div>}>
+                  <Routes>
               {/* Redirect root to login */}
               <Route path="/" element={<Navigate to="/connexion" replace />} />
               
@@ -149,8 +151,9 @@ const App = () => (
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-                </Suspense>
-                </ErrorBoundary>
+                  </Suspense>
+                  </ErrorBoundary>
+                </TenantGate>
               </TenantProvider>
             </AuthProvider>
           </BrowserRouter>

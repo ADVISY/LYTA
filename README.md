@@ -27,7 +27,11 @@ npm run build
 Le build Vite attend au minimum:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+Compatibilite legacy:
+
+- `VITE_SUPABASE_ANON_KEY` reste accepte comme alias si l'environnement utilise encore cet ancien nom.
 
 Les secrets Stripe, Twilio, Resend et les variables des Edge Functions sont geres dans Supabase, pas dans Vercel.
 
