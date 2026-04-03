@@ -447,7 +447,7 @@ serve(async (req) => {
       ],
       max_tokens: 12000,
       temperature: 0.1,
-    }, 30000);
+    }, 120000);
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
@@ -655,7 +655,7 @@ serve(async (req) => {
         overall_confidence: overallConfidence,
         ocr_required: true,
         processing_time_ms: processingTime,
-        ai_model_used: "google/gemini-2.5-flash",
+        ai_model_used: getAiModel(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", scanId);
@@ -823,6 +823,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         scanId,
+        documentType: mainDocType,
+        documentTypeConfidence: parsedResult.documents_detected?.[0]?.doc_type_confidence || 0,
         dossierSummary: parsedResult.dossier_summary,
         documentsDetected: parsedResult.documents_detected,
         hasOldPolicy: parsedResult.has_old_policy,
@@ -869,7 +871,7 @@ serve(async (req) => {
     // Handle AI request timeout
     if (error instanceof Error && error.name === "AbortError") {
       return new Response(
-        JSON.stringify({ error: "AI analysis timed out after 30 seconds" }),
+        JSON.stringify({ error: "AI analysis timed out after 120 seconds" }),
         { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
