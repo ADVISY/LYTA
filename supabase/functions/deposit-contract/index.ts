@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError, requireTenantAccess } from "../_shared/auth.ts";
+import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { resolvePartnerAccessByEmail } from "../_shared/partner-access.ts";
 
 const log = createLogger("deposit-contract");
 
@@ -12,7 +13,8 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { user } = await requireAuth(req);
+    await checkRateLimit(req, "deposit-contract", 10);
+
     const { 
       partnerEmail, 
       formType, 
@@ -37,105 +39,59 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verify that the partner email is valid (collaborateur or admin)
-    let partnerId: string | null = null
-    let tenantId: string | null = null
+    const access = await resolvePartnerAccessByEmail(normalizedEmail)
 
-    // Check if email exists as collaborateur in clients table
-    const { data: collaborateur, error: collabError } = await supabaseAdmin
-      .from('clients')
-      .select('id, tenant_id')
-      .eq('email', normalizedEmail)
-      .eq('type_adresse', 'collaborateur')
-      .maybeSingle()
-
-    if (collabError) {
-      log.error('Database error (collaborateur)', { error: collabError })
-    }
-
-    if (collaborateur) {
-      // Check if this collaborateur has an associated partner record
-      const { data: partnerRecord } = await supabaseAdmin
-        .from('partners')
-        .select('id')
-        .eq('user_id', collaborateur.id)
-        .maybeSingle()
-      
-      partnerId = partnerRecord?.id || null
-      tenantId = collaborateur.tenant_id
-    } else {
-      // Check if user is an admin/agent via profiles + user_tenant_assignments
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .maybeSingle()
-
-      if (profileError) {
-        log.error('Database error (profile)', { error: profileError })
-      }
-
-      if (profile) {
-        // Get tenant via user_tenant_assignments
-        const { data: assignment, error: assignmentError } = await supabaseAdmin
-          .from('user_tenant_assignments')
-          .select('tenant_id')
-          .eq('user_id', profile.id)
-          .maybeSingle()
-
-        if (assignmentError) {
-          log.error('Database error (assignment)', { error: assignmentError })
-        }
-
-        if (assignment?.tenant_id) {
-          tenantId = assignment.tenant_id
-
-          // Check if this user has admin/partner role
-          const { data: rolesRows, error: rolesError } = await supabaseAdmin
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', profile.id)
-            .in('role', ['admin', 'manager', 'agent', 'partner'])
-
-          if (rolesError) {
-            log.error('Database error (roles)', { error: rolesError })
-          }
-
-          // Check if this user has a partner record
-          const { data: partnerRecord, error: partnerError } = await supabaseAdmin
-            .from('partners')
-            .select('id')
-            .eq('user_id', profile.id)
-            .maybeSingle()
-
-          if (partnerError) {
-            log.error('Database error (partner)', { error: partnerError })
-          }
-
-          partnerId = partnerRecord?.id || null
-        }
-      }
-    }
-
-    if (!tenantId) {
+    if (!access.authorized || !access.tenantId) {
       return new Response(
-        JSON.stringify({ error: 'Partner not authorized or no tenant associated' }),
+        JSON.stringify({ error: access.message || 'Partner not authorized or no tenant associated' }),
         { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
+    const tenantId = access.tenantId
+    const partnerId = access.partnerId
 
-    // Verify the authenticated user has access to this tenant
-    await requireTenantAccess(user.id, tenantId);
+    // Resolve product ID dynamically — upsert placeholder company & product if needed
+    const categoryMap: Record<string, string> = {
+      'sana': 'health',
+      'vita': 'life',
+      'medio': 'home',
+      'business': 'rcpro',
+    }
+    const productName = (formType || 'sana').charAt(0).toUpperCase() + (formType || 'sana').slice(1)
+    const productCategory = categoryMap[formType] || 'health'
 
-    // Map form type to product ID
-    const productIdMap: Record<string, string> = {
-      'sana': '00000000-0000-0000-0000-000000000001',
-      'vita': '00000000-0000-0000-0000-000000000002',
-      'medio': '00000000-0000-0000-0000-000000000003',
-      'business': '00000000-0000-0000-0000-000000000004',
+    // Ensure placeholder company exists
+    const { data: company } = await supabaseAdmin
+      .from('insurance_companies')
+      .upsert({ name: 'Dépôt générique' }, { onConflict: 'name' })
+      .select('id')
+      .single()
+
+    if (!company) {
+      return new Response(
+        JSON.stringify({ error: 'Could not resolve placeholder company' }),
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+      )
     }
 
-    const productId = productIdMap[formType] || productIdMap['sana']
+    // Ensure product exists for this form type
+    const { data: product } = await supabaseAdmin
+      .from('insurance_products')
+      .upsert(
+        { company_id: company.id, name: productName, category: productCategory, source: 'manual' },
+        { onConflict: 'company_id,name' }
+      )
+      .select('id')
+      .single()
+
+    if (!product) {
+      return new Response(
+        JSON.stringify({ error: 'Could not resolve product for form type: ' + formType }),
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const productId = product.id
 
     // Insert the policy with proper tenant_id
     const { data: policy, error: insertError } = await supabaseAdmin
@@ -174,10 +130,17 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof RateLimitError) {
       return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: error.status, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Trop de requetes, reessayez plus tard" }),
+        {
+          status: 429,
+          headers: {
+            ...getCorsHeaders(req),
+            'Content-Type': 'application/json',
+            'Retry-After': String(error.retryAfter),
+          },
+        }
       );
     }
     log.error('Error', { error: error instanceof Error ? error.message : error })

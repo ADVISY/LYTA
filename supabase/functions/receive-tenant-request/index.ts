@@ -58,6 +58,27 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Validate plan_id exists in platform_plans before inserting
+    let validPlanId = planId || null;
+    if (validPlanId) {
+      const { data: plan } = await supabase
+        .from("platform_plans")
+        .select("id")
+        .eq("id", validPlanId)
+        .maybeSingle();
+
+      if (!plan) {
+        // Fallback to 'start' plan if provided plan_id is invalid
+        const { data: defaultPlan } = await supabase
+          .from("platform_plans")
+          .select("id")
+          .eq("slug", "start")
+          .maybeSingle();
+        validPlanId = defaultPlan?.id || null;
+        log.warn("Invalid plan_id provided, falling back to default", { originalPlanId: planId, resolvedPlanId: validPlanId });
+      }
+    }
+
     // Insert tenant request with status 'pending'
     const { data: tenant, error } = await supabase.from("tenants").insert({
       name: companyName,
@@ -65,7 +86,7 @@ serve(async (req) => {
       email: contactEmail,
       phone: contactPhone,
       contact_name: contactName,
-      plan_id: planId,
+      plan_id: validPlanId,
       stripe_session_id: stripeSessionId,
       backoffice_email: backofficeEmail,
       admin_email: adminEmail,

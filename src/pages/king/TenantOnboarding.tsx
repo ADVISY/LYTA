@@ -62,11 +62,11 @@ export default function TenantOnboarding() {
         {
           id: "subdomain-2",
           title: "2. Configurer les DNS",
-          description: "Ajouter les enregistrements DNS chez Cloudflare pour pointer vers Vercel",
+          description: "Le wizard ajoute automatiquement les enregistrements DNS Cloudflare vers Vercel",
           details: [
-            "Creer un enregistrement CNAME pour le sous-domaine du tenant",
-            "Pointer le sous-domaine vers la cible Vercel standard",
-            "Ajouter un CNAME www uniquement si le tenant en a besoin",
+            "Le sous-domaine du tenant est ajoute au projet Vercel automatiquement",
+            "Le CNAME Cloudflare est cree ou mis a jour automatiquement",
+            "La verification DNS Vercel est relancee automatiquement",
             "Attendre la propagation DNS (jusqu'à 48h)",
             "Vérifier avec un outil comme dnschecker.org"
           ],
@@ -87,13 +87,13 @@ export default function TenantOnboarding() {
         },
         {
           id: "subdomain-4",
-          title: "4. Configurer dans Vercel",
-          description: "Ajouter le sous-domaine dans le projet Vercel principal",
+          title: "4. Verification Vercel",
+          description: "Le sous-domaine est enregistre automatiquement dans le projet Vercel principal",
           details: [
             "Aller dans le projet Vercel puis Settings → Domains",
-            "Cliquer sur 'Add Domain'",
-            "Entrer le sous-domaine complet du tenant",
-            "Verifier que le CNAME Cloudflare pointe bien vers Vercel"
+            "L'edge function ajoute automatiquement le domaine au projet",
+            "Les enregistrements TXT de verification sont crees si necessaire",
+            "Une verification manuelle n'est utile qu'en cas d'alerte"
           ],
           links: [
             { label: "Documentation Vercel", url: "https://vercel.com/docs/domains" },

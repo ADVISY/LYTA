@@ -4,10 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { resolvePartnerAccessByEmail } from "../_shared/partner-access.ts";
 
 const log = createLogger("send-contract-deposit-email");
 
@@ -29,6 +29,8 @@ interface TenantBranding {
   email_footer_text: string | null;
 }
 
+type ContractFormData = Record<string, string | number | boolean | null | undefined>;
+
 interface ContractData {
   formType: 'sana' | 'vita' | 'medio' | 'business';
   clientName: string;
@@ -37,7 +39,7 @@ interface ContractData {
   clientTel: string;
   agentName: string;
   agentEmail: string;
-  formData: Record<string, any>;
+  formData: ContractFormData;
   documents: Array<{
     file_name: string;
     doc_kind: string;
@@ -58,7 +60,7 @@ const formTypeLabels: Record<string, string> = {
   business: 'BUSINESS - Assurance Entreprise',
 };
 
-const formatFormData = (formType: string, formData: Record<string, any>): string => {
+const formatFormData = (formType: string, formData: ContractFormData): string => {
   const lines: string[] = [];
   
   switch (formType) {
@@ -273,9 +275,10 @@ const sendEmail = async (
     const data = await response.json();
     log.info(`Email sent successfully`, { to, emailId: data.id });
     return { success: true };
-  } catch (error: any) {
-    log.error(`Error sending email`, { to, error: error.message });
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error(`Error sending email`, { to, error: errorMessage });
+    return { success: false, error: errorMessage };
   }
 };
 
@@ -286,11 +289,16 @@ const handler = async (req: Request): Promise<Response> => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { user } = await requireAuth(req);
-
     await checkRateLimit(req, "send-contract-deposit-email", 10);
 
     const { contractData, notificationEmails }: ContractDepositRequest = await req.json();
+
+    if (!contractData?.agentEmail) {
+      return new Response(
+        JSON.stringify({ error: "agentEmail is required" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+      );
+    }
 
     log.info("Contract data received", {
       formType: contractData.formType,
@@ -303,6 +311,21 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const access = await resolvePartnerAccessByEmail(contractData.agentEmail);
+
+    if (!access.authorized || !access.tenantId) {
+      return new Response(
+        JSON.stringify({ error: access.message || "Partner not authorized or no tenant associated" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+      );
+    }
+
+    if (contractData.tenantSlug && access.tenantSlug && contractData.tenantSlug !== access.tenantSlug) {
+      return new Response(
+        JSON.stringify({ error: "Tenant mismatch for this collaborator" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+      );
+    }
 
     // Fetch tenant info and branding
     let emails = (notificationEmails || [])
@@ -310,9 +333,10 @@ const handler = async (req: Request): Promise<Response> => {
       .filter((e) => e);
     let branding: TenantBranding | null = null;
     let tenantName = 'LYTA';
+    const effectiveTenantSlug = access.tenantSlug || contractData.tenantSlug;
     
-    if (contractData.tenantSlug) {
-      log.info("Fetching tenant info", { tenantSlug: contractData.tenantSlug });
+    if (effectiveTenantSlug) {
+      log.info("Fetching tenant info", { tenantSlug: effectiveTenantSlug });
       
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
@@ -333,7 +357,7 @@ const handler = async (req: Request): Promise<Response> => {
             email_footer_text
           )
         `)
-        .eq('slug', contractData.tenantSlug)
+        .eq('slug', effectiveTenantSlug)
         .single();
 
       if (tenantError) {
@@ -411,7 +435,7 @@ const handler = async (req: Request): Promise<Response> => {
       clientName: `${contractData.clientPrenom} ${contractData.clientName}`,
       clientEmail: contractData.clientEmail,
       agentName: contractData.agentName,
-      tenantSlug: contractData.tenantSlug || null,
+      tenantSlug: effectiveTenantSlug || null,
       sender: senderName,
       recipients: emails,
       documentsCount: contractData.documents?.length || 0,
@@ -430,13 +454,7 @@ const handler = async (req: Request): Promise<Response> => {
       { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
     );
 
-  } catch (error: any) {
-    if (error instanceof AuthError) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: error.status, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
-    }
+  } catch (error: unknown) {
     if (error instanceof RateLimitError) {
       return new Response(
         JSON.stringify({ error: "Rate limit exceeded" }),
@@ -446,9 +464,10 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
-    log.error("Error in send-contract-deposit-email", { error: error.message });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error("Error in send-contract-deposit-email", { error: errorMessage });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
     );
   }

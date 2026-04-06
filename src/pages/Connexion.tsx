@@ -936,6 +936,8 @@ const Connexion = () => {
 
     // IMPORTANT: keep chosen space (lyta_login_space), but clear one-shot target
     sessionStorage.removeItem('loginTarget');
+    // Clear redirect guard so the redirect effect can run again
+    sessionStorage.removeItem('lyta_redirect_done');
 
     // Clear SMS state
     setSmsVerificationData(null);

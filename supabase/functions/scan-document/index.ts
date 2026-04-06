@@ -377,11 +377,17 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Update scan status to processing
-    await supabase
+    // Verify scan exists before processing
+    const { data: existingScan, error: scanCheckError } = await supabase
       .from("document_scans")
       .update({ status: "processing", updated_at: new Date().toISOString() })
-      .eq("id", scanId);
+      .eq("id", scanId)
+      .select("id")
+      .single();
+
+    if (scanCheckError || !existingScan) {
+      throw new Error(`Scan not found: ${scanId}`);
+    }
 
     // Determine files to process
     const filesToProcess: { path: string; fileName: string; mimeType: string }[] = batchMode && files 
@@ -699,13 +705,24 @@ serve(async (req) => {
       },
     });
 
-    // Increment tenant AI docs usage
+    // Increment tenant AI docs usage (verify tenant exists first)
+    let validTenantId: string | null = null;
     if (tenantId) {
-      await supabase.rpc("increment_tenant_consumption", {
-        p_tenant_id: tenantId,
-        p_type: "ai_docs",
-        p_amount: fileContents.length,
-      });
+      const { data: tenantCheck } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (tenantCheck) {
+        validTenantId = tenantCheck.id;
+        await supabase.rpc("increment_tenant_consumption", {
+          p_tenant_id: validTenantId,
+          p_type: "ai_docs",
+          p_amount: fileContents.length,
+        });
+      } else {
+        log.warn("Invalid tenantId provided, skipping consumption tracking", { tenantId });
+      }
     }
 
     // Get scan record to get partner email
@@ -716,11 +733,11 @@ serve(async (req) => {
       .single();
 
     // Send notification to tenant admins with enhanced info
-    if (tenantId) {
+    if (validTenantId) {
       const { data: tenantAdmins } = await supabase
         .from("user_tenant_roles")
         .select("user_id")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", validTenantId)
         .eq("role", "admin");
 
       const { data: globalAdmins } = await supabase
@@ -737,9 +754,9 @@ serve(async (req) => {
             .from("user_tenant_roles")
             .select("id")
             .eq("user_id", admin.user_id)
-            .eq("tenant_id", tenantId)
+            .eq("tenant_id", validTenantId)
             .maybeSingle();
-          
+
           if (hasTenantAccess) {
             adminUserIds.add(admin.user_id);
           }
@@ -777,7 +794,7 @@ serve(async (req) => {
 
         const notifications = adminUsers.map(admin => ({
           user_id: admin.user_id,
-          tenant_id: tenantId,
+          tenant_id: validTenantId,
           kind: 'new_contract',
           priority: hasTermination || lowConfidenceCount > 2 ? 'high' : 'normal',
           title: notifTitle,

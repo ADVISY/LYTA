@@ -280,13 +280,22 @@ serve(async (req) => {
       log.error("Failed to update batch", { error: batchUpdateError });
     }
 
-    // Increment tenant consumption
+    // Increment tenant consumption (verify tenant exists first)
     if (tenantId) {
-      await supabase.rpc("increment_tenant_consumption", {
-        p_tenant_id: tenantId,
-        p_type: "ai_docs",
-        p_amount: fileContents.length,
-      });
+      const { data: tenantCheck } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (tenantCheck) {
+        await supabase.rpc("increment_tenant_consumption", {
+          p_tenant_id: tenantCheck.id,
+          p_type: "ai_docs",
+          p_amount: fileContents.length,
+        });
+      } else {
+        log.warn("Invalid tenantId, skipping consumption tracking", { tenantId });
+      }
     }
 
     const processingTime = Date.now() - startTime;

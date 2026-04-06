@@ -50,12 +50,36 @@ Le fichier `vercel.json` du depot contient deja cette configuration.
 
 ## Sous-domaines tenant
 
-Pour les tenants `*.lyta.ch`, le flux d'onboarding DNS suppose un CNAME vers Vercel:
+Le wizard KING peut maintenant provisionner automatiquement chaque sous-domaine tenant sur Vercel et Cloudflare.
 
-- `TENANT_CNAME_TARGET=cname.vercel-dns.com`
+Secrets requis dans les Edge Functions Supabase:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ZONE_ID`
+- `VERCEL_TOKEN`
+- `VERCEL_PROJECT_ID`
+- `VERCEL_TEAM_ID` (ou `VERCEL_TEAM_SLUG`)
+- `ALLOWED_ORIGINS` avec au moins le domaine principal et le wildcard tenant
+
+Variables optionnelles:
+
+- `TENANT_DOMAIN_SUFFIX=lyta.ch`
+- `TENANT_CNAME_TARGET=cname.vercel-dns.com` (fallback seulement)
 - `TENANT_CNAME_PROXIED=false`
 
-Le domaine doit aussi etre ajoute dans le projet Vercel principal avant validation DNS.
+Exemple recommande pour `ALLOWED_ORIGINS`:
+
+- `https://lyta.ch,https://app.lyta.ch,https://*.lyta.ch,http://localhost:5173`
+
+Flux automatique:
+
+- l'edge function ajoute `tenant.lyta.ch` au projet Vercel
+- elle recupere la cible CNAME recommandee par Vercel
+- elle cree ou met a jour le record Cloudflare
+- elle cree les TXT de verification Vercel si necessaire
+- elle relance la verification jusqu'a validation ou timeout
+
+Le mode wildcard `*.lyta.ch` n'est pas utilise ici. Chaque sous-domaine tenant est enregistre individuellement sur Vercel, ce qui reste compatible avec Cloudflare comme DNS autoritaire.
 
 ## Notes d'exploitation
 

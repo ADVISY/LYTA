@@ -101,11 +101,10 @@ export function SmsVerificationDialog({
 
       if (data.success) {
         toast.success(t('smsVerification.verificationSuccess'));
+        // Call onVerified first so parent clears smsVerificationData before
+        // the "reopen" guard effect sees showSmsVerification=false with stale data
+        onVerified();
         onOpenChange(false);
-        // Small delay to ensure dialog closes before calling onVerified
-        setTimeout(() => {
-          onVerified();
-        }, 100);
       } else {
         toast.error(data.error || t('smsVerification.invalidCode'));
         setCode("");
