@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useUserTenant } from '@/hooks/useUserTenant';
+import { recordAuditLog } from '@/lib/audit';
 
 export type FamilyMember = {
   id: string;
@@ -21,25 +23,24 @@ export function useFamilyMembers(clientId?: string) {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenantId } = useUserTenant();
 
   const fetchFamilyMembers = async (id?: string) => {
     try {
       setLoading(true);
       const targetId = id || clientId;
-      
+
       if (!targetId) {
         setFamilyMembers([]);
         return;
       }
 
-      // Get current client info
       const { data: currentClient } = await supabase
         .from('clients')
         .select('first_name, last_name')
         .eq('id', targetId)
         .maybeSingle();
 
-      // 1. Get direct family members (this client is the owner of the relation)
       const { data: directMembers, error: directError } = await supabase
         .from('family_members')
         .select(`
@@ -72,7 +73,6 @@ export function useFamilyMembers(clientId?: string) {
         linked_client_id: member.linked_client_id ?? member.linked_client?.id ?? null,
       }));
 
-      // 2. Get reverse relationships using explicit client links when available
       const reverseMembers: FamilyMember[] = [];
 
       const inverseRelation = (
@@ -181,7 +181,6 @@ export function useFamilyMembers(clientId?: string) {
           }
         }
 
-        // Fetch siblings in a single batch query (only if we found reverse relations)
         if (parentIds.size > 0) {
           const { data: allSiblings } = await supabase
             .from('family_members')
@@ -249,9 +248,21 @@ export function useFamilyMembers(clientId?: string) {
 
       if (error) throw error;
 
+      await recordAuditLog({
+        action: 'create',
+        entity: 'family_member',
+        entityId: data.id,
+        tenantId,
+        metadata: {
+          client_id: data.client_id,
+          linked_client_id: data.linked_client_id,
+          relation_type: data.relation_type,
+        },
+      });
+
       toast({
-        title: "Membre ajouté",
-        description: "Le membre de la famille a été ajouté avec succès"
+        title: "Membre ajoutÃ©",
+        description: "Le membre de la famille a Ã©tÃ© ajoutÃ© avec succÃ¨s"
       });
 
       await fetchFamilyMembers(memberData.client_id);
@@ -275,9 +286,19 @@ export function useFamilyMembers(clientId?: string) {
 
       if (error) throw error;
 
+      await recordAuditLog({
+        action: 'update',
+        entity: 'family_member',
+        entityId: id,
+        tenantId,
+        metadata: {
+          changes: updates,
+        },
+      });
+
       toast({
-        title: "Membre mis à jour",
-        description: "Les modifications ont été enregistrées"
+        title: "Membre mis Ã  jour",
+        description: "Les modifications ont Ã©tÃ© enregistrÃ©es"
       });
 
       await fetchFamilyMembers(clientId);
@@ -294,6 +315,8 @@ export function useFamilyMembers(clientId?: string) {
 
   const deleteFamilyMember = async (id: string) => {
     try {
+      const existingMember = familyMembers.find((member) => member.id === id);
+
       const { error } = await supabase
         .from('family_members')
         .delete()
@@ -301,9 +324,21 @@ export function useFamilyMembers(clientId?: string) {
 
       if (error) throw error;
 
+      await recordAuditLog({
+        action: 'delete',
+        entity: 'family_member',
+        entityId: id,
+        tenantId,
+        metadata: {
+          client_id: existingMember?.client_id ?? null,
+          linked_client_id: existingMember?.linked_client_id ?? null,
+          relation_type: existingMember?.relation_type ?? null,
+        },
+      });
+
       toast({
-        title: "Membre supprimé",
-        description: "Le membre de la famille a été supprimé avec succès"
+        title: "Membre supprimÃ©",
+        description: "Le membre de la famille a Ã©tÃ© supprimÃ© avec succÃ¨s"
       });
 
       await fetchFamilyMembers(clientId);

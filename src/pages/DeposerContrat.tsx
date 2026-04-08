@@ -478,7 +478,7 @@ export default function DeposerContrat() {
     if (!isPartnerVerified) {
       toast({
         title: t('depositContract.accessDenied'),
-        description: t('depositContract.enterCollaboratorEmail'),
+        description: t('depositContract.emailDescription'),
         variant: "destructive",
       });
       setVerificationStep('email');
@@ -696,7 +696,7 @@ export default function DeposerContrat() {
             </div>
             <div>
               <CardTitle>{t('depositContract.title')}</CardTitle>
-              <CardDescription>{t('depositContract.enterCollaboratorEmail')}</CardDescription>
+              <CardDescription>{t('depositContract.emailDescription')}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

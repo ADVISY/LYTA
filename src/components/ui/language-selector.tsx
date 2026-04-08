@@ -17,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export function LanguageSelector() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { user } = useAuth();
   const currentLang = (i18n.language?.split('-')[0] || 'fr') as SupportedLanguage;
   const displayLang = SUPPORTED_LANGUAGES.includes(currentLang) ? currentLang : 'fr';
@@ -51,7 +51,7 @@ export function LanguageSelector() {
           title={LANGUAGE_NAMES[displayLang]}
         >
           <Globe className="h-4 w-4" />
-          <span className="sr-only">Change language</span>
+          <span className="sr-only">{t('languages.select')}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

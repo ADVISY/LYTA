@@ -29,6 +29,8 @@ import {
 import { useFamilyMembers, FamilyMember } from "@/hooks/useFamilyMembers";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserTenant } from "@/hooks/useUserTenant";
+import { recordAuditLog } from "@/lib/audit";
 
 const getSchema = (t: (key: string) => string) => z.object({
   first_name: z.string().min(1, t("forms.familyMember.errors.firstNameRequired")),
@@ -59,8 +61,8 @@ export default function FamilyMemberForm({
   const [loading, setLoading] = useState(false);
   const [parentClient, setParentClient] = useState<any>(null);
   const { toast } = useToast();
+  const { tenantId } = useUserTenant();
 
-  // Fetch parent client data to copy address info
   useEffect(() => {
     const fetchParentClient = async () => {
       if (clientId && open) {
@@ -105,94 +107,121 @@ export default function FamilyMemberForm({
         onOpenChange(false);
         form.reset();
       }
-    } else {
-      try {
-        // 1. Create a new client entry for this family member
-        const newClientData = {
-          first_name: data.first_name,
-          last_name: data.last_name,
-          birthdate: data.birth_date || null,
-          permit_type: data.permit_type || null,
-          nationality: data.nationality || null,
-          type_adresse: 'client',
-          status: 'prospect',
-          // Copy address from parent client
-          address: parentClient?.address || null,
-          zip_code: parentClient?.zip_code || null,
-          city: parentClient?.city || null,
-          country: parentClient?.country || 'Suisse',
-        };
+      setLoading(false);
+      return;
+    }
 
-        const { data: newClient, error: clientError } = await supabase
-          .from('clients')
-          .insert([newClientData])
-          .select('id')
-          .single();
+    try {
+      const newClientData = {
+        tenant_id: parentClient?.tenant_id || tenantId || null,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        birthdate: data.birth_date || null,
+        permit_type: data.permit_type || null,
+        nationality: data.nationality || null,
+        type_adresse: 'client',
+        status: 'prospect',
+        address: parentClient?.address || null,
+        zip_code: parentClient?.zip_code || null,
+        city: parentClient?.city || null,
+        country: parentClient?.country || 'Suisse',
+      };
 
-        if (clientError) {
-          console.error('Error creating client for family member:', clientError);
+      const { data: newClient, error: clientError } = await supabase
+        .from('clients')
+        .insert([newClientData])
+        .select('id')
+        .single();
+
+      if (clientError) {
+        console.error('Error creating client for family member:', clientError);
         toast({
           title: t("common.error"),
           description: t("forms.familyMember.errors.createClientError"),
           variant: "destructive"
         });
-          setLoading(false);
-          return;
-        }
+        setLoading(false);
+        return;
+      }
 
-        // 2. Create family member entry (child linked to parent)
-        const { error: familyError } = await createFamilyMember({
-          client_id: clientId,
-          linked_client_id: newClient.id,
-          ...data,
-        } as any);
+      await recordAuditLog({
+        action: "create",
+        entity: "client",
+        entityId: newClient.id,
+        tenantId: parentClient?.tenant_id || tenantId || null,
+        metadata: {
+          source: "family_member_form",
+          linked_parent_client_id: clientId,
+          first_name: data.first_name,
+          last_name: data.last_name,
+        },
+      });
 
-        if (familyError) {
-          console.error('Error creating family member:', familyError);
-        }
+      const { error: familyError } = await createFamilyMember({
+        client_id: clientId,
+        linked_client_id: newClient.id,
+        ...data,
+      } as any);
 
-        // 3. Create reverse family member entry (parent linked to child)
-        // So when viewing the child's profile, they see the parent
-        const reverseRelationType =
-          data.relation_type === 'conjoint'
-            ? 'conjoint'
-            : data.relation_type === 'enfant'
-            ? 'parent'
-            : data.relation_type === 'parent'
-            ? 'enfant'
-            : 'autre';
-        const { error: reverseError } = await supabase
-          .from('family_members')
-          .insert([{
+      if (familyError) {
+        console.error('Error creating family member:', familyError);
+      }
+
+      const reverseRelationType =
+        data.relation_type === 'conjoint'
+          ? 'conjoint'
+          : data.relation_type === 'enfant'
+          ? 'parent'
+          : data.relation_type === 'parent'
+          ? 'enfant'
+          : 'autre';
+
+      const { data: reverseRelation, error: reverseError } = await supabase
+        .from('family_members')
+        .insert([{
+          client_id: newClient.id,
+          linked_client_id: clientId,
+          first_name: parentClient?.first_name || '',
+          last_name: parentClient?.last_name || '',
+          birth_date: parentClient?.birthdate || null,
+          relation_type: reverseRelationType,
+          permit_type: parentClient?.permit_type || null,
+          nationality: parentClient?.nationality || null,
+        }])
+        .select('id')
+        .single();
+
+      if (reverseError) {
+        console.error('Error creating reverse family member:', reverseError);
+      } else {
+        await recordAuditLog({
+          action: "create",
+          entity: "family_member",
+          entityId: reverseRelation.id,
+          tenantId: parentClient?.tenant_id || tenantId || null,
+          metadata: {
+            source: "family_member_form",
             client_id: newClient.id,
             linked_client_id: clientId,
-            first_name: parentClient?.first_name || '',
-            last_name: parentClient?.last_name || '',
-            birth_date: parentClient?.birthdate || null,
             relation_type: reverseRelationType,
-            permit_type: parentClient?.permit_type || null,
-            nationality: parentClient?.nationality || null,
-          }]);
-
-        if (reverseError) {
-          console.error('Error creating reverse family member:', reverseError);
-        }
-
-        toast({
-          title: t("forms.familyMember.success.added"),
-          description: t("forms.familyMember.success.addedDescription", { name: `${data.first_name} ${data.last_name}` })
-        });
-
-        onOpenChange(false);
-        form.reset();
-      } catch (err) {
-        console.error('Error:', err);
-        toast({
-          title: t("common.error"),
-          description: t("forms.familyMember.errors.genericError"),
-          variant: "destructive"
+          },
         });
       }
+
+      toast({
+        title: t("forms.familyMember.success.added"),
+        description: t("forms.familyMember.success.addedDescription", { name: `${data.first_name} ${data.last_name}` })
+      });
+
+      onOpenChange(false);
+      form.reset();
+    } catch (err) {
+      console.error('Error:', err);
+      toast({
+        title: t("common.error"),
+        description: t("forms.familyMember.errors.genericError"),
+        variant: "destructive"
+      });
     }
 
     setLoading(false);
@@ -255,7 +284,7 @@ export default function FamilyMemberForm({
                       <SelectContent>
                         <SelectItem value="conjoint">{t("forms.familyMember.relationTypes.spouse")}</SelectItem>
                         <SelectItem value="enfant">{t("forms.familyMember.relationTypes.child")}</SelectItem>
-                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="parent">{t("forms.familyMember.relationTypes.parent")}</SelectItem>
                         <SelectItem value="autre">{t("forms.familyMember.relationTypes.other")}</SelectItem>
                       </SelectContent>
                     </Select>

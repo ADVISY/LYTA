@@ -45,6 +45,7 @@ import {
   Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { recordAuditLog } from "@/lib/audit";
 
 /** Extended primary_holder type that allows arbitrary string field access from AI snapshots */
 interface PrimaryHolderData {
@@ -182,6 +183,27 @@ export default function ScanValidationDialog({
   const [createSuivis, setCreateSuivis] = useState(true);
   const [linkDocuments, setLinkDocuments] = useState(true);
   const [createFamilyMembers, setCreateFamilyMembers] = useState(true);
+
+  const logAudit = async (
+    tenantId: string | null,
+    action: string,
+    entity: string,
+    entityId?: string | null,
+    metadata?: Record<string, unknown>
+  ) => {
+    await recordAuditLog({
+      action,
+      entity,
+      entityId,
+      tenantId,
+      userId: user?.id ?? null,
+      metadata: {
+        source: "ia_scan",
+        scan_id: scan?.id ?? null,
+        ...metadata,
+      },
+    });
+  };
 
   // Initialize edited values when scan changes
   useEffect(() => {
@@ -482,6 +504,12 @@ export default function ScanValidationDialog({
         throw new Error("Le client n'a pas pu être créé. Veuillez réessayer.");
       }
 
+      await logAudit(tenantId, 'create', 'client', newClient.id, {
+        first_name: newClient.first_name,
+        last_name: newClient.last_name,
+        status: newClient.status,
+      });
+
       const createdPolicies: { id: string; type: 'old' | 'new' | 'standard'; productName?: string }[] = [];
       const createdSuivis: string[] = [];
       const createdFamilyMembers: { id: string; name: string }[] = [];
@@ -714,7 +742,14 @@ export default function ScanValidationDialog({
             name: `${firstName} ${lastName}`.trim(),
           });
 
-          await supabase.from('family_members').insert({
+          await logAudit(tenantId, 'create', 'client', familyClient.id, {
+            linked_parent_client_id: newClient.id,
+            first_name: firstName,
+            last_name: lastName,
+            relation_type: relationType,
+          });
+
+          const { data: directRelation } = await supabase.from('family_members').insert({
             client_id: newClient.id,
             linked_client_id: familyClient.id,
             first_name: firstName,
@@ -722,9 +757,17 @@ export default function ScanValidationDialog({
             birth_date: birthdate,
             relation_type: relationType,
             nationality: getValue('nationalite') || null,
-          } as any);
+          } as any).select('id').single();
 
-          await supabase.from('family_members').insert({
+          if (directRelation?.id) {
+            await logAudit(tenantId, 'create', 'family_member', directRelation.id, {
+              client_id: newClient.id,
+              linked_client_id: familyClient.id,
+              relation_type: relationType,
+            });
+          }
+
+          const { data: reverseRelation } = await supabase.from('family_members').insert({
             client_id: familyClient.id,
             linked_client_id: newClient.id,
             first_name: getClientValue('prenom', 'first_name') || '',
@@ -732,7 +775,15 @@ export default function ScanValidationDialog({
             birth_date: parseDate(getClientValue('date_naissance', 'birthdate')),
             relation_type: inverseRelationship(relationType),
             nationality: getValue('nationalite') || null,
-          } as any);
+          } as any).select('id').single();
+
+          if (reverseRelation?.id) {
+            await logAudit(tenantId, 'create', 'family_member', reverseRelation.id, {
+              client_id: familyClient.id,
+              linked_client_id: newClient.id,
+              relation_type: inverseRelationship(relationType),
+            });
+          }
 
           registerLinkedPerson({
             clientId: familyClient.id,
@@ -974,6 +1025,13 @@ export default function ScanValidationDialog({
             .single();
 
           if (!policyError && oldPolicy) {
+            await logAudit(tenantId, 'import', 'policy', oldPolicy.id, {
+              policy_type: 'old',
+              client_id: clientId,
+              company_name: firstProduct.company || null,
+              insured_person: personLabel || null,
+              product_names: productNames || null,
+            });
             createdPolicies.push({ 
               id: oldPolicy.id, 
               type: 'old', 
@@ -1013,6 +1071,11 @@ export default function ScanValidationDialog({
             .single();
 
           if (!policyError && oldPolicy) {
+            await logAudit(tenantId, 'import', 'policy', oldPolicy.id, {
+              policy_type: 'old',
+              client_id: newClient.id,
+              company_name: companyName || null,
+            });
             createdPolicies.push({ id: oldPolicy.id, type: 'old' });
           }
         }
@@ -1107,6 +1170,13 @@ export default function ScanValidationDialog({
             .single();
 
           if (!policyError && createdPolicy) {
+            await logAudit(tenantId, 'import', 'policy', createdPolicy.id, {
+              policy_type: 'new',
+              client_id: clientId,
+              company_name: firstProduct.company || null,
+              insured_person: personLabel || null,
+              product_names: productNames || null,
+            });
             createdPolicies.push({ 
               id: createdPolicy.id, 
               type: 'new', 
@@ -1146,6 +1216,11 @@ export default function ScanValidationDialog({
             .single();
 
           if (!policyError && newPolicy) {
+            await logAudit(tenantId, 'import', 'policy', newPolicy.id, {
+              policy_type: 'new',
+              client_id: newClient.id,
+              company_name: companyName || null,
+            });
             createdPolicies.push({ id: newPolicy.id, type: 'new' });
           }
         }
@@ -1181,6 +1256,11 @@ export default function ScanValidationDialog({
             .single();
 
           if (!policyError && newPolicy) {
+            await logAudit(tenantId, 'import', 'policy', newPolicy.id, {
+              policy_type: 'standard',
+              client_id: newClient.id,
+              company_name: companyName || null,
+            });
             createdPolicies.push({ id: newPolicy.id, type: 'standard' });
           }
         }
@@ -1243,7 +1323,14 @@ export default function ScanValidationDialog({
             };
 
             const { data: insertedDoc } = await supabase.from('documents').insert([documentData]).select('id').single();
-            if (insertedDoc?.id) createdDocuments.push(insertedDoc.id);
+            if (insertedDoc?.id) {
+              await logAudit(tenantId, 'import', 'document', insertedDoc.id, {
+                client_id: newClient.id,
+                doc_kind: docType,
+                file_name: smartName,
+              });
+              createdDocuments.push(insertedDoc.id);
+            }
           }
         } else if (scan.original_file_key) {
           // Fallback: single document import (legacy behavior)
@@ -1268,7 +1355,14 @@ export default function ScanValidationDialog({
           };
 
           const { data: insertedDoc } = await supabase.from('documents').insert([documentData]).select('id').single();
-          if (insertedDoc?.id) createdDocuments.push(insertedDoc.id);
+          if (insertedDoc?.id) {
+            await logAudit(tenantId, 'import', 'document', insertedDoc.id, {
+              client_id: newClient.id,
+              doc_kind: scan.detected_doc_type || 'police',
+              file_name: scan.original_file_name,
+            });
+            createdDocuments.push(insertedDoc.id);
+          }
         }
       }
 
@@ -1309,7 +1403,14 @@ export default function ScanValidationDialog({
               reminder_date: action.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             }]).select('id').single();
             
-            if (suiviData?.id) createdSuivis.push(suiviData.id);
+            if (suiviData?.id) {
+              await logAudit(tenantId, 'import', 'suivi', suiviData.id, {
+                client_id: newClient.id,
+                title,
+                workflow_action: action.action_type,
+              });
+              createdSuivis.push(suiviData.id);
+            }
           }
         }
 
@@ -1326,7 +1427,13 @@ export default function ScanValidationDialog({
             reminder_date: terminationDeadline || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           }]).select('id').single();
           
-          if (termSuivi?.id) createdSuivis.push(termSuivi.id);
+          if (termSuivi?.id) {
+            await logAudit(tenantId, 'import', 'suivi', termSuivi.id, {
+              client_id: newClient.id,
+              title: 'termination_followup',
+            });
+            createdSuivis.push(termSuivi.id);
+          }
         }
 
         // Create general follow-up for new client if no other suivis created
@@ -1341,7 +1448,13 @@ export default function ScanValidationDialog({
             reminder_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           }]).select('id').single();
           
-          if (generalSuivi?.id) createdSuivis.push(generalSuivi.id);
+          if (generalSuivi?.id) {
+            await logAudit(tenantId, 'import', 'suivi', generalSuivi.id, {
+              client_id: newClient.id,
+              title: 'general_followup',
+            });
+            createdSuivis.push(generalSuivi.id);
+          }
         }
       }
 

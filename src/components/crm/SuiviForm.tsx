@@ -27,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useSuivis, Suivi, SuiviType, SuiviStatus, suiviTypeLabels, suiviStatusLabels } from "@/hooks/useSuivis";
+import { useSuivis, Suivi, SuiviType, SuiviStatus, getSuiviTypeLabels, getSuiviStatusLabels } from "@/hooks/useSuivis";
 import { Loader2 } from "lucide-react";
 
 const getFormSchema = (t: (key: string) => string) => z.object({
@@ -61,6 +61,8 @@ export default function SuiviForm({
   const { t } = useTranslation();
   const { createSuivi, updateSuivi } = useSuivis(clientId);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const suiviTypeLabels = getSuiviTypeLabels(t);
+  const suiviStatusLabels = getSuiviStatusLabels(t);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(getFormSchema(t)),

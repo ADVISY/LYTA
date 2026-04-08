@@ -4919,6 +4919,7 @@ export type Database = {
           p_entity: string
           p_entity_id: string
           p_metadata?: Json
+          p_tenant_id?: string | null
           p_user_id: string
         }
         Returns: number

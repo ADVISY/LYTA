@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { translateError } from "@/lib/errorTranslations";
+import { recordAuditLog } from "@/lib/audit";
 import { usePaginatedQuery } from "./usePaginatedQuery";
 
 export type SuiviType = "activation" | "annulation" | "retour" | "resiliation" | "sinistre" | "autre";
@@ -54,7 +55,7 @@ export const suiviTypeLabels: Record<SuiviType, string> = {
   activation: "Activation",
   annulation: "Annulation",
   retour: "Retour",
-  resiliation: "Résiliation",
+  resiliation: "RÃ©siliation",
   sinistre: "Sinistre",
   autre: "Autre",
 };
@@ -62,7 +63,7 @@ export const suiviTypeLabels: Record<SuiviType, string> = {
 export const suiviStatusLabels: Record<SuiviStatus, string> = {
   ouvert: "Ouvert",
   en_cours: "En cours",
-  ferme: "Fermé",
+  ferme: "FermÃ©",
 };
 
 export const suiviStatusColors: Record<SuiviStatus, string> = {
@@ -122,7 +123,7 @@ export function useSuivis(clientId?: string) {
   const createSuivi = async (data: CreateSuiviData): Promise<{ data: Suivi | null; error: string | null }> => {
     try {
       if (!tenantId) {
-        throw new Error("Aucun cabinet assigné à cet utilisateur");
+        throw new Error("Aucun cabinet assignÃ© Ã  cet utilisateur");
       }
 
       const { data: newSuivi, error } = await supabase
@@ -150,9 +151,22 @@ export function useSuivis(clientId?: string) {
         return { data: null, error: error.message };
       }
 
+      await recordAuditLog({
+        action: "create",
+        entity: "suivi",
+        entityId: newSuivi.id,
+        tenantId,
+        metadata: {
+          client_id: newSuivi.client_id,
+          title: newSuivi.title,
+          type: newSuivi.type,
+          status: newSuivi.status,
+        },
+      });
+
       toast({
-        title: "Succès",
-        description: "Suivi créé avec succès",
+        title: "SuccÃ¨s",
+        description: "Suivi crÃ©Ã© avec succÃ¨s",
       });
 
       refetch();
@@ -170,7 +184,6 @@ export function useSuivis(clientId?: string) {
 
   const updateSuivi = async (id: string, data: UpdateSuiviData): Promise<{ data: Suivi | null; error: string | null }> => {
     try {
-      // Build update object, only including defined values
       const updateData: Record<string, any> = {};
       if (data.title !== undefined) updateData.title = data.title;
       if (data.description !== undefined) updateData.description = data.description;
@@ -179,7 +192,6 @@ export function useSuivis(clientId?: string) {
       if (data.reminder_date !== undefined) updateData.reminder_date = data.reminder_date;
       if (data.assigned_agent_id !== undefined) updateData.assigned_agent_id = data.assigned_agent_id;
 
-      // Always update updated_at
       updateData.updated_at = new Date().toISOString();
 
       const { data: updatedSuivi, error } = await supabase
@@ -199,9 +211,20 @@ export function useSuivis(clientId?: string) {
         return { data: null, error: error.message };
       }
 
+      await recordAuditLog({
+        action: "update",
+        entity: "suivi",
+        entityId: updatedSuivi.id,
+        tenantId,
+        metadata: {
+          client_id: updatedSuivi.client_id,
+          changes: updateData,
+        },
+      });
+
       toast({
-        title: "Succès",
-        description: "Suivi mis à jour avec succès",
+        title: "SuccÃ¨s",
+        description: "Suivi mis Ã  jour avec succÃ¨s",
       });
 
       refetch();
@@ -229,6 +252,8 @@ export function useSuivis(clientId?: string) {
 
   const deleteSuivi = async (id: string): Promise<{ error: string | null }> => {
     try {
+      const existingSuivi = suivis.find((suivi) => suivi.id === id);
+
       const { error } = await supabase
         .from("suivis")
         .delete()
@@ -244,9 +269,21 @@ export function useSuivis(clientId?: string) {
         return { error: error.message };
       }
 
+      await recordAuditLog({
+        action: "delete",
+        entity: "suivi",
+        entityId: id,
+        tenantId,
+        metadata: {
+          client_id: existingSuivi?.client_id ?? null,
+          title: existingSuivi?.title ?? null,
+          status: existingSuivi?.status ?? null,
+        },
+      });
+
       toast({
-        title: "Succès",
-        description: "Suivi supprimé avec succès",
+        title: "SuccÃ¨s",
+        description: "Suivi supprimÃ© avec succÃ¨s",
       });
 
       refetch();
@@ -257,7 +294,6 @@ export function useSuivis(clientId?: string) {
     }
   };
 
-  // Stats
   const stats = {
     total: totalCount,
     ouverts: suivis.filter(s => s.status === "ouvert").length,

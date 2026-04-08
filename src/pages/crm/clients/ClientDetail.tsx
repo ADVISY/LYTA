@@ -5,7 +5,7 @@ import { useClients, Client } from "@/hooks/useClients";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 import { usePolicies, Policy } from "@/hooks/usePolicies";
 import { useDocuments, Document } from "@/hooks/useDocuments";
-import { useSuivis, Suivi, suiviTypeLabels, suiviStatusLabels, suiviStatusColors } from "@/hooks/useSuivis";
+import { useSuivis, Suivi, getSuiviTypeLabels, getSuiviStatusLabels, suiviStatusColors } from "@/hooks/useSuivis";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
 import { useCommissionParts, CommissionPart } from "@/hooks/useCommissionParts";
@@ -98,6 +98,8 @@ const getPolicyStatusLabel = (status: string, t: (key: string) => string): strin
 
 export default function ClientDetail() {
   const { t } = useTranslation();
+  const suiviTypeLabels = getSuiviTypeLabels(t);
+  const suiviStatusLabels = getSuiviStatusLabels(t);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "info";
