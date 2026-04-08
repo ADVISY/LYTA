@@ -4,6 +4,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("send-sms");
 
@@ -16,15 +17,18 @@ serve(async (req: Request): Promise<Response> => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } }
+  );
+
+  let reservedTenantId: string | null = null;
+  let reservedAmount = 0;
+
   try {
     const { user } = await requireAuth(req);
     await checkRateLimit(req, "send-sms", 10);
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
 
     const { recipients, message }: SmsRequest = await req.json();
 
@@ -45,6 +49,12 @@ serve(async (req: Request): Promise<Response> => {
       .maybeSingle();
 
     const tenantId = assignment?.tenant_id ?? null;
+
+    if (tenantId) {
+      await reserveTenantQuota(supabase, tenantId, "sms", recipients.length);
+      reservedTenantId = tenantId;
+      reservedAmount = recipients.length;
+    }
 
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -98,12 +108,9 @@ serve(async (req: Request): Promise<Response> => {
 
     const successCount = results.filter((r) => r.success).length;
 
-    if (tenantId && successCount > 0) {
-      await supabase.rpc("increment_tenant_consumption", {
-        p_tenant_id: tenantId,
-        p_type: "sms",
-        p_amount: successCount,
-      });
+    if (reservedTenantId && reservedAmount > successCount) {
+      await releaseTenantQuota(supabase, reservedTenantId, "sms", reservedAmount - successCount);
+      reservedAmount = successCount;
     }
 
     return new Response(
@@ -116,6 +123,9 @@ serve(async (req: Request): Promise<Response> => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
+    if (reservedTenantId && reservedAmount > 0) {
+      await releaseTenantQuota(supabase, reservedTenantId, "sms", reservedAmount);
+    }
     if (error instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: error.message }),
@@ -137,6 +147,18 @@ serve(async (req: Request): Promise<Response> => {
             ...getCorsHeaders(req),
             "Content-Type": "application/json",
             "Retry-After": String(error.retryAfter),
+          },
+        }
+      );
+    }
+    if (error instanceof QuotaError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
           },
         }
       );

@@ -6,6 +6,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("process-scheduled-emails");
 
@@ -379,6 +380,7 @@ serve(async (req) => {
     const results = [];
 
     for (const email of pendingEmails || []) {
+      let quotaReservedForEmail = false;
       try {
         // Get tenant branding
         const { data: branding } = await supabase
@@ -518,6 +520,26 @@ serve(async (req) => {
         const isValidEmail = recipientEmail && typeof recipientEmail === 'string' && recipientEmail.includes('@');
 
         if (isValidEmail && emailContent) {
+          if (email.tenant_id) {
+            try {
+              await reserveTenantQuota(supabase, email.tenant_id, "email", 1);
+              quotaReservedForEmail = true;
+            } catch (quotaError) {
+              if (quotaError instanceof QuotaError) {
+                await supabase
+                  .from('scheduled_emails')
+                  .update({
+                    status: 'failed',
+                    error_message: quotaError.message
+                  })
+                  .eq('id', email.id);
+                results.push({ id: email.id, status: 'failed', error: quotaError.message });
+                continue;
+              }
+              throw quotaError;
+            }
+          }
+
           const { fromAddress } = getSenderAddress(tenantBranding, "Lyta");
 
           const html = generateEmailWrapper(emailContent, tenantBranding, lang);
@@ -530,6 +552,10 @@ serve(async (req) => {
           });
 
           if (sendError) {
+            if (quotaReservedForEmail) {
+              await releaseTenantQuota(supabase, email.tenant_id, "email", 1);
+              quotaReservedForEmail = false;
+            }
             log.error(`Error sending email`, { emailId: email.id, error: sendError });
             await supabase
               .from('scheduled_emails')
@@ -560,12 +586,6 @@ serve(async (req) => {
               })
               .eq('id', email.id);
 
-            await supabase.rpc("increment_tenant_consumption", {
-              p_tenant_id: email.tenant_id,
-              p_type: "email",
-              p_amount: 1,
-            });
-
             log.info("Email archived", { emailId: email.id });
           }
 
@@ -582,6 +602,9 @@ serve(async (req) => {
           results.push({ id: email.id, status: 'skipped' });
         }
       } catch (emailError) {
+        if (quotaReservedForEmail) {
+          await releaseTenantQuota(supabase, email.tenant_id, "email", 1);
+        }
         log.error("Error processing email", { emailId: email.id, error: emailError instanceof Error ? emailError.message : emailError });
         await supabase
           .from('scheduled_emails')

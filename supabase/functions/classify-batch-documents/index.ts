@@ -4,6 +4,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("classify-batch-documents");
 
@@ -107,6 +108,9 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   const startTime = Date.now();
+  let supabase: ReturnType<typeof createClient> | null = null;
+  let reservedTenantId: string | null = null;
+  let reservedAmount = 0;
 
   try {
     const { user } = await requireAuth(req);
@@ -119,7 +123,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Update batch status
     await supabase
@@ -139,6 +143,22 @@ serve(async (req) => {
     }
 
     log.info(`Classifying documents in batch`, { count: batchDocs.length, batchId });
+
+    if (tenantId) {
+      const { data: tenantCheck } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("id", tenantId)
+        .maybeSingle();
+
+      if (tenantCheck) {
+        reservedAmount = batchDocs.length;
+        await reserveTenantQuota(supabase, tenantCheck.id, "ai_docs", reservedAmount);
+        reservedTenantId = tenantCheck.id;
+      } else {
+        log.warn("Invalid tenantId, skipping quota enforcement", { tenantId });
+      }
+    }
 
     // Download and encode all files
     const fileContents: { docId: string; fileName: string; base64: string; mimeType: string }[] = [];
@@ -176,6 +196,11 @@ serve(async (req) => {
 
     if (fileContents.length === 0) {
       throw new Error("No files could be processed");
+    }
+
+    if (supabase && reservedTenantId && reservedAmount > fileContents.length) {
+      await releaseTenantQuota(supabase, reservedTenantId, "ai_docs", reservedAmount - fileContents.length);
+      reservedAmount = fileContents.length;
     }
 
     // Build AI request with all images
@@ -280,24 +305,6 @@ serve(async (req) => {
       log.error("Failed to update batch", { error: batchUpdateError });
     }
 
-    // Increment tenant consumption (verify tenant exists first)
-    if (tenantId) {
-      const { data: tenantCheck } = await supabase
-        .from("tenants")
-        .select("id")
-        .eq("id", tenantId)
-        .maybeSingle();
-      if (tenantCheck) {
-        await supabase.rpc("increment_tenant_consumption", {
-          p_tenant_id: tenantCheck.id,
-          p_type: "ai_docs",
-          p_amount: fileContents.length,
-        });
-      } else {
-        log.warn("Invalid tenantId, skipping consumption tracking", { tenantId });
-      }
-    }
-
     const processingTime = Date.now() - startTime;
     log.info(`Classification completed`, { processingTimeMs: processingTime, classified: classifiedCount, total: fileContents.length });
 
@@ -313,7 +320,27 @@ serve(async (req) => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (supabase && reservedTenantId && reservedAmount > 0) {
+      await releaseTenantQuota(supabase, reservedTenantId, "ai_docs", reservedAmount);
+      reservedTenantId = null;
+      reservedAmount = 0;
+    }
+
     log.error("Classification error", { error: error instanceof Error ? error.message : String(error) });
+
+    if (error instanceof AuthError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: error.status, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    if (error instanceof QuotaError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: error.status, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({

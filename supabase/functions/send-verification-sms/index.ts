@@ -4,6 +4,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("send-verification-sms");
 
@@ -17,6 +18,9 @@ interface SendVerificationRequest {
 serve(async (req: Request): Promise<Response> => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  let reservedTenantId: string | null = null;
+  let quotaReserved = false;
 
   try {
     const { user } = await requireAuth(req);
@@ -63,6 +67,12 @@ serve(async (req: Request): Promise<Response> => {
 
     const tenantId = assignment?.tenant_id ?? null;
 
+    if (tenantId) {
+      await reserveTenantQuota(supabase, tenantId, "sms", 1);
+      reservedTenantId = tenantId;
+      quotaReserved = true;
+    }
+
     // Delete any existing pending verifications for this user/type
     await supabase
       .from("sms_verifications")
@@ -98,14 +108,6 @@ serve(async (req: Request): Promise<Response> => {
       if (insertError) {
         log.error("Error inserting verification", { error: insertError });
         throw new Error("Erreur lors de la création du code de vérification");
-      }
-
-      if (tenantId) {
-        await supabase.rpc("increment_tenant_consumption", {
-          p_tenant_id: tenantId,
-          p_type: "sms",
-          p_amount: 1,
-        });
       }
 
       return new Response(
@@ -162,14 +164,6 @@ serve(async (req: Request): Promise<Response> => {
       // Don't fail - the SMS was already sent
     }
 
-    if (tenantId) {
-      await supabase.rpc("increment_tenant_consumption", {
-        p_tenant_id: tenantId,
-        p_type: "sms",
-        p_amount: 1,
-      });
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -179,6 +173,14 @@ serve(async (req: Request): Promise<Response> => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
+    if (quotaReserved && reservedTenantId) {
+      await releaseTenantQuota(
+        createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        reservedTenantId,
+        "sms",
+        1
+      );
+    }
     if (error instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: error.message }),
@@ -200,6 +202,18 @@ serve(async (req: Request): Promise<Response> => {
             ...getCorsHeaders(req),
             "Content-Type": "application/json",
             "Retry-After": String(error.retryAfter),
+          },
+        }
+      );
+    }
+    if (error instanceof QuotaError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
           },
         }
       );

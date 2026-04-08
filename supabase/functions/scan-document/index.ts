@@ -5,6 +5,7 @@ import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("scan-document");
 
@@ -382,6 +383,10 @@ serve(async (req) => {
   // Clone early: `req.json()` consumes the body; cloning later throws `Body is unusable`
   const reqForErrorHandling = req.clone();
   let scanIdForErrorHandling: string | undefined;
+  let supabase: ReturnType<typeof createClient> | null = null;
+  let validTenantId: string | null = null;
+  let reservedTenantId: string | null = null;
+  let reservedAmount = 0;
 
   const startTime = Date.now();
 
@@ -402,7 +407,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify scan exists before processing
     const { data: existingScan, error: scanCheckError } = await supabase
@@ -422,6 +427,23 @@ serve(async (req) => {
       : [{ path: fileKey, fileName, mimeType }];
 
     log.info("Processing files", { count: filesToProcess.length, mode: batchMode ? "batch" : "single", scanId });
+
+    if (tenantId) {
+      const { data: tenantCheck } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("id", tenantId)
+        .maybeSingle();
+
+      if (tenantCheck) {
+        validTenantId = tenantCheck.id;
+        reservedAmount = filesToProcess.length;
+        await reserveTenantQuota(supabase, validTenantId, "ai_docs", reservedAmount);
+        reservedTenantId = validTenantId;
+      } else {
+        log.warn("Invalid tenantId provided, skipping quota enforcement", { tenantId });
+      }
+    }
 
     // Download and encode all files - preserve file_key for document mapping
     const fileContents: { fileName: string; fileKey: string; base64: string; mimeType: string }[] = [];
@@ -449,6 +471,11 @@ serve(async (req) => {
 
     if (fileContents.length === 0) {
       throw new Error("No files could be processed");
+    }
+
+    if (supabase && reservedTenantId && reservedAmount > fileContents.length) {
+      await releaseTenantQuota(supabase, reservedTenantId, "ai_docs", reservedAmount - fileContents.length);
+      reservedAmount = fileContents.length;
     }
 
     // Build prompts
@@ -732,26 +759,6 @@ serve(async (req) => {
       },
     });
 
-    // Increment tenant AI docs usage (verify tenant exists first)
-    let validTenantId: string | null = null;
-    if (tenantId) {
-      const { data: tenantCheck } = await supabase
-        .from("tenants")
-        .select("id")
-        .eq("id", tenantId)
-        .maybeSingle();
-      if (tenantCheck) {
-        validTenantId = tenantCheck.id;
-        await supabase.rpc("increment_tenant_consumption", {
-          p_tenant_id: validTenantId,
-          p_type: "ai_docs",
-          p_amount: fileContents.length,
-        });
-      } else {
-        log.warn("Invalid tenantId provided, skipping consumption tracking", { tenantId });
-      }
-    }
-
     // Get scan record to get partner email
     const { data: scanData } = await supabase
       .from("document_scans")
@@ -889,6 +896,12 @@ serve(async (req) => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (supabase && reservedTenantId && reservedAmount > 0) {
+      await releaseTenantQuota(supabase, reservedTenantId, "ai_docs", reservedAmount);
+      reservedTenantId = null;
+      reservedAmount = 0;
+    }
+
     if (error instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: error.message }),
@@ -906,6 +919,16 @@ serve(async (req) => {
             "Content-Type": "application/json",
             "Retry-After": String(error.retryAfter),
           },
+        }
+      );
+    }
+
+    if (error instanceof QuotaError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         }
       );
     }

@@ -8,6 +8,7 @@ import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("send-crm-email");
 
@@ -611,6 +612,10 @@ const handler = async (req: Request): Promise<Response> => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+  let reservedTenantId: string | null = null;
+  let quotaReserved = false;
+
   try {
     const { user } = await requireAuth(req);
 
@@ -624,7 +629,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: type, clientEmail, clientName");
     }
 
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { autoRefreshToken: false, persistSession: false } }
@@ -716,6 +721,12 @@ const handler = async (req: Request): Promise<Response> => {
         branding = tenant.tenant_branding[0];
       }
       log.info("Found tenant branding", { displayName: branding?.display_name || tenantName });
+    }
+
+    if (tenant?.id) {
+      await reserveTenantQuota(supabaseAdmin, tenant.id, "email", 1);
+      reservedTenantId = tenant.id;
+      quotaReserved = true;
     }
 
     let emailData: EmailData = data || {};
@@ -851,14 +862,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     log.info("Email sent successfully", { emailId: emailResult.id });
 
-    if (tenant?.id) {
-      await supabaseAdmin.rpc("increment_tenant_consumption", {
-        p_tenant_id: tenant.id,
-        p_type: "email",
-        p_amount: 1,
-      });
-    }
-
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -873,6 +876,9 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: unknown) {
+    if (quotaReserved && reservedTenantId && supabaseAdmin) {
+      await releaseTenantQuota(supabaseAdmin, reservedTenantId, "email", 1);
+    }
     if (error instanceof AuthError) {
       return new Response(
         JSON.stringify({ error: (error as AuthError).message }),
@@ -885,6 +891,15 @@ const handler = async (req: Request): Promise<Response> => {
         {
           status: 429,
           headers: { ...getCorsHeaders(req), "Content-Type": "application/json", "Retry-After": String(error.retryAfter) },
+        }
+      );
+    }
+    if (error instanceof QuotaError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
         }
       );
     }
