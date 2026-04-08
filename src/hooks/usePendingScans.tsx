@@ -23,6 +23,10 @@ export interface ProductDetected {
   product_name: string;
   product_category: string;
   company: string;
+  insured_person_name?: string;
+  insured_person_first_name?: string;
+  insured_person_last_name?: string;
+  insured_person_birthdate?: string;
   premium_monthly?: number;
   premium_yearly?: number;
   franchise?: number;

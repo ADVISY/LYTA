@@ -1,16 +1,33 @@
 -- Seed placeholder products for the deposit-contract edge function
--- The function maps formType to hardcoded UUIDs that must exist in insurance_products
+-- The function historically expected hardcoded placeholder products.
 
--- Create a placeholder company for deposit form products
-INSERT INTO insurance_companies (id, name)
-VALUES ('00000000-0000-0000-0000-000000000000', 'Dépôt générique')
-ON CONFLICT (name) DO NOTHING;
+DO $$
+DECLARE
+  v_company_id UUID;
+BEGIN
+  INSERT INTO insurance_companies (name)
+  VALUES ('Dépôt générique')
+  ON CONFLICT (name) DO NOTHING;
 
--- Create the 4 products expected by deposit-contract/index.ts
-INSERT INTO insurance_products (id, company_id, name, category, description, source)
-VALUES
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'Sana', 'health', 'Produit placeholder pour dépôt de contrat santé', 'manual'),
-  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000000', 'Vita', 'life', 'Produit placeholder pour dépôt de contrat vie', 'manual'),
-  ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000000', 'Medio', 'home', 'Produit placeholder pour dépôt de contrat ménage', 'manual'),
-  ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000000', 'Business', 'rcpro', 'Produit placeholder pour dépôt de contrat entreprise', 'manual')
-ON CONFLICT DO NOTHING;
+  SELECT id
+  INTO v_company_id
+  FROM insurance_companies
+  WHERE name = 'Dépôt générique'
+  LIMIT 1;
+
+  IF v_company_id IS NULL THEN
+    RAISE EXCEPTION 'Unable to resolve placeholder company "Dépôt générique"';
+  END IF;
+
+  INSERT INTO insurance_products (company_id, name, category, description, source)
+  VALUES
+    (v_company_id, 'Sana', 'health', 'Produit placeholder pour dépôt de contrat santé', 'manual'),
+    (v_company_id, 'Vita', 'life', 'Produit placeholder pour dépôt de contrat vie', 'manual'),
+    (v_company_id, 'Medio', 'home', 'Produit placeholder pour dépôt de contrat ménage', 'manual'),
+    (v_company_id, 'Business', 'rcpro', 'Produit placeholder pour dépôt de contrat entreprise', 'manual')
+  ON CONFLICT (company_id, name) DO UPDATE
+  SET
+    category = EXCLUDED.category,
+    description = EXCLUDED.description,
+    source = EXCLUDED.source;
+END $$;

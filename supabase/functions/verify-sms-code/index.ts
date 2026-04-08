@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 
@@ -17,6 +18,7 @@ serve(async (req: Request): Promise<Response> => {
   if (corsResponse) return corsResponse;
 
   try {
+    const { user } = await requireAuth(req);
     await checkRateLimit(req, "verify-sms-code", 10);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -27,6 +29,14 @@ serve(async (req: Request): Promise<Response> => {
 
     if (!userId || !code) {
       throw new Error("userId et code sont requis");
+    }
+
+    if (verificationType !== "login") {
+      throw new Error("Type de vérification non supporté");
+    }
+
+    if (user.id !== userId) {
+      throw new Error("Utilisateur non autorisé pour cette vérification");
     }
 
     // Find the verification record
@@ -150,6 +160,18 @@ serve(async (req: Request): Promise<Response> => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
     if (error instanceof RateLimitError) {
       return new Response(
         JSON.stringify({ error: "Trop de requêtes, réessayez plus tard" }),

@@ -4,20 +4,13 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
-import { supabaseConfig } from "@/integrations/supabase/config";
+import { supabase } from "@/integrations/supabase/client";
 
-async function invokePublicFunction(name: string, body: Record<string, unknown>) {
-  const response = await fetch(`${supabaseConfig.url}/functions/v1/${name}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": supabaseConfig.publishableKey,
-      "Authorization": `Bearer ${supabaseConfig.publishableKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Erreur ${response.status}`);
+async function invokeAuthenticatedFunction(name: string, body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    throw error;
+  }
   return data;
 }
 
@@ -64,7 +57,7 @@ export function SmsVerificationDialog({
   const sendCode = useCallback(async () => {
     setSending(true);
     try {
-      const data = await invokePublicFunction("send-verification-sms", {
+      const data = await invokeAuthenticatedFunction("send-verification-sms", {
         userId,
         phoneNumber,
         verificationType,
@@ -93,7 +86,7 @@ export function SmsVerificationDialog({
 
     setLoading(true);
     try {
-      const data = await invokePublicFunction("verify-sms-code", {
+      const data = await invokeAuthenticatedFunction("verify-sms-code", {
         userId,
         code,
         verificationType,

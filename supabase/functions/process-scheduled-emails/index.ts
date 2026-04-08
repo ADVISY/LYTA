@@ -560,6 +560,12 @@ serve(async (req) => {
               })
               .eq('id', email.id);
 
+            await supabase.rpc("increment_tenant_consumption", {
+              p_tenant_id: email.tenant_id,
+              p_type: "email",
+              p_amount: 1,
+            });
+
             log.info("Email archived", { emailId: email.id });
           }
 

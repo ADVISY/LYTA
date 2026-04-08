@@ -8,12 +8,11 @@ export type FamilyMember = {
   first_name: string;
   last_name: string;
   birth_date?: string | null;
-  relation_type: 'conjoint' | 'enfant' | 'autre';
+  relation_type: 'conjoint' | 'enfant' | 'parent' | 'autre';
   permit_type?: string | null;
   nationality?: string | null;
   created_at: string;
   updated_at: string;
-  // For bidirectional display
   linked_client_id?: string | null;
   is_reverse_relation?: boolean;
 };
@@ -40,24 +39,98 @@ export function useFamilyMembers(clientId?: string) {
         .eq('id', targetId)
         .maybeSingle();
 
-      // 1. Get direct family members (this client is the parent)
+      // 1. Get direct family members (this client is the owner of the relation)
       const { data: directMembers, error: directError } = await supabase
         .from('family_members')
-        .select('*')
+        .select(`
+          *,
+          linked_client:clients!family_members_linked_client_id_fkey(
+            id,
+            first_name,
+            last_name,
+            birthdate,
+            permit_type,
+            nationality
+          )
+        `)
         .eq('client_id', targetId)
         .order('created_at', { ascending: false });
 
       if (directError) throw directError;
 
-      // 2. Get reverse relationships (this client is a family member of someone else)
-      // Filter server-side by name to avoid loading the entire family_members table (N+1 fix)
-      const matchingReverseMembers: FamilyMember[] = [];
+      const mappedDirectMembers: FamilyMember[] = (directMembers || []).map((member: any) => ({
+        id: member.id,
+        client_id: member.client_id,
+        first_name: member.first_name,
+        last_name: member.last_name,
+        birth_date: member.birth_date,
+        relation_type: member.relation_type,
+        permit_type: member.permit_type ?? member.linked_client?.permit_type ?? null,
+        nationality: member.nationality ?? member.linked_client?.nationality ?? null,
+        created_at: member.created_at,
+        updated_at: member.updated_at,
+        linked_client_id: member.linked_client_id ?? member.linked_client?.id ?? null,
+      }));
+
+      // 2. Get reverse relationships using explicit client links when available
+      const reverseMembers: FamilyMember[] = [];
+
+      const inverseRelation = (
+        relation: FamilyMember["relation_type"]
+      ): FamilyMember["relation_type"] => {
+        if (relation === "conjoint") return "conjoint";
+        if (relation === "enfant") return "parent";
+        if (relation === "parent") return "enfant";
+        return "autre";
+      };
+
+      const { data: reverseRows, error: reverseRowsError } = await supabase
+        .from('family_members')
+        .select(`
+          *,
+          parent_client:clients!family_members_client_id_fkey(
+            id,
+            first_name,
+            last_name,
+            birthdate,
+            permit_type,
+            nationality
+          )
+        `)
+        .eq('linked_client_id', targetId)
+        .neq('client_id', targetId);
+
+      if (reverseRowsError) throw reverseRowsError;
+
+      const parentIds = new Set<string>();
+
+      for (const member of reverseRows || []) {
+        const parentClient = (member as any).parent_client;
+        if (!parentClient) continue;
+
+        parentIds.add(parentClient.id);
+        reverseMembers.push({
+          id: `reverse-${member.id}`,
+          client_id: targetId,
+          first_name: parentClient.first_name || '',
+          last_name: parentClient.last_name || '',
+          birth_date: parentClient.birthdate,
+          relation_type: inverseRelation(member.relation_type),
+          permit_type: parentClient.permit_type,
+          nationality: parentClient.nationality,
+          created_at: member.created_at,
+          updated_at: member.updated_at,
+          linked_client_id: parentClient.id,
+          is_reverse_relation: true,
+        });
+      }
 
       if (currentClient?.first_name && currentClient?.last_name) {
-        const { data: reverseMembers, error: reverseError } = await supabase
+        const { data: legacyReverseMembers, error: reverseError } = await supabase
           .from('family_members')
           .select('*, clients!family_members_client_id_fkey(id, first_name, last_name, birthdate, permit_type, nationality)')
           .neq('client_id', targetId)
+          .is('linked_client_id', null)
           .ilike('first_name', currentClient.first_name)
           .ilike('last_name', currentClient.last_name);
 
@@ -68,7 +141,7 @@ export function useFamilyMembers(clientId?: string) {
           client_id: string;
           first_name: string;
           last_name: string;
-          relation_type: 'conjoint' | 'enfant' | 'autre';
+          relation_type: 'conjoint' | 'enfant' | 'parent' | 'autre';
           created_at: string;
           updated_at: string;
           clients: {
@@ -81,28 +154,22 @@ export function useFamilyMembers(clientId?: string) {
           } | null;
         };
 
-        const parentIds: string[] = [];
         const memberIdsToExclude: string[] = [];
 
-        if (reverseMembers) {
-          for (const member of reverseMembers as ReverseMemberRow[]) {
+        if (legacyReverseMembers) {
+          for (const member of legacyReverseMembers as ReverseMemberRow[]) {
             const parentClient = member.clients;
             if (parentClient) {
-              let reverseRelationType: 'conjoint' | 'enfant' | 'autre' = 'autre';
-              if (member.relation_type === 'conjoint') {
-                reverseRelationType = 'conjoint';
-              }
-
-              parentIds.push(parentClient.id);
+              parentIds.add(parentClient.id);
               memberIdsToExclude.push(member.id);
 
-              matchingReverseMembers.push({
+              reverseMembers.push({
                 id: `reverse-${member.id}`,
                 client_id: targetId,
                 first_name: parentClient.first_name || '',
                 last_name: parentClient.last_name || '',
                 birth_date: parentClient.birthdate,
-                relation_type: reverseRelationType,
+                relation_type: inverseRelation(member.relation_type),
                 permit_type: parentClient.permit_type,
                 nationality: parentClient.nationality,
                 created_at: member.created_at,
@@ -115,33 +182,50 @@ export function useFamilyMembers(clientId?: string) {
         }
 
         // Fetch siblings in a single batch query (only if we found reverse relations)
-        if (parentIds.length > 0) {
+        if (parentIds.size > 0) {
           const { data: allSiblings } = await supabase
             .from('family_members')
-            .select('*')
-            .in('client_id', parentIds)
-            .not('id', 'in', `(${memberIdsToExclude.join(',')})`);
+            .select(`
+              *,
+              linked_client:clients!family_members_linked_client_id_fkey(
+                id,
+                first_name,
+                last_name,
+                birthdate,
+                permit_type,
+                nationality
+              )
+            `)
+            .in('client_id', Array.from(parentIds))
+            .neq('linked_client_id', targetId);
 
           if (allSiblings) {
             for (const sibling of allSiblings) {
-              // Don't add ourselves again
-              if (
-                sibling.first_name?.toLowerCase() !== currentClient.first_name?.toLowerCase() ||
-                sibling.last_name?.toLowerCase() !== currentClient.last_name?.toLowerCase()
-              ) {
-                matchingReverseMembers.push({
-                  ...sibling,
-                  id: `sibling-${sibling.id}`,
-                  is_reverse_relation: true,
-                });
-              }
+              if (memberIdsToExclude.includes(sibling.id)) continue;
+              if (!sibling.linked_client_id || sibling.linked_client_id === targetId) continue;
+
+              reverseMembers.push({
+                id: `sibling-${sibling.id}`,
+                client_id: sibling.client_id,
+                first_name: sibling.first_name,
+                last_name: sibling.last_name,
+                birth_date: sibling.birth_date,
+                relation_type: sibling.relation_type,
+                permit_type: sibling.permit_type ?? sibling.linked_client?.permit_type ?? null,
+                nationality: sibling.nationality ?? sibling.linked_client?.nationality ?? null,
+                created_at: sibling.created_at,
+                updated_at: sibling.updated_at,
+                linked_client_id: sibling.linked_client_id,
+                is_reverse_relation: true,
+              });
             }
           }
         }
       }
 
-      // Combine direct and reverse members
-      const allMembers = [...(directMembers ?? []), ...matchingReverseMembers];
+      const allMembers = [...mappedDirectMembers, ...reverseMembers].filter((member, index, array) => {
+        return array.findIndex((candidate) => candidate.id === member.id) === index;
+      });
       setFamilyMembers(allMembers);
     } catch (error: unknown) {
       console.error('Error fetching family members:', error);

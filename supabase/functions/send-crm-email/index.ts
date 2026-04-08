@@ -691,6 +691,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .select(`
+        id,
         name,
         tenant_branding (
           display_name,
@@ -849,6 +850,14 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResult = await emailResponse.json();
 
     log.info("Email sent successfully", { emailId: emailResult.id });
+
+    if (tenant?.id) {
+      await supabaseAdmin.rpc("increment_tenant_consumption", {
+        p_tenant_id: tenant.id,
+        p_type: "email",
+        p_amount: 1,
+      });
+    }
 
     return new Response(
       JSON.stringify({ 

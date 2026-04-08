@@ -485,6 +485,264 @@ export default function ScanValidationDialog({
       const createdPolicies: { id: string; type: 'old' | 'new' | 'standard'; productName?: string }[] = [];
       const createdSuivis: string[] = [];
       const createdFamilyMembers: { id: string; name: string }[] = [];
+      const documentSizeCache = new Map<string, number>();
+      type LinkedPerson = {
+        clientId: string;
+        firstName: string;
+        lastName: string;
+        birthdate: string | null;
+        label: string;
+      };
+
+      const linkedPeople = new Map<string, LinkedPerson>();
+
+      const getStoredFileSize = async (fileKey?: string | null): Promise<number | null> => {
+        if (!fileKey) return null;
+        if (documentSizeCache.has(fileKey)) {
+          return documentSizeCache.get(fileKey) ?? null;
+        }
+
+        try {
+          const { data, error } = await supabase.storage.from('documents').download(fileKey);
+          if (error || !data) return null;
+
+          documentSizeCache.set(fileKey, data.size);
+          return data.size;
+        } catch (error) {
+          console.warn('[ScanValidation] Failed to resolve document size:', fileKey, error);
+          return null;
+        }
+      };
+
+      const normalizeTextValue = (value?: string | null): string =>
+        (value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+          .toLowerCase();
+
+      const buildPersonKey = (
+        firstName?: string | null,
+        lastName?: string | null,
+        birthdate?: string | null
+      ): string => {
+        const normalizedFirstName = normalizeTextValue(firstName);
+        const normalizedLastName = normalizeTextValue(lastName);
+        const normalizedBirthdate = birthdate || '';
+        return `${normalizedFirstName}::${normalizedLastName}::${normalizedBirthdate}`;
+      };
+
+      const registerLinkedPerson = (person: LinkedPerson) => {
+        linkedPeople.set(buildPersonKey(person.firstName, person.lastName, person.birthdate), person);
+        linkedPeople.set(buildPersonKey(person.firstName, person.lastName, null), person);
+      };
+
+      const normalizeRelationship = (
+        relationship?: string | null
+      ): 'conjoint' | 'enfant' | 'parent' | 'autre' => {
+        const normalized = normalizeTextValue(relationship);
+
+        if (['conjoint', 'spouse', 'epoux', 'epouse', 'mari', 'femme', 'partner', 'partenaire'].includes(normalized)) {
+          return 'conjoint';
+        }
+        if (['enfant', 'child', 'kid', 'fils', 'fille'].includes(normalized)) {
+          return 'enfant';
+        }
+        if (['parent', 'pere', 'mere', 'father', 'mother'].includes(normalized)) {
+          return 'parent';
+        }
+
+        return 'autre';
+      };
+
+      const inverseRelationship = (
+        relationship: 'conjoint' | 'enfant' | 'parent' | 'autre'
+      ): 'conjoint' | 'enfant' | 'parent' | 'autre' => {
+        if (relationship === 'conjoint') return 'conjoint';
+        if (relationship === 'enfant') return 'parent';
+        if (relationship === 'parent') return 'enfant';
+        return 'autre';
+      };
+
+      const parseInsuredPersonName = (fullName?: string | null) => {
+        const trimmed = (fullName || '').trim();
+        if (!trimmed) return { firstName: '', lastName: '' };
+
+        const parts = trimmed.split(/\s+/).filter(Boolean);
+        if (parts.length === 1) {
+          return { firstName: parts[0], lastName: primaryHolder?.last_name || getValue('nom') || '' };
+        }
+
+        return {
+          firstName: parts.slice(0, -1).join(' '),
+          lastName: parts.slice(-1).join(' '),
+        };
+      };
+
+      const getInsuredIdentity = (product?: ProductDetected) => {
+        const parsedName = parseInsuredPersonName(product?.insured_person_name);
+        return {
+          firstName:
+            product?.insured_person_first_name ||
+            parsedName.firstName ||
+            getClientValue('prenom', 'first_name') ||
+            '',
+          lastName:
+            product?.insured_person_last_name ||
+            parsedName.lastName ||
+            getClientValue('nom', 'last_name') ||
+            '',
+          birthdate:
+            parseDate(product?.insured_person_birthdate) ||
+            null,
+        };
+      };
+
+      const resolveLinkedPerson = (product?: ProductDetected): LinkedPerson => {
+        const insured = getInsuredIdentity(product);
+        const fullKey = buildPersonKey(insured.firstName, insured.lastName, insured.birthdate);
+        const looseKey = buildPersonKey(insured.firstName, insured.lastName, null);
+
+        return (
+          linkedPeople.get(fullKey) ||
+          linkedPeople.get(looseKey) || {
+            clientId: newClient.id,
+            firstName: getClientValue('prenom', 'first_name') || '',
+            lastName: getClientValue('nom', 'last_name') || '',
+            birthdate: parseDate(getClientValue('date_naissance', 'birthdate')),
+            label: `${getClientValue('prenom', 'first_name') || ''} ${getClientValue('nom', 'last_name') || ''}`.trim(),
+          }
+        );
+      };
+
+      const deduplicateProducts = (products: ProductDetected[]): ProductDetected[] => {
+        const seen = new Set<string>();
+        const uniqueProducts: ProductDetected[] = [];
+
+        for (const product of products) {
+          const insured = getInsuredIdentity(product);
+          const dedupeKey = [
+            normalizeTextValue(product.company),
+            normalizeTextValue(product.product_name),
+            normalizeTextValue(product.policy_number),
+            parseDate(product.start_date) || '',
+            parseDate(product.end_date) || '',
+            buildPersonKey(insured.firstName, insured.lastName, insured.birthdate),
+          ].join('::');
+
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+          uniqueProducts.push(product);
+        }
+
+        return uniqueProducts;
+      };
+
+      const groupProductsByCompanyAndInsured = (products: ProductDetected[]) => {
+        const grouped = new Map<
+          string,
+          { clientId: string; personLabel: string; products: ProductDetected[] }
+        >();
+
+        for (const product of deduplicateProducts(products)) {
+          const person = resolveLinkedPerson(product);
+          const companyKey = normalizeTextValue(product.company) || 'unknown';
+          const groupKey = `${person.clientId}::${companyKey}`;
+
+          if (!grouped.has(groupKey)) {
+            grouped.set(groupKey, {
+              clientId: person.clientId,
+              personLabel: person.label,
+              products: [],
+            });
+          }
+
+          grouped.get(groupKey)!.products.push(product);
+        }
+
+        return grouped;
+      };
+
+      registerLinkedPerson({
+        clientId: newClient.id,
+        firstName: getClientValue('prenom', 'first_name') || '',
+        lastName: getClientValue('nom', 'last_name') || '',
+        birthdate: parseDate(getClientValue('date_naissance', 'birthdate')),
+        label: `${getClientValue('prenom', 'first_name') || ''} ${getClientValue('nom', 'last_name') || ''}`.trim(),
+      });
+
+      if (createFamilyMembers && scan.family_members_detected && scan.family_members_detected.length > 0) {
+        for (const member of scan.family_members_detected) {
+          const firstName = (member.first_name || '').trim();
+          const lastName = (member.last_name || getClientValue('nom', 'last_name') || '').trim();
+          const birthdate = parseDate(member.birthdate);
+
+          if (!firstName) continue;
+
+          const memberKey = buildPersonKey(firstName, lastName, birthdate);
+          const looseMemberKey = buildPersonKey(firstName, lastName, null);
+          if (linkedPeople.has(memberKey) || linkedPeople.has(looseMemberKey)) continue;
+
+          const relationType = normalizeRelationship(member.relationship);
+          const familyClientData = {
+            tenant_id: tenantId,
+            last_name: lastName,
+            first_name: firstName,
+            birthdate,
+            gender: normalizeGender(member.gender || null),
+            address: getValue('adresse') || null,
+            postal_code: getValue('npa') || null,
+            city: getValue('localite') || null,
+            canton: getValue('canton') || null,
+            nationality: getValue('nationalite') || null,
+            status: member.has_own_policy ? 'actif' : 'prospect',
+          };
+
+          const { data: familyClient, error: familyError } = await supabase
+            .from('clients')
+            .insert(familyClientData)
+            .select()
+            .single();
+
+          if (familyError || !familyClient) {
+            console.error('[ScanValidation] Failed to create family client:', familyError);
+            continue;
+          }
+
+          createdFamilyMembers.push({
+            id: familyClient.id,
+            name: `${firstName} ${lastName}`.trim(),
+          });
+
+          await supabase.from('family_members').insert({
+            client_id: newClient.id,
+            linked_client_id: familyClient.id,
+            first_name: firstName,
+            last_name: lastName,
+            birth_date: birthdate,
+            relation_type: relationType,
+            nationality: getValue('nationalite') || null,
+          } as any);
+
+          await supabase.from('family_members').insert({
+            client_id: familyClient.id,
+            linked_client_id: newClient.id,
+            first_name: getClientValue('prenom', 'first_name') || '',
+            last_name: getClientValue('nom', 'last_name') || '',
+            birth_date: parseDate(getClientValue('date_naissance', 'birthdate')),
+            relation_type: inverseRelationship(relationType),
+            nationality: getValue('nationalite') || null,
+          } as any);
+
+          registerLinkedPerson({
+            clientId: familyClient.id,
+            firstName,
+            lastName,
+            birthdate,
+            label: `${firstName} ${lastName}`.trim(),
+          });
+        }
+      }
 
       // Helper to resolve product using RPC or auto-create if not found
       // Returns the product's catalog category (health, life, auto, etc.) for proper display
@@ -626,24 +884,12 @@ export default function ScanValidationDialog({
         }
       };
 
-      // Helper to group products by company for multi-product contracts
-      const groupProductsByCompany = (products: ProductDetected[]): Map<string, ProductDetected[]> => {
-        const grouped = new Map<string, ProductDetected[]>();
-        for (const product of products) {
-          const companyKey = (product.company || 'Unknown').toLowerCase().trim();
-          if (!grouped.has(companyKey)) {
-            grouped.set(companyKey, []);
-          }
-          grouped.get(companyKey)!.push(product);
-        }
-        return grouped;
-      };
-
-      // 2. CREATE OLD POLICIES - Group by company for multi-product contracts
+      // 2. CREATE OLD POLICIES - Group by insured person and company for multi-product contracts
       if (createOldContract && scan.old_products_detected && scan.old_products_detected.length > 0) {
-        const groupedOldProducts = groupProductsByCompany(scan.old_products_detected);
+        const groupedOldProducts = groupProductsByCompanyAndInsured(scan.old_products_detected);
         
-        for (const [companyKey, products] of groupedOldProducts) {
+        for (const [companyKey, group] of groupedOldProducts) {
+          const { clientId, personLabel, products } = group;
           const firstProduct = products[0];
           
           // Build products_data array EXACTLY like ContractForm (same structure)
@@ -682,7 +928,9 @@ export default function ScanValidationDialog({
 
           // Calculate totals like ContractForm
           const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-          const totalPremiumYearly = totalPremiumMonthly * 12;  // Calculate from monthly like ContractForm
+          const totalPremiumYearly = products.some(p => p.premium_yearly)
+            ? products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0)
+            : totalPremiumMonthly * 12;
           
           // Get product names for display
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
@@ -697,20 +945,21 @@ export default function ScanValidationDialog({
           // Build notes similar to ContractForm format
           const notesParts: string[] = [];
           if (productNames) notesParts.push(productNames);
+          if (personLabel) notesParts.push(`Assuré: ${personLabel}`);
           notesParts.push(`Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`);
           if (hasTermination) notesParts.push('À RÉSILIER');
 
           const policyData = {
             tenant_id: tenantId,
-            client_id: newClient.id,
+            client_id: clientId,
             product_id: mainProductId,
             policy_number: firstProduct.policy_number || null,
-            status: hasTermination ? 'resilie' : 'active',
+            status: hasTermination ? 'cancelled' : 'active',
             start_date: parseDate(firstProduct.start_date) || new Date().toISOString().split('T')[0],
             end_date: parseDate(firstProduct.end_date),
             premium_monthly: totalPremiumMonthly || null,
             premium_yearly: totalPremiumYearly || null,
-            deductible: products[0].franchise || null,
+            deductible: products.find(p => p.franchise != null)?.franchise || null,
             currency: 'CHF',
             company_name: firstProduct.company || null,
             product_type: mainCategory,  // 'multi' for multiple products, like ContractForm
@@ -745,7 +994,7 @@ export default function ScanValidationDialog({
             client_id: newClient.id,
             product_id: productId,
             policy_number: getValue('ancien_numero_police') || getValue('numero_police') || null,
-            status: hasTermination ? 'resilie' : 'active',
+            status: hasTermination ? 'cancelled' : 'active',
             start_date: parseDate(getValue('ancienne_date_debut') || getValue('date_debut')) || new Date().toISOString().split('T')[0],
             end_date: parseDate(getValue('ancienne_date_fin') || getValue('date_fin')),
             premium_monthly: parseAmount(getValue('ancienne_prime_mensuelle') || getValue('prime_mensuelle')),
@@ -769,11 +1018,12 @@ export default function ScanValidationDialog({
         }
       }
 
-      // 3. CREATE NEW POLICIES - Group by company for multi-product contracts
+      // 3. CREATE NEW POLICIES - Group by insured person and company for multi-product contracts
       if (createNewContract && scan.new_products_detected && scan.new_products_detected.length > 0) {
-        const groupedNewProducts = groupProductsByCompany(scan.new_products_detected);
+        const groupedNewProducts = groupProductsByCompanyAndInsured(scan.new_products_detected);
         
-        for (const [companyKey, products] of groupedNewProducts) {
+        for (const [companyKey, group] of groupedNewProducts) {
+          const { clientId, personLabel, products } = group;
           const firstProduct = products[0];
           
           // Build products_data array EXACTLY like ContractForm (same structure)
@@ -812,7 +1062,9 @@ export default function ScanValidationDialog({
 
           // Calculate totals like ContractForm
           const totalPremiumMonthly = products.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
-          const totalPremiumYearly = totalPremiumMonthly * 12;  // Calculate from monthly like ContractForm
+          const totalPremiumYearly = products.some(p => p.premium_yearly)
+            ? products.reduce((sum, p) => sum + (p.premium_yearly || 0), 0)
+            : totalPremiumMonthly * 12;
           
           // Get product names for display
           const productNames = products.map(p => p.product_name).filter(Boolean).join(' + ');
@@ -827,11 +1079,12 @@ export default function ScanValidationDialog({
           // Build notes similar to ContractForm format
           const notesParts: string[] = [];
           if (productNames) notesParts.push(productNames);
+          if (personLabel) notesParts.push(`Assuré: ${personLabel}`);
           notesParts.push(`Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`);
 
           const policyData = {
             tenant_id: tenantId,
-            client_id: newClient.id,
+            client_id: clientId,
             product_id: mainProductId,
             policy_number: firstProduct.policy_number || null,
             status: 'active',
@@ -839,7 +1092,7 @@ export default function ScanValidationDialog({
             end_date: parseDate(firstProduct.end_date),
             premium_monthly: totalPremiumMonthly || null,
             premium_yearly: totalPremiumYearly || null,
-            deductible: products[0].franchise || null,
+            deductible: products.find(p => p.franchise != null)?.franchise || null,
             currency: 'CHF',
             company_name: firstProduct.company || null,
             product_type: mainCategory,  // 'multi' for multiple products, like ContractForm
@@ -933,68 +1186,6 @@ export default function ScanValidationDialog({
         }
       }
 
-      // 5. CREATE FAMILY MEMBERS as linked clients
-      if (createFamilyMembers && scan.family_members_detected && scan.family_members_detected.length > 0) {
-        for (const member of scan.family_members_detected) {
-          // Create family member as a new client
-          const familyClientData = {
-            tenant_id: tenantId,
-            last_name: member.last_name || getValue('nom'),
-            first_name: member.first_name,
-            birthdate: parseDate(member.birthdate),
-            gender: member.gender || null,
-            // Copy address from primary client
-            address: getValue('adresse') || null,
-            postal_code: getValue('npa') || null,
-            city: getValue('localite') || null,
-            canton: getValue('canton') || null,
-            nationality: getValue('nationalite') || null,
-            status: 'prospect',
-          };
-
-          const { data: familyClient, error: familyError } = await supabase
-            .from('clients')
-            .insert(familyClientData)
-            .select()
-            .single();
-
-          if (!familyError && familyClient) {
-            createdFamilyMembers.push({ 
-              id: familyClient.id, 
-              name: `${member.first_name} ${member.last_name || getValue('nom')}`
-            });
-
-            // Create family member record linking to the primary client
-            const relationship = member.relationship || 'autre';
-            
-            // Parent client -> Family member record
-            await supabase.from('family_members').insert({
-              client_id: newClient.id,
-              first_name: member.first_name,
-              last_name: member.last_name || getValue('nom'),
-              birth_date: parseDate(member.birthdate),
-              relation_type: relationship,
-              nationality: getValue('nationalite') || null,
-            });
-
-            // Also add reverse record on the family member client
-            const inverseRelationship = relationship === 'conjoint' ? 'conjoint' 
-              : relationship === 'enfant' ? 'parent'
-              : relationship === 'parent' ? 'enfant'
-              : 'autre';
-              
-            await supabase.from('family_members').insert({
-              client_id: familyClient.id,
-              first_name: getValue('prenom') || '',
-              last_name: getValue('nom') || '',
-              birth_date: parseDate(getValue('date_naissance')),
-              relation_type: inverseRelationship,
-              nationality: getValue('nationalite') || null,
-            });
-          }
-        }
-      }
-
       // 5. Link ALL scanned documents to client (including individual files from batch)
       const createdDocuments: string[] = [];
       if (linkDocuments) {
@@ -1028,6 +1219,7 @@ export default function ScanValidationDialog({
             // CRITICAL FIX: Use individual file_key from document if available, 
             // otherwise fall back to scan.original_file_key
             const documentFileKey = doc.file_key || scan.original_file_key;
+            const sizeBytes = await getStoredFileSize(documentFileKey);
 
             const documentData = {
               tenant_id: tenantId,
@@ -1036,6 +1228,7 @@ export default function ScanValidationDialog({
               file_name: smartName,
               file_key: documentFileKey,  // Use the correct individual file key
               mime_type: doc.file_key ? (doc.file_name?.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream') : 'application/pdf',
+              size_bytes: sizeBytes,
               doc_kind: docType,
               created_by: user.id,
               category: docType,
@@ -1054,6 +1247,7 @@ export default function ScanValidationDialog({
           }
         } else if (scan.original_file_key) {
           // Fallback: single document import (legacy behavior)
+          const sizeBytes = await getStoredFileSize(scan.original_file_key);
           const documentData = {
             tenant_id: tenantId,
             owner_type: 'client',
@@ -1061,6 +1255,7 @@ export default function ScanValidationDialog({
             file_name: scan.original_file_name,
             file_key: scan.original_file_key,
             mime_type: 'application/pdf',
+            size_bytes: sizeBytes,
             doc_kind: scan.detected_doc_type || 'police',
             created_by: user.id,
             category: 'Dossier IA Scan',

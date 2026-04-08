@@ -1882,6 +1882,7 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          linked_client_id: string | null
           nationality: string | null
           permit_type: string | null
           relation_type: string
@@ -1894,6 +1895,7 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          linked_client_id?: string | null
           nationality?: string | null
           permit_type?: string | null
           relation_type: string
@@ -1906,6 +1908,7 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          linked_client_id?: string | null
           nationality?: string | null
           permit_type?: string | null
           relation_type?: string
@@ -1922,6 +1925,20 @@ export type Database = {
           {
             foreignKeyName: "family_members_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_members_linked_client_id_fkey"
+            columns: ["linked_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_members_linked_client_id_fkey"
+            columns: ["linked_client_id"]
             isOneToOne: false
             referencedRelation: "clients_safe"
             referencedColumns: ["id"]

@@ -34,7 +34,7 @@ const getSchema = (t: (key: string) => string) => z.object({
   first_name: z.string().min(1, t("forms.familyMember.errors.firstNameRequired")),
   last_name: z.string().min(1, t("forms.familyMember.errors.lastNameRequired")),
   birth_date: z.string().optional().nullable(),
-  relation_type: z.enum(["conjoint", "enfant", "autre"]),
+  relation_type: z.enum(["conjoint", "enfant", "parent", "autre"]),
   permit_type: z.string().optional().nullable(),
   nationality: z.string().optional().nullable(),
 });
@@ -143,6 +143,7 @@ export default function FamilyMemberForm({
         // 2. Create family member entry (child linked to parent)
         const { error: familyError } = await createFamilyMember({
           client_id: clientId,
+          linked_client_id: newClient.id,
           ...data,
         } as any);
 
@@ -152,11 +153,19 @@ export default function FamilyMemberForm({
 
         // 3. Create reverse family member entry (parent linked to child)
         // So when viewing the child's profile, they see the parent
-        const reverseRelationType = data.relation_type === 'conjoint' ? 'conjoint' : 'autre';
+        const reverseRelationType =
+          data.relation_type === 'conjoint'
+            ? 'conjoint'
+            : data.relation_type === 'enfant'
+            ? 'parent'
+            : data.relation_type === 'parent'
+            ? 'enfant'
+            : 'autre';
         const { error: reverseError } = await supabase
           .from('family_members')
           .insert([{
             client_id: newClient.id,
+            linked_client_id: clientId,
             first_name: parentClient?.first_name || '',
             last_name: parentClient?.last_name || '',
             birth_date: parentClient?.birthdate || null,
@@ -246,6 +255,7 @@ export default function FamilyMemberForm({
                       <SelectContent>
                         <SelectItem value="conjoint">{t("forms.familyMember.relationTypes.spouse")}</SelectItem>
                         <SelectItem value="enfant">{t("forms.familyMember.relationTypes.child")}</SelectItem>
+                        <SelectItem value="parent">Parent</SelectItem>
                         <SelectItem value="autre">{t("forms.familyMember.relationTypes.other")}</SelectItem>
                       </SelectContent>
                     </Select>

@@ -45,6 +45,14 @@ async function getExtraUserPriceId(supabaseAdmin: ReturnType<typeof createClient
   return (data?.value as string) || FALLBACK_EXTRA_USER_PRICE_ID;
 }
 
+async function collectStripeList<T>(iterable: AsyncIterable<T>): Promise<T[]> {
+  const items: T[] = [];
+  for await (const item of iterable) {
+    items.push(item);
+  }
+  return items;
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -83,22 +91,31 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Fetch all active subscriptions
-    const subscriptions = await stripe.subscriptions.list({
-      status: 'active',
-      limit: 100,
-      expand: ['data.items.data.price'],
-    });
+    const activeSubscriptions = await collectStripeList(
+      stripe.subscriptions.list({
+        status: 'active',
+        limit: 100,
+        expand: ['data.items.data.price'],
+      })
+    );
 
-    // Fetch all past_due subscriptions too
-    const pastDueSubscriptions = await stripe.subscriptions.list({
-      status: 'past_due',
-      limit: 100,
-      expand: ['data.items.data.price'],
-    });
+    const pastDueSubscriptions = await collectStripeList(
+      stripe.subscriptions.list({
+        status: 'past_due',
+        limit: 100,
+        expand: ['data.items.data.price'],
+      })
+    );
 
-    // Combine subscriptions
-    const allSubscriptions = [...subscriptions.data, ...pastDueSubscriptions.data];
+    const trialingSubscriptions = await collectStripeList(
+      stripe.subscriptions.list({
+        status: 'trialing',
+        limit: 100,
+        expand: ['data.items.data.price'],
+      })
+    );
+
+    const allSubscriptions = [...activeSubscriptions, ...pastDueSubscriptions, ...trialingSubscriptions];
 
     // Calculate MRR and stats
     let totalMRR = 0;
@@ -187,10 +204,12 @@ serve(async (req) => {
     const now = new Date();
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     
-    const payments = await stripe.paymentIntents.list({
-      created: { gte: Math.floor(sixMonthsAgo.getTime() / 1000) },
-      limit: 100,
-    });
+    const paidInvoices = await collectStripeList(
+      stripe.invoices.list({
+        created: { gte: Math.floor(sixMonthsAgo.getTime() / 1000) },
+        limit: 100,
+      })
+    );
 
     // Group payments by month
     const monthlyRevenue: Record<string, number> = {};
@@ -200,12 +219,13 @@ serve(async (req) => {
       monthlyRevenue[key] = 0;
     }
 
-    for (const payment of payments.data) {
-      if (payment.status === 'succeeded') {
-        const date = new Date(payment.created * 1000);
+    for (const invoice of paidInvoices) {
+      if (invoice.status === 'paid' || invoice.paid) {
+        const paidAt = invoice.status_transitions?.paid_at || invoice.created;
+        const date = new Date(paidAt * 1000);
         const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
         if (monthlyRevenue.hasOwnProperty(key)) {
-          monthlyRevenue[key] += (payment.amount / 100);
+          monthlyRevenue[key] += ((invoice.amount_paid || invoice.amount_due || 0) / 100);
         }
       }
     }
@@ -213,11 +233,13 @@ serve(async (req) => {
     // Get upcoming invoices value
     let upcomingInvoicesTotal = 0;
     try {
-      const invoices = await stripe.invoices.list({
-        status: 'open',
-        limit: 100,
-      });
-      upcomingInvoicesTotal = invoices.data.reduce((sum: number, inv: { amount_due: number }) => sum + (inv.amount_due / 100), 0);
+      const openInvoices = await collectStripeList(
+        stripe.invoices.list({
+          status: 'open',
+          limit: 100,
+        })
+      );
+      upcomingInvoicesTotal = openInvoices.reduce((sum: number, inv: { amount_due: number }) => sum + (inv.amount_due / 100), 0);
     } catch (e) {
       log.error('Error fetching invoices', { error: e instanceof Error ? e.message : e });
     }
@@ -235,8 +257,9 @@ serve(async (req) => {
       upcomingInvoices: upcomingInvoicesTotal,
       planStats: planCounts,
       revenueChart: revenueChartData,
-      totalActiveSubscriptions: allSubscriptions.filter(s => s.status === 'active').length,
-      totalPastDueSubscriptions: allSubscriptions.filter(s => s.status === 'past_due').length,
+      totalActiveSubscriptions: activeSubscriptions.length,
+      totalPastDueSubscriptions: pastDueSubscriptions.length,
+      totalTrialingSubscriptions: trialingSubscriptions.length,
       tenantSubscriptions,
       customerEmails,
     }), {

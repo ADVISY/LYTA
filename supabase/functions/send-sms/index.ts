@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 
@@ -15,7 +17,14 @@ serve(async (req: Request): Promise<Response> => {
   if (corsResponse) return corsResponse;
 
   try {
+    const { user } = await requireAuth(req);
     await checkRateLimit(req, "send-sms", 10);
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
 
     const { recipients, message }: SmsRequest = await req.json();
 
@@ -26,6 +35,16 @@ serve(async (req: Request): Promise<Response> => {
     if (!message) {
       throw new Error("Message requis");
     }
+
+    const { data: assignment } = await supabase
+      .from("user_tenant_assignments")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    const tenantId = assignment?.tenant_id ?? null;
 
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -79,6 +98,14 @@ serve(async (req: Request): Promise<Response> => {
 
     const successCount = results.filter((r) => r.success).length;
 
+    if (tenantId && successCount > 0) {
+      await supabase.rpc("increment_tenant_consumption", {
+        p_tenant_id: tenantId,
+        p_type: "sms",
+        p_amount: successCount,
+      });
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -89,6 +116,18 @@ serve(async (req: Request): Promise<Response> => {
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          status: error.status,
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
     if (error instanceof RateLimitError) {
       return new Response(
         JSON.stringify({ error: "Trop de requêtes, réessayez plus tard" }),

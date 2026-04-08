@@ -70,7 +70,7 @@ export default function KingDashboard() {
       const sevenDaysAgo = subDays(new Date(), 7);
 
       const [tenantsResult, usersResult, policiesResult] = await Promise.all([
-        supabase.from('tenants').select('id, status, plan, billing_status, payment_status, tenant_status, mrr_amount, created_at, last_activity_at'),
+        supabase.from('tenants').select('id, status, plan, billing_status, payment_status, tenant_status, mrr_amount, created_at, updated_at, last_activity_at'),
         supabase.from('user_tenant_assignments').select('id', { count: 'exact' }),
         supabase.from('policies').select('id', { count: 'exact' }),
       ]);

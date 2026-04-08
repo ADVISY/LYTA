@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 
 ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "King can read settings" ON platform_settings;
+DROP POLICY IF EXISTS "King can write settings" ON platform_settings;
 CREATE POLICY "King can read settings" ON platform_settings
   FOR SELECT USING (public.is_king());
 CREATE POLICY "King can write settings" ON platform_settings
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS king_ip_whitelist (
 
 ALTER TABLE king_ip_whitelist ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "King can manage whitelist" ON king_ip_whitelist;
 CREATE POLICY "King can manage whitelist" ON king_ip_whitelist
   FOR ALL USING (public.is_king());
 

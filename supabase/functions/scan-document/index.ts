@@ -44,6 +44,10 @@ interface ProductDetected {
   product_name: string;           // e.g. "LAMal FAVORIT MEDPHARM", "COMPLETA TOP"
   product_category: string;       // "LAMal" | "LCA" | "VIE" | "NON-VIE" | "LAA" | "LPP"
   company: string;                // Insurance company name
+  insured_person_name?: string;
+  insured_person_first_name?: string;
+  insured_person_last_name?: string;
+  insured_person_birthdate?: string;
   premium_monthly?: number;
   premium_yearly?: number;
   franchise?: number;
@@ -153,6 +157,12 @@ Exemple: Une proposition Swica peut inclure:
 
 Tu dois extraire CHAQUE produit séparément dans "products_detected" ou "new_products_detected".
 Chaque ligne de produit avec une prime = un produit séparé!
+Pour CHAQUE produit, indique la personne assurée concernée dans:
+- insured_person_name
+- insured_person_first_name
+- insured_person_last_name
+- insured_person_birthdate (si disponible)
+Ne fusionne jamais des produits appartenant à plusieurs assurés dans un seul objet.
 
 ## 3. DÉTECTER LES MEMBRES DE LA FAMILLE
 Si le dossier contient plusieurs personnes (conjoint, enfants):
@@ -240,6 +250,10 @@ Réponds UNIQUEMENT en JSON valide:
       "product_name": "LAMal FAVORIT MEDPHARM",
       "product_category": "LAMal",
       "company": "Swica",
+      "insured_person_name": "Marie Dupont",
+      "insured_person_first_name": "Marie",
+      "insured_person_last_name": "Dupont",
+      "insured_person_birthdate": "1985-03-15",
       "premium_monthly": 429.50,
       "franchise": 2500,
       "start_date": "2024-01-01"
@@ -248,6 +262,10 @@ Réponds UNIQUEMENT en JSON valide:
       "product_name": "COMPLETA TOP",
       "product_category": "LCA",
       "company": "Swica",
+      "insured_person_name": "Pierre Dupont",
+      "insured_person_first_name": "Pierre",
+      "insured_person_last_name": "Dupont",
+      "insured_person_birthdate": "1982-07-20",
       "premium_monthly": 85.20,
       "start_date": "2024-01-01"
     },
@@ -255,6 +273,10 @@ Réponds UNIQUEMENT en JSON valide:
       "product_name": "HOSPITA FLEX",
       "product_category": "LCA",
       "company": "Swica",
+      "insured_person_name": "Pierre Dupont",
+      "insured_person_first_name": "Pierre",
+      "insured_person_last_name": "Dupont",
+      "insured_person_birthdate": "1982-07-20",
       "premium_monthly": 120.00,
       "start_date": "2024-01-01"
     },
@@ -262,6 +284,10 @@ Réponds UNIQUEMENT en JSON valide:
       "product_name": "INFORTUNA",
       "product_category": "LAA",
       "company": "Swica",
+      "insured_person_name": "Lucas Dupont",
+      "insured_person_first_name": "Lucas",
+      "insured_person_last_name": "Dupont",
+      "insured_person_birthdate": "2010-11-05",
       "premium_monthly": 15.50,
       "start_date": "2024-01-01"
     }
@@ -341,6 +367,7 @@ RÉSILIATION (si présente):
 
 IMPORTANT:
 - Consolide les informations de TOUS les documents
+- Pour chaque produit détecté, précise systématiquement l'assuré concerné avec insured_person_name, insured_person_first_name, insured_person_last_name et insured_person_birthdate si disponible
 - Signale les incohérences entre documents
 - Vérifie les dates d'engagement et délais de résiliation
 - Suggère les actions back-office nécessaires
