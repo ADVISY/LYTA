@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User, Session, createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { supabaseConfig } from "@/integrations/supabase/config";
 import { useNavigate } from "react-router-dom";
 
 interface AuthActionError {
@@ -11,6 +13,8 @@ interface PendingSmsVerificationState {
   userId: string;
   phoneNumber: string;
 }
+
+type SmsChallengeFunctionName = "send-verification-sms" | "verify-sms-code";
 
 interface LoginData {
   role: string;
@@ -70,22 +74,18 @@ function parseLoginData(value: unknown): LoginData | null {
   };
 }
 
-/**
- * Check if a password has been exposed in known data breaches
- * Uses HaveIBeenPwned API with k-anonymity
- */
 async function checkPasswordCompromised(password: string): Promise<{ isCompromised: boolean; count: number }> {
   try {
     const buffer = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+    const hashBuffer = await crypto.subtle.digest("SHA-1", buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
 
     const prefix = hash.slice(0, 5);
     const suffix = hash.slice(5);
 
     const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-      headers: { 'Add-Padding': 'true' },
+      headers: { "Add-Padding": "true" },
     });
 
     if (!response.ok) {
@@ -93,19 +93,19 @@ async function checkPasswordCompromised(password: string): Promise<{ isCompromis
     }
 
     const text = await response.text();
-    const lines = text.split('\n');
+    const lines = text.split("\n");
 
     for (const line of lines) {
-      const [hashSuffix, countStr] = line.split(':');
+      const [hashSuffix, countStr] = line.split(":");
       if (hashSuffix?.trim().toUpperCase() === suffix) {
-        const count = parseInt(countStr?.trim() || '0', 10);
+        const count = parseInt(countStr?.trim() || "0", 10);
         return { isCompromised: count > 0, count };
       }
     }
 
     return { isCompromised: false, count: 0 };
   } catch (err) {
-    console.error('Error checking password:', err);
+    console.error("Error checking password:", err);
     return { isCompromised: false, count: 0 };
   }
 }
@@ -119,6 +119,10 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<AuthActionResult>;
   updatePassword: (newPassword: string) => Promise<AuthActionResult>;
   completeSmsVerification: () => Promise<void>;
+  invokePendingAuthFunction: (
+    name: SmsChallengeFunctionName,
+    body: Record<string, unknown>,
+  ) => Promise<unknown>;
   loading: boolean;
   pendingSmsVerification: PendingSmsVerificationState | null;
   clearPendingVerification: () => void;
@@ -126,53 +130,132 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SMS_CHALLENGE_STORAGE_KEY = "lyta_sms_challenge";
+
+function createSmsChallengeClient() {
+  return createClient<Database>(supabaseConfig.url, supabaseConfig.publishableKey, {
+    auth: {
+      storage: sessionStorage,
+      storageKey: SMS_CHALLENGE_STORAGE_KEY,
+      persistSession: true,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingSmsVerification, _setPendingSmsVerification] = useState<PendingSmsVerificationState | null>(() => {
-    // Restore from sessionStorage to survive page refresh
     try {
-      const stored = sessionStorage.getItem('pendingSmsVerification');
+      const stored = sessionStorage.getItem("pendingSmsVerification");
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   });
 
-  // Wrapper that syncs to sessionStorage
   const setPendingSmsVerification = useCallback((value: PendingSmsVerificationState | null) => {
     _setPendingSmsVerification(value);
     if (value) {
-      sessionStorage.setItem('pendingSmsVerification', JSON.stringify(value));
+      sessionStorage.setItem("pendingSmsVerification", JSON.stringify(value));
     } else {
-      sessionStorage.removeItem('pendingSmsVerification');
+      sessionStorage.removeItem("pendingSmsVerification");
     }
   }, []);
+
   const navigate = useNavigate();
 
+  const clearSmsChallengeSession = useCallback(async () => {
+    try {
+      const smsClient = createSmsChallengeClient();
+      await smsClient.auth.signOut();
+    } catch (error) {
+      console.warn("Unable to clear SMS challenge session", error);
+    } finally {
+      sessionStorage.removeItem(SMS_CHALLENGE_STORAGE_KEY);
+    }
+  }, []);
+
+  const promoteSmsChallengeSession = useCallback(async () => {
+    const smsClient = createSmsChallengeClient();
+    const { data: { session: challengeSession } } = await smsClient.auth.getSession();
+
+    if (!challengeSession) {
+      throw new Error("La session de verification SMS a expire. Veuillez vous reconnecter.");
+    }
+
+    const { error } = await supabase.auth.setSession({
+      access_token: challengeSession.access_token,
+      refresh_token: challengeSession.refresh_token,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    await clearSmsChallengeSession();
+  }, [clearSmsChallengeSession]);
+
   useEffect(() => {
-    // Set up auth state listener (must be registered before getSession)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
       setLoading(false);
     });
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: nextSession } }) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const syncPendingSmsState = async () => {
+      if (!pendingSmsVerification) {
+        return;
+      }
+
+      const smsClient = createSmsChallengeClient();
+      const { data: { session: challengeSession } } = await smsClient.auth.getSession();
+
+      if (!challengeSession) {
+        setPendingSmsVerification(null);
+      }
+    };
+
+    void syncPendingSmsState();
+  }, [pendingSmsVerification, setPendingSmsVerification]);
+
+  const invokePendingAuthFunction = useCallback(async (
+    name: SmsChallengeFunctionName,
+    body: Record<string, unknown>,
+  ) => {
+    const smsClient = createSmsChallengeClient();
+    const { data: { session: challengeSession } } = await smsClient.auth.getSession();
+    const client = challengeSession ? smsClient : supabase;
+    const { data, error } = await client.functions.invoke(name, { body });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }, []);
+
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    await clearSmsChallengeSession();
+    setPendingSmsVerification(null);
+
+    const smsClient = createSmsChallengeClient();
+    const { data, error } = await smsClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -182,27 +265,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.user) {
-      // SINGLE RPC call to get ALL login data at once (role, tenant, sms requirement, phone)
-      const { data: loginData, error: rpcError } = await supabase.rpc(
+      const { data: loginData, error: rpcError } = await smsClient.rpc(
         "get_user_login_data",
-        { p_user_id: data.user.id }
+        { p_user_id: data.user.id },
       );
 
       if (rpcError) {
         console.error("Error fetching login data:", rpcError);
-        // SECURITY: Ne jamais autoriser le login si la vérification échoue
-        await supabase.auth.signOut();
-        return { error: { message: "Erreur de vérification. Veuillez réessayer." } };
+        await clearSmsChallengeSession();
+        return { error: { message: "Erreur de verification. Veuillez reessayer." } };
       }
 
       const parsedData = parseLoginData(loginData);
 
-      // Store login data for redirect logic
       if (parsedData) {
-        sessionStorage.setItem('userLoginData', JSON.stringify(parsedData));
+        sessionStorage.setItem("userLoginData", JSON.stringify(parsedData));
       }
 
-      // Enforce 2FA for KING users if platform setting requires it
       if (parsedData && !parsedData.requires_sms && parsedData.role === "king") {
         const { data: setting2fa } = await supabase.rpc("get_platform_setting", {
           setting_key: "king_2fa_required",
@@ -215,6 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               userId: data.user.id,
               phoneNumber,
             });
+
             return {
               error: null,
               requiresSmsVerification: true,
@@ -229,11 +309,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const phoneNumber = parsedData.phone || data.user.phone;
 
         if (!phoneNumber) {
-          await supabase.auth.signOut();
-          return { 
-            error: { 
-              message: "Numéro de téléphone requis pour la vérification SMS. Contactez l'administrateur." 
-            } 
+          await clearSmsChallengeSession();
+          return {
+            error: {
+              message: "Numero de telephone requis pour la verification SMS. Contactez l'administrateur.",
+            },
           };
         }
 
@@ -242,8 +322,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phoneNumber,
         });
 
-        return { 
-          error: null, 
+        return {
+          error: null,
           requiresSmsVerification: true,
           userId: data.user.id,
           phoneNumber,
@@ -251,45 +331,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (data.session) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+
+      if (sessionError) {
+        await clearSmsChallengeSession();
+        return { error: sessionError };
+      }
+    }
+
+    await clearSmsChallengeSession();
+
     return { error: null };
   };
 
   const completeSmsVerification = useCallback(async () => {
-    if (!pendingSmsVerification) return;
-
-    // Re-authenticate the user after SMS verification
-    // The session should still be valid or we need to re-login
-    setPendingSmsVerification(null);
-    
-    // Refresh session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setSession(session);
-      setUser(session.user);
+    if (!pendingSmsVerification) {
+      return;
     }
-  }, [pendingSmsVerification, setPendingSmsVerification]);
+
+    await promoteSmsChallengeSession();
+    setPendingSmsVerification(null);
+
+    const { data: { session: nextSession } } = await supabase.auth.getSession();
+    if (nextSession) {
+      setSession(nextSession);
+      setUser(nextSession.user);
+    }
+  }, [pendingSmsVerification, promoteSmsChallengeSession, setPendingSmsVerification]);
 
   const clearPendingVerification = useCallback(() => {
     setPendingSmsVerification(null);
-  }, [setPendingSmsVerification]);
+    void clearSmsChallengeSession();
+  }, [clearSmsChallengeSession, setPendingSmsVerification]);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    // Check if password has been compromised (HaveIBeenPwned)
     try {
       const result = await checkPasswordCompromised(password);
       if (result.isCompromised) {
-        return { 
-          error: { 
-            message: `Ce mot de passe a été exposé dans ${result.count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.` 
-          } 
+        return {
+          error: {
+            message: `Ce mot de passe a ete expose dans ${result.count.toLocaleString()} fuites de donnees. Veuillez en choisir un autre plus securise.`,
+          },
         };
       }
     } catch (err) {
-      console.warn('Password check failed, proceeding with signup:', err);
+      console.warn("Password check failed, proceeding with signup:", err);
     }
 
     const redirectUrl = `${window.location.origin}/crm`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -301,37 +395,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       },
     });
+
     return { error };
   };
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-    } catch (error) {
-      // Session might already be expired/invalid - ignore error
+    } catch {
       console.log("Logout completed (session may have been expired)");
     }
-    // Always clear local state and redirect, even if signOut fails
+
     setSession(null);
     setUser(null);
     setPendingSmsVerification(null);
-    
-    // Clear all session data to prevent role/session leakage
-    sessionStorage.removeItem('lyta_active_role');
-    sessionStorage.removeItem('loginTarget');
-    sessionStorage.removeItem('lyta_login_space');
-    sessionStorage.removeItem('userLoginData');
-    
+    await clearSmsChallengeSession();
+
+    sessionStorage.removeItem("lyta_active_role");
+    sessionStorage.removeItem("loginTarget");
+    sessionStorage.removeItem("lyta_login_space");
+    sessionStorage.removeItem("userLoginData");
+
     navigate("/connexion");
   };
 
   const resetPassword = async (email: string) => {
     const redirectUrl = `${window.location.origin}/reset-password`;
-    
+
     try {
-      // Use custom edge function for branded password reset emails
-      const response = await supabase.functions.invoke('send-password-reset', {
-        body: { email, redirectUrl }
+      const response = await supabase.functions.invoke("send-password-reset", {
+        body: { email, redirectUrl },
       });
 
       if (response.error) {
@@ -340,7 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: {
             message: getErrorMessage(
               response.error,
-              "Erreur lors de l'envoi du mail de réinitialisation."
+              "Erreur lors de l'envoi du mail de reinitialisation.",
             ),
           },
         };
@@ -353,7 +446,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (err: unknown) {
       console.error("Password reset exception:", err);
-      // Fallback to Supabase default if edge function fails
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
       });
@@ -369,19 +461,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      signIn, 
-      signUp, 
-      signOut, 
-      resetPassword, 
-      updatePassword, 
-      completeSmsVerification,
-      loading,
-      pendingSmsVerification,
-      clearPendingVerification,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        updatePassword,
+        completeSmsVerification,
+        invokePendingAuthFunction,
+        loading,
+        pendingSmsVerification,
+        clearPendingVerification,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

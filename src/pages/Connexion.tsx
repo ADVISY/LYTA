@@ -363,7 +363,7 @@ const Connexion = () => {
     phoneNumber: string;
   } | null>(null);
   const { toast } = useToast();
-  const { signIn, resetPassword, user, clearPendingVerification } = useAuth();
+  const { signIn, resetPassword, user, clearPendingVerification, completeSmsVerification } = useAuth();
   const navigate = useNavigate();
   
   // Flag to completely block redirects during SMS flow
@@ -933,6 +933,25 @@ const Connexion = () => {
 
   const handleSmsVerified = async () => {
     console.log("[Connexion] SMS verified successfully");
+
+    try {
+      await completeSmsVerification();
+    } catch (error: unknown) {
+      sessionStorage.removeItem('loginTarget');
+      sessionStorage.removeItem('lyta_login_space');
+      sessionStorage.removeItem('lyta_redirect_done');
+      setSmsVerificationData(null);
+      setShowSmsVerification(false);
+      clearPendingVerification();
+      smsFlowActive.current = false;
+      toast({
+        title: "Erreur",
+        description: getErrorMessage(error, "La session de verification SMS a expire. Veuillez vous reconnecter."),
+        variant: "destructive",
+      });
+      await supabase.auth.signOut();
+      return;
+    }
 
     // IMPORTANT: keep chosen space (lyta_login_space), but clear one-shot target
     sessionStorage.removeItem('loginTarget');

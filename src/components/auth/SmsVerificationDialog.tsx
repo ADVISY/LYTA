@@ -4,15 +4,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-
-async function invokeAuthenticatedFunction(name: string, body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) {
-    throw error;
-  }
-  return data;
-}
+import { useAuth } from "@/hooks/useAuth";
 
 interface SmsVerificationDialogProps {
   open: boolean;
@@ -34,6 +26,7 @@ export function SmsVerificationDialog({
   onCancel,
 }: SmsVerificationDialogProps) {
   const { t } = useTranslation();
+  const { invokePendingAuthFunction } = useAuth();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -57,11 +50,11 @@ export function SmsVerificationDialog({
   const sendCode = useCallback(async () => {
     setSending(true);
     try {
-      const data = await invokeAuthenticatedFunction("send-verification-sms", {
+      const data = await invokePendingAuthFunction("send-verification-sms", {
         userId,
         phoneNumber,
         verificationType,
-      });
+      }) as { simulated?: boolean };
 
       if (data.simulated) {
         console.log("SMS en mode simulation");
@@ -76,7 +69,7 @@ export function SmsVerificationDialog({
     } finally {
       setSending(false);
     }
-  }, [phoneNumber, t, userId, verificationType]);
+  }, [invokePendingAuthFunction, phoneNumber, t, userId, verificationType]);
 
   const verifyCode = async () => {
     if (code.length !== 6) {
@@ -86,11 +79,11 @@ export function SmsVerificationDialog({
 
     setLoading(true);
     try {
-      const data = await invokeAuthenticatedFunction("verify-sms-code", {
+      const data = await invokePendingAuthFunction("verify-sms-code", {
         userId,
         code,
         verificationType,
-      });
+      }) as { success?: boolean; error?: string };
 
       if (data.success) {
         toast.success(t('smsVerification.verificationSuccess'));
