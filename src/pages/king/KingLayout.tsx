@@ -28,8 +28,6 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useSessionTimeout } from "@/hooks/useSessionTimeout";
-import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 
 const menuItems = [
   { to: "/king", icon: LayoutDashboard, label: "Dashboard", end: true },
@@ -48,15 +46,12 @@ const menuItems = [
 
 export default function KingLayout() {
   const { user, signOut } = useAuth();
-  const { role, loading, isKing } = useUserRole();
+  const { loading, isKing } = useUserRole();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
-  const { getSetting } = usePlatformSettings();
-  const timeoutMinutes = getSetting('king_session_timeout_minutes', 30);
-  useSessionTimeout(typeof timeoutMinutes === 'number' ? timeoutMinutes : Number(timeoutMinutes) || 30);
 
   useEffect(() => {
     const fetchProfile = async () => {

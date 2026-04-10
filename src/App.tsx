@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { TenantGate } from "./components/TenantGate";
+import { SessionEnforcer } from "./components/SessionEnforcer";
 
 // CRM (lazy loaded)
 const CRMLayout = lazy(() => import("./pages/crm/CRMLayout"));
@@ -83,6 +84,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <AuthProvider>
+              <SessionEnforcer />
               <TenantProvider>
                 <TenantGate>
                   <ErrorBoundary>

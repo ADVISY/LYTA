@@ -34,7 +34,6 @@ export default function KingSecurity() {
 
   // State for settings
   const [twoFaRequired, setTwoFaRequired] = useState(false);
-  const [sessionTimeout, setSessionTimeout] = useState("30");
   const [ipWhitelistEnabled, setIpWhitelistEnabled] = useState(false);
   const [auditTrailEnabled, setAuditTrailEnabled] = useState(true);
 
@@ -47,12 +46,10 @@ export default function KingSecurity() {
   useEffect(() => {
     if (settings.length > 0) {
       const twoFa = getSetting("king_2fa_required", false);
-      const timeout = getSetting("king_session_timeout_minutes", 30);
       const ipEnabled = getSetting("king_ip_whitelist_enabled", false);
       const audit = getSetting("king_audit_trail_enabled", true);
 
       setTwoFaRequired(twoFa === true || twoFa === "true");
-      setSessionTimeout(String(timeout ?? "30"));
       setIpWhitelistEnabled(ipEnabled === true || ipEnabled === "true");
       setAuditTrailEnabled(audit === true || audit === "true");
     }
@@ -99,14 +96,11 @@ export default function KingSecurity() {
     const changes: Record<string, unknown> = {};
 
     const current2fa = getSetting("king_2fa_required", false);
-    const currentTimeout = getSetting("king_session_timeout_minutes", 30);
     const currentIpEnabled = getSetting("king_ip_whitelist_enabled", false);
     const currentAudit = getSetting("king_audit_trail_enabled", true);
 
     if (twoFaRequired !== (current2fa === true || current2fa === "true"))
       changes.king_2fa_required = twoFaRequired;
-    if (String(sessionTimeout) !== String(currentTimeout))
-      changes.king_session_timeout_minutes = Number(sessionTimeout);
     if (ipWhitelistEnabled !== (currentIpEnabled === true || currentIpEnabled === "true"))
       changes.king_ip_whitelist_enabled = ipWhitelistEnabled;
     if (auditTrailEnabled !== (currentAudit === true || currentAudit === "true"))
@@ -133,7 +127,7 @@ export default function KingSecurity() {
       setNewIp("");
       setNewIpLabel("");
       queryClient.invalidateQueries({ queryKey: ["king-ip-whitelist"] });
-      toast({ title: "IP ajoutée", description: `${newIp} a été ajoutée à la whitelist.` });
+      toast({ title: "IP ajoutÃ©e", description: `${newIp} a Ã©tÃ© ajoutÃ©e Ã  la whitelist.` });
     } catch (error: any) {
       console.error("Error adding IP:", error);
       toast({
@@ -156,7 +150,7 @@ export default function KingSecurity() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["king-ip-whitelist"] });
-      toast({ title: "IP supprimée", description: "L'adresse IP a été retirée de la whitelist." });
+      toast({ title: "IP supprimÃ©e", description: "L'adresse IP a Ã©tÃ© retirÃ©e de la whitelist." });
     } catch (error: any) {
       console.error("Error deleting IP:", error);
       toast({
@@ -196,8 +190,8 @@ export default function KingSecurity() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Sécurité Plateforme</h1>
-        <p className="text-muted-foreground">Paramètres de sécurité globaux de LYTA</p>
+        <h1 className="text-3xl font-bold">SÃ©curitÃ© Plateforme</h1>
+        <p className="text-muted-foreground">ParamÃ¨tres de sÃ©curitÃ© globaux de LYTA</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -223,16 +217,9 @@ export default function KingSecurity() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Session timeout (minutes)</Label>
-              <Input
-                type="number"
-                min={5}
-                max={480}
-                value={sessionTimeout}
-                onChange={(e) => setSessionTimeout(e.target.value)}
-              />
+              <Label>Deconnexion forcee</Label>
               <p className="text-xs text-muted-foreground">
-                Déconnexion automatique après inactivité
+                Tous les utilisateurs sont automatiquement deconnectes 60 minutes apres leur connexion.
               </p>
             </div>
           </CardContent>
@@ -243,7 +230,7 @@ export default function KingSecurity() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Lock className="h-5 w-5 text-amber-500" />
-              Accès
+              AccÃ¨s
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -251,7 +238,7 @@ export default function KingSecurity() {
               <div>
                 <p className="font-medium">IP Whitelist</p>
                 <p className="text-sm text-muted-foreground">
-                  Limiter accès par adresses IP
+                  Limiter accÃ¨s par adresses IP
                 </p>
               </div>
               <Switch
@@ -344,7 +331,7 @@ export default function KingSecurity() {
               <div className="text-center py-8">
                 <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">
-                  Aucune entrée d'audit pour le moment
+                  Aucune entrÃ©e d'audit pour le moment
                 </p>
               </div>
             ) : (
@@ -382,7 +369,7 @@ export default function KingSecurity() {
           disabled={saving}
         >
           <Shield className="h-4 w-4 mr-2" />
-          {saving ? "Sauvegarde..." : "Sauvegarder la sécurité"}
+          {saving ? "Sauvegarde..." : "Sauvegarder la sÃ©curitÃ©"}
         </Button>
       </div>
     </div>

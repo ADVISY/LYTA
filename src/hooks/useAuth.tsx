@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { supabaseConfig } from "@/integrations/supabase/config";
 import { useNavigate } from "react-router-dom";
+import { clearSessionEnforcerState } from "@/lib/sessionEnforcerStorage";
 
 interface AuthActionError {
   message: string;
@@ -415,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem("loginTarget");
     sessionStorage.removeItem("lyta_login_space");
     sessionStorage.removeItem("userLoginData");
+    clearSessionEnforcerState();
 
     navigate("/connexion");
   };
