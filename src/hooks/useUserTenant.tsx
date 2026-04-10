@@ -18,6 +18,12 @@ export function useUserTenant() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (contextTenantId) {
+      setUserTenantId(null);
+      setLoading(false);
+      return;
+    }
+
     const fetchUserTenant = async () => {
       if (!user) {
         setUserTenantId(null);
@@ -43,7 +49,7 @@ export function useUserTenant() {
     };
 
     fetchUserTenant();
-  }, [user]);
+  }, [contextTenantId, user?.id]);
 
   // Le tenant du contexte (sous-domaine) a priorité sur l'assignation utilisateur
   const effectiveTenantId = contextTenantId || userTenantId;

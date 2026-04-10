@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useClients, Client } from "@/hooks/useClients";
@@ -142,12 +142,21 @@ export default function ClientDetail() {
   const [clientAccountDialogOpen, setClientAccountDialogOpen] = useState(false);
   const [resendingInvitation, setResendingInvitation] = useState(false);
 
-  // Filter policies for this client
-  const clientPolicies = policies.filter(p => p.client_id === id);
-  
-  // Filter commissions for this client's policies
-  const clientCommissions = commissions.filter(c => 
-    clientPolicies.some(p => p.id === c.policy_id)
+  const clientPolicies = useMemo(
+    () => policies.filter((p) => p.client_id === id),
+    [id, policies]
+  );
+
+  const clientPolicyIds = useMemo(
+    () => clientPolicies.map((policy) => policy.id),
+    [clientPolicies]
+  );
+
+  const clientCommissions = useMemo(
+    () => commissions.filter((commission) =>
+      clientPolicies.some((policy) => policy.id === commission.policy_id)
+    ),
+    [clientPolicies, commissions]
   );
 
   const loadClient = useCallback(async () => {
@@ -162,9 +171,6 @@ export default function ClientDetail() {
     if (!id) return;
     setDocumentsLoading(true);
     try {
-      // Get documents for this client and their policies
-      const policyIds = policies.filter(p => p.client_id === id).map(p => p.id);
-      
       let data: Document[] = [];
       
       // First, always get documents owned by this client
@@ -183,11 +189,11 @@ export default function ClientDetail() {
       }
       
       // Then, if there are policies, get their documents too
-      if (policyIds.length > 0) {
+      if (clientPolicyIds.length > 0) {
         const { data: policyDocs, error: policyError } = await supabase
           .from('documents')
           .select('*')
-          .in('owner_id', policyIds)
+          .in('owner_id', clientPolicyIds)
           .order('created_at', { ascending: false });
         
         if (policyError) {
@@ -214,12 +220,11 @@ export default function ClientDetail() {
     } finally {
       setDocumentsLoading(false);
     }
-  }, [id, policies]);
+  }, [clientPolicyIds, id]);
 
   useEffect(() => {
     loadClient();
-    loadDocuments();
-  }, [loadClient, loadDocuments]);
+  }, [loadClient]);
 
   // Reload documents when policies finish loading
   useEffect(() => {

@@ -264,7 +264,7 @@ export function useClients(typeFilter?: string) {
     }
   };
 
-  const getClientById = async (id: string) => {
+  const getClientById = useCallback(async (id: string) => {
     try {
       const { data: client, error: clientError } = await supabase
         .from("clients")
@@ -285,7 +285,7 @@ export function useClients(typeFilter?: string) {
       });
       return { data: null, error: caughtError };
     }
-  };
+  }, [toast]);
 
   return {
     clients: data?.rows ?? [],
