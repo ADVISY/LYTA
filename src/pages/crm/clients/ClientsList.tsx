@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
@@ -44,7 +44,18 @@ export default function ClientsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("client");
-  const { clients, loading, deleteClient, page, totalCount, totalPages, goToPage } = useClients(typeFilter);
+  const {
+    clients,
+    loading,
+    isError,
+    error,
+    fetchClients,
+    deleteClient,
+    page,
+    totalCount,
+    totalPages,
+    goToPage,
+  } = useClients(typeFilter);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
 
@@ -106,6 +117,28 @@ export default function ClientsList() {
           <div className="absolute inset-0 rounded-full bg-primary/10 animate-ping" />
         </div>
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="border-0 shadow-lg bg-card/80 backdrop-blur">
+        <CardContent className="py-16">
+          <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="h-7 w-7" />
+            </div>
+            <h2 className="text-xl font-semibold">{t('common.error')}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {error || "Impossible de charger les adresses pour le moment."}
+            </p>
+            <Button className="mt-6" onClick={() => fetchClients()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {t('common.retry', 'Réessayer')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

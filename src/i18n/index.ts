@@ -11,17 +11,17 @@ export const SUPPORTED_LANGUAGES = ['fr', 'de', 'it', 'en'] as const;
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 export const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
-  fr: 'FranÃ§ais',
+  fr: 'Français',
   de: 'Deutsch',
   it: 'Italiano',
   en: 'English',
 };
 
 export const LANGUAGE_FLAGS: Record<SupportedLanguage, string> = {
-  fr: 'ðŸ‡«ðŸ‡·',
-  de: 'ðŸ‡©ðŸ‡ª',
-  it: 'ðŸ‡®ðŸ‡¹',
-  en: 'ðŸ‡¬ðŸ‡§',
+  fr: '🇫🇷',
+  de: '🇩🇪',
+  it: '🇮🇹',
+  en: '🇬🇧',
 };
 
 type TranslationTree = Record<string, any>;
@@ -410,7 +410,7 @@ const humanize = (raw: string) => {
 };
 
 const MISSING_KEY_OVERRIDES: Record<SupportedLanguage, Record<string, string>> = {
-  fr: { system: "SystÃ¨me", activeCount: "Actifs", inactiveCount: "Inactifs" },
+  fr: { system: "Système", activeCount: "Actifs", inactiveCount: "Inactifs" },
   en: { system: "System", activeCount: "Active", inactiveCount: "Inactive" },
   de: { system: "System", activeCount: "Aktiv", inactiveCount: "Inaktiv" },
   it: { system: "Sistema", activeCount: "Attivi", inactiveCount: "Inattivi" },

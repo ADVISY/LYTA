@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserTenant } from '@/hooks/useUserTenant';
-import { translateError } from '@/lib/errorTranslations';
-import { usePaginatedQuery } from './usePaginatedQuery';
-import type { Tables } from '@/integrations/supabase/types';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserTenant } from "@/hooks/useUserTenant";
+import { translateError } from "@/lib/errorTranslations";
 
-type ClientRow = Tables<'clients'>;
+const CLIENTS_PAGE_SIZE = 50;
+const CLIENTS_QUERY_TIMEOUT_MS = 12_000;
 
 export type Client = {
   id: string;
@@ -41,7 +41,6 @@ export type Client = {
   created_at: string;
   updated_at: string;
   external_ref?: string | null;
-  // Collaborateur fields
   commission_rate?: number | null;
   commission_rate_lca?: number | null;
   commission_rate_vie?: number | null;
@@ -62,149 +61,249 @@ export type Client = {
   } | null;
 };
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export function useClients(typeFilter?: string) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { tenantId, loading: tenantLoading } = useUserTenant();
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
 
-  const { data: rawClients, page, totalCount, totalPages, goToPage, nextPage, prevPage, isLoading: loading, isError, refetch } = usePaginatedQuery<Client>({
-    queryKey: ['clients', tenantId ?? '', typeFilter ?? ''],
-    buildQuery: (client) => {
-      let query = client
-        .from('clients')
-        .select('*')
-        .eq('tenant_id', tenantId ?? '')
-        .order('created_at', { ascending: false });
+  useEffect(() => {
+    setPage(1);
+  }, [tenantId, typeFilter]);
 
-      if (typeFilter) {
-        query = query.eq('type_adresse', typeFilter);
-      }
+  const from = (page - 1) * CLIENTS_PAGE_SIZE;
+  const to = from + CLIENTS_PAGE_SIZE - 1;
+  const baseQueryKey = useMemo(
+    () => ["clients", tenantId ?? "", typeFilter ?? ""],
+    [tenantId, typeFilter]
+  );
 
-      return query;
-    },
-    pageSize: 50,
+  const fetchClientsPage = useCallback(async () => {
+    if (!tenantId) {
+      return { rows: [] as Client[], count: 0 };
+    }
+
+    let query = supabase
+      .from("clients")
+      .select("*", { count: "exact" })
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false });
+
+    if (typeFilter) {
+      query = query.eq("type_adresse", typeFilter);
+    }
+
+    const result = await withTimeout(
+      query.range(from, to),
+      CLIENTS_QUERY_TIMEOUT_MS,
+      "Le chargement des adresses a expire."
+    );
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return {
+      rows: (result.data ?? []) as Client[],
+      count: result.count ?? 0,
+    };
+  }, [from, tenantId, to, typeFilter]);
+
+  const {
+    data,
+    error,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: [...baseQueryKey, page, CLIENTS_PAGE_SIZE],
+    queryFn: fetchClientsPage,
     enabled: !tenantLoading && !!tenantId && !!user,
+    placeholderData: (previousData) => previousData,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  // Clients are returned as-is (assigned_agent enrichment done inline below)
-  const clients = rawClients;
+  const totalCount = data?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / CLIENTS_PAGE_SIZE));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const goToPage = useCallback(
+    (nextPage: number) => {
+      setPage((currentPage) => {
+        if (Number.isNaN(nextPage)) return currentPage;
+        return Math.max(1, Math.min(nextPage, totalPages));
+      });
+    },
+    [totalPages]
+  );
+
+  const nextPage = useCallback(() => {
+    goToPage(page + 1);
+  }, [goToPage, page]);
+
+  const prevPage = useCallback(() => {
+    goToPage(page - 1);
+  }, [goToPage, page]);
+
+  const refreshClients = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: baseQueryKey });
+    return refetch();
+  }, [baseQueryKey, queryClient, refetch]);
 
   const createClient = async (clientData: any) => {
     try {
       if (!tenantId) {
-        throw new Error("Aucun cabinet assigné à cet utilisateur");
+        throw new Error("Aucun cabinet assigne a cet utilisateur");
       }
 
-      const { data, error } = await supabase
-        .from('clients')
+      const { data: createdClient, error: createError } = await supabase
+        .from("clients")
         .insert([{ ...clientData, tenant_id: tenantId }])
-        .select('*')
+        .select("*")
         .single();
 
-      if (error) throw error;
+      if (createError) {
+        throw createError;
+      }
 
       toast({
-        title: "Client créé",
-        description: "Le client a été créé avec succès"
+        title: "Client cree",
+        description: "Le client a ete cree avec succes",
       });
 
-      refetch();
-      return { data, error: null };
-    } catch (error: any) {
+      await refreshClients();
+      return { data: createdClient, error: null };
+    } catch (caughtError: any) {
       toast({
         title: "Erreur",
-        description: translateError(error.message),
-        variant: "destructive"
+        description: translateError(caughtError.message),
+        variant: "destructive",
       });
-      return { data: null, error };
+      return { data: null, error: caughtError };
     }
   };
 
   const updateClient = async (id: string, updates: any) => {
     try {
-      const { error } = await supabase
-        .from('clients')
+      const { error: updateError } = await supabase
+        .from("clients")
         .update(updates)
-        .eq('id', id);
+        .eq("id", id);
 
-      if (error) throw error;
+      if (updateError) {
+        throw updateError;
+      }
 
       toast({
-        title: "Client mis à jour",
-        description: "Les modifications ont été enregistrées"
+        title: "Client mis a jour",
+        description: "Les modifications ont ete enregistrees",
       });
 
-      refetch();
+      await refreshClients();
       return { error: null };
-    } catch (error: any) {
+    } catch (caughtError: any) {
       toast({
         title: "Erreur",
-        description: error.message,
-        variant: "destructive"
+        description: caughtError.message,
+        variant: "destructive",
       });
-      return { error };
+      return { error: caughtError };
     }
   };
 
   const deleteClient = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('clients')
+      const { error: deleteError } = await supabase
+        .from("clients")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
 
-      if (error) throw error;
+      if (deleteError) {
+        throw deleteError;
+      }
 
       toast({
-        title: "Client supprimé",
-        description: "Le client a été supprimé avec succès"
+        title: "Client supprime",
+        description: "Le client a ete supprime avec succes",
       });
 
-      refetch();
+      await refreshClients();
       return { error: null };
-    } catch (error: any) {
+    } catch (caughtError: any) {
       toast({
         title: "Erreur",
-        description: error.message,
-        variant: "destructive"
+        description: caughtError.message,
+        variant: "destructive",
       });
-      return { error };
+      return { error: caughtError };
     }
   };
 
   const getClientById = async (id: string) => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', id)
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error: any) {
+      if (clientError) {
+        throw clientError;
+      }
+
+      return { data: client, error: null };
+    } catch (caughtError: any) {
       toast({
         title: "Erreur",
-        description: error.message,
-        variant: "destructive"
+        description: caughtError.message,
+        variant: "destructive",
       });
-      return { data: null, error };
+      return { data: null, error: caughtError };
     }
   };
 
   return {
-    clients,
-    loading,
+    clients: data?.rows ?? [],
+    loading: isLoading,
+    isError,
+    error: isError
+      ? translateError((error as Error | null)?.message || "Erreur lors du chargement des adresses")
+      : null,
     page,
     totalCount,
     totalPages,
     goToPage,
     nextPage,
     prevPage,
-    fetchClients: refetch,
+    fetchClients: refreshClients,
     createClient,
     updateClient,
     deleteClient,
-    getClientById
+    getClientById,
   };
 }
