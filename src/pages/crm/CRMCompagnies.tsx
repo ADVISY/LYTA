@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -494,20 +495,11 @@ export default function CRMCompagnies() {
                 <div className="flex items-center justify-between">
                   <CollapsibleTrigger asChild>
                     <div className="flex items-center gap-4 flex-1">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                        {company.logo_url ? (
-                          <img 
-                            src={company.logo_url} 
-                            alt={company.name} 
-                            className="w-10 h-10 object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <Building2 className="h-6 w-6 text-primary" />
-                        )}
-                      </div>
+                      <InsuranceCompanyLogo
+                        name={company.name}
+                        logoUrl={company.logo_url}
+                        size="lg"
+                      />
                       <div>
                         <CardTitle className="text-lg">{company.name}</CardTitle>
                         <p className="text-sm text-muted-foreground">

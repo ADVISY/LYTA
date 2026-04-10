@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { usePolicies } from "@/hooks/usePolicies";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,14 +137,13 @@ export default function CRMContracts() {
                   >
                     <div className="flex items-center gap-4">
                       {/* Company Logo or Icon */}
-                      {policy.product?.company?.logo_url ? (
-                        <div className="w-12 h-12 rounded-xl bg-white border border-border flex items-center justify-center overflow-hidden p-1 group-hover:scale-110 transition-transform">
-                          <img 
-                            src={policy.product.company.logo_url} 
-                            alt={policy.product.company.name}
-                            className="h-full w-full object-contain"
-                          />
-                        </div>
+                      {policy.product?.company?.name ? (
+                        <InsuranceCompanyLogo
+                          name={policy.product.company.name}
+                          logoUrl={policy.product.company.logo_url}
+                          size="lg"
+                          className="group-hover:scale-110 transition-transform"
+                        />
                       ) : (
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <FileCheck className="h-6 w-6 text-primary" />

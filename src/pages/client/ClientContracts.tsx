@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 
 const categoryIcons: Record<string, any> = {
   health: Heart,
@@ -260,14 +261,13 @@ export default function ClientContracts() {
                     <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors p-3 lg:p-6 active:bg-muted/70">
                       <div className="flex items-center gap-3 lg:gap-4">
                         {/* Company Logo or Category Icon */}
-                        {contract.product?.company?.logo_url ? (
-                          <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-xl bg-background border border-border flex items-center justify-center overflow-hidden p-1 flex-shrink-0">
-                            <img 
-                              src={contract.product.company.logo_url} 
-                              alt={contract.product.company.name}
-                              className="h-full w-full object-contain"
-                            />
-                          </div>
+                        {contract.product?.company?.name ? (
+                          <InsuranceCompanyLogo
+                            name={contract.product.company.name}
+                            logoUrl={contract.product.company.logo_url}
+                            size="lg"
+                            className="flex-shrink-0"
+                          />
                         ) : (
                           <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <Icon className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />

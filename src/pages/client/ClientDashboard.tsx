@@ -30,6 +30,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useTenant } from "@/contexts/TenantContext";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 
 const categoryIcons: Record<string, any> = {
   health: Heart,
@@ -396,14 +397,12 @@ export default function ClientDashboard() {
                     className="flex items-center gap-3 lg:gap-4 p-3 lg:p-4 rounded-xl border bg-card hover:bg-muted/50 transition-colors cursor-pointer active:scale-[0.98]"
                     onClick={() => navigate('/espace-client/contrats')}
                   >
-                    {contract.product?.company?.logo_url ? (
-                      <div className="h-10 w-10 rounded-lg bg-background border border-border flex items-center justify-center overflow-hidden p-1">
-                        <img 
-                          src={contract.product.company.logo_url} 
-                          alt={contract.product.company.name}
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
+                    {contract.product?.company?.name ? (
+                      <InsuranceCompanyLogo
+                        name={contract.product.company.name}
+                        logoUrl={contract.product.company.logo_url}
+                        size="md"
+                      />
                     ) : (
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                         <Icon className="h-5 w-5 text-primary" />

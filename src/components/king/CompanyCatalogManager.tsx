@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import { useInsuranceCompanies, InsuranceCompany } from "@/hooks/useInsuranceCompanies";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,6 @@ import {
   Search,
   Edit2,
   Trash2,
-  Image,
 } from "lucide-react";
 
 export default function CompanyCatalogManager() {
@@ -168,17 +168,11 @@ export default function CompanyCatalogManager() {
                 {filteredCompanies.map(company => (
                   <TableRow key={company.id}>
                     <TableCell>
-                      {company.logo_url ? (
-                        <img 
-                          src={company.logo_url} 
-                          alt={company.name} 
-                          className="h-8 w-8 object-contain"
-                        />
-                      ) : (
-                        <div className="h-8 w-8 bg-muted rounded flex items-center justify-center">
-                          <Image className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+                      <InsuranceCompanyLogo
+                        name={company.name}
+                        logoUrl={company.logo_url}
+                        size="sm"
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="font-medium">{company.name}</span>

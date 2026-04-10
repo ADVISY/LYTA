@@ -36,6 +36,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import ClaimForm from "@/components/client/ClaimForm";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 
 interface ClaimDocument {
   document_id: string;
@@ -277,14 +278,13 @@ export default function ClientClaims() {
                       <CardContent className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
                         <div className="flex items-start gap-4">
                           {/* Company logo or type icon */}
-                          {claim.policy?.product?.company?.logo_url ? (
-                            <div className="h-12 w-12 rounded-xl bg-white border border-border flex items-center justify-center overflow-hidden p-1 flex-shrink-0">
-                              <img 
-                                src={claim.policy.product.company.logo_url} 
-                                alt={claim.policy.company_name}
-                                className="h-full w-full object-contain"
-                              />
-                            </div>
+                          {claim.policy?.product?.company?.logo_url || claim.policy?.company_name ? (
+                            <InsuranceCompanyLogo
+                              name={claim.policy.company_name}
+                              logoUrl={claim.policy?.product?.company?.logo_url}
+                              size="lg"
+                              className="flex-shrink-0"
+                            />
                           ) : (
                             <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${typeConfig.color}`}>
                               <TypeIcon className="h-6 w-6" />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
-import { usePendingScans } from "@/hooks/usePendingScans";
+import { usePendingScanCount } from "@/hooks/usePendingScans";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,8 +55,7 @@ export default function ClientsList() {
     dormant: { label: t('clients.dormant'), color: "text-amber-700", bgColor: "bg-amber-100" },
   };
 
-  const { scans: pendingScans } = usePendingScans();
-  const pendingScanCount = pendingScans.filter(s => s.status === 'completed' || s.status === 'processing').length;
+  const { count: pendingScanCount } = usePendingScanCount();
 
   const typeConfig = [
     { value: "client", label: t('clients.clients'), icon: Users, color: "from-blue-500 to-blue-600" },

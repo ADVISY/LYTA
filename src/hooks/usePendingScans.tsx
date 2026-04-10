@@ -316,3 +316,30 @@ export function usePendingScans() {
     rejectScan,
   };
 }
+
+export function usePendingScanCount() {
+  const { tenantId } = useUserTenant();
+
+  const { data: count = 0, isLoading } = useQuery({
+    queryKey: ['pending_scans', tenantId ?? '', 'badge-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('document_scans')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId ?? '')
+        .in('status', ['completed', 'pending', 'processing'])
+        .is('validated_at', null);
+
+      if (error) throw error;
+
+      return count ?? 0;
+    },
+    enabled: !!tenantId,
+    refetchOnWindowFocus: false,
+  });
+
+  return {
+    count,
+    loading: isLoading,
+  };
+}
