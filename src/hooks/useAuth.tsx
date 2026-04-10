@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { User, Session, createClient } from "@supabase/supabase-js";
+import { User, Session, createClient, FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { supabaseConfig } from "@/integrations/supabase/config";
@@ -245,6 +245,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await client.functions.invoke(name, { body });
 
     if (error) {
+      if (error instanceof FunctionsHttpError) {
+        let message = `Erreur de service (${error.context.status})`;
+        try {
+          const payload = await error.context.json() as { error?: string; message?: string };
+          if (payload.error || payload.message) {
+            message = payload.error || payload.message || message;
+          }
+        } catch {
+          // Ignore JSON parsing errors and keep the status-based fallback.
+        }
+        throw new Error(message);
+      }
       throw error;
     }
 

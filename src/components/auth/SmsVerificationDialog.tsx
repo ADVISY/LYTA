@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
@@ -27,25 +27,11 @@ export function SmsVerificationDialog({
 }: SmsVerificationDialogProps) {
   const { t } = useTranslation();
   const { invokePendingAuthFunction } = useAuth();
+  const autoSendKeyRef = useRef<string | null>(null);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  // Send code on open
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- sendCode is stable via useCallback, avoid re-trigger loop
-  useEffect(() => {
-    if (open && userId && phoneNumber) {
-      sendCode();
-    }
-  }, [open, phoneNumber, userId]);
-
-  // Countdown timer
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
 
   const sendCode = useCallback(async () => {
     setSending(true);
@@ -63,13 +49,41 @@ export function SmsVerificationDialog({
       }
 
       setCountdown(60); // 60 seconds before resend
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error sending SMS:", error);
-      toast.error(t('smsVerification.sendError'));
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : t('smsVerification.sendError');
+      toast.error(message);
     } finally {
       setSending(false);
     }
   }, [invokePendingAuthFunction, phoneNumber, t, userId, verificationType]);
+
+  // Send code once per dialog opening
+  useEffect(() => {
+    if (!open || !userId || !phoneNumber) {
+      autoSendKeyRef.current = null;
+      return;
+    }
+
+    const autoSendKey = `${verificationType}:${userId}:${phoneNumber}`;
+    if (autoSendKeyRef.current === autoSendKey) {
+      return;
+    }
+
+    autoSendKeyRef.current = autoSendKey;
+    void sendCode();
+  }, [open, phoneNumber, sendCode, userId, verificationType]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   const verifyCode = async () => {
     if (code.length !== 6) {

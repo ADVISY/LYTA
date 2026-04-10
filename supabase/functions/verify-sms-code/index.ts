@@ -19,7 +19,11 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const { user } = await requireAuth(req);
-    await checkRateLimit(req, "verify-sms-code", 10);
+    await checkRateLimit(req, "verify-sms-code", {
+      identifier: `user:${user.id}`,
+      maxPerWindow: 12,
+      windowMs: 10 * 60 * 1000,
+    });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
