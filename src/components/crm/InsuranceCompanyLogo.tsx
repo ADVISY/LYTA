@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getLocalInsuranceCompanyLogo } from "@/lib/insuranceCompanyLogos";
 
 type LogoSize = "sm" | "md" | "lg";
 
@@ -49,14 +50,20 @@ export function InsuranceCompanyLogo({
   className,
   imageClassName,
 }: InsuranceCompanyLogoProps) {
-  const [hasImageError, setHasImageError] = useState(false);
+  const localLogoUrl = getLocalInsuranceCompanyLogo(name);
+  const imageCandidates = [
+    localLogoUrl,
+    localLogoUrl !== logoUrl ? logoUrl : null,
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  const [imageIndex, setImageIndex] = useState(0);
 
   useEffect(() => {
-    setHasImageError(false);
-  }, [logoUrl]);
+    setImageIndex(0);
+  }, [localLogoUrl, logoUrl]);
 
   const initials = getCompanyInitials(name);
-  const showImage = !!logoUrl && !hasImageError;
+  const currentImage = imageCandidates[imageIndex];
+  const showImage = Boolean(currentImage);
 
   return (
     <div
@@ -68,11 +75,11 @@ export function InsuranceCompanyLogo({
     >
       {showImage ? (
         <img
-          src={logoUrl}
+          src={currentImage}
           alt={name || "Logo compagnie"}
           className={cn("h-full w-full object-contain p-1", imageClassName)}
           loading="lazy"
-          onError={() => setHasImageError(true)}
+          onError={() => setImageIndex((previous) => previous + 1)}
         />
       ) : initials ? (
         <span className={cn("font-semibold tracking-tight", textClasses[size])}>
