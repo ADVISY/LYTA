@@ -1,7 +1,7 @@
 const SESSION_ENFORCER_STORAGE_KEY = "lyta_session_enforcer";
 
 export interface SessionEnforcerState {
-  startedAt: number;
+  lastActivityAt: number;
   userId: string;
 }
 
@@ -10,13 +10,20 @@ export function readSessionEnforcerState(): SessionEnforcerState | null {
     const rawValue = localStorage.getItem(SESSION_ENFORCER_STORAGE_KEY);
     if (!rawValue) return null;
 
-    const parsed = JSON.parse(rawValue) as Partial<SessionEnforcerState>;
-    if (typeof parsed.startedAt !== "number" || typeof parsed.userId !== "string") {
+    const parsed = JSON.parse(rawValue) as Partial<SessionEnforcerState> & { startedAt?: number };
+    const lastActivityAt =
+      typeof parsed.lastActivityAt === "number"
+        ? parsed.lastActivityAt
+        : typeof parsed.startedAt === "number"
+          ? parsed.startedAt
+          : null;
+
+    if (typeof lastActivityAt !== "number" || typeof parsed.userId !== "string") {
       return null;
     }
 
     return {
-      startedAt: parsed.startedAt,
+      lastActivityAt,
       userId: parsed.userId,
     };
   } catch {

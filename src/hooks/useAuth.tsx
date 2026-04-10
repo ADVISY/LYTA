@@ -412,7 +412,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
     } catch {
@@ -431,7 +431,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearSessionEnforcerState();
 
     navigate("/connexion");
-  };
+  }, [clearSmsChallengeSession, navigate, setPendingSmsVerification]);
 
   const resetPassword = async (email: string) => {
     const redirectUrl = `${window.location.origin}/reset-password`;

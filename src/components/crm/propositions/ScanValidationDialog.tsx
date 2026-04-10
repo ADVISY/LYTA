@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordAuditLog } from "@/lib/audit";
+import { savePolicy } from "@/lib/policiesApi";
 
 /** Extended primary_holder type that allows arbitrary string field access from AI snapshots */
 interface PrimaryHolderData {
@@ -348,6 +349,13 @@ export default function ScanValidationDialog({
     
     return null;
   };
+
+  const createPolicyRecord = async (tenantId: string, policyData: Record<string, unknown>) =>
+    savePolicy({
+      action: "create",
+      tenantId,
+      policyData,
+    });
 
   const handleValidate = async () => {
     console.log('[ScanValidation] Starting validation...', { userId: user?.id, tenantId: tenantIdFromHook });
@@ -1018,13 +1026,8 @@ export default function ScanValidationDialog({
             notes: notesParts.join(' - '),
           };
 
-          const { data: oldPolicy, error: policyError } = await supabase
-            .from('policies')
-            .insert(policyData)
-            .select()
-            .single();
-
-          if (!policyError && oldPolicy) {
+          try {
+            const oldPolicy = await createPolicyRecord(tenantId, policyData);
             await logAudit(tenantId, 'import', 'policy', oldPolicy.id, {
               policy_type: 'old',
               client_id: clientId,
@@ -1037,7 +1040,7 @@ export default function ScanValidationDialog({
               type: 'old', 
               productName: productNames || firstProduct.company 
             });
-          } else if (policyError) {
+          } catch (policyError) {
             console.error(`[ScanValidation] Failed to create old policy for ${companyKey}:`, policyError);
           }
         }
@@ -1064,19 +1067,16 @@ export default function ScanValidationDialog({
             notes: `Ancienne police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}${hasTermination ? ' - À RÉSILIER' : ''}`,
           };
 
-          const { data: oldPolicy, error: policyError } = await supabase
-            .from('policies')
-            .insert(policyData)
-            .select()
-            .single();
-
-          if (!policyError && oldPolicy) {
+          try {
+            const oldPolicy = await createPolicyRecord(tenantId, policyData);
             await logAudit(tenantId, 'import', 'policy', oldPolicy.id, {
               policy_type: 'old',
               client_id: newClient.id,
               company_name: companyName || null,
             });
             createdPolicies.push({ id: oldPolicy.id, type: 'old' });
+          } catch (policyError) {
+            console.error('[ScanValidation] Failed to create old fallback policy:', policyError);
           }
         }
       }
@@ -1163,13 +1163,8 @@ export default function ScanValidationDialog({
             notes: notesParts.join(' - '),
           };
 
-          const { data: createdPolicy, error: policyError } = await supabase
-            .from('policies')
-            .insert(policyData)
-            .select()
-            .single();
-
-          if (!policyError && createdPolicy) {
+          try {
+            const createdPolicy = await createPolicyRecord(tenantId, policyData);
             await logAudit(tenantId, 'import', 'policy', createdPolicy.id, {
               policy_type: 'new',
               client_id: clientId,
@@ -1182,7 +1177,7 @@ export default function ScanValidationDialog({
               type: 'new', 
               productName: productNames || firstProduct.company 
             });
-          } else if (policyError) {
+          } catch (policyError) {
             console.error(`[ScanValidation] Failed to create new policy for ${companyKey}:`, policyError);
           }
         }
@@ -1209,19 +1204,16 @@ export default function ScanValidationDialog({
             notes: `Nouvelle police importée via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
           };
 
-          const { data: newPolicy, error: policyError } = await supabase
-            .from('policies')
-            .insert(policyData)
-            .select()
-            .single();
-
-          if (!policyError && newPolicy) {
+          try {
+            const newPolicy = await createPolicyRecord(tenantId, policyData);
             await logAudit(tenantId, 'import', 'policy', newPolicy.id, {
               policy_type: 'new',
               client_id: newClient.id,
               company_name: companyName || null,
             });
             createdPolicies.push({ id: newPolicy.id, type: 'new' });
+          } catch (policyError) {
+            console.error('[ScanValidation] Failed to create new fallback policy:', policyError);
           }
         }
       }
@@ -1249,19 +1241,16 @@ export default function ScanValidationDialog({
             notes: `Contrat importé via IA Scan le ${new Date().toLocaleDateString('fr-CH')}`,
           };
 
-          const { data: newPolicy, error: policyError } = await supabase
-            .from('policies')
-            .insert(policyData)
-            .select()
-            .single();
-
-          if (!policyError && newPolicy) {
+          try {
+            const newPolicy = await createPolicyRecord(tenantId, policyData);
             await logAudit(tenantId, 'import', 'policy', newPolicy.id, {
               policy_type: 'standard',
               client_id: newClient.id,
               company_name: companyName || null,
             });
             createdPolicies.push({ id: newPolicy.id, type: 'standard' });
+          } catch (policyError) {
+            console.error('[ScanValidation] Failed to create standard policy:', policyError);
           }
         }
       }
@@ -1591,8 +1580,8 @@ export default function ScanValidationDialog({
       const isAuthError =
         typedError.code === 'PGRST301' ||
         status === 401 ||
-        status === 403 ||
-        (typeof message === 'string' && /jwt|invalid.*jwt|token.*expired|refresh_token/i.test(message));
+        (typeof message === 'string' &&
+          /jwt|invalid.*jwt|token.*expired|refresh_token|authorization header|expired token/i.test(message));
 
       if (isAuthError) {
         toast({

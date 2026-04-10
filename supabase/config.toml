@@ -76,6 +76,9 @@ verify_jwt = false
 [functions.send-verification-sms]
 verify_jwt = false
 
+[functions.save-policy]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 

@@ -1,21 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { usePolicies } from "@/hooks/usePolicies";
+import { usePermissions } from "@/hooks/usePermissions";
 import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, FileCheck, Eye, ChevronRight, Building2, Calendar, Search } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, FileCheck, ChevronRight, Building2, Calendar, Search, Check, User, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+interface ContractClientOption {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  email: string | null;
+}
 
 export default function CRMContracts() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { can, isLoading: permissionsLoading } = usePermissions();
   const { policies, loading, page, totalCount, totalPages, goToPage } = usePolicies();
   const [searchQuery, setSearchQuery] = useState("");
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientOptions, setClientOptions] = useState<ContractClientOption[]>([]);
+
+  const canCreateContract = can('contracts', 'deposit');
 
   const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
     pending: { label: t('contracts.pending'), color: "text-amber-700", bgColor: "bg-amber-100" },
@@ -41,6 +68,84 @@ export default function CRMContracts() {
     );
   });
 
+  useEffect(() => {
+    if (!clientPickerOpen || !canCreateContract) {
+      return;
+    }
+
+    const loadClients = async () => {
+      setClientsLoading(true);
+
+      let query = supabase
+        .from('clients')
+        .select('id, first_name, last_name, company_name, email')
+        .eq('type_adresse', 'client')
+        .order('company_name', { ascending: true })
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true })
+        .limit(25);
+
+      const normalizedSearch = clientSearch.trim();
+      if (normalizedSearch) {
+        const safeSearch = normalizedSearch.replace(/[%_,]/g, '').trim();
+        if (safeSearch) {
+          query = query.or(
+            `company_name.ilike.%${safeSearch}%,first_name.ilike.%${safeSearch}%,last_name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`
+          );
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error loading clients for contract creation:', error);
+        toast({
+          title: t('common.error'),
+          description: "Impossible de charger les clients pour creer un contrat.",
+          variant: 'destructive',
+        });
+        setClientOptions([]);
+      } else {
+        setClientOptions((data || []) as ContractClientOption[]);
+      }
+
+      setClientsLoading(false);
+    };
+
+    void loadClients();
+  }, [canCreateContract, clientPickerOpen, clientSearch, t, toast]);
+
+  const getClientLabel = (client: ContractClientOption) => {
+    if (client.company_name) {
+      return client.company_name;
+    }
+
+    return `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client sans nom';
+  };
+
+  const handleNewContractClick = () => {
+    if (permissionsLoading) {
+      return;
+    }
+
+    if (!canCreateContract) {
+      toast({
+        title: t('common.error'),
+        description: "Vous n'avez pas les permissions pour creer un contrat.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setClientSearch("");
+    setClientPickerOpen(true);
+  };
+
+  const handleSelectClient = (clientId: string) => {
+    setClientPickerOpen(false);
+    navigate(`/crm/clients/${clientId}?tab=contracts&newContract=1`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -65,7 +170,11 @@ export default function CRMContracts() {
             <p className="text-muted-foreground">{t('contracts.subtitle')}</p>
           </div>
         </div>
-        <Button className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20">
+        <Button
+          onClick={handleNewContractClick}
+          disabled={permissionsLoading}
+          className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20"
+        >
           <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
           {t('contracts.newContract')}
         </Button>
@@ -201,6 +310,71 @@ export default function CRMContracts() {
         totalCount={totalCount}
         onPageChange={goToPage}
       />
+
+      <Dialog open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t('contracts.newContract')}</DialogTitle>
+            <DialogDescription>
+              Selectionnez d'abord un client pour ouvrir le formulaire de contrat.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Rechercher un client..."
+              value={clientSearch}
+              onValueChange={setClientSearch}
+            />
+            <CommandList>
+              {clientsLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Chargement des clients...
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>Aucun client trouve.</CommandEmpty>
+                  <CommandGroup>
+                    {clientOptions.map((client) => (
+                      <CommandItem
+                        key={client.id}
+                        value={client.id}
+                        onSelect={() => handleSelectClient(client.id)}
+                      >
+                        <Check className="mr-2 h-4 w-4 opacity-0" />
+                        <div className="flex flex-col">
+                          <span className="font-medium flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            {getClientLabel(client)}
+                          </span>
+                          {client.email && (
+                            <span className="text-xs text-muted-foreground">{client.email}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </Command>
+
+          {!clientsLoading && clientOptions.length === 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setClientPickerOpen(false);
+                navigate('/crm/clients/nouveau');
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Creer un client
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

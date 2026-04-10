@@ -103,6 +103,7 @@ export default function ClientDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "info";
+  const shouldOpenNewContract = searchParams.get("newContract") === "1";
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getClientById } = useClients();
@@ -225,6 +226,28 @@ export default function ClientDetail() {
   useEffect(() => {
     loadClient();
   }, [loadClient]);
+
+  useEffect(() => {
+    if (!id || !shouldOpenNewContract) {
+      return;
+    }
+
+    setContractFormOpen(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("newContract");
+    if (!nextParams.get("tab")) {
+      nextParams.set("tab", "contracts");
+    }
+
+    navigate(
+      {
+        pathname: `/crm/clients/${id}`,
+        search: `?${nextParams.toString()}`,
+      },
+      { replace: true }
+    );
+  }, [id, navigate, searchParams, shouldOpenNewContract]);
 
   // Reload documents when policies finish loading
   useEffect(() => {

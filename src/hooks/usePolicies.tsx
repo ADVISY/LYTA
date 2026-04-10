@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserTenant } from '@/hooks/useUserTenant';
 import { translateError } from '@/lib/errorTranslations';
 import { ClientNotifications } from '@/lib/clientNotifications';
+import { savePolicy } from '@/lib/policiesApi';
 import { usePaginatedQuery } from './usePaginatedQuery';
 
 export type Policy = {
@@ -37,12 +38,31 @@ export type Policy = {
   partner?: any;
 };
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 export function usePolicies() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { tenantId, loading: tenantLoading } = useUserTenant();
 
-  const { data: policies, page, totalCount, totalPages, goToPage, nextPage, prevPage, isLoading: loading, isError, refetch } = usePaginatedQuery<Policy>({
+  const {
+    data: policies,
+    page,
+    totalCount,
+    totalPages,
+    goToPage,
+    nextPage,
+    prevPage,
+    isLoading: loading,
+    isError,
+    refetch,
+  } = usePaginatedQuery<Policy>({
     queryKey: ['policies', tenantId ?? ''],
     buildQuery: (client) =>
       client
@@ -78,80 +98,37 @@ export function usePolicies() {
   });
 
   const createPolicy = async (policyData: any) => {
-    try {
-      if (!tenantId) {
-        throw new Error("Aucun cabinet assigné à cet utilisateur");
-      }
-
-      // Get the current user's partner profile if they have one
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-      if (currentUser) {
-        const { data: partnerData } = await supabase
-          .from('partners')
-          .select('id')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-
-        // Add partner_id if the user has a partner profile
-        if (partnerData) {
-          policyData.partner_id = partnerData.id;
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('policies')
-        .insert([{ ...policyData, tenant_id: tenantId }])
-        .select('id')
-        .maybeSingle();
-
-      if (error) throw error;
-
-      // Notifier le client si le contrat est créé
-      if (data?.id && policyData.client_id) {
-        ClientNotifications.newContract(policyData.client_id, data.id, policyData.product_name);
-      }
-
-      toast({
-        title: "Police créée",
-        description: "La police d'assurance a été créée avec succès"
-      });
-
-      refetch();
-      return data as { id: string };
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: translateError(error.message),
-        variant: "destructive"
-      });
-      throw error;
+    if (!tenantId) {
+      throw new Error('Aucun cabinet assigne a cet utilisateur');
     }
+
+    const data = await savePolicy({
+      action: 'create',
+      tenantId,
+      policyData,
+    });
+
+    if (data.id && policyData.client_id) {
+      ClientNotifications.newContract(policyData.client_id, data.id, policyData.product_name);
+    }
+
+    refetch();
+    return data as { id: string };
   };
 
   const updatePolicy = async (id: string, updates: any) => {
-    try {
-      const { error } = await supabase
-        .from('policies')
-        .update(updates)
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Police mise à jour",
-        description: "Les modifications ont été enregistrées"
-      });
-
-      refetch();
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive"
-      });
-      throw error;
+    if (!tenantId) {
+      throw new Error('Aucun cabinet assigne a cet utilisateur');
     }
+
+    await savePolicy({
+      action: 'update',
+      tenantId,
+      policyId: id,
+      policyData: updates,
+    });
+
+    refetch();
   };
 
   const deletePolicy = async (id: string) => {
@@ -164,16 +141,16 @@ export function usePolicies() {
       if (error) throw error;
 
       toast({
-        title: "Police supprimée",
-        description: "La police a été supprimée avec succès"
+        title: 'Police supprimee',
+        description: "La police d'assurance a ete supprimee avec succes",
       });
 
       refetch();
-    } catch (error: any) {
+    } catch (error) {
       toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive"
+        title: 'Erreur',
+        description: translateError(getErrorMessage(error, 'Impossible de supprimer le contrat')),
+        variant: 'destructive',
       });
       throw error;
     }
@@ -182,6 +159,7 @@ export function usePolicies() {
   return {
     policies,
     loading,
+    isError,
     page,
     totalCount,
     totalPages,
@@ -191,6 +169,6 @@ export function usePolicies() {
     fetchPolicies: refetch,
     createPolicy,
     updatePolicy,
-    deletePolicy
+    deletePolicy,
   };
 }

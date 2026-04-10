@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { PendingScanCard, ScanValidationDialog } from "@/components/crm/propositions";
 import { ScanBatchUpload, ScanBatchReview } from "@/components/crm/ia-scan";
+import { savePolicy } from "@/lib/policiesApi";
 import {
   FileText,
   Plus,
@@ -371,6 +372,10 @@ export default function CRMPropositions() {
                       batch={batch}
                       onValidate={async (batchId: string) => {
                         try {
+                          if (!tenantId) {
+                            throw new Error("Cabinet introuvable pour creer les contrats");
+                          }
+
                           // Fetch classified scans for this batch
                           const { data: scansData, error: scansErr } = await supabase
                             .from("document_scans")
@@ -387,23 +392,21 @@ export default function CRMPropositions() {
                           for (const scan of validScans) {
                             const result = scan.classification_result || {};
 
-                            // Create a draft policy from extracted data
-                            const { error: policyErr } = await supabase
-                              .from("policies")
-                              .insert({
-                                tenant_id: tenantId,
+                            await savePolicy({
+                              action: "create",
+                              tenantId,
+                              policyData: {
                                 product_type: result.product_type || "autre",
                                 company_name: result.company_name || null,
                                 premium_monthly: result.premiums?.monthly || null,
-                                premium_annual: result.premiums?.annual || null,
+                                premium_yearly: result.premiums?.annual || null,
                                 client_id: scan.client_id || null,
                                 status: "draft",
                                 notes: `Import auto depuis scan batch ${batchId}`,
-                              });
+                              },
+                            });
 
-                            if (!policyErr) {
-                              createdCount++;
-                            }
+                            createdCount++;
 
                             // Mark scan as processed
                             await supabase
