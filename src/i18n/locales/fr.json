@@ -866,7 +866,11 @@
     "paymentOverdueDesc": "Votre paiement est en retard. Veuillez régulariser votre situation pour éviter une suspension.",
     "trialPeriod": "Période d'essai",
     "trialPeriodDesc": "Vous êtes actuellement en période d'essai. Profitez de toutes les fonctionnalités !",
-    "extraUsersAlert": "Vous avez {{count}} utilisateur(s) supplémentaire(s) au-delà de votre quota inclus."
+    "extraUsersAlert": "Vous avez {{count}} utilisateur(s) supplémentaire(s) au-delà de votre quota inclus.",
+    "availablePlans": "Offres disponibles",
+    "availablePlansDescription": "Choisissez l'offre adaptée à votre cabinet.",
+    "current": "Actuelle",
+    "currentPlan": "Offre actuelle"
   },
   "languages": {
     "fr": "Français",

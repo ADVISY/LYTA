@@ -979,7 +979,11 @@
     "paymentOverdueDesc": "Ihre Zahlung ist überfällig. Bitte begleichen Sie Ihr Konto, um eine Sperrung zu vermeiden.",
     "trialPeriod": "Testphase",
     "trialPeriodDesc": "Sie befinden sich derzeit in der Testphase. Geniessen Sie alle Funktionen!",
-    "extraUsersAlert": "Sie haben {{count}} zusätzliche(n) Benutzer über Ihr enthaltenes Kontingent hinaus."
+    "extraUsersAlert": "Sie haben {{count}} zusätzliche(n) Benutzer über Ihr enthaltenes Kontingent hinaus.",
+    "availablePlans": "Verfügbare Pläne",
+    "availablePlansDescription": "Wählen Sie den passenden Plan für Ihr Unternehmen.",
+    "current": "Aktuell",
+    "currentPlan": "Aktueller Plan"
   },
   "languages": {
     "fr": "Français",

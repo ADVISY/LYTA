@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlanFeatures, useTenantSeats } from '@/hooks/usePlanFeatures';
 import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, MODULE_TRANSLATION_KEYS, getPlansInOrder, PlanModule } from '@/config/plans';
@@ -27,6 +28,7 @@ const PLAN_ICONS: Record<string, typeof Crown> = {
 
 export default function CRMAbonnement() {
   const { t } = useTranslation();
+  const plansRef = useRef<HTMLDivElement>(null);
   const { 
     plan, 
     planDisplayName, 
@@ -43,6 +45,11 @@ export default function CRMAbonnement() {
   const loading = planLoading || seatsLoading;
   const extraUsers = Math.max(0, activeUsers - seatsIncluded);
   const estimatedCost = extraUsers * seatsPrice;
+  const availablePlans = getPlansInOrder();
+
+  const scrollToPlans = () => {
+    plansRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const allModules: PlanModule[] = [
     'clients', 'contracts', 'commissions', 'statements', 'membership',
@@ -149,7 +156,7 @@ export default function CRMAbonnement() {
               <p className="text-sm text-muted-foreground mb-2">
                 {PLAN_CONFIGS[plan]?.description}
               </p>
-              <Button variant="outline" className="w-full gap-2">
+              <Button variant="outline" className="w-full gap-2" onClick={scrollToPlans}>
                 <ArrowUpRight className="h-4 w-4" />
                 {t('subscription.viewOtherPlans')}
               </Button>
@@ -194,6 +201,76 @@ export default function CRMAbonnement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Available plans */}
+      <Card ref={plansRef}>
+        <CardHeader>
+          <CardTitle>{t('subscription.availablePlans')}</CardTitle>
+          <CardDescription>
+            {t('subscription.availablePlansDescription')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {availablePlans.map((planKey) => {
+              const config = PLAN_CONFIGS[planKey];
+              const PlanCardIcon = PLAN_ICONS[planKey] || Zap;
+              const isCurrentPlan = planKey === plan;
+
+              return (
+                <div
+                  key={planKey}
+                  className={`rounded-lg border p-4 space-y-4 ${
+                    isCurrentPlan ? 'border-primary bg-primary/5' : 'bg-background'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <PlanCardIcon className="h-5 w-5 text-primary" />
+                      <div>
+                        <h3 className="font-semibold">{config.displayName}</h3>
+                        <p className="text-sm text-muted-foreground">{config.description}</p>
+                      </div>
+                    </div>
+                    {isCurrentPlan && (
+                      <Badge variant="default">{t('subscription.current')}</Badge>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-2xl font-bold">{config.monthlyPrice} CHF</span>
+                    <span className="text-sm text-muted-foreground">/{t('common.month')}</span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{t('subscription.includedInPlan')}</span>
+                      <span className="font-medium">{config.seatsIncluded}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{t('subscription.pricePerExtraUser')}</span>
+                      <span className="font-medium">{config.extraSeatPrice} CHF</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{t('subscription.includedModules')}</span>
+                      <span className="font-medium">{config.modules.length}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant={isCurrentPlan ? 'secondary' : 'default'}
+                    className="w-full"
+                    disabled={isCurrentPlan}
+                    onClick={() => window.open('mailto:support@lyta.ch?subject=Changement%20d%27offre%20LYTA', '_blank')}
+                  >
+                    {isCurrentPlan ? t('subscription.currentPlan') : t('plans.upgradeNow', 'Mettre à niveau')}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Modules */}
       <Card>

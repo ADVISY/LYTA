@@ -969,7 +969,11 @@
     "paymentOverdueDesc": "Il tuo pagamento è scaduto. Regolarizza il tuo account per evitare la sospensione.",
     "trialPeriod": "Periodo di prova",
     "trialPeriodDesc": "Sei attualmente in periodo di prova. Goditi tutte le funzionalità!",
-    "extraUsersAlert": "Hai {{count}} utente/i extra oltre la tua quota inclusa."
+    "extraUsersAlert": "Hai {{count}} utente/i extra oltre la tua quota inclusa.",
+    "availablePlans": "Piani disponibili",
+    "availablePlansDescription": "Scegli il piano adatto al tuo studio.",
+    "current": "Attuale",
+    "currentPlan": "Piano attuale"
   },
   "languages": {
     "fr": "Français",

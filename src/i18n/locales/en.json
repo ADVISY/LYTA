@@ -979,7 +979,11 @@
     "paymentOverdueDesc": "Your payment is overdue. Please settle your account to avoid suspension.",
     "trialPeriod": "Trial period",
     "trialPeriodDesc": "You are currently in trial period. Enjoy all features!",
-    "extraUsersAlert": "You have {{count}} extra user(s) beyond your included quota."
+    "extraUsersAlert": "You have {{count}} extra user(s) beyond your included quota.",
+    "availablePlans": "Available plans",
+    "availablePlansDescription": "Choose the plan that fits your firm.",
+    "current": "Current",
+    "currentPlan": "Current plan"
   },
   "languages": {
     "fr": "Français",
