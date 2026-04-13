@@ -18,6 +18,14 @@ interface PendingSmsVerificationState {
   phoneNumber: string;
 }
 
+interface ClearSmsChallengeSessionOptions {
+  revoke?: boolean;
+}
+
+interface ClearPendingVerificationOptions {
+  revokeSession?: boolean;
+}
+
 type SmsChallengeFunctionName = "send-verification-sms" | "verify-sms-code";
 
 interface LoginData {
@@ -129,7 +137,7 @@ interface AuthContextType {
   ) => Promise<unknown>;
   loading: boolean;
   pendingSmsVerification: PendingSmsVerificationState | null;
-  clearPendingVerification: () => void;
+  clearPendingVerification: (options?: ClearPendingVerificationOptions) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -172,15 +180,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const navigate = useNavigate();
 
-  const clearSmsChallengeSession = useCallback(async () => {
-    try {
-      const smsClient = createSmsChallengeClient();
-      await smsClient.auth.signOut();
-    } catch (error) {
-      console.warn("Unable to clear SMS challenge session", error);
-    } finally {
-      sessionStorage.removeItem(SMS_CHALLENGE_STORAGE_KEY);
+  const clearSmsChallengeSession = useCallback(async (options: ClearSmsChallengeSessionOptions = {}) => {
+    if (options.revoke) {
+      try {
+        const smsClient = createSmsChallengeClient();
+        await smsClient.auth.signOut();
+      } catch (error) {
+        console.warn("Unable to revoke SMS challenge session", error);
+      }
     }
+
+    sessionStorage.removeItem(SMS_CHALLENGE_STORAGE_KEY);
   }, []);
 
   const promoteSmsChallengeSession = useCallback(async () => {
@@ -273,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    await clearSmsChallengeSession();
+    await clearSmsChallengeSession({ revoke: true });
     setPendingSmsVerification(null);
     sessionStorage.removeItem("lyta_redirect_done");
 
@@ -295,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (rpcError) {
         console.error("Error fetching login data:", rpcError);
-        await clearSmsChallengeSession();
+        await clearSmsChallengeSession({ revoke: true });
         return { error: { message: "Erreur de verification. Veuillez reessayer." } };
       }
 
@@ -332,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const phoneNumber = parsedData.phone || data.user.phone;
 
         if (!phoneNumber) {
-          await clearSmsChallengeSession();
+          await clearSmsChallengeSession({ revoke: true });
           return {
             error: {
               message: "Numero de telephone requis pour la verification SMS. Contactez l'administrateur.",
@@ -367,7 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (sessionError) {
         clearSessionEnforcerState();
-        await clearSmsChallengeSession();
+        await clearSmsChallengeSession({ revoke: true });
         return { error: sessionError };
       }
     }
@@ -396,9 +406,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pendingSmsVerification, promoteSmsChallengeSession, setPendingSmsVerification]);
 
-  const clearPendingVerification = useCallback(() => {
+  const clearPendingVerification = useCallback(async (options: ClearPendingVerificationOptions = {}) => {
     setPendingSmsVerification(null);
-    void clearSmsChallengeSession();
+    await clearSmsChallengeSession({ revoke: options.revokeSession });
   }, [clearSmsChallengeSession, setPendingSmsVerification]);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {

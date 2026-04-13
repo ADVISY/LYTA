@@ -951,7 +951,7 @@ const Connexion = () => {
       sessionStorage.removeItem('lyta_redirect_done');
       setSmsVerificationData(null);
       setShowSmsVerification(false);
-      clearPendingVerification();
+      await clearPendingVerification({ revokeSession: true });
       smsFlowActive.current = false;
       toast({
         title: "Erreur",
@@ -970,7 +970,7 @@ const Connexion = () => {
     // Clear SMS state
     setSmsVerificationData(null);
     setShowSmsVerification(false);
-    clearPendingVerification();
+    await clearPendingVerification();
 
     // Allow the redirect effect to run now that SMS is completed
     smsFlowActive.current = false;
@@ -988,7 +988,7 @@ const Connexion = () => {
     sessionStorage.removeItem('lyta_login_space');
     setSmsVerificationData(null);
     setShowSmsVerification(false);
-    clearPendingVerification();
+    await clearPendingVerification({ revokeSession: true });
     smsFlowActive.current = false;
     setPassword("");
     await supabase.auth.signOut();
