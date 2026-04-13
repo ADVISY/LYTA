@@ -207,19 +207,25 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           }
           
           // Verify user actually belongs to THIS tenant
-          const { data: tenantCheck } = await supabase
+          const { data: tenantCheck, error: tenantCheckError } = await supabase
             .from('user_tenant_assignments')
             .select('tenant_id, tenants!inner(slug)')
             .eq('user_id', user.id)
             .not('tenant_id', 'is', null)
+            .eq('tenants.slug', currentTenantSlug)
+            .limit(1)
             .maybeSingle();
+
+          if (tenantCheckError) {
+            console.error("[ProtectedRoute] Error checking tenant assignment", tenantCheckError);
+          }
 
           const tenantData = tenantCheck as TenantCheckResult | null;
           const userTenantSlug = Array.isArray(tenantData?.tenants)
             ? (tenantData.tenants[0]?.slug ?? null)
             : (tenantData?.tenants?.slug ?? null);
           
-          if (!userTenantSlug || userTenantSlug !== currentTenantSlug) {
+          if (tenantCheckError || !userTenantSlug || userTenantSlug !== currentTenantSlug) {
             console.error(`[ProtectedRoute] SECURITY: User tenant (${userTenantSlug}) does not match domain tenant (${currentTenantSlug})`);
             sessionStorage.clear();
             await signOut();
@@ -277,12 +283,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         // ======== CRITICAL SECURITY: SMS 2FA VERIFICATION ========
         // Check tenant_security_settings to see if 2FA is required for this tenant
         // This aligns with the RPC get_user_login_data which triggers SMS at login
-        const { data: tenantAssignment } = await supabase
+        let tenantAssignmentQuery = supabase
           .from('user_tenant_assignments')
-          .select('tenant_id')
+          .select('tenant_id, tenants!inner(slug)')
           .eq('user_id', user.id)
-          .not('tenant_id', 'is', null)
-          .maybeSingle();
+          .not('tenant_id', 'is', null);
+
+        if (currentTenantSlug) {
+          tenantAssignmentQuery = tenantAssignmentQuery.eq('tenants.slug', currentTenantSlug);
+        }
+
+        const { data: tenantAssignment } = await tenantAssignmentQuery.limit(1).maybeSingle();
 
         let requiresSms2FA = false;
         if (tenantAssignment?.tenant_id) {
@@ -359,12 +370,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           }
 
           // Validate tenant membership (server-side)
-          const { data: assignment, error: assignmentError } = await supabase
+          let assignmentQuery = supabase
             .from('user_tenant_assignments')
-            .select('tenant_id, is_platform_admin')
+            .select('tenant_id, is_platform_admin, tenants!inner(slug)')
             .eq('user_id', user.id)
-            .not('tenant_id', 'is', null)
-            .maybeSingle();
+            .not('tenant_id', 'is', null);
+
+          if (currentTenantSlug) {
+            assignmentQuery = assignmentQuery.eq('tenants.slug', currentTenantSlug);
+          }
+
+          const { data: assignment, error: assignmentError } = await assignmentQuery.limit(1).maybeSingle();
 
           if (assignmentError || !assignment?.tenant_id) {
             console.error("[ProtectedRoute] User has no tenant assignment for CRM", assignmentError);

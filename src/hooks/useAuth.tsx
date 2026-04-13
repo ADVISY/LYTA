@@ -4,7 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { supabaseConfig } from "@/integrations/supabase/config";
 import { useNavigate } from "react-router-dom";
-import { clearSessionEnforcerState } from "@/lib/sessionEnforcerStorage";
+import {
+  clearSessionEnforcerState,
+  writeSessionEnforcerState,
+} from "@/lib/sessionEnforcerStorage";
 
 interface AuthActionError {
   message: string;
@@ -188,12 +191,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("La session de verification SMS a expire. Veuillez vous reconnecter.");
     }
 
+    writeSessionEnforcerState({
+      userId: challengeSession.user.id,
+      lastActivityAt: Date.now(),
+    });
+
     const { error } = await supabase.auth.setSession({
       access_token: challengeSession.access_token,
       refresh_token: challengeSession.refresh_token,
     });
 
     if (error) {
+      clearSessionEnforcerState();
       throw error;
     }
 
@@ -266,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     await clearSmsChallengeSession();
     setPendingSmsVerification(null);
+    sessionStorage.removeItem("lyta_redirect_done");
 
     const smsClient = createSmsChallengeClient();
     const { data, error } = await smsClient.auth.signInWithPassword({
@@ -345,12 +355,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.session) {
+      writeSessionEnforcerState({
+        userId: data.session.user.id,
+        lastActivityAt: Date.now(),
+      });
+
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
       });
 
       if (sessionError) {
+        clearSessionEnforcerState();
         await clearSmsChallengeSession();
         return { error: sessionError };
       }
@@ -373,6 +389,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (nextSession) {
       setSession(nextSession);
       setUser(nextSession.user);
+      writeSessionEnforcerState({
+        userId: nextSession.user.id,
+        lastActivityAt: Date.now(),
+      });
     }
   }, [pendingSmsVerification, promoteSmsChallengeSession, setPendingSmsVerification]);
 
@@ -427,6 +447,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem("lyta_active_role");
     sessionStorage.removeItem("loginTarget");
     sessionStorage.removeItem("lyta_login_space");
+    sessionStorage.removeItem("lyta_redirect_done");
     sessionStorage.removeItem("userLoginData");
     clearSessionEnforcerState();
 

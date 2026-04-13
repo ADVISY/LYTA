@@ -437,6 +437,7 @@ const Connexion = () => {
     const handleRedirect = async () => {
       // Wait for the login submit to finish (prevents "redirect missed" race)
       if (loading) return;
+      if (tenantLoading) return;
 
       // CRITICAL: Never redirect during SMS verification flow
       if (smsFlowActive.current) {
@@ -539,19 +540,25 @@ const Connexion = () => {
           tenantSlug: string | null;
           isPlatformAdmin: boolean;
         }> => {
-          // cachedData contains tenant_slug but not tenant_id.
-          const { data, error } = await supabase
+          // On a tenant subdomain, only the assignment for that tenant is valid.
+          let query = supabase
             .from('user_tenant_assignments')
             .select('tenant_id, is_platform_admin, tenants(slug)')
             .eq('user_id', user.id)
-            .not('tenant_id', 'is', null)
-            .maybeSingle();
+            .not('tenant_id', 'is', null);
+
+          if (tenant?.id) {
+            query = query.eq('tenant_id', tenant.id);
+          }
+
+          const { data, error } = await query.limit(1).maybeSingle();
 
           if (error) {
             console.error('[Connexion] Error fetching tenant assignment:', error);
           }
 
           const tenantSlug =
+            tenant?.slug ??
             cachedData?.tenant_slug ?? ((data?.tenants as { slug?: string })?.slug || null);
 
           const result = {
@@ -749,7 +756,7 @@ const Connexion = () => {
     };
 
     handleRedirect();
-  }, [user, loading, showSmsVerification, smsVerificationData]);
+  }, [user, loading, tenantLoading, tenant?.id, tenant?.slug, showSmsVerification, smsVerificationData]);
 
   // Ensure SMS dialog stays open if data exists
   useEffect(() => {
@@ -876,6 +883,8 @@ const Connexion = () => {
     sessionStorage.setItem('loginTarget', loginType);
     // Persist chosen space for the whole session (strict space separation)
     sessionStorage.setItem('lyta_login_space', loginType);
+    // A previous blocked redirect must not prevent a fresh manual login.
+    sessionStorage.removeItem('lyta_redirect_done');
 
     setLoading(true);
     // CRITICAL: Set flag BEFORE signIn to prevent any redirect
