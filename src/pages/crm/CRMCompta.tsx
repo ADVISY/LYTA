@@ -192,6 +192,8 @@ export default function CRMCompta() {
 
   // Select all collaborateurs (décomptes)
   const selectAllCollaborateurs = () => {
+    if (collaborateurs.length === 0) return;
+
     if (selectedCollaborateurs.length === collaborateurs.length) {
       setSelectedCollaborateurs([]);
     } else {
@@ -210,6 +212,8 @@ export default function CRMCompta() {
 
   // Select all collaborateurs (salaires)
   const selectAllCollabsSalaire = () => {
+    if (collaborateurs.length === 0) return;
+
     if (selectedCollabsSalaire.length === collaborateurs.length) {
       setSelectedCollabsSalaire([]);
     } else {
@@ -905,9 +909,9 @@ export default function CRMCompta() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>{t('accounting.selectCollaborators')}</Label>
-                  <Button variant="outline" size="sm" onClick={selectAllCollaborateurs} className="gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAllCollaborateurs} className="gap-2" disabled={collaborateurs.length === 0}>
                     <CheckSquare className="h-4 w-4" />
-                    {selectedCollaborateurs.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
+                    {collaborateurs.length > 0 && selectedCollaborateurs.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
                   </Button>
                 </div>
                 
@@ -915,6 +919,10 @@ export default function CRMCompta() {
                   <div className="p-4 text-center text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
                     {t('accounting.loading')}
+                  </div>
+                ) : collaborateurs.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground bg-muted/30 rounded-lg">
+                    {t('collaborators.noCollaborators')}
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg max-h-64 overflow-y-auto">
@@ -1016,9 +1024,9 @@ export default function CRMCompta() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>{t('accounting.selectCollaborators')}</Label>
-                  <Button variant="outline" size="sm" onClick={selectAllCollabsSalaire} className="gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAllCollabsSalaire} className="gap-2" disabled={collaborateurs.length === 0}>
                     <CheckSquare className="h-4 w-4" />
-                    {selectedCollabsSalaire.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
+                    {collaborateurs.length > 0 && selectedCollabsSalaire.length === collaborateurs.length ? t('accounting.deselectAll') : t('accounting.selectAll')}
                   </Button>
                 </div>
                 
@@ -1026,6 +1034,10 @@ export default function CRMCompta() {
                   <div className="p-4 text-center text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
                     {t('accounting.loading')}
+                  </div>
+                ) : collaborateurs.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground bg-muted/30 rounded-lg">
+                    {t('collaborators.noCollaborators')}
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg max-h-64 overflow-y-auto">
