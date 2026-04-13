@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+import { useUserTenant } from "@/hooks/useUserTenant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +35,7 @@ interface SmsTemplate {
 export const SmsComposer = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { tenantId } = useUserTenant();
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [selectedClients, setSelectedClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,15 +146,13 @@ export const SmsComposer = () => {
         ? [{ phone: singlePhone, name: singleName || "Client" }]
         : selectedClients.map(c => ({ phone: getClientPhone(c), name: getClientDisplayName(c) }));
 
-      const { data, error } = await supabase.functions.invoke("send-sms", {
-        body: { recipients, message },
+      const data = await invokeSupabaseFunction<{ sent?: number; simulated?: boolean }>("send-sms", {
+        body: { recipients, message, tenantId },
       });
-
-      if (error) throw error;
 
       toast({
         title: t('smsComposer.smsSent'),
-        description: t('smsComposer.smsSentSuccess', { count: recipients.length }),
+        description: t('smsComposer.smsSentSuccess', { count: data?.sent ?? recipients.length }),
       });
 
       // Reset form

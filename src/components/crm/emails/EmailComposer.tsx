@@ -134,12 +134,13 @@ export const EmailComposer = () => {
     try {
       if (mode === "single") {
         // Single email - use relation_client type for custom emails
-        await sendEmail({
+        const result = await sendEmail({
           type: "relation_client",
           clientEmail: singleEmail,
           clientName: singleName || "Client",
-          data: { contractDetails: body },
+          data: { subject, html: body },
         });
+        if (!result.success) throw result.error;
         toast({ title: "Email envoyé avec succès" });
       } else {
         // Bulk send
@@ -149,12 +150,13 @@ export const EmailComposer = () => {
         for (const client of selectedClients) {
           if (!client.email) continue;
           try {
-            await sendEmail({
+            const result = await sendEmail({
               type: "relation_client",
               clientEmail: client.email,
               clientName: getClientDisplayName(client),
-              data: { contractDetails: body },
+              data: { subject, html: body },
             });
+            if (!result.success) throw result.error;
             successCount++;
           } catch {
             errorCount++;

@@ -62,6 +62,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserTenant } from "@/hooks/useUserTenant";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 const statusColors: Record<string, string> = {
   prospect: "bg-blue-500",
   actif: "bg-green-500",
@@ -115,6 +117,7 @@ export default function ClientDetail() {
   const { commissions, loading: commissionsLoading, fetchCommissions, markAsPaid, deleteCommission } = useCommissions();
   const { fetchCommissionParts, deleteCommissionPart } = useCommissionParts();
   const { hasModule } = usePlanFeatures();
+  const { tenantId } = useUserTenant();
   
   // Check plan modules
   const hasClientPortal = hasModule('client_portal');
@@ -325,22 +328,16 @@ export default function ClientDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non authentifié");
 
-      const response = await supabase.functions.invoke('create-user-account', {
+      await invokeSupabaseFunction('create-user-account', {
         body: {
           email: client.email,
           role: 'client',
           clientId: client.id,
           firstName: client.first_name,
           lastName: client.last_name,
+          tenantId,
         },
       });
-
-      if (response.error) throw response.error;
-
-      // Check for application-level errors returned in the response body
-      if (response.data?.error) {
-        throw new Error(response.data.error);
-      }
 
       toast({
         title: t('clientDetail.accountCreated') || "Compte créé",

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
+import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
@@ -11,6 +11,7 @@ const log = createLogger("send-sms");
 interface SmsRequest {
   recipients: { phone: string; name: string }[];
   message: string;
+  tenantId?: string;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -30,7 +31,7 @@ serve(async (req: Request): Promise<Response> => {
     const { user } = await requireAuth(req);
     await checkRateLimit(req, "send-sms", 10);
 
-    const { recipients, message }: SmsRequest = await req.json();
+    const { recipients, message, tenantId: requestedTenantId }: SmsRequest = await req.json();
 
     if (!recipients || recipients.length === 0) {
       throw new Error("Au moins un destinataire requis");
@@ -40,15 +41,20 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Message requis");
     }
 
-    const { data: assignment } = await supabase
-      .from("user_tenant_assignments")
-      .select("tenant_id")
-      .eq("user_id", user.id)
-      .not("tenant_id", "is", null)
-      .limit(1)
-      .maybeSingle();
+    let tenantId = requestedTenantId ?? null;
+    if (tenantId) {
+      await requireTenantAccess(user.id, tenantId);
+    } else {
+      const { data: assignment } = await supabase
+        .from("user_tenant_assignments")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .not("tenant_id", "is", null)
+        .limit(1)
+        .maybeSingle();
 
-    const tenantId = assignment?.tenant_id ?? null;
+      tenantId = assignment?.tenant_id ?? null;
+    }
 
     if (tenantId) {
       await reserveTenantQuota(supabase, tenantId, "sms", recipients.length);
@@ -62,6 +68,10 @@ serve(async (req: Request): Promise<Response> => {
 
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       log.info("SMS simulation - Twilio non configuré");
+      if (reservedTenantId && reservedAmount > 0) {
+        await releaseTenantQuota(supabase, reservedTenantId, "sms", reservedAmount);
+        reservedAmount = 0;
+      }
       // Simulate success for demo purposes
       return new Response(
         JSON.stringify({

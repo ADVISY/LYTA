@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
+import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
 
@@ -14,6 +14,27 @@ interface TenantBranding {
   primary_color: string | null;
   email_sender_name: string | null;
   email_sender_address: string | null;
+}
+
+interface CreateUserAccountRequest {
+  email?: string;
+  password?: string;
+  role?: string;
+  collaborateurId?: string;
+  clientId?: string;
+  firstName?: string;
+  lastName?: string;
+  regeneratePassword?: boolean;
+  tenantId?: string;
+}
+
+interface TenantRecord {
+  id: string;
+  name: string;
+  slug: string | null;
+  seats_included: number | null;
+  extra_users: number | null;
+  tenant_branding?: TenantBranding[] | TenantBranding | null;
 }
 
 // Generate a human-readable password
@@ -293,6 +314,209 @@ function generateWelcomeEmailWithPassword(
   };
 }
 
+function getBranding(tenant: TenantRecord): TenantBranding | null {
+  if (Array.isArray(tenant.tenant_branding)) {
+    return tenant.tenant_branding[0] || null;
+  }
+
+  return tenant.tenant_branding || null;
+}
+
+function generateAccessEnabledEmail(
+  clientName: string,
+  loginUrl: string,
+  branding: TenantBranding | null,
+  tenantName: string,
+): { subject: string; html: string } {
+  const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
+  const primaryColor = branding?.primary_color || "#0066FF";
+  const logoUrl = branding?.logo_url || "";
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" alt="${displayName}" style="height: 40px; max-width: 160px; object-fit: contain;" />`
+    : `<div style="font-size: 36px; font-weight: 700; color: #ffffff;">${displayName}</div>`;
+
+  return {
+    subject: `Votre acces ${displayName} est active`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acces active - ${displayName}</title>
+</head>
+<body style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f0f2f5; margin: 0; padding: 40px 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 100%); padding: 40px; text-align: center;">
+      ${logoHtml}
+      <h1 style="color: #fff; font-size: 26px; margin: 20px 0 0;">Acces active</h1>
+    </div>
+    <div style="padding: 30px 40px;">
+      <p style="font-size: 20px; font-weight: 600; color: ${primaryColor};">Bonjour ${clientName}</p>
+      <p style="color: #4a4a68; font-size: 15px; line-height: 1.7;">
+        Votre espace client ${displayName} est maintenant accessible. Connectez-vous avec vos identifiants habituels.
+      </p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${loginUrl}" style="display: inline-block; background: ${primaryColor}; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600;">
+          Me connecter
+        </a>
+      </div>
+      <p style="color: #4a4a68; font-size: 15px;">Cordialement,<br><strong>L'equipe ${displayName}</strong></p>
+    </div>
+  </div>
+</body>
+</html>`,
+  };
+}
+
+async function resolveTenantId(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  requestedTenantId?: string,
+): Promise<string> {
+  if (requestedTenantId) {
+    await requireTenantAccess(userId, requestedTenantId);
+    return requestedTenantId;
+  }
+
+  const { data: assignment } = await supabaseAdmin
+    .from("user_tenant_assignments")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .not("tenant_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!assignment?.tenant_id) {
+    throw new AuthError("Utilisateur non assigne a un tenant", 400);
+  }
+
+  return assignment.tenant_id;
+}
+
+async function canCreateAccount(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  tenantId: string,
+  isClientAccount: boolean,
+): Promise<boolean> {
+  const [{ data: assignment }, { data: globalRoles }] = await Promise.all([
+    supabaseAdmin
+      .from("user_tenant_assignments")
+      .select("is_platform_admin")
+      .eq("user_id", userId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId),
+  ]);
+
+  if (assignment?.is_platform_admin) {
+    return true;
+  }
+
+  if ((globalRoles ?? []).some(({ role }) => role === "admin" || role === "king")) {
+    return true;
+  }
+
+  const { data: tenantRoleLinks } = await supabaseAdmin
+    .from("user_tenant_roles")
+    .select("role_id")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId);
+
+  const roleIds = (tenantRoleLinks ?? []).map(({ role_id }) => role_id).filter(Boolean);
+  if (roleIds.length === 0) {
+    return false;
+  }
+
+  const { data: activeRoles } = await supabaseAdmin
+    .from("tenant_roles")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .in("id", roleIds);
+
+  const activeRoleIds = (activeRoles ?? []).map(({ id }) => id).filter(Boolean);
+  if (activeRoleIds.length === 0) {
+    return false;
+  }
+
+  const allowedModules = isClientAccount ? ["clients", "settings"] : ["settings"];
+  const { data: permissions } = await supabaseAdmin
+    .from("tenant_role_permissions")
+    .select("role_id")
+    .in("role_id", activeRoleIds)
+    .in("module", allowedModules)
+    .eq("action", "update")
+    .eq("allowed", true)
+    .limit(1);
+
+  return (permissions?.length ?? 0) > 0;
+}
+
+async function assertSeatAvailable(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  tenantId: string,
+  tenant: TenantRecord,
+): Promise<void> {
+  const { count: activeUsersCount } = await supabaseAdmin
+    .from("user_tenant_assignments")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+
+  const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+  const availableSeats = totalSeats - (activeUsersCount || 0);
+
+  if (availableSeats <= 0) {
+    throw new AuthError("Aucun siege disponible. Debloquez un siege supplementaire.", 400);
+  }
+}
+
+async function ensureTenantAssignment(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  tenantId: string,
+  tenant: TenantRecord,
+): Promise<void> {
+  const { data: existingTenantAssignment } = await supabaseAdmin
+    .from("user_tenant_assignments")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (existingTenantAssignment) {
+    return;
+  }
+
+  await assertSeatAvailable(supabaseAdmin, tenantId, tenant);
+
+  const { error } = await supabaseAdmin
+    .from("user_tenant_assignments")
+    .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: "user_id,tenant_id" });
+
+  if (error) {
+    throw new AuthError(`Erreur lors de l'assignation au tenant: ${error.message}`, 500);
+  }
+}
+
+async function ensureUserRole(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  role: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("user_roles")
+    .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
+
+  if (error) {
+    throw new AuthError(`Erreur lors de l'attribution du role: ${error.message}`, 500);
+  }
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -312,41 +536,32 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Check if requesting user is admin (user can have multiple roles)
-    const { data: roleData } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", requestingUser.id);
-
-    const isAdmin = roleData?.some(r => r.role === "admin" || r.role === "king");
-    
-    if (!isAdmin) {
+    let requestBody: CreateUserAccountRequest;
+    try {
+      requestBody = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ error: "Accès refusé. Seuls les administrateurs peuvent créer des comptes." }),
-        { status: 403, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get the requesting user's tenant
-    const { data: tenantAssignment } = await supabaseAdmin
-      .from("user_tenant_assignments")
-      .select("tenant_id")
-      .eq("user_id", requestingUser.id)
-      .single();
-
-    if (!tenantAssignment) {
-      return new Response(
-        JSON.stringify({ error: "Utilisateur non assigné à un tenant" }),
+        JSON.stringify({ error: "Corps de la requete invalide (JSON attendu)" }),
         { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
-    const tenantId = tenantAssignment.tenant_id;
+    const { email, role, collaborateurId, clientId, firstName, lastName, regeneratePassword, tenantId: requestedTenantId } = requestBody;
+    const targetId = collaborateurId || clientId;
+    const isClientAccount = !!clientId;
+
+    const tenantId = await resolveTenantId(supabaseAdmin, requestingUser.id, requestedTenantId);
+    const authorized = await canCreateAccount(supabaseAdmin, requestingUser.id, tenantId, isClientAccount);
+    
+    if (!authorized) {
+      throw new AuthError("Acces refuse. Droits insuffisants pour creer ce compte.", 403);
+    }
 
     // Get tenant info and branding for email
     const { data: tenant } = await supabaseAdmin
       .from("tenants")
       .select(`
+        id,
         name,
         slug,
         seats_included,
@@ -369,24 +584,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const branding: TenantBranding | null = tenant.tenant_branding?.[0] || null;
-
-    // Parse request body - password is now optional
-    let requestBody;
-    try {
-      requestBody = await req.json();
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Corps de la requête invalide (JSON attendu)" }),
-        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
-    }
-
-    const { email, password, role, collaborateurId, clientId, firstName, lastName, regeneratePassword } = requestBody;
-
-    // Determine if this is a collaborateur or client account creation
-    const targetId = collaborateurId || clientId;
-    const isClientAccount = !!clientId;
+    const branding: TenantBranding | null = getBranding(tenant as TenantRecord);
 
     // Validate inputs
     if (!email || !role || !targetId) {
@@ -433,6 +631,10 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: isClientAccount ? "Client non trouvé" : "Collaborateur non trouvé" }),
         { status: 404, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
+    }
+
+    if (!RESEND_API_KEY) {
+      throw new AuthError("Configuration email manquante: RESEND_API_KEY n'est pas defini.", 500);
     }
 
     // If regeneratePassword is true and user already has an account, regenerate and send new password
@@ -494,6 +696,7 @@ Deno.serve(async (req) => {
         } else {
           const errorText = await emailResponse.text();
           log.error(`Failed to send email`, { to: email, error: errorText });
+          throw new AuthError(`Erreur Resend: ${errorText}`, 502);
         }
       }
 
@@ -539,6 +742,7 @@ Deno.serve(async (req) => {
       // User already exists - we'll add the new role and link to the client record
       log.info(`User already exists, adding role`, { email, userId: existingUser.id, role });
       userId = existingUser.id;
+      await ensureUserRole(supabaseAdmin, userId, role);
 
       // Check if user already has this role
       const { data: existingRole } = await supabaseAdmin
@@ -558,6 +762,8 @@ Deno.serve(async (req) => {
           log.error("Error adding role", { error: roleInsertError });
         }
       }
+
+      await ensureTenantAssignment(supabaseAdmin, userId, tenantId, tenant as TenantRecord);
 
       // Check if user is already assigned to this tenant
       const { data: existingTenantAssignment } = await supabaseAdmin
@@ -658,9 +864,10 @@ Deno.serve(async (req) => {
         } else {
           const errorText = await emailResponse.text();
           log.error(`Failed to send email to existing user`, { to: email, error: errorText });
+          throw new AuthError(`Erreur Resend: ${errorText}`, 502);
         }
       } else {
-        log.warn("RESEND_API_KEY not configured - email not sent");
+        throw new AuthError("Configuration email manquante: RESEND_API_KEY n'est pas defini.", 500);
       }
 
     } else {
@@ -716,7 +923,7 @@ Deno.serve(async (req) => {
       if (roleError) {
         const { error: upsertError } = await supabaseAdmin
           .from("user_roles")
-          .upsert({ user_id: userId, role }, { onConflict: "user_id" });
+          .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
 
         if (upsertError) {
           log.error("Failed to assign role after upsert fallback", { error: upsertError, userId, role });
@@ -727,10 +934,12 @@ Deno.serve(async (req) => {
         }
       }
 
+      await ensureUserRole(supabaseAdmin, userId, role);
+
       // Assign user to tenant
       await supabaseAdmin
         .from("user_tenant_assignments")
-        .insert({ user_id: userId, tenant_id: tenantId });
+        .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: "user_id,tenant_id" });
 
       // Send welcome email with credentials
       const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
@@ -771,9 +980,10 @@ Deno.serve(async (req) => {
         } else {
           const errorText = await emailResponse.text();
           log.error(`Failed to send email`, { to: email, error: errorText });
+          throw new AuthError(`Erreur Resend: ${errorText}`, 502);
         }
       } else {
-        log.warn("RESEND_API_KEY not configured - email not sent");
+        throw new AuthError("Configuration email manquante: RESEND_API_KEY n'est pas defini.", 500);
       }
     }
 
@@ -781,7 +991,8 @@ Deno.serve(async (req) => {
     const { error: linkError } = await supabaseAdmin
       .from("clients")
       .update({ user_id: userId })
-      .eq("id", targetId);
+      .eq("id", targetId)
+      .eq("tenant_id", tenantId);
 
     if (linkError) {
       log.error("Error linking record", { error: linkError });

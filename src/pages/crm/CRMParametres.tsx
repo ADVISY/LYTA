@@ -24,6 +24,7 @@ import { useUserTenant } from "@/hooks/useUserTenant";
 import { useTenantSeats } from "@/hooks/useTenantSeats";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
@@ -610,7 +611,7 @@ export default function CRMParametres() {
     try {
       const selectedCollab = collaborateurs.find(c => c.id === newAccount.collaborateurId);
       
-      const response = await supabase.functions.invoke("create-user-account", {
+      await invokeSupabaseFunction("create-user-account", {
         body: {
           email: newAccount.email,
           password: newAccount.password,
@@ -618,18 +619,9 @@ export default function CRMParametres() {
           collaborateurId: newAccount.collaborateurId,
           firstName: selectedCollab?.first_name,
           lastName: selectedCollab?.last_name,
+          tenantId,
         },
       });
-
-      if (response.error) {
-        toast.error(response.error.message || t('settings.accountCreationError'));
-        return;
-      }
-
-      if (response.data?.error) {
-        toast.error(response.data.error);
-        return;
-      }
 
       toast.success(t('settings.accountCreated'));
       setIsAddingAccount(false);
@@ -688,7 +680,7 @@ export default function CRMParametres() {
       if (!session) throw new Error("Non authentifié");
 
       // Appeler l'edge function pour recréer un mot de passe et l'envoyer
-      const response = await supabase.functions.invoke('create-user-account', {
+      await invokeSupabaseFunction('create-user-account', {
         body: {
           email: clientEmail,
           role: 'client',
@@ -696,15 +688,9 @@ export default function CRMParametres() {
           firstName: client.first_name,
           lastName: client.last_name,
           regeneratePassword: true,
+          tenantId,
         },
       });
-
-      if (response.error) throw response.error;
-
-      // Check for application-level errors in the response body
-      if (response.data?.error) {
-        throw new Error(response.data.error);
-      }
 
       toast.success(t('settings.passwordResent'));
     } catch (error: unknown) {

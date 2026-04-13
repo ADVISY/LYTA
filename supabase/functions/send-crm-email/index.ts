@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
+import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
@@ -27,6 +27,8 @@ interface TenantBranding {
 }
 
 interface EmailData {
+  subject?: string;
+  html?: string;
   contractDetails?: string;
   companyName?: string;
   agentName?: string;
@@ -34,6 +36,7 @@ interface EmailData {
   loginUrl?: string;
   clientEmail?: string;
   tenantSlug?: string;
+  tenantId?: string;
 }
 
 interface EmailRequest {
@@ -42,6 +45,7 @@ interface EmailRequest {
   clientName: string;
   data?: EmailData;
   tenantSlug?: string;
+  tenantId?: string;
 }
 
 // Dynamic email wrapper with tenant branding
@@ -598,6 +602,103 @@ const getEmailContent = (
   }
 };
 
+const getCustomEmailContent = (
+  subject: string | undefined,
+  html: string,
+  branding: TenantBranding | null,
+  tenantName: string,
+) => {
+  const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
+
+  return {
+    subject: subject?.trim() || `Message de ${displayName}`,
+    html: getEmailWrapper(`
+      <div class="header">
+        <h1 class="header-title">${displayName}</h1>
+      </div>
+      <div class="content">
+        ${html}
+      </div>
+    `, branding, tenantName),
+  };
+};
+
+async function fetchTenantWithBranding(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  column: "id" | "slug",
+  value: string,
+) {
+  const { data, error } = await supabaseAdmin
+    .from("tenants")
+    .select(`
+      id,
+      name,
+      tenant_branding (
+        display_name,
+        logo_url,
+        primary_color,
+        secondary_color,
+        email_sender_name,
+        email_sender_address,
+        company_address,
+        company_phone,
+        company_website,
+        company_email,
+        email_footer_text
+      )
+    `)
+    .eq(column, value)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to resolve tenant branding: ${error.message}`);
+  }
+
+  return data;
+}
+
+async function canSendSensitiveEmail(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  tenantId: string | null,
+): Promise<boolean> {
+  const { data: roleData } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+
+  const allowedRoles = new Set(["admin", "agent", "manager", "backoffice", "partner", "king"]);
+  if ((roleData ?? []).some(({ role }) => allowedRoles.has(String(role)))) {
+    return true;
+  }
+
+  if (!tenantId) {
+    return false;
+  }
+
+  const { data: tenantRoleLinks } = await supabaseAdmin
+    .from("user_tenant_roles")
+    .select("role_id")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId);
+
+  const roleIds = (tenantRoleLinks ?? []).map(({ role_id }) => role_id).filter(Boolean);
+  if (roleIds.length === 0) {
+    return false;
+  }
+
+  const { data: permissions } = await supabaseAdmin
+    .from("tenant_role_permissions")
+    .select("role_id")
+    .in("role_id", roleIds)
+    .in("module", ["clients", "settings"])
+    .eq("action", "update")
+    .eq("allowed", true)
+    .limit(1);
+
+  return (permissions?.length ?? 0) > 0;
+}
+
 // Generate secure temporary password
 const generateTemporaryPassword = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -621,12 +722,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     await checkRateLimit(req, "send-crm-email", 20);
 
-    const { type, clientEmail, clientName, data, tenantSlug }: EmailRequest & { tenantSlug?: string } = await req.json();
+    const { type, clientEmail, clientName, data, tenantSlug, tenantId }: EmailRequest = await req.json();
 
     log.info(`Processing email request`, { type, email: clientEmail, name: clientName, tenant: tenantSlug });
 
     if (!clientEmail || !clientName || !type) {
       throw new Error("Missing required fields: type, clientEmail, clientName");
+    }
+
+    if (!RESEND_API_KEY) {
+      throw new Error("Configuration email manquante: RESEND_API_KEY n'est pas defini.");
     }
 
     supabaseAdmin = createClient(
@@ -635,87 +740,38 @@ const handler = async (req: Request): Promise<Response> => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // SECURITY: Verify authentication for sensitive email types
-    // Types that can create/modify user accounts MUST be authenticated
-    const sensitiveTypes = ['mandat_signed', 'account_created'];
-    
-    if (sensitiveTypes.includes(type)) {
-      const authHeader = req.headers.get('Authorization');
-      
-      if (!authHeader) {
-        log.error(`Unauthorized access attempt for sensitive email type`, { type });
-        return new Response(
-          JSON.stringify({ error: "Authentication required for this email type" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-        );
-      }
-
-      // Create a client with the user's token to verify they are authenticated
-      const supabaseUser = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-        { global: { headers: { Authorization: authHeader } } }
-      );
-
-      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
-      
-      if (authError || !user) {
-        log.error(`Authentication failed for sensitive email type`, { type, error: authError });
-        return new Response(
-          JSON.stringify({ error: "Invalid or expired authentication" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-        );
-      }
-
-      // Verify the user has appropriate role (admin, agent, manager, backoffice, partner)
-      const { data: roleData, error: roleError } = await supabaseAdmin
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      const allowedRoles = ['admin', 'agent', 'manager', 'backoffice', 'partner', 'king'];
-      
-      if (roleError || !roleData || !allowedRoles.includes(roleData.role)) {
-        log.error(`User lacks permission for email type`, { userId: user.id, type });
-        return new Response(
-          JSON.stringify({ error: "Insufficient permissions for this email type" }),
-          { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
-        );
-      }
-
-      log.info(`Authenticated request`, { userId: user.id, role: roleData.role, type });
-    }
-
-    // Fetch tenant branding
     let branding: TenantBranding | null = null;
     let tenantName = 'Cabinet';
-    
-    const slug = tenantSlug || data?.tenantSlug;
-    
-    const { data: tenant, error: tenantError } = await supabaseAdmin
-      .from('tenants')
-      .select(`
-        id,
-        name,
-        tenant_branding (
-          display_name,
-          logo_url,
-          primary_color,
-          secondary_color,
-          email_sender_name,
-          email_sender_address,
-          company_address,
-          company_phone,
-          company_website,
-          company_email,
-          email_footer_text
-        )
-      `)
-      .eq('slug', slug)
-      .single();
+    let resolvedTenantId: string | null = null;
 
-    if (!tenantError && tenant) {
+    const requestedTenantId = tenantId || data?.tenantId || null;
+    const slug = tenantSlug || data?.tenantSlug || null;
+
+    let tenant: Awaited<ReturnType<typeof fetchTenantWithBranding>> | null = null;
+    if (requestedTenantId) {
+      await requireTenantAccess(user.id, requestedTenantId);
+      tenant = await fetchTenantWithBranding(supabaseAdmin, "id", requestedTenantId);
+    } else if (slug) {
+      tenant = await fetchTenantWithBranding(supabaseAdmin, "slug", slug);
+      if (tenant?.id) {
+        await requireTenantAccess(user.id, tenant.id);
+      }
+    } else {
+      const { data: assignment } = await supabaseAdmin
+        .from("user_tenant_assignments")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .not("tenant_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (assignment?.tenant_id) {
+        tenant = await fetchTenantWithBranding(supabaseAdmin, "id", assignment.tenant_id);
+      }
+    }
+
+    if (tenant) {
+      resolvedTenantId = tenant.id;
       tenantName = tenant.name;
       if (tenant.tenant_branding && tenant.tenant_branding.length > 0) {
         branding = tenant.tenant_branding[0];
@@ -723,9 +779,21 @@ const handler = async (req: Request): Promise<Response> => {
       log.info("Found tenant branding", { displayName: branding?.display_name || tenantName });
     }
 
-    if (tenant?.id) {
-      await reserveTenantQuota(supabaseAdmin, tenant.id, "email", 1);
-      reservedTenantId = tenant.id;
+    const sensitiveTypes = ['mandat_signed', 'account_created'];
+    if (sensitiveTypes.includes(type)) {
+      const authorized = await canSendSensitiveEmail(supabaseAdmin, user.id, resolvedTenantId);
+      if (!authorized) {
+        log.error(`User lacks permission for email type`, { userId: user.id, type });
+        return new Response(
+          JSON.stringify({ error: "Insufficient permissions for this email type" }),
+          { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
+        );
+      }
+    }
+
+    if (resolvedTenantId) {
+      await reserveTenantQuota(supabaseAdmin, resolvedTenantId, "email", 1);
+      reservedTenantId = resolvedTenantId;
       quotaReserved = true;
     }
 
@@ -774,11 +842,25 @@ const handler = async (req: Request): Promise<Response> => {
             .from('user_roles')
             .upsert({ user_id: createdUserId, role: 'client' }, { onConflict: 'user_id,role' });
 
-          const { data: clientRecord } = await supabaseAdmin
+          if (resolvedTenantId) {
+            await supabaseAdmin
+              .from('user_tenant_assignments')
+              .upsert(
+                { user_id: createdUserId, tenant_id: resolvedTenantId },
+                { onConflict: 'user_id,tenant_id' },
+              );
+          }
+
+          let clientQuery = supabaseAdmin
             .from('clients')
             .select('id')
-            .eq('email', clientEmail)
-            .single();
+            .eq('email', clientEmail);
+
+          if (resolvedTenantId) {
+            clientQuery = clientQuery.eq('tenant_id', resolvedTenantId);
+          }
+
+          const { data: clientRecord } = await clientQuery.maybeSingle();
 
           if (clientRecord) {
             await supabaseAdmin
@@ -806,11 +888,29 @@ const handler = async (req: Request): Promise<Response> => {
         const newTemporaryPassword = generateTemporaryPassword();
         await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { password: newTemporaryPassword });
 
-        const { data: clientRecord } = await supabaseAdmin
+        await supabaseAdmin
+          .from('user_roles')
+          .upsert({ user_id: existingUser.id, role: 'client' }, { onConflict: 'user_id,role' });
+
+        if (resolvedTenantId) {
+          await supabaseAdmin
+            .from('user_tenant_assignments')
+            .upsert(
+              { user_id: existingUser.id, tenant_id: resolvedTenantId },
+              { onConflict: 'user_id,tenant_id' },
+            );
+        }
+
+        let clientQuery = supabaseAdmin
           .from('clients')
           .select('id, user_id')
-          .eq('email', clientEmail)
-          .single();
+          .eq('email', clientEmail);
+
+        if (resolvedTenantId) {
+          clientQuery = clientQuery.eq('tenant_id', resolvedTenantId);
+        }
+
+        const { data: clientRecord } = await clientQuery.maybeSingle();
 
         if (clientRecord && !clientRecord.user_id) {
           await supabaseAdmin
@@ -833,7 +933,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Get email content with branding
-    const { subject, html } = getEmailContent(type, clientName, emailData, branding, tenantName);
+    const { subject, html } = emailData.html
+      ? getCustomEmailContent(emailData.subject, emailData.html, branding, tenantName)
+      : getEmailContent(type, clientName, emailData, branding, tenantName);
 
     // Determine sender
     const { fromAddress, senderName } = getSenderAddress(branding, tenantName);

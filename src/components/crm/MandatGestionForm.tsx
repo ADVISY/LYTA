@@ -17,7 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCrmEmails } from "@/hooks/useCrmEmails";
+import { useDocuments } from "@/hooks/useDocuments";
 import { useTenant } from "@/contexts/TenantContext";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 interface MandatGestionFormProps {
   client: Client;
@@ -75,6 +77,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
   const { toast } = useToast();
   const { user } = useAuth();
   const { sendMandatSignedEmail } = useCrmEmails();
+  const { createDocument } = useDocuments();
 
   // Get date-fns locale based on current language
   const getDateLocale = () => {
@@ -155,6 +158,9 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
     if (!mandatRef.current) return;
 
     try {
+      if (!user?.id) {
+        throw new Error("Non authentifie. Veuillez vous reconnecter.");
+      }
       const opt = {
         margin: [8, 10, 8, 10] as [number, number, number, number],
         filename: `Mandat_Gestion_${getClientName().replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`,
@@ -199,6 +205,15 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: t('mandatForm.error'),
+        description: "Session expiree. Veuillez vous reconnecter.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -208,7 +223,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
 
       // Créer le nom du fichier
       const fileName = `Mandat_Gestion_${getClientName().replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd_HHmmss')}.pdf`;
-      const fileKey = `mandats/${client.id}/${fileName}`;
+      const fileKey = `${user.id}/mandats/${client.id}/${fileName}`;
 
       // Upload vers Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -221,30 +236,50 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       if (uploadError) throw uploadError;
 
       // Créer l'entrée dans la table documents
-      const { error: docError } = await supabase
-        .from('documents')
-        .insert({
-          owner_id: client.id,
-          owner_type: 'client',
-          file_name: fileName,
-          file_key: fileKey,
-          mime_type: 'application/pdf',
-          size_bytes: pdfBlob.size,
-          doc_kind: 'mandat_gestion',
-          created_by: user?.id
-        });
+      await createDocument({
+        owner_id: client.id,
+        owner_type: 'client',
+        file_name: fileName,
+        file_key: fileKey,
+        mime_type: 'application/pdf',
+        size_bytes: pdfBlob.size,
+        doc_kind: 'mandat_gestion',
+      });
 
-      if (docError) throw docError;
+      const deliveryWarnings: string[] = [];
+      const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
 
       // Send mandat signed email with account creation
       if (client.email) {
-        const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
-        await sendMandatSignedEmail(client.email, clientName);
+        const emailResult = await sendMandatSignedEmail(client.email, clientName);
+        if (!emailResult.success) {
+          deliveryWarnings.push("Email d'acces client non envoye.");
+        }
+      } else {
+        deliveryWarnings.push("Aucun email client renseigne.");
+      }
+
+      const phone = client.mobile || client.phone;
+      if (phone) {
+        try {
+          await invokeSupabaseFunction("send-sms", {
+            body: {
+              recipients: [{ phone, name: clientName }],
+              message: `Bonjour ${clientName}, votre mandat de gestion a ete signe. Votre espace client est disponible ici: ${window.location.origin}/connexion`,
+            },
+          });
+        } catch (smsError) {
+          console.error("Erreur envoi SMS mandat:", smsError);
+          deliveryWarnings.push("SMS non envoye.");
+        }
       }
 
       toast({
-        title: t('mandatForm.mandatSaved'),
-        description: t('mandatForm.mandatSavedDesc')
+        title: deliveryWarnings.length ? "Mandat enregistre, envoi a verifier" : t('mandatForm.mandatSaved'),
+        description: deliveryWarnings.length
+          ? `Le document est enregistre. ${deliveryWarnings.join(" ")}`
+          : t('mandatForm.mandatSavedDesc'),
+        variant: deliveryWarnings.length ? "destructive" : "default",
       });
 
       // Callback pour rafraîchir la liste des documents

@@ -1,5 +1,4 @@
-import { FunctionsHttpError } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { translateError } from "@/lib/errorTranslations";
 
 type PolicyMutationAction = "create" | "update";
@@ -15,34 +14,19 @@ interface SavePolicyResponse {
   id: string;
 }
 
-async function getFunctionErrorMessage(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const payload = await error.context.json() as { error?: string; message?: string };
-      return payload.error || payload.message || error.message;
-    } catch {
-      return error.message;
-    }
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "Erreur inconnue";
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "Erreur inconnue";
 }
 
 export async function savePolicy(input: SavePolicyInput): Promise<SavePolicyResponse> {
-  const { data, error } = await supabase.functions.invoke("save-policy", {
-    body: input,
-  });
+  let data: { policy?: SavePolicyResponse };
 
-  if (error) {
-    throw new Error(translateError(await getFunctionErrorMessage(error)));
-  }
-
-  if (data?.error) {
-    throw new Error(translateError(data.error));
+  try {
+    data = await invokeSupabaseFunction<{ policy?: SavePolicyResponse }>("save-policy", {
+      body: input,
+    });
+  } catch (error) {
+    throw new Error(translateError(getErrorMessage(error)));
   }
 
   if (!data?.policy?.id) {
