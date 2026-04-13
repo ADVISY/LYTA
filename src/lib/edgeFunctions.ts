@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseConfig } from "@/integrations/supabase/config";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -42,7 +43,12 @@ export async function getFunctionErrorMessage(error: unknown): Promise<string> {
   return "Erreur inconnue";
 }
 
-async function getFreshAccessToken(): Promise<string> {
+function isExpiredTokenMessage(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("invalid or expired token") || normalized.includes("jwt expired");
+}
+
+async function getFreshAccessToken(forceRefresh = false): Promise<string> {
   const {
     data: { session: currentSession },
     error: sessionError,
@@ -55,7 +61,7 @@ async function getFreshAccessToken(): Promise<string> {
   let session = currentSession;
   const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
 
-  if (session?.refresh_token && expiresAtMs > 0 && expiresAtMs < Date.now() + 30_000) {
+  if (session?.refresh_token && (forceRefresh || expiresAtMs === 0 || expiresAtMs < Date.now() + 60_000)) {
     const {
       data: { session: refreshedSession },
       error: refreshError,
@@ -75,28 +81,67 @@ async function getFreshAccessToken(): Promise<string> {
   return session.access_token;
 }
 
+async function parseFunctionResponse(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return text ? { message: text } : null;
+}
+
+async function invokeWithToken<T>(
+  name: string,
+  options: InvokeSupabaseFunctionOptions,
+  forceRefresh: boolean,
+): Promise<T> {
+  const headers = new Headers(options.headers ?? {});
+  headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
+
+  if (options.requireAuth !== false) {
+    headers.set("Authorization", `Bearer ${await getFreshAccessToken(forceRefresh)}`);
+  }
+
+  const response = await fetch(`${supabaseConfig.url}/functions/v1/${name}`, {
+    method: "POST",
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+
+  const payload = await parseFunctionResponse(response);
+
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === "object"
+        ? asMessage((payload as JsonRecord).error) ||
+          asMessage((payload as JsonRecord).message) ||
+          asMessage((payload as JsonRecord).details)
+        : null;
+
+    throw new Error(message || `Erreur de service (${response.status})`);
+  }
+
+  if (payload && typeof payload === "object" && "error" in payload && payload.error) {
+    throw new Error(String(payload.error));
+  }
+
+  return payload as T;
+}
+
 export async function invokeSupabaseFunction<T = unknown>(
   name: string,
   options: InvokeSupabaseFunctionOptions = {},
 ): Promise<T> {
-  const headers = { ...(options.headers ?? {}) };
+  try {
+    return await invokeWithToken<T>(name, options, false);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (options.requireAuth !== false && isExpiredTokenMessage(message)) {
+      return await invokeWithToken<T>(name, options, true);
+    }
 
-  if (options.requireAuth !== false) {
-    headers.Authorization = `Bearer ${await getFreshAccessToken()}`;
+    throw error;
   }
-
-  const { data, error } = await supabase.functions.invoke(name, {
-    body: options.body,
-    headers,
-  });
-
-  if (error) {
-    throw new Error(await getFunctionErrorMessage(error));
-  }
-
-  if (data && typeof data === "object" && "error" in data && data.error) {
-    throw new Error(String(data.error));
-  }
-
-  return data as T;
 }
