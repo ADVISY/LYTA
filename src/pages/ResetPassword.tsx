@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -273,11 +274,7 @@ const ResetPassword = () => {
       <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
         <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20">
           <div className="text-center mb-8">
-            <img 
-              src={lytaLogo} 
-              alt="LYTA" 
-              className="h-24 sm:h-32 mx-auto"
-            />
+            <BrandLogo src={lytaLogo} name="LYTA" platform imgClassName="h-24 sm:h-32 mx-auto" />
           </div>
           
           <div className="w-full max-w-md p-8 rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-xl text-center">
@@ -296,11 +293,7 @@ const ResetPassword = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20">
         <div className="text-center mb-8">
-          <img 
-            src={lytaLogo} 
-            alt="LYTA" 
-            className="h-24 sm:h-32 mx-auto"
-          />
+          <BrandLogo src={lytaLogo} name="LYTA" platform imgClassName="h-24 sm:h-32 mx-auto" />
         </div>
 
         <div className="w-full max-w-md p-8 rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-xl">

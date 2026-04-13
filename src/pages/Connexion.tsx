@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown, Building2 } from "lucide-react";
+import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { LanguageSelector } from "@/components/ui/language-selector";
 import { MouseGradient } from "@/components/ui/mouse-gradient";
 import { ReactiveGrid } from "@/components/ui/reactive-grid";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email requis").email("Email invalide"),
@@ -1134,16 +1135,12 @@ const Connexion = () => {
 
       <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative z-10">
         <div className="text-center mb-8">
-          {showPlatformLogo ? (
-            <img src={lytaLogo} alt="Platform" className="h-24 sm:h-32 mx-auto" />
-          ) : logoUrl ? (
-            <img src={logoUrl} alt={displayName} className="h-24 sm:h-32 mx-auto" />
-          ) : (
-            <div className="flex items-center justify-center gap-3">
-              <Building2 className="h-16 w-16 text-primary" />
-              <span className="text-4xl font-bold">{displayName}</span>
-            </div>
-          )}
+          <BrandLogo
+            src={showPlatformLogo ? lytaLogo : logoUrl}
+            name={showPlatformLogo ? "LYTA" : displayName}
+            platform={showPlatformLogo}
+            imgClassName="h-24 sm:h-32 mx-auto"
+          />
         </div>
 
         <div className="max-w-xl w-full bg-card rounded-xl shadow-lg border p-6 sm:p-8">
