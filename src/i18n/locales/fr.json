@@ -1581,6 +1581,8 @@
     "totalContracts": "Total contrats",
     "noContract": "Aucun contrat",
     "noContractRegistered": "Vous n'avez pas encore de contrat enregistré",
+    "clientProfileUnavailable": "Profil client introuvable",
+    "clientProfileUnavailableDescription": "Ce compte n'est pas lié à une fiche client. Aucun contrat ne peut être chargé tant que la liaison client n'est pas configurée.",
     "contractDetails": "Détails du contrat",
     "startDate": "Début",
     "endDate": "Fin",

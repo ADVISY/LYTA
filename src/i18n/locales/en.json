@@ -1692,6 +1692,8 @@
     "totalContracts": "Total contracts",
     "noContract": "No contract",
     "noContractRegistered": "You don't have any registered contracts yet",
+    "clientProfileUnavailable": "Client profile unavailable",
+    "clientProfileUnavailableDescription": "This account is not linked to a client record. Contracts cannot be loaded until the client link is configured.",
     "contractDetails": "Contract details",
     "startDate": "Start",
     "endDate": "End",

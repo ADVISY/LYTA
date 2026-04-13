@@ -1682,6 +1682,8 @@
     "totalContracts": "Contratti totali",
     "noContract": "Nessun contratto",
     "noContractRegistered": "Non hai ancora contratti registrati",
+    "clientProfileUnavailable": "Profilo cliente non disponibile",
+    "clientProfileUnavailableDescription": "Questo account non è collegato a una scheda cliente. I contratti non possono essere caricati finché il collegamento cliente non è configurato.",
     "contractDetails": "Dettagli contratto",
     "startDate": "Inizio",
     "endDate": "Fine",

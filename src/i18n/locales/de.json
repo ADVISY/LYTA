@@ -1725,6 +1725,8 @@
     "totalContracts": "Verträge gesamt",
     "noContract": "Kein Vertrag",
     "noContractRegistered": "Sie haben noch keine registrierten Verträge",
+    "clientProfileUnavailable": "Kundenprofil nicht verfügbar",
+    "clientProfileUnavailableDescription": "Dieses Konto ist nicht mit einem Kundendatensatz verknüpft. Verträge können erst geladen werden, wenn die Kundenverknüpfung konfiguriert ist.",
     "contractDetails": "Vertragsdetails",
     "startDate": "Beginn",
     "endDate": "Ende",
