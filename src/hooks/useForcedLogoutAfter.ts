@@ -47,8 +47,8 @@ export function useForcedLogoutAfter(durationMinutes: number) {
       isSigningOutRef.current = true;
 
       toast({
-        title: "Session expiree",
-        description: "Vous avez ete deconnecte automatiquement apres une periode d'inactivite.",
+        title: "Session expirée",
+        description: "Vous avez été déconnecté automatiquement après une période d'inactivité.",
         variant: "destructive",
       });
 

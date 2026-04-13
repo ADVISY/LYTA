@@ -53,16 +53,16 @@ export const useCrmEmails = () => {
       console.log("Email sent successfully:", response);
 
       const messages: Record<EmailType, string> = {
-        welcome: "Email de bienvenue envoye",
-        contract_signed: "Confirmation de signature envoyee",
-        mandat_signed: "Email avec identifiants envoye",
-        account_created: "Identifiants de connexion envoyes",
-        relation_client: "Email relation client envoye",
-        offre_speciale: "Email d'offre speciale envoye",
+        welcome: "Email de bienvenue envoyé",
+        contract_signed: "Confirmation de signature envoyée",
+        mandat_signed: "Email avec identifiants envoyé",
+        account_created: "Identifiants de connexion envoyés",
+        relation_client: "Email relation client envoyé",
+        offre_speciale: "Email d'offre spéciale envoyé",
       };
 
       toast({
-        title: "Email envoye",
+        title: "Email envoyé",
         description: messages[type],
       });
 

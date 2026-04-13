@@ -68,14 +68,14 @@ async function getFreshAccessToken(forceRefresh = false): Promise<string> {
     } = await supabase.auth.refreshSession();
 
     if (refreshError) {
-      throw new Error("Votre session a expire. Veuillez vous reconnecter.");
+      throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
     }
 
     session = refreshedSession;
   }
 
   if (!session?.access_token) {
-    throw new Error("Non authentifie. Veuillez vous reconnecter.");
+    throw new Error("Non authentifié. Veuillez vous reconnecter.");
   }
 
   return session.access_token;

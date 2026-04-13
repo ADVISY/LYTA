@@ -198,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { session: challengeSession } } = await smsClient.auth.getSession();
 
     if (!challengeSession) {
-      throw new Error("La session de verification SMS a expire. Veuillez vous reconnecter.");
+      throw new Error("La session de vérification SMS a expiré. Veuillez vous reconnecter.");
     }
 
     writeSessionEnforcerState({
@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rpcError) {
         console.error("Error fetching login data:", rpcError);
         await clearSmsChallengeSession({ revoke: true });
-        return { error: { message: "Erreur de verification. Veuillez reessayer." } };
+        return { error: { message: "Erreur de vérification. Veuillez réessayer." } };
       }
 
       const parsedData = parseLoginData(loginData);
@@ -345,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await clearSmsChallengeSession({ revoke: true });
           return {
             error: {
-              message: "Numero de telephone requis pour la verification SMS. Contactez l'administrateur.",
+              message: "Numéro de téléphone requis pour la vérification SMS. Contactez l'administrateur.",
             },
           };
         }
@@ -417,7 +417,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.isCompromised) {
         return {
           error: {
-            message: `Ce mot de passe a ete expose dans ${result.count.toLocaleString()} fuites de donnees. Veuillez en choisir un autre plus securise.`,
+            message: `Ce mot de passe a été exposé dans ${result.count.toLocaleString()} fuites de données. Veuillez en choisir un autre plus sécurisé.`,
           },
         };
       }
@@ -478,7 +478,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: {
             message: getErrorMessage(
               response.error,
-              "Erreur lors de l'envoi du mail de reinitialisation.",
+              "Erreur lors de l'envoi du mail de réinitialisation.",
             ),
           },
         };

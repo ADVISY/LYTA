@@ -955,7 +955,7 @@ const Connexion = () => {
       smsFlowActive.current = false;
       toast({
         title: "Erreur",
-        description: getErrorMessage(error, "La session de verification SMS a expire. Veuillez vous reconnecter."),
+        description: getErrorMessage(error, "La session de vérification SMS a expiré. Veuillez vous reconnecter."),
         variant: "destructive",
       });
       await supabase.auth.signOut();
