@@ -208,7 +208,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
     if (!user?.id) {
       toast({
         title: t('mandatForm.error'),
-        description: "Session expiree. Veuillez vous reconnecter.",
+        description: "Session expirée. Veuillez vous reconnecter.",
         variant: "destructive"
       });
       return;
@@ -253,10 +253,10 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       if (client.email) {
         const emailResult = await sendMandatSignedEmail(client.email, clientName);
         if (!emailResult.success) {
-          deliveryWarnings.push("Email d'acces client non envoye.");
+          deliveryWarnings.push("Email d'accès client non envoyé.");
         }
       } else {
-        deliveryWarnings.push("Aucun email client renseigne.");
+        deliveryWarnings.push("Aucun email client renseigné.");
       }
 
       const phone = client.mobile || client.phone;
@@ -265,19 +265,19 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
           await invokeSupabaseFunction("send-sms", {
             body: {
               recipients: [{ phone, name: clientName }],
-              message: `Bonjour ${clientName}, votre mandat de gestion a ete signe. Votre espace client est disponible ici: ${window.location.origin}/connexion`,
+              message: `Bonjour ${clientName}, votre mandat de gestion a été signé. Votre espace client est disponible ici: ${window.location.origin}/connexion`,
             },
           });
         } catch (smsError) {
           console.error("Erreur envoi SMS mandat:", smsError);
-          deliveryWarnings.push("SMS non envoye.");
+          deliveryWarnings.push("SMS non envoyé.");
         }
       }
 
       toast({
-        title: deliveryWarnings.length ? "Mandat enregistre, envoi a verifier" : t('mandatForm.mandatSaved'),
+        title: deliveryWarnings.length ? "Mandat enregistré, envoi à vérifier" : t('mandatForm.mandatSaved'),
         description: deliveryWarnings.length
-          ? `Le document est enregistre. ${deliveryWarnings.join(" ")}`
+          ? `Le document est enregistré. ${deliveryWarnings.join(" ")}`
           : t('mandatForm.mandatSavedDesc'),
         variant: deliveryWarnings.length ? "destructive" : "default",
       });
