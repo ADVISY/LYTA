@@ -39,8 +39,11 @@
     "callAdvisor": "Appelez {{name}}",
     "callCabinet": "Appelez le cabinet",
     "contactAdvisor": "Contactez votre conseiller",
+    "you": "Vous",
+    "advisor": "Conseiller",
     "messageSent": "Message envoyé",
-    "messageSuccessDescription": "Votre conseiller vous répondra dans les plus brefs délais"
+    "messageSuccessDescription": "Votre conseiller vous répondra dans les plus brefs délais",
+    "messageError": "Erreur"
   },
   "mandatForm": {
     "title": "Créer un Mandat de Gestion",
@@ -1582,7 +1585,7 @@
     "noContract": "Aucun contrat",
     "noContractRegistered": "Vous n'avez pas encore de contrat enregistré",
     "clientProfileUnavailable": "Profil client introuvable",
-    "clientProfileUnavailableDescription": "Ce compte n'est pas lié à une fiche client. Aucun contrat ne peut être chargé tant que la liaison client n'est pas configurée.",
+    "clientProfileUnavailableDescription": "Ce compte n'est pas lié à une fiche client. Les données de l'espace client ne peuvent pas être chargées tant que la liaison client n'est pas configurée.",
     "contractDetails": "Détails du contrat",
     "startDate": "Début",
     "endDate": "Fin",

@@ -14,7 +14,8 @@ import {
   File,
   FileImage,
   Upload,
-  FolderOpen
+  FolderOpen,
+  AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -48,10 +49,14 @@ export default function ClientDocuments() {
   const docKindLabels = getDocKindLabels(t);
 
   useEffect(() => {
-    if (clientData?.id) {
-      fetchDocuments();
+    if (!clientData?.id) {
+      setDocuments([]);
+      setLoading(false);
+      return;
     }
-  }, [clientData]);
+
+    fetchDocuments();
+  }, [clientData?.id]);
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -145,6 +150,29 @@ export default function ClientDocuments() {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!clientData?.id) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t('clientDocuments.title')}</h1>
+          <p className="text-muted-foreground">{t('clientDocuments.subtitle')}</p>
+        </div>
+
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 text-amber-500" />
+            <h3 className="text-base lg:text-lg font-medium mb-2">
+              {t('clientSpace.clientProfileUnavailable')}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+              {t('clientSpace.clientProfileUnavailableDescription')}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

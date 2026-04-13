@@ -39,8 +39,11 @@
     "callAdvisor": "{{name}} anrufen",
     "callCabinet": "Büro anrufen",
     "contactAdvisor": "Kontaktieren Sie Ihren Berater",
+    "you": "Sie",
+    "advisor": "Berater",
     "messageSent": "Nachricht gesendet",
-    "messageSuccessDescription": "Ihr Berater wird Ihnen so schnell wie möglich antworten"
+    "messageSuccessDescription": "Ihr Berater wird Ihnen so schnell wie möglich antworten",
+    "messageError": "Fehler"
   },
   "mandatForm": {
     "title": "Verwaltungsmandat erstellen",
@@ -1726,7 +1729,7 @@
     "noContract": "Kein Vertrag",
     "noContractRegistered": "Sie haben noch keine registrierten Verträge",
     "clientProfileUnavailable": "Kundenprofil nicht verfügbar",
-    "clientProfileUnavailableDescription": "Dieses Konto ist nicht mit einem Kundendatensatz verknüpft. Verträge können erst geladen werden, wenn die Kundenverknüpfung konfiguriert ist.",
+    "clientProfileUnavailableDescription": "Dieses Konto ist nicht mit einem Kundendatensatz verknüpft. Daten im Kundenbereich können erst geladen werden, wenn die Kundenverknüpfung konfiguriert ist.",
     "contractDetails": "Vertragsdetails",
     "startDate": "Beginn",
     "endDate": "Ende",

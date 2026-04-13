@@ -39,8 +39,11 @@
     "callAdvisor": "Call {{name}}",
     "callCabinet": "Call the office",
     "contactAdvisor": "Contact your advisor",
+    "you": "You",
+    "advisor": "Advisor",
     "messageSent": "Message sent",
-    "messageSuccessDescription": "Your advisor will respond as soon as possible"
+    "messageSuccessDescription": "Your advisor will respond as soon as possible",
+    "messageError": "Error"
   },
   "mandatForm": {
     "title": "Create Management Mandate",
@@ -1693,7 +1696,7 @@
     "noContract": "No contract",
     "noContractRegistered": "You don't have any registered contracts yet",
     "clientProfileUnavailable": "Client profile unavailable",
-    "clientProfileUnavailableDescription": "This account is not linked to a client record. Contracts cannot be loaded until the client link is configured.",
+    "clientProfileUnavailableDescription": "This account is not linked to a client record. Client space data cannot be loaded until the client link is configured.",
     "contractDetails": "Contract details",
     "startDate": "Start",
     "endDate": "End",

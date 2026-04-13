@@ -39,8 +39,11 @@
     "callAdvisor": "Chiama {{name}}",
     "callCabinet": "Chiama l'ufficio",
     "contactAdvisor": "Contatta il tuo consulente",
+    "you": "Tu",
+    "advisor": "Consulente",
     "messageSent": "Messaggio inviato",
-    "messageSuccessDescription": "Il tuo consulente ti risponderà al più presto"
+    "messageSuccessDescription": "Il tuo consulente ti risponderà al più presto",
+    "messageError": "Errore"
   },
   "mandatForm": {
     "title": "Crea mandato di gestione",
@@ -1683,7 +1686,7 @@
     "noContract": "Nessun contratto",
     "noContractRegistered": "Non hai ancora contratti registrati",
     "clientProfileUnavailable": "Profilo cliente non disponibile",
-    "clientProfileUnavailableDescription": "Questo account non è collegato a una scheda cliente. I contratti non possono essere caricati finché il collegamento cliente non è configurato.",
+    "clientProfileUnavailableDescription": "Questo account non è collegato a una scheda cliente. I dati dell'area cliente non possono essere caricati finché il collegamento cliente non è configurato.",
     "contractDetails": "Dettagli contratto",
     "startDate": "Inizio",
     "endDate": "Fine",

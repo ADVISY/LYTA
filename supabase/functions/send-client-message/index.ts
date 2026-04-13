@@ -13,6 +13,7 @@ const log = createLogger("send-client-message");
 
 interface ClientMessageRequest {
   message: string;
+  clientId?: string;
 }
 
 const getMessageEmailTemplate = (
@@ -124,17 +125,12 @@ const handler = async (req: Request): Promise<Response> => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { user, supabase: userSupabase } = await requireAuth(req);
+    const { user } = await requireAuth(req);
 
     await checkRateLimit(req, "send-client-message", 5);
 
-    if (!RESEND_API_KEY) {
-      log.error("RESEND_API_KEY not configured");
-      throw new Error("Email service not configured");
-    }
-
     const body: ClientMessageRequest = await req.json();
-    const { message } = body;
+    const { message, clientId: requestedClientId } = body;
 
     if (!message || !message.trim()) {
       return new Response(
@@ -159,9 +155,6 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("User profile not found");
     }
 
-    const clientName = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Client";
-    const clientEmail = profile.email || user.email || "";
-
     // Get tenant assignment for this user
     const { data: tenantAssignment, error: tenantError } = await supabase
       .from("user_tenant_assignments")
@@ -176,13 +169,46 @@ const handler = async (req: Request): Promise<Response> => {
 
     const tenantId = tenantAssignment.tenant_id;
 
-    // Find the client record linked to this user to get assigned_agent_id
-    const { data: clientRecord, error: clientError } = await supabase
+    // Find the client record linked to this user to get assigned_agent_id.
+    // If the frontend sends a clientId, validate that it is the user's own client record.
+    const clientQuery = supabase
       .from("clients")
-      .select("id, assigned_agent_id")
+      .select("id, assigned_agent_id, first_name, last_name, email")
       .eq("user_id", user.id)
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
+      .eq("tenant_id", tenantId);
+
+    const { data: clientRecord, error: clientError } = requestedClientId
+      ? await clientQuery.eq("id", requestedClientId).maybeSingle()
+      : await clientQuery.maybeSingle();
+
+    if (clientError || !clientRecord) {
+      log.error("Client record not found for user", { userId: user.id, tenantId, requestedClientId, error: clientError?.message });
+      return new Response(
+        JSON.stringify({ error: "Compte client non lie a une fiche client. Contactez votre conseiller." }),
+        { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    const clientName = [clientRecord.first_name || profile.first_name, clientRecord.last_name || profile.last_name]
+      .filter(Boolean)
+      .join(" ") || "Client";
+    const clientEmail = clientRecord.email || profile.email || user.email || "";
+
+    const { data: savedMessage, error: saveMessageError } = await supabase
+      .from("messages_clients")
+      .insert({
+        client_id: clientRecord.id,
+        direction: "sortant",
+        channel: "email",
+        content: message.trim(),
+      })
+      .select("id, created_at")
+      .single();
+
+    if (saveMessageError) {
+      log.error("Failed to save client message", { error: saveMessageError.message, clientId: clientRecord.id });
+      throw new Error("Impossible d'enregistrer le message");
+    }
 
     let recipientEmail: string | null = null;
 
@@ -230,8 +256,19 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (!recipientEmail) {
-      log.error("No recipient email found");
-      throw new Error("No recipient email found for this tenant");
+      log.warn("No recipient email found; message saved without email notification", { messageId: savedMessage.id, tenantId });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: savedMessage.id,
+          emailSent: false,
+          warning: "Message enregistre, mais aucun email destinataire n'est configure pour ce cabinet.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
+        }
+      );
     }
 
     // Get tenant branding for email template
@@ -262,6 +299,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { fromAddress } = getSenderAddress(tenantBranding, tenantBranding.display_name || "Cabinet");
 
+    if (!RESEND_API_KEY) {
+      log.warn("RESEND_API_KEY not configured; message saved without email notification", { messageId: savedMessage.id });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: savedMessage.id,
+          emailSent: false,
+          warning: "Message enregistre, mais la notification email n'est pas configuree.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
+        }
+      );
+    }
+
     log.info("Sending client message email", { to: recipientEmail, from: fromAddress, client: clientName });
 
     const emailResponse = await fetch("https://api.resend.com/emails", {
@@ -279,17 +332,34 @@ const handler = async (req: Request): Promise<Response> => {
       }),
     });
 
-    const emailResult = await emailResponse.json();
+    const emailResultText = await emailResponse.text();
+    let emailResult: Record<string, unknown> = {};
+    try {
+      emailResult = emailResultText ? JSON.parse(emailResultText) : {};
+    } catch {
+      emailResult = { message: emailResultText };
+    }
 
     if (!emailResponse.ok) {
-      log.error("Resend API error", { error: emailResult });
-      throw new Error(emailResult.message || "Failed to send email");
+      log.error("Resend API error; message saved without email notification", { error: emailResult, messageId: savedMessage.id });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messageId: savedMessage.id,
+          emailSent: false,
+          warning: "Message enregistre, mais la notification email n'a pas pu etre envoyee.",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
+        }
+      );
     }
 
     log.info("Client message email sent successfully", { emailId: emailResult.id });
 
     return new Response(
-      JSON.stringify({ success: true, emailId: emailResult.id }),
+      JSON.stringify({ success: true, messageId: savedMessage.id, emailSent: true, emailId: emailResult.id }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,11 +14,13 @@ import {
   Clock,
   Building2,
   MapPin,
-  Globe
+  Globe,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 type AdvisorData = {
   id: string;
@@ -28,6 +30,14 @@ type AdvisorData = {
   phone: string | null;
   mobile: string | null;
   photo_url: string | null;
+};
+
+type ClientMessage = {
+  id: string;
+  content: string;
+  direction: string;
+  channel: string;
+  created_at: string | null;
 };
 
 export default function ClientMessages() {
@@ -41,6 +51,8 @@ export default function ClientMessages() {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState<ClientMessage[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
 
   // Get tenant branding info
   const branding = tenant?.branding;
@@ -51,30 +63,63 @@ export default function ClientMessages() {
   const cabinetWebsite = branding?.company_website;
   const cabinetLogo = branding?.logo_url;
 
+  useEffect(() => {
+    if (!clientData?.id) {
+      setMessages([]);
+      setLoadingMessages(false);
+      return;
+    }
+
+    fetchMessages();
+  }, [clientData?.id]);
+
+  const fetchMessages = async () => {
+    setLoadingMessages(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('messages_clients')
+        .select('id, content, direction, channel, created_at')
+        .eq('client_id', clientData.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading client messages:', error);
+        return;
+      }
+
+      setMessages((data || []) as ClientMessage[]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
+
+    if (!clientData?.id) {
+      toast({
+        title: t('clientMessages.messageError', { defaultValue: 'Erreur' }),
+        description: t('clientSpace.clientProfileUnavailableDescription'),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSending(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('send-client-message', {
-        body: { message: message.trim() }
+      const data = await invokeSupabaseFunction<{ success?: boolean; warning?: string }>('send-client-message', {
+        body: { message: message.trim(), clientId: clientData.id }
       });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
 
       toast({
         title: t('clientMessages.messageSent'),
-        description: t('clientMessages.messageSuccessDescription'),
+        description: data?.warning || t('clientMessages.messageSuccessDescription'),
       });
 
       setMessage("");
+      fetchMessages();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       toast({
@@ -112,6 +157,37 @@ export default function ClientMessages() {
   const getWhatsAppLink = (phone: string) => {
     return `https://wa.me/${formatPhoneForLink(phone)}`;
   };
+
+  const formatMessageDate = (value: string | null) => {
+    if (!value) return "";
+    return new Date(value).toLocaleString('fr-CH', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  };
+
+  if (!clientData?.id) {
+    return (
+      <div className="space-y-4 lg:space-y-6">
+        <div>
+          <h1 className="text-xl lg:text-2xl font-bold">{t('clientMessages.title')}</h1>
+          <p className="text-sm lg:text-base text-muted-foreground">{t('clientMessages.subtitle', { cabinet: cabinetName })}</p>
+        </div>
+
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="h-12 w-12 lg:h-16 lg:w-16 mx-auto mb-4 text-amber-500" />
+            <h3 className="text-base lg:text-lg font-medium mb-2">
+              {t('clientSpace.clientProfileUnavailable')}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+              {t('clientSpace.clientProfileUnavailableDescription')}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -155,11 +231,40 @@ export default function ClientMessages() {
               <CardTitle className="text-base lg:text-lg">{t('clientMessages.history')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-6 lg:py-8 text-muted-foreground">
-                <MessageCircle className="h-10 w-10 lg:h-12 lg:w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm lg:text-base">{t('clientMessages.noMessages')}</p>
-                <p className="text-xs lg:text-sm">{t('clientMessages.messagesWillAppear')}</p>
-              </div>
+              {loadingMessages ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-6 lg:py-8 text-muted-foreground">
+                  <MessageCircle className="h-10 w-10 lg:h-12 lg:w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm lg:text-base">{t('clientMessages.noMessages')}</p>
+                  <p className="text-xs lg:text-sm">{t('clientMessages.messagesWillAppear')}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map((item) => {
+                    const isClientMessage = item.direction === 'sortant' || item.direction === 'outgoing';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`rounded-lg border p-3 ${isClientMessage ? 'bg-primary/5 border-primary/20' : 'bg-muted/40'}`}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <Badge variant={isClientMessage ? 'default' : 'secondary'}>
+                            {isClientMessage ? t('clientMessages.you') : t('clientMessages.advisor')}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatMessageDate(item.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{item.content}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
