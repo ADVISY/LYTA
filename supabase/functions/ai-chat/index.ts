@@ -263,25 +263,9 @@ serve(async (req) => {
     }, 20000);
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      log.error('AI Gateway error', { status: aiResponse.status, errorText });
-      throw await buildAiError(aiResponse);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Trop de requêtes, veuillez réessayer dans quelques instants.' }),
-          { status: 429, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Service temporairement indisponible.' }),
-          { status: 402, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw await buildAiError(aiResponse);
+      const aiError = await buildAiError(aiResponse);
+      log.error('AI Gateway error', { status: aiResponse.status, error: aiError.message });
+      throw aiError;
     }
 
     const aiData = await aiResponse.json();

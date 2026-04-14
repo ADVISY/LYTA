@@ -1,5 +1,11 @@
 const DEFAULT_AI_GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_AI_MODEL = "gpt-5.4-mini";
+const DEFAULT_AI_MODEL = "gpt-5-mini";
+
+type AiErrorPayload = {
+  message: string;
+  code: string;
+  type: string;
+};
 
 function getAiGatewayApiKey(): string {
   const apiKey =
@@ -21,36 +27,50 @@ export function getAiGatewayUrl(): string {
   return Deno.env.get("AI_GATEWAY_URL") ?? DEFAULT_AI_GATEWAY_URL;
 }
 
-export async function buildAiError(response: Response): Promise<Error> {
-  let details = "";
-  let code = "";
-  let type = "";
-
-  try {
-    const payload = await response.clone().json();
-    const message =
-      payload?.error?.message ||
-      payload?.message ||
-      payload?.error ||
-      "";
-    details = typeof message === "string" ? message : JSON.stringify(message);
-    code = typeof payload?.error?.code === "string" ? payload.error.code : "";
-    type = typeof payload?.error?.type === "string" ? payload.error.type : "";
-  } catch {
-    try {
-      details = await response.clone().text();
-    } catch {
-      details = "";
-    }
+function shouldUseDefaultSampling(model: unknown): boolean {
+  if (typeof model !== "string") {
+    return false;
   }
 
-  if (response.status === 401 || response.status === 403) {
+  const normalizedModel = model.toLowerCase();
+  return normalizedModel.startsWith("gpt-5") || /^o\d/.test(normalizedModel);
+}
+
+function extractAiErrorPayload(payload: unknown): AiErrorPayload {
+  if (!payload || typeof payload !== "object") {
+    return { message: "", code: "", type: "" };
+  }
+
+  const record = payload as Record<string, unknown>;
+  const error = record.error && typeof record.error === "object"
+    ? record.error as Record<string, unknown>
+    : null;
+  const rawMessage = error?.message ?? record.message ?? record.error ?? "";
+  const message = typeof rawMessage === "string" ? rawMessage : JSON.stringify(rawMessage);
+
+  return {
+    message,
+    code: typeof error?.code === "string" ? error.code : "",
+    type: typeof error?.type === "string" ? error.type : "",
+  };
+}
+
+export function buildAiErrorFromPayload(status: number, payload: AiErrorPayload): Error {
+  const details = payload.message;
+  const code = payload.code;
+  const type = payload.type;
+
+  if (status === 400) {
+    return new Error(`Requete IA invalide.${details ? ` ${details}` : ""}`);
+  }
+
+  if (status === 401 || status === 403) {
     return new Error(
       "Configuration IA invalide: la cle API est refusee par le fournisseur. Verifiez OPENAI_API_KEY ou configurez AI_GATEWAY_API_KEY/AI_GATEWAY_URL.",
     );
   }
 
-  if (response.status === 429) {
+  if (status === 429) {
     if (
       code === "insufficient_quota" ||
       type === "insufficient_quota" ||
@@ -64,11 +84,27 @@ export async function buildAiError(response: Response): Promise<Error> {
     return new Error(`Trop de requetes IA.${details ? ` ${details}` : " Reessayez dans quelques instants."}`);
   }
 
-  if (response.status === 402) {
+  if (status === 402) {
     return new Error("Credits IA insuffisants. Contactez l'administrateur.");
   }
 
-  return new Error(`AI request failed: ${response.status}${details ? ` - ${details}` : ""}`);
+  return new Error(`AI request failed: ${status}${details ? ` - ${details}` : ""}`);
+}
+
+export async function buildAiError(response: Response): Promise<Error> {
+  try {
+    return buildAiErrorFromPayload(response.status, extractAiErrorPayload(await response.clone().json()));
+  } catch {
+    try {
+      return buildAiErrorFromPayload(response.status, {
+        message: await response.clone().text(),
+        code: "",
+        type: "",
+      });
+    } catch {
+      return buildAiErrorFromPayload(response.status, { message: "", code: "", type: "" });
+    }
+  }
 }
 
 export async function fetchAiChatCompletions(
@@ -79,13 +115,30 @@ export async function fetchAiChatCompletions(
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const normalizedPayload = { ...payload };
+    if (
+      "max_tokens" in normalizedPayload &&
+      !("max_completion_tokens" in normalizedPayload)
+    ) {
+      normalizedPayload.max_completion_tokens = normalizedPayload.max_tokens;
+      delete normalizedPayload.max_tokens;
+    }
+
+    if (
+      shouldUseDefaultSampling(normalizedPayload.model) &&
+      "temperature" in normalizedPayload &&
+      normalizedPayload.temperature !== 1
+    ) {
+      delete normalizedPayload.temperature;
+    }
+
     return await fetch(getAiGatewayUrl(), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getAiGatewayApiKey()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(normalizedPayload),
       signal: controller.signal,
     });
   } catch (error) {

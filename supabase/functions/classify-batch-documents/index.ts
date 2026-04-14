@@ -284,17 +284,9 @@ serve(async (req) => {
     }, 30000);
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      log.error("AI Gateway error", { status: aiResponse.status, errorText });
-      throw await buildAiError(aiResponse);
-      
-      if (aiResponse.status === 429) {
-        throw new Error("Trop de requêtes. Réessayez dans quelques instants.");
-      }
-      if (aiResponse.status === 402) {
-        throw new Error("Crédits IA insuffisants. Contactez l'administrateur.");
-      }
-      throw await buildAiError(aiResponse);
+      const aiError = await buildAiError(aiResponse);
+      log.error("AI Gateway error", { status: aiResponse.status, error: aiError.message });
+      throw aiError;
     }
 
     const aiData = await aiResponse.json();
