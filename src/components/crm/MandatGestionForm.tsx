@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCrmEmails } from "@/hooks/useCrmEmails";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useTenant } from "@/contexts/TenantContext";
+import { useUserTenant } from "@/hooks/useUserTenant";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 interface MandatGestionFormProps {
@@ -76,6 +77,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
   const mandatRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { tenantId } = useUserTenant();
   const { sendMandatSignedEmail } = useCrmEmails();
   const { createDocument } = useDocuments();
 
@@ -265,6 +267,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
           await invokeSupabaseFunction("send-sms", {
             body: {
               recipients: [{ phone, name: clientName }],
+              tenantId,
               message: `Bonjour ${clientName}, votre mandat de gestion a été signé. Votre espace client est disponible ici: ${window.location.origin}/connexion`,
             },
           });

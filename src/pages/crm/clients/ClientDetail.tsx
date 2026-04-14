@@ -1648,7 +1648,7 @@ export default function ClientDetail() {
 
             {hasMandateAutomation && (
               <TabsContent value="mandat">
-                <MandatGestionForm client={client} />
+                <MandatGestionForm client={client} onSaved={loadDocuments} />
               </TabsContent>
             )}
           </Tabs>

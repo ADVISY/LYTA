@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
 import { OnboardingNotifications } from "@/components/king/OnboardingNotifications";
+import { getFunctionErrorMessage, invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 interface TenantFormData {
   // Step 1 - Info cabinet
@@ -197,7 +198,7 @@ export default function KingWizard() {
   const runOnboarding = async (tenantId: string, slug: string, tenantName: string, emailDomain?: string) => {
     setIsOnboarding(true);
     try {
-      const response = await supabase.functions.invoke('tenant-onboarding', {
+      const response = await invokeSupabaseFunction('tenant-onboarding', {
         body: {
           tenant_id: tenantId,
           slug: slug,
@@ -207,16 +208,11 @@ export default function KingWizard() {
         },
       });
 
-      if (response.error) {
-        console.error("Onboarding error:", response.error);
-        toast.error("Erreur lors de l'onboarding automatique: " + response.error.message);
-      } else {
-        console.log("Onboarding completed:", response.data);
-        toast.success("Onboarding DNS & Email terminé!");
-      }
+      console.log("Onboarding completed:", response);
+      toast.success("Onboarding DNS & Email terminé!");
     } catch (error: any) {
       console.error("Error calling onboarding:", error);
-      toast.error("Erreur lors de l'onboarding: " + (error.message || "Erreur inconnue"));
+      toast.error("Erreur lors de l'onboarding: " + await getFunctionErrorMessage(error));
     } finally {
       setIsOnboarding(false);
     }
@@ -306,7 +302,7 @@ export default function KingWizard() {
 
       // 4. Create admin user via edge function
       try {
-        const response = await supabase.functions.invoke('create-tenant-admin', {
+        const response = await invokeSupabaseFunction('create-tenant-admin', {
           body: {
             tenant_id: tenant.id,
             email: formData.admin_email,
@@ -317,14 +313,10 @@ export default function KingWizard() {
           },
         });
 
-        if (response.error) {
-          console.error("Error creating admin:", response.error);
-          toast.error("Le tenant a été créé mais l'admin n'a pas pu être créé: " + response.error.message);
-        } else {
-          console.log("Admin created successfully:", response.data);
-        }
+        console.log("Admin created successfully:", response);
       } catch (adminError: any) {
         console.error("Error calling edge function:", adminError);
+        toast.error("Le tenant a été créé mais l'admin n'a pas pu être créé: " + await getFunctionErrorMessage(adminError));
       }
 
       setIsComplete(true);

@@ -9,6 +9,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 
+type LoginSpace = "client" | "team" | "king";
+
+function getRequestedLoginSpace(search: string): LoginSpace | null {
+  const params = new URLSearchParams(search);
+  const value = params.get("space") || params.get("login");
+  return value === "client" || value === "team" || value === "king" ? value : null;
+}
+
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,6 +28,7 @@ const ResetPassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const processedRef = useRef(false);
+  const requestedLoginSpaceRef = useRef<LoginSpace | null>(null);
 
   // Listen for auth state changes - Supabase may auto-process recovery tokens
   useEffect(() => {
@@ -56,6 +65,11 @@ const ResetPassword = () => {
 
         // Also check query params for code flow
         const queryParams = new URLSearchParams(location.search);
+        const requestedLoginSpace = getRequestedLoginSpace(location.search);
+        if (requestedLoginSpace) {
+          requestedLoginSpaceRef.current = requestedLoginSpace;
+        }
+
         const code = queryParams.get('code');
         const tokenHash = queryParams.get('token_hash');
 
@@ -242,7 +256,8 @@ const ResetPassword = () => {
         
         // Sign out and redirect to login
         await supabase.auth.signOut();
-        navigate("/connexion");
+        const loginSpace = requestedLoginSpaceRef.current;
+        navigate(loginSpace ? `/connexion?space=${loginSpace}` : "/connexion", { replace: true });
       }
     } catch (error: any) {
       console.error("[ResetPassword] Unexpected error:", error);
@@ -280,7 +295,13 @@ const ResetPassword = () => {
           <div className="w-full max-w-md p-8 rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-xl text-center">
             <h2 className="text-xl font-bold text-foreground mb-4">Lien expiré</h2>
             <p className="text-muted-foreground mb-6">{tokenError}</p>
-            <Button onClick={() => navigate("/connexion")} className="w-full">
+            <Button
+              onClick={() => {
+                const loginSpace = requestedLoginSpaceRef.current;
+                navigate(loginSpace ? `/connexion?space=${loginSpace}` : "/connexion", { replace: true });
+              }}
+              className="w-full"
+            >
               Retour à la connexion
             </Button>
           </div>

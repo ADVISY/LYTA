@@ -462,13 +462,36 @@ async function assertSeatAvailable(
   tenantId: string,
   tenant: TenantRecord,
 ): Promise<void> {
-  const { count: activeUsersCount } = await supabaseAdmin
+  const { data: tenantAssignments, error: assignmentsError } = await supabaseAdmin
     .from("user_tenant_assignments")
-    .select("*", { count: "exact", head: true })
+    .select("user_id")
     .eq("tenant_id", tenantId);
 
+  if (assignmentsError) {
+    throw new AuthError(`Erreur lors du controle des sieges: ${assignmentsError.message}`, 500);
+  }
+
+  const assignedUserIds = (tenantAssignments ?? [])
+    .map(({ user_id }) => user_id)
+    .filter(Boolean);
+
+  let billableUsersCount = 0;
+  if (assignedUserIds.length > 0) {
+    const { data: billableRoles, error: rolesError } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id")
+      .in("user_id", assignedUserIds)
+      .neq("role", "client");
+
+    if (rolesError) {
+      throw new AuthError(`Erreur lors du controle des roles: ${rolesError.message}`, 500);
+    }
+
+    billableUsersCount = new Set((billableRoles ?? []).map(({ user_id }) => user_id)).size;
+  }
+
   const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
-  const availableSeats = totalSeats - (activeUsersCount || 0);
+  const availableSeats = totalSeats - billableUsersCount;
 
   if (availableSeats <= 0) {
     throw new AuthError("Aucun siege disponible. Debloquez un siege supplementaire.", 400);
@@ -480,6 +503,7 @@ async function ensureTenantAssignment(
   userId: string,
   tenantId: string,
   tenant: TenantRecord,
+  consumesSeat: boolean,
 ): Promise<void> {
   const { data: existingTenantAssignment } = await supabaseAdmin
     .from("user_tenant_assignments")
@@ -492,7 +516,9 @@ async function ensureTenantAssignment(
     return;
   }
 
-  await assertSeatAvailable(supabaseAdmin, tenantId, tenant);
+  if (consumesSeat) {
+    await assertSeatAvailable(supabaseAdmin, tenantId, tenant);
+  }
 
   const { error } = await supabaseAdmin
     .from("user_tenant_assignments")
@@ -737,6 +763,7 @@ Deno.serve(async (req) => {
     let isNewUser = false;
 
     const clientName = `${firstName || targetRecord.first_name || ''} ${lastName || targetRecord.last_name || ''}`.trim() || email;
+    const consumesSeat = role !== "client";
 
     if (existingUser) {
       // User already exists - we'll add the new role and link to the client record
@@ -763,7 +790,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      await ensureTenantAssignment(supabaseAdmin, userId, tenantId, tenant as TenantRecord);
+      await ensureTenantAssignment(supabaseAdmin, userId, tenantId, tenant as TenantRecord, consumesSeat);
 
       // Check if user is already assigned to this tenant
       const { data: existingTenantAssignment } = await supabaseAdmin
@@ -874,6 +901,11 @@ Deno.serve(async (req) => {
       // New user - create account with temporary password then send reset link
       isNewUser = true;
 
+      if (consumesSeat) {
+        await assertSeatAvailable(supabaseAdmin, tenantId, tenant as TenantRecord);
+      }
+
+      /*
       // Check seat availability
       const { count: activeUsersCount } = await supabaseAdmin
         .from("user_tenant_assignments")
@@ -883,12 +915,14 @@ Deno.serve(async (req) => {
       const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
       const availableSeats = totalSeats - (activeUsersCount || 0);
 
-      if (availableSeats <= 0) {
+      if (false && availableSeats <= 0) {
         return new Response(
           JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
           { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
         );
       }
+
+      */
 
       // Create user with a readable generated password
       const generatedPassword = generateReadablePassword();

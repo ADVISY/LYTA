@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { ChevronLeft, LayoutDashboard, FileUp, User, Users, Crown } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,7 @@ const loginSchema = z.object({
 });
 
 type View = "choice" | "client" | "team" | "team-login" | "king";
+type LoginSpace = "client" | "team" | "king";
 
 interface FieldErrors {
   email?: string;
@@ -45,6 +46,12 @@ function getErrorMessage(error: unknown, fallback = "Une erreur est survenue.") 
   }
 
   return fallback;
+}
+
+function getRequestedLoginSpace(search: string): LoginSpace | null {
+  const params = new URLSearchParams(search);
+  const value = params.get("space") || params.get("login");
+  return value === "client" || value === "team" || value === "king" ? value : null;
 }
 
 interface LoginFormProps {
@@ -366,6 +373,7 @@ const Connexion = () => {
   const { toast } = useToast();
   const { signIn, resetPassword, user, clearPendingVerification, completeSmsVerification } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Flag to completely block redirects during SMS flow
   const smsFlowActive = useRef(false);
@@ -426,6 +434,20 @@ const Connexion = () => {
     navigateRef.current = navigate;
     toastRef.current = toast;
   });
+
+  useEffect(() => {
+    const requestedSpace = getRequestedLoginSpace(location.search);
+    if (!requestedSpace) return;
+
+    setLoginType(requestedSpace);
+    if (requestedSpace === "team") {
+      setView("team-login");
+    } else if (requestedSpace === "client") {
+      setView("client");
+    } else if (!tenant) {
+      setView("king");
+    }
+  }, [location.search, tenant]);
 
   // SMS 2FA is now driven by the RPC `get_user_login_data` (requires_sms field)
   // and handled in useAuth.tsx — no local role-based check needed here.
@@ -699,6 +721,20 @@ const Connexion = () => {
         
         const globalRole = await getGlobalRole();
         console.log('[Connexion] Global role for auto-detect:', globalRole);
+
+        if (tenant?.id) {
+          const tenantTeamAccess = await getTeamAccess();
+          if (tenantTeamAccess.allowed) {
+            console.log('[Connexion] Auto-detected TENANT TEAM access');
+            sessionStorage.setItem('lyta_login_space', 'team');
+            if (tenantTeamAccess.tenantSlug) {
+              goToTenantCrm(tenantTeamAccess.tenantSlug);
+            } else {
+              navigateRef.current("/crm", { replace: true });
+            }
+            return;
+          }
+        }
 
         if (globalRole === 'king') {
           sessionStorage.setItem('lyta_login_space', 'king');

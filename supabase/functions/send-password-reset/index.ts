@@ -397,12 +397,14 @@ const handler = async (req: Request): Promise<Response> => {
       log.info("No tenant found for user, using default Lyta branding");
     }
 
+    const resolvedRedirectUrl = redirectUrl || `${req.headers.get("Origin") || "https://app.lyta.ch"}/reset-password`;
+
     // Generate password reset link using Supabase Admin API
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email: email,
       options: {
-        redirectTo: redirectUrl || `${req.headers.get("Origin") || "https://app.lyta.ch"}/reset-password`,
+        redirectTo: resolvedRedirectUrl,
       },
     });
 
@@ -412,12 +414,20 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Prefer sending a direct app link with token_hash (more reliable than the /verify redirect flow)
-    const hashedToken = resetData?.properties?.hashed_token;
     const actionLink = resetData?.properties?.action_link;
+    let hashedToken = resetData?.properties?.hashed_token;
+
+    if (!hashedToken && actionLink) {
+      try {
+        hashedToken = new URL(actionLink).searchParams.get('token');
+      } catch {
+        hashedToken = null;
+      }
+    }
 
     let resetLink: string | null = null;
-    if (hashedToken && redirectUrl) {
-      const url = new URL(redirectUrl);
+    if (hashedToken) {
+      const url = new URL(resolvedRedirectUrl);
       url.searchParams.set('token_hash', hashedToken);
       url.searchParams.set('type', 'recovery');
       resetLink = url.toString();

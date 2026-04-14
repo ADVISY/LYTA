@@ -21,6 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TenantPlan, isModuleEnabled, PLAN_CONFIGS } from "@/config/plans";
 import lytaSmartFlowLogo from "@/assets/lyta-smartflow-logo.png";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 interface IAScanUploadProps {
   formType: 'sana' | 'vita' | 'medio' | 'business';
@@ -40,6 +41,15 @@ export interface ScanResults {
   overallConfidence: number;
   fields: ExtractedField[];
   documentsProcessed?: number;
+}
+
+interface ScanDocumentResponse {
+  success?: boolean;
+  error?: string;
+  documentType: string;
+  documentTypeConfidence: number;
+  qualityScore: number;
+  overallConfidence: number;
 }
 
 export interface ExtractedField {
@@ -218,17 +228,19 @@ export default function IAScanUpload({
       setCurrentStep(t('iaScan.analyzingFolder'));
 
       // 3. Call scan-document edge function with all files
-      const { data: scanResult, error: functionError } = await supabase.functions.invoke('scan-document', {
+      const scanResult = await invokeSupabaseFunction<ScanDocumentResponse>('scan-document', {
+        requireAuth: false,
         body: {
           scanId: scanRecord.id,
           files: uploadedPaths,
           formType,
           tenantId,
           batchMode: true,
+          verifiedPartnerEmail: normalizedVerifiedEmail,
+          verifiedPartnerId: verifiedPartnerId ?? null,
         }
       });
 
-      if (functionError) throw functionError;
       if (!scanResult.success) throw new Error(scanResult.error || t('iaScan.scanFailed'));
       
       setProgress(80);

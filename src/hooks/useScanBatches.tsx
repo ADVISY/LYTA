@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/contexts/TenantContext';
 import { usePaginatedQuery } from './usePaginatedQuery';
+import { invokeSupabaseFunction } from '@/lib/edgeFunctions';
 
 export type DocClassification =
   | 'identity_doc'
@@ -173,11 +174,10 @@ export function useScanBatches() {
 
   const classifyBatch = async (batchId: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.functions.invoke('classify-batch-documents', {
-        body: { batchId, tenantId }
-      });
-
-      if (error) throw error;
+      const data = await invokeSupabaseFunction<{ success?: boolean; error?: string; documentsClassified?: number; documentsProcessed?: number }>(
+        'classify-batch-documents',
+        { body: { batchId, tenantId } },
+      );
       if (!data.success) throw new Error(data.error || 'Classification failed');
 
       toast({

@@ -52,6 +52,7 @@ import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
 import { TenantConsumptionLimits } from "@/components/king/TenantConsumptionLimits";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { getFunctionErrorMessage, invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 export default function KingTenantDetail() {
   const { tenantId } = useParams();
@@ -1157,16 +1158,17 @@ export default function KingTenantDetail() {
                     onClick={async () => {
                       setIsExporting(true);
                       try {
-                        const response = await supabase.functions.invoke('export-tenant-data', {
+                        const response = await invokeSupabaseFunction<{ message?: string }>('export-tenant-data', {
                           body: { tenant_id: tenantId, format: 'csv' },
                         });
 
-                        if (response.error) {
-                          throw new Error(response.error.message || "Erreur d'export");
+                        const csvContent = response.message || "";
+                        if (!csvContent) {
+                          throw new Error("Export CSV vide");
                         }
 
                         // Create download link
-                        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                         const url = URL.createObjectURL(blob);
                         const link = document.createElement('a');
                         link.href = url;
@@ -1182,9 +1184,10 @@ export default function KingTenantDetail() {
                         });
                       } catch (error: any) {
                         console.error('Export error:', error);
+                        const message = await getFunctionErrorMessage(error);
                         toast({
                           title: "Erreur",
-                          description: error.message || "Impossible d'exporter les données.",
+                          description: message || "Impossible d'exporter les données.",
                           variant: "destructive",
                         });
                       } finally {
@@ -1201,16 +1204,12 @@ export default function KingTenantDetail() {
                     onClick={async () => {
                       setIsExporting(true);
                       try {
-                        const response = await supabase.functions.invoke('export-tenant-data', {
+                        const response = await invokeSupabaseFunction('export-tenant-data', {
                           body: { tenant_id: tenantId, format: 'json' },
                         });
 
-                        if (response.error) {
-                          throw new Error(response.error.message || "Erreur d'export");
-                        }
-
                         // Create download link
-                        const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+                        const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
                         const url = URL.createObjectURL(blob);
                         const link = document.createElement('a');
                         link.href = url;
@@ -1226,9 +1225,10 @@ export default function KingTenantDetail() {
                         });
                       } catch (error: any) {
                         console.error('Export error:', error);
+                        const message = await getFunctionErrorMessage(error);
                         toast({
                           title: "Erreur",
-                          description: error.message || "Impossible d'exporter les données.",
+                          description: message || "Impossible d'exporter les données.",
                           variant: "destructive",
                         });
                       } finally {
@@ -1307,7 +1307,7 @@ export default function KingTenantDetail() {
                               
                               setIsResetting(true);
                               try {
-                                const response = await supabase.functions.invoke('reset-tenant-data', {
+                                const response = await invokeSupabaseFunction<{ deleted_counts?: Record<string, number> }>('reset-tenant-data', {
                                   body: {
                                     tenant_id: tenantId,
                                     confirmation_name: resetConfirmation,
@@ -1315,11 +1315,7 @@ export default function KingTenantDetail() {
                                   },
                                 });
 
-                                if (response.error) {
-                                  throw new Error(response.error.message || "Erreur de remise à zéro");
-                                }
-
-                                const deletedCounts = response.data?.deleted_counts || {};
+                                const deletedCounts = response.deleted_counts || {};
                                 const totalDeleted = Object.values(deletedCounts).reduce((sum: number, count: any) => sum + (count || 0), 0);
 
                                 toast({
@@ -1332,9 +1328,10 @@ export default function KingTenantDetail() {
                                 setResetDialogOpen(false);
                               } catch (error: any) {
                                 console.error('Reset tenant error:', error);
+                                const message = await getFunctionErrorMessage(error);
                                 toast({
                                   title: "Erreur",
-                                  description: error.message || "Impossible de remettre à zéro.",
+                                  description: message || "Impossible de remettre à zéro.",
                                   variant: "destructive",
                                 });
                               } finally {
@@ -1414,17 +1411,12 @@ export default function KingTenantDetail() {
                               
                               setIsDeleting(true);
                               try {
-                                const { data: session } = await supabase.auth.getSession();
-                                const response = await supabase.functions.invoke('delete-tenant', {
+                                await invokeSupabaseFunction('delete-tenant', {
                                   body: {
                                     tenant_id: tenantId,
                                     confirmation_name: deleteConfirmation,
                                   },
                                 });
-
-                                if (response.error) {
-                                  throw new Error(response.error.message || "Erreur de suppression");
-                                }
 
                                 toast({
                                   title: "Tenant supprimé",
@@ -1433,9 +1425,10 @@ export default function KingTenantDetail() {
                                 navigate('/king/tenants');
                               } catch (error: any) {
                                 console.error('Delete tenant error:', error);
+                                const message = await getFunctionErrorMessage(error);
                                 toast({
                                   title: "Erreur",
-                                  description: error.message || "Impossible de supprimer le tenant.",
+                                  description: message || "Impossible de supprimer le tenant.",
                                   variant: "destructive",
                                 });
                               } finally {

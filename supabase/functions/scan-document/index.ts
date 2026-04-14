@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
+import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
@@ -125,6 +125,19 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+async function getOptionalAuth(req: Request): Promise<{ user: { id: string } } | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  return await requireAuth(req);
+}
+
+function normalizeEmail(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 function buildSystemPrompt(fileCount: number): string {
@@ -391,13 +404,13 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { user } = await requireAuth(req);
+    const authContext = await getOptionalAuth(req);
 
     // Rate limit: 10 requests per hour per IP (scan is expensive — AI vision costs)
     await checkRateLimit(req, "scan-document", 10);
 
     const body = await req.json();
-    const { scanId, formType, tenantId, batchMode, files, fileKey, fileName, mimeType } = body;
+    const { scanId, formType, tenantId, batchMode, files, fileKey, fileName, mimeType, verifiedPartnerEmail, verifiedPartnerId } = body;
 
     scanIdForErrorHandling = scanId;
 
@@ -409,16 +422,43 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify scan exists before processing
+    // Verify scan exists and authorize either an authenticated CRM user or a verified public deposit.
     const { data: existingScan, error: scanCheckError } = await supabase
       .from("document_scans")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .select("id, tenant_id, source_type, verified_partner_email, verified_partner_id")
       .eq("id", scanId)
-      .select("id")
-      .single();
+      .maybeSingle();
 
     if (scanCheckError || !existingScan) {
       throw new Error(`Scan not found: ${scanId}`);
+    }
+
+    if (authContext?.user) {
+      if (existingScan.tenant_id) {
+        await requireTenantAccess(authContext.user.id, existingScan.tenant_id);
+      }
+    } else {
+      const requestPartnerEmail = normalizeEmail(verifiedPartnerEmail);
+      const scanPartnerEmail = normalizeEmail(existingScan.verified_partner_email);
+      const requestPartnerId = typeof verifiedPartnerId === "string" ? verifiedPartnerId : "";
+      const scanPartnerId = typeof existingScan.verified_partner_id === "string" ? existingScan.verified_partner_id : "";
+      const partnerMatches = requestPartnerEmail && requestPartnerEmail === scanPartnerEmail
+        && (!scanPartnerId || requestPartnerId === scanPartnerId);
+
+      if (existingScan.source_type !== "deposit" || !partnerMatches) {
+        throw new AuthError("Missing or invalid authorization header", 401);
+      }
+    }
+
+    validTenantId = existingScan.tenant_id || null;
+
+    const { error: processingUpdateError } = await supabase
+      .from("document_scans")
+      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .eq("id", scanId);
+
+    if (processingUpdateError) {
+      throw new Error(`Unable to update scan status: ${processingUpdateError.message}`);
     }
 
     // Determine files to process
@@ -428,21 +468,12 @@ serve(async (req) => {
 
     log.info("Processing files", { count: filesToProcess.length, mode: batchMode ? "batch" : "single", scanId });
 
-    if (tenantId) {
-      const { data: tenantCheck } = await supabase
-        .from("tenants")
-        .select("id")
-        .eq("id", tenantId)
-        .maybeSingle();
-
-      if (tenantCheck) {
-        validTenantId = tenantCheck.id;
-        reservedAmount = filesToProcess.length;
-        await reserveTenantQuota(supabase, validTenantId, "ai_docs", reservedAmount);
-        reservedTenantId = validTenantId;
-      } else {
-        log.warn("Invalid tenantId provided, skipping quota enforcement", { tenantId });
-      }
+    if (validTenantId) {
+      reservedAmount = filesToProcess.length;
+      await reserveTenantQuota(supabase, validTenantId, "ai_docs", reservedAmount);
+      reservedTenantId = validTenantId;
+    } else if (tenantId) {
+      log.warn("Scan has no tenant_id, skipping quota enforcement", { tenantId });
     }
 
     // Download and encode all files - preserve file_key for document mapping

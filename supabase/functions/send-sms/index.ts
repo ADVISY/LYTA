@@ -14,6 +14,22 @@ interface SmsRequest {
   tenantId?: string;
 }
 
+function normalizePhone(value: string): string {
+  let phone = (value || "").trim().replace(/[^\d+]/g, "");
+  if (!phone) return "";
+  if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
+  if (phone.startsWith("+")) return phone;
+  if (phone.startsWith("41") && phone.length >= 11) return `+${phone}`;
+  if (phone.startsWith("0")) return `+41${phone.slice(1)}`;
+  return `+41${phone}`;
+}
+
+function assertValidPhone(phone: string, name: string): void {
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+    throw new Error(`Numero SMS invalide pour ${name || "un destinataire"}: ${phone || "vide"}`);
+  }
+}
+
 serve(async (req: Request): Promise<Response> => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -41,6 +57,12 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Message requis");
     }
 
+    const normalizedRecipients = recipients.map((recipient) => {
+      const phone = normalizePhone(recipient.phone);
+      assertValidPhone(phone, recipient.name);
+      return { ...recipient, phone };
+    });
+
     let tenantId = requestedTenantId ?? null;
     if (tenantId) {
       await requireTenantAccess(user.id, tenantId);
@@ -57,9 +79,9 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (tenantId) {
-      await reserveTenantQuota(supabase, tenantId, "sms", recipients.length);
+      await reserveTenantQuota(supabase, tenantId, "sms", normalizedRecipients.length);
       reservedTenantId = tenantId;
-      reservedAmount = recipients.length;
+      reservedAmount = normalizedRecipients.length;
     }
 
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -76,7 +98,7 @@ serve(async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: true,
-          sent: recipients.length,
+          sent: normalizedRecipients.length,
           simulated: true,
           message: "SMS simulé (Twilio non configuré)",
         }),
@@ -86,9 +108,9 @@ serve(async (req: Request): Promise<Response> => {
 
     const results = [];
 
-    for (const recipient of recipients) {
+    for (const recipient of normalizedRecipients) {
       // Replace variables in message (company_name should be passed from frontend with tenant branding)
-      let personalizedMessage = message
+      const personalizedMessage = message
         .replace(/\{\{client_name\}\}/g, recipient.name);
 
       try {
@@ -109,7 +131,12 @@ serve(async (req: Request): Promise<Response> => {
         );
 
         const data = await response.json();
-        results.push({ phone: recipient.phone, success: response.ok, sid: data.sid });
+        results.push({
+          phone: recipient.phone,
+          success: response.ok,
+          sid: data.sid,
+          error: response.ok ? undefined : data.message || data.error_message || data.code || "Erreur Twilio",
+        });
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         results.push({ phone: recipient.phone, success: false, error: errorMessage });
@@ -123,11 +150,31 @@ serve(async (req: Request): Promise<Response> => {
       reservedAmount = successCount;
     }
 
+    if (successCount === 0) {
+      if (reservedTenantId && reservedAmount > 0) {
+        await releaseTenantQuota(supabase, reservedTenantId, "sms", reservedAmount);
+        reservedAmount = 0;
+      }
+
+      const firstError = results.find((result) => !result.success)?.error || "Aucun SMS n'a pu etre envoye";
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: firstError,
+          sent: 0,
+          total: normalizedRecipients.length,
+          results,
+        }),
+        { status: 502, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         sent: successCount,
-        total: recipients.length,
+        failed: normalizedRecipients.length - successCount,
+        total: normalizedRecipients.length,
         results,
       }),
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }

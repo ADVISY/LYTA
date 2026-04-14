@@ -26,6 +26,32 @@ interface TenantBranding {
   email_sender_address: string | null;
 }
 
+function getTenantResetRedirectUrl(slug: string | null): string {
+  return slug ? `https://${slug}.lyta.ch/reset-password?space=team` : "https://app.lyta.ch/reset-password?space=team";
+}
+
+function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
+  const actionLink = linkData?.properties?.action_link;
+  let hashedToken = linkData?.properties?.hashed_token;
+
+  if (!hashedToken && actionLink) {
+    try {
+      hashedToken = new URL(actionLink).searchParams.get("token");
+    } catch {
+      hashedToken = null;
+    }
+  }
+
+  if (hashedToken) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("type", "recovery");
+    return url.toString();
+  }
+
+  return actionLink ?? null;
+}
+
 // Default roles configuration for new tenants
 const DEFAULT_ROLES = [
   {
@@ -624,16 +650,18 @@ serve(async (req) => {
         .eq("id", userId);
 
       // Generate and send password reset email for existing users
+      const resetRedirectUrl = getTenantResetRedirectUrl(tenant.slug);
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
-          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+          redirectTo: resetRedirectUrl,
         },
       });
 
-      if (!linkError && linkData?.properties?.action_link && RESEND_API_KEY) {
-        const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, linkData.properties.action_link, branding);
+      const resetLink = !linkError ? buildRecoveryLink(resetRedirectUrl, linkData) : null;
+      if (resetLink && RESEND_API_KEY) {
+        const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, resetLink, branding);
         
         await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -700,37 +728,43 @@ serve(async (req) => {
         });
 
       // Generate password reset link and send branded welcome email
+      const resetRedirectUrl = getTenantResetRedirectUrl(tenant.slug);
       const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
         type: "recovery",
         email,
         options: {
-          redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+          redirectTo: resetRedirectUrl,
         },
       });
 
       if (linkError) {
         log.error("Error generating password reset link", { error: linkError });
-      } else if (linkData?.properties?.action_link && RESEND_API_KEY) {
-        const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, linkData.properties.action_link, branding);
-        
-        const emailResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: "Lyta <support@lyta.ch>",
-            to: [email],
-            subject,
-            html,
-          }),
-        });
-
-        if (emailResponse.ok) {
-          log.info("Welcome email with password reset link sent", { to: email });
+      } else if (RESEND_API_KEY) {
+        const resetLink = buildRecoveryLink(resetRedirectUrl, linkData);
+        if (!resetLink) {
+          log.error("Error generating password reset link", { error: "Missing recovery link" });
         } else {
-          log.error("Failed to send welcome email", { error: await emailResponse.text() });
+          const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, resetLink, branding);
+        
+          const emailResponse = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "Lyta <support@lyta.ch>",
+              to: [email],
+              subject,
+              html,
+            }),
+          });
+
+          if (emailResponse.ok) {
+            log.info("Welcome email with password reset link sent", { to: email });
+          } else {
+            log.error("Failed to send welcome email", { error: await emailResponse.text() });
+          }
         }
       }
 

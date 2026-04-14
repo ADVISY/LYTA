@@ -3,12 +3,15 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// 2FA is now driven by tenant_security_settings.enable_2fa_login in DB
-// The RPC get_user_login_data checks this at login time and triggers the SMS flow
-// ProtectedRoute only verifies AFTER the SMS flow was triggered (not hardcoded by role)
+// 2FA is driven by tenant_security_settings.enable_2fa_login for tenants and
+// platform_settings.king_2fa_required for King users.
 
 // How long a SMS verification is considered valid (in minutes)
 const SMS_VERIFICATION_VALIDITY_MINUTES = 120; // 2 hours
+
+function isSettingEnabled(value: unknown): boolean {
+  return value === true || value === "true";
+}
 
 interface TenantRelation {
   slug: string | null;
@@ -304,9 +307,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
             .maybeSingle();
           requiresSms2FA = secSettings?.enable_2fa_login === true;
         }
-        // King users always require 2FA (no tenant context)
         if (roles.includes('king')) {
-          requiresSms2FA = true;
+          const { data: king2faSetting } = await supabase.rpc("get_platform_setting", {
+            setting_key: "king_2fa_required",
+          });
+          requiresSms2FA = isSettingEnabled(king2faSetting);
         }
 
         if (requiresSms2FA) {
@@ -357,13 +362,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         if (currentPath.startsWith('/crm')) {
           if (intendedSpace !== 'team') {
             console.error("[ProtectedRoute] Non-team space user trying to access CRM via URL");
-            setIsAuthorized(false);
-            setIsValidating(false);
-            return;
-          }
-
-          if (isKing) {
-            console.error("[ProtectedRoute] King user trying to access CRM");
             setIsAuthorized(false);
             setIsValidating(false);
             return;

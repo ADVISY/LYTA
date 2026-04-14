@@ -9,6 +9,32 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 const log = createLogger("activate-tenant");
 
+function getTenantResetRedirectUrl(slug: string | null): string {
+  return slug ? `https://${slug}.lyta.ch/reset-password?space=team` : "https://app.lyta.ch/reset-password?space=team";
+}
+
+function buildRecoveryLink(redirectTo: string, resetData: any): string | null {
+  const actionLink = resetData?.properties?.action_link;
+  let hashedToken = resetData?.properties?.hashed_token;
+
+  if (!hashedToken && actionLink) {
+    try {
+      hashedToken = new URL(actionLink).searchParams.get("token");
+    } catch {
+      hashedToken = null;
+    }
+  }
+
+  if (hashedToken) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("type", "recovery");
+    return url.toString();
+  }
+
+  return actionLink ?? null;
+}
+
 async function sendAccessEmail(email: string, tenantName: string, slug: string, resetLink: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -205,11 +231,12 @@ serve(async (req) => {
     log.info("Tenant status updated to active");
 
     // Generate password reset link
+    const resetRedirectUrl = getTenantResetRedirectUrl(tenant.slug);
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: finalAdminEmail,
       options: {
-        redirectTo: `https://${tenant.slug}.lyta.ch/reset-password`,
+        redirectTo: resetRedirectUrl,
       }
     });
 
@@ -218,13 +245,14 @@ serve(async (req) => {
     }
 
     // Send access email
-    if (resetData?.properties?.action_link) {
+    const resetLink = buildRecoveryLink(resetRedirectUrl, resetData);
+    if (resetLink) {
       try {
         await sendAccessEmail(
           finalAdminEmail,
           tenant.name,
           tenant.slug,
-          resetData.properties.action_link
+          resetLink
         );
         log.info("Access email sent", { email: finalAdminEmail });
       } catch (emailError) {
@@ -268,7 +296,7 @@ serve(async (req) => {
       success: true, 
       message: "Tenant activated successfully",
       admin_user_id: adminUserId,
-      reset_link_sent: !!resetData?.properties?.action_link,
+      reset_link_sent: !!resetLink,
     }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 200,
