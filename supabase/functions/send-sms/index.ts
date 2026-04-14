@@ -14,6 +14,20 @@ interface SmsRequest {
   tenantId?: string;
 }
 
+interface TwilioSender {
+  params: Record<string, string>;
+  label: string;
+}
+
+interface TwilioPhoneNumber {
+  phone_number?: string;
+  capabilities?: {
+    sms?: boolean;
+    mms?: boolean;
+    voice?: boolean;
+  };
+}
+
 function normalizePhone(value: string): string {
   let phone = (value || "").trim().replace(/[^\d+]/g, "");
   if (!phone) return "";
@@ -28,6 +42,142 @@ function assertValidPhone(phone: string, name: string): void {
   if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
     throw new Error(`Numero SMS invalide pour ${name || "un destinataire"}: ${phone || "vide"}`);
   }
+}
+
+function isE164Phone(value: string): boolean {
+  return /^\+[1-9]\d{7,14}$/.test(value);
+}
+
+function isMessagingServiceSid(value: string): boolean {
+  return /^MG[0-9a-f]{32}$/i.test(value);
+}
+
+function isPhoneNumberSid(value: string): boolean {
+  return /^PN[0-9a-f]{32}$/i.test(value);
+}
+
+function isAlphaSenderId(value: string): boolean {
+  return /^[a-zA-Z0-9 ]{1,11}$/.test(value);
+}
+
+async function fetchTwilioJson(
+  accountSid: string,
+  authToken: string,
+  path: string,
+): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/${path}`,
+    {
+      headers: {
+        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+      },
+    },
+  );
+
+  return {
+    ok: response.ok,
+    data: await response.json(),
+  };
+}
+
+async function findSmsCapableTwilioNumber(
+  accountSid: string,
+  authToken: string,
+): Promise<string | null> {
+  const { ok, data } = await fetchTwilioJson(
+    accountSid,
+    authToken,
+    "IncomingPhoneNumbers.json?PageSize=100",
+  );
+
+  if (!ok) {
+    return null;
+  }
+
+  const numbers = Array.isArray(data.incoming_phone_numbers)
+    ? data.incoming_phone_numbers as TwilioPhoneNumber[]
+    : [];
+
+  const smsCapableNumber = numbers.find((number) => (
+    number.capabilities?.sms === true &&
+    typeof number.phone_number === "string" &&
+    isE164Phone(number.phone_number)
+  ));
+
+  return smsCapableNumber?.phone_number ?? null;
+}
+
+async function resolveTwilioSender(
+  accountSid: string,
+  authToken: string,
+  configuredSender: string,
+): Promise<TwilioSender> {
+  const sender = configuredSender.trim();
+
+  if (isMessagingServiceSid(sender)) {
+    return {
+      params: { MessagingServiceSid: sender },
+      label: sender,
+    };
+  }
+
+  if (isE164Phone(sender) || isAlphaSenderId(sender)) {
+    return {
+      params: { From: sender },
+      label: sender,
+    };
+  }
+
+  if (isPhoneNumberSid(sender)) {
+    const { ok, data } = await fetchTwilioJson(
+      accountSid,
+      authToken,
+      `IncomingPhoneNumbers/${sender}.json`,
+    );
+
+    if (!ok) {
+      throw new Error(
+        data.message ||
+          `Configuration Twilio invalide: impossible de resoudre le numero ${sender}`,
+      );
+    }
+
+    const resolvedPhone = typeof data.phone_number === "string" ? data.phone_number.trim() : "";
+    if (!isE164Phone(resolvedPhone)) {
+      throw new Error(
+        "Configuration Twilio invalide: le SID PN ne contient pas de numero expediteur E.164",
+      );
+    }
+
+    const capabilities = data.capabilities as TwilioPhoneNumber["capabilities"] | undefined;
+    if (capabilities?.sms !== true) {
+      const fallbackPhone = await findSmsCapableTwilioNumber(accountSid, authToken);
+      if (fallbackPhone) {
+        log.warn("Twilio sender fallback to SMS-capable number", {
+          configuredSender: sender,
+          resolvedPhone,
+          fallbackPhone,
+        });
+        return {
+          params: { From: fallbackPhone },
+          label: fallbackPhone,
+        };
+      }
+
+      throw new Error(
+        `Configuration Twilio invalide: le numero expediteur ${resolvedPhone} n'est pas compatible SMS. Configurez TWILIO_PHONE_NUMBER avec un numero SMS-capable ou TWILIO_MESSAGING_SERVICE_SID avec un service MG...`,
+      );
+    }
+
+    return {
+      params: { From: resolvedPhone },
+      label: resolvedPhone,
+    };
+  }
+
+  throw new Error(
+    "Configuration Twilio invalide: utilisez un numero +..., un Sender ID alphanumerique, un SID PN... resolvable, ou un TWILIO_MESSAGING_SERVICE_SID MG...",
+  );
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -87,8 +237,10 @@ serve(async (req: Request): Promise<Response> => {
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
     const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
     const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
+    const TWILIO_MESSAGING_SERVICE_SID = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
+    const configuredSender = TWILIO_MESSAGING_SERVICE_SID || TWILIO_PHONE_NUMBER;
 
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !configuredSender) {
       log.info("SMS simulation - Twilio non configuré");
       if (reservedTenantId && reservedAmount > 0) {
         await releaseTenantQuota(supabase, reservedTenantId, "sms", reservedAmount);
@@ -106,6 +258,11 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    const sender = await resolveTwilioSender(
+      TWILIO_ACCOUNT_SID,
+      TWILIO_AUTH_TOKEN,
+      configuredSender,
+    );
     const results = [];
 
     for (const recipient of normalizedRecipients) {
@@ -124,7 +281,7 @@ serve(async (req: Request): Promise<Response> => {
             },
             body: new URLSearchParams({
               To: recipient.phone,
-              From: TWILIO_PHONE_NUMBER,
+              ...sender.params,
               Body: personalizedMessage,
             }),
           }
@@ -135,6 +292,7 @@ serve(async (req: Request): Promise<Response> => {
           phone: recipient.phone,
           success: response.ok,
           sid: data.sid,
+          from: response.ok ? sender.label : undefined,
           error: response.ok ? undefined : data.message || data.error_message || data.code || "Erreur Twilio",
         });
       } catch (error: unknown) {
