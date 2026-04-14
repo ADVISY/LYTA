@@ -4,7 +4,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
-import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
 const log = createLogger("scan-document");
@@ -543,6 +543,7 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       log.error("AI Gateway error", { status: aiResponse.status, error: errorText, scanId });
+      throw await buildAiError(aiResponse);
       
       if (aiResponse.status === 429) {
         throw new Error("Trop de requêtes. Réessayez dans quelques instants.");
@@ -550,7 +551,7 @@ serve(async (req) => {
       if (aiResponse.status === 402) {
         throw new Error("Crédits IA insuffisants. Contactez l'administrateur.");
       }
-      throw new Error(`AI analysis failed: ${aiResponse.status}`);
+      throw await buildAiError(aiResponse);
     }
 
     const aiData = await aiResponse.json();

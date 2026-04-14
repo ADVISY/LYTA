@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
-import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
 
 const log = createLogger("ai-chat");
@@ -265,6 +265,7 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       log.error('AI Gateway error', { status: aiResponse.status, errorText });
+      throw await buildAiError(aiResponse);
       
       if (aiResponse.status === 429) {
         return new Response(
@@ -280,7 +281,7 @@ serve(async (req) => {
         );
       }
       
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      throw await buildAiError(aiResponse);
     }
 
     const aiData = await aiResponse.json();

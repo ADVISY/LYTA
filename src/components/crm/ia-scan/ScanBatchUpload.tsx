@@ -96,17 +96,7 @@ export default function ScanBatchUpload({
   const startProcess = async () => {
     if (pendingFiles.length === 0) return;
 
-    const normalizedEmail = (verifiedPartnerEmail ?? '').trim().toLowerCase();
-    if (!normalizedEmail) {
-      setStatus('error');
-      setErrorMessage(t('iaScan.verifyEmailFirst'));
-      toast({
-        title: t('auth.accessDenied'),
-        description: t('iaScan.verifyEmailFirst'),
-        variant: "destructive",
-      });
-      return;
-    }
+    const normalizedEmail = (verifiedPartnerEmail ?? '').trim().toLowerCase() || undefined;
 
     try {
       // Step 1: Upload files and create batch
@@ -128,7 +118,11 @@ export default function ScanBatchUpload({
       setCurrentStep(t('iaScan.classifyingDocuments'));
       setProgress(50);
 
-      const classifySuccess = await classifyBatch(batchId);
+      const classifySuccess = await classifyBatch(
+        batchId,
+        normalizedEmail,
+        verifiedPartnerId,
+      );
 
       if (!classifySuccess) {
         throw new Error(t('iaScan.classificationFailed'));

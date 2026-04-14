@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, AuthError } from "../_shared/auth.ts";
-import { fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
+import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 
@@ -39,6 +39,23 @@ interface ClassificationResult {
     termination_found: boolean;
     recommended_action: string;
   };
+}
+
+type AuthContext = Awaited<ReturnType<typeof requireAuth>>;
+
+async function getOptionalAuth(req: Request): Promise<AuthContext | null> {
+  try {
+    return await requireAuth(req);
+  } catch (error) {
+    if (error instanceof AuthError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function normalizeEmail(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 // Avoid stack overflow on large buffers
@@ -113,9 +130,8 @@ serve(async (req) => {
   let reservedAmount = 0;
 
   try {
-    const { user } = await requireAuth(req);
     const body = await req.json();
-    const { batchId, tenantId } = body;
+    const { batchId, tenantId, verifiedPartnerEmail, verifiedPartnerId } = body;
 
     if (!batchId) {
       throw new Error("Missing required parameter: batchId");
@@ -124,6 +140,36 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authContext = await getOptionalAuth(req);
+
+    const { data: batch, error: batchError } = await supabase
+      .from("scan_batches")
+      .select("id, tenant_id, verified_partner_email, verified_partner_id")
+      .eq("id", batchId)
+      .maybeSingle();
+
+    if (batchError || !batch) {
+      throw new Error("Batch not found");
+    }
+
+    if (authContext) {
+      if (batch.tenant_id) {
+        await requireTenantAccess(authContext.user.id, batch.tenant_id);
+      }
+    } else {
+      const batchPartnerEmail = normalizeEmail(batch.verified_partner_email);
+      const requestPartnerEmail = normalizeEmail(verifiedPartnerEmail);
+      const batchPartnerId = typeof batch.verified_partner_id === "string" ? batch.verified_partner_id : "";
+      const requestPartnerId = typeof verifiedPartnerId === "string" ? verifiedPartnerId : "";
+      const partnerMatches =
+        (!!batchPartnerEmail && batchPartnerEmail === requestPartnerEmail) ||
+        (!!batchPartnerId && batchPartnerId === requestPartnerId);
+
+      if (!partnerMatches) {
+        throw new AuthError("Access denied to this scan batch", 403);
+      }
+    }
 
     // Update batch status
     await supabase
@@ -144,11 +190,20 @@ serve(async (req) => {
 
     log.info(`Classifying documents in batch`, { count: batchDocs.length, batchId });
 
-    if (tenantId) {
+    const batchTenantId = typeof batch.tenant_id === "string" ? batch.tenant_id : null;
+    if (tenantId && batchTenantId && tenantId !== batchTenantId) {
+      log.warn("Request tenantId does not match batch tenant, using batch tenant", {
+        requestedTenantId: tenantId,
+        batchTenantId,
+        batchId,
+      });
+    }
+
+    if (batchTenantId) {
       const { data: tenantCheck } = await supabase
         .from("tenants")
         .select("id")
-        .eq("id", tenantId)
+        .eq("id", batchTenantId)
         .maybeSingle();
 
       if (tenantCheck) {
@@ -156,7 +211,7 @@ serve(async (req) => {
         await reserveTenantQuota(supabase, tenantCheck.id, "ai_docs", reservedAmount);
         reservedTenantId = tenantCheck.id;
       } else {
-        log.warn("Invalid tenantId, skipping quota enforcement", { tenantId });
+        log.warn("Invalid batch tenantId, skipping quota enforcement", { tenantId: batchTenantId });
       }
     }
 
@@ -231,6 +286,7 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       log.error("AI Gateway error", { status: aiResponse.status, errorText });
+      throw await buildAiError(aiResponse);
       
       if (aiResponse.status === 429) {
         throw new Error("Trop de requêtes. Réessayez dans quelques instants.");
@@ -238,7 +294,7 @@ serve(async (req) => {
       if (aiResponse.status === 402) {
         throw new Error("Crédits IA insuffisants. Contactez l'administrateur.");
       }
-      throw new Error(`AI classification failed: ${aiResponse.status}`);
+      throw await buildAiError(aiResponse);
     }
 
     const aiData = await aiResponse.json();

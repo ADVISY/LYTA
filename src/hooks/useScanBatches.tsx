@@ -172,11 +172,23 @@ export function useScanBatches() {
     }
   };
 
-  const classifyBatch = async (batchId: string): Promise<boolean> => {
+  const classifyBatch = async (
+    batchId: string,
+    verifiedPartnerEmail?: string,
+    verifiedPartnerId?: string
+  ): Promise<boolean> => {
     try {
       const data = await invokeSupabaseFunction<{ success?: boolean; error?: string; documentsClassified?: number; documentsProcessed?: number }>(
         'classify-batch-documents',
-        { body: { batchId, tenantId } },
+        {
+          requireAuth: !verifiedPartnerEmail,
+          body: {
+            batchId,
+            tenantId,
+            verifiedPartnerEmail,
+            verifiedPartnerId,
+          },
+        },
       );
       if (!data.success) throw new Error(data.error || 'Classification failed');
 
