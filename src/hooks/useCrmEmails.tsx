@@ -2,6 +2,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+import { buildTenantLoginUrl } from "@/lib/tenantUrls";
 
 type EmailType = "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
 
@@ -33,6 +34,7 @@ export const useCrmEmails = () => {
   const sendEmail = async ({ type, clientEmail, clientName, data }: SendEmailParams) => {
     try {
       console.log(`Sending ${type} email to ${clientEmail}`);
+      const loginUrl = buildTenantLoginUrl(tenant?.slug, "client");
 
       const response = await invokeSupabaseFunction("send-crm-email", {
         body: {
@@ -45,7 +47,7 @@ export const useCrmEmails = () => {
             ...(data ?? {}),
             tenantSlug: data?.tenantSlug ?? tenant?.slug,
             tenantId: data?.tenantId ?? tenantId ?? undefined,
-            loginUrl: data?.loginUrl ?? `${window.location.origin}/connexion`,
+            loginUrl: data?.loginUrl ?? loginUrl,
           },
         },
       });
@@ -122,7 +124,7 @@ export const useCrmEmails = () => {
       data: {
         temporaryPassword,
         clientEmail,
-        loginUrl: `${window.location.origin}/connexion`,
+        loginUrl: buildTenantLoginUrl(tenant?.slug, "client"),
       },
     });
   };

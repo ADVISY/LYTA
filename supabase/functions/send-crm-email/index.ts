@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const TENANT_DOMAIN_SUFFIX = Deno.env.get("TENANT_DOMAIN_SUFFIX") ?? "lyta.ch";
+const DEFAULT_APP_ORIGIN = Deno.env.get("PUBLIC_APP_ORIGIN") ?? "https://app.lyta.ch";
 
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
@@ -75,6 +77,44 @@ const normalizeWebsiteUrl = (website: string | null | undefined): string => {
   return /^https?:\/\//i.test(cleanWebsite) ? cleanWebsite : `https://${cleanWebsite}`;
 };
 
+const appendLoginSpace = (url: string, space = "client"): string => {
+  try {
+    const parsedUrl = new URL(url);
+    if (!parsedUrl.searchParams.has("space")) {
+      parsedUrl.searchParams.set("space", space);
+    }
+    return parsedUrl.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return url.includes("space=") ? url : `${url}${separator}space=${encodeURIComponent(space)}`;
+  }
+};
+
+const isPlatformLoginUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    const host = parsedUrl.hostname.toLowerCase();
+    return (host === "app.lyta.ch" || host === "lyta.ch" || host === "www.lyta.ch")
+      && parsedUrl.pathname.replace(/\/$/, "") === "/connexion";
+  } catch {
+    return false;
+  }
+};
+
+const buildTenantLoginUrl = (data: EmailData | undefined): string => {
+  const tenantSlug = typeof data?.tenantSlug === "string" ? data.tenantSlug.trim() : "";
+  const explicitLoginUrl = typeof data?.loginUrl === "string" ? data.loginUrl.trim() : "";
+  if (explicitLoginUrl && !(tenantSlug && isPlatformLoginUrl(explicitLoginUrl))) {
+    return appendLoginSpace(explicitLoginUrl);
+  }
+
+  if (tenantSlug) {
+    return appendLoginSpace(`https://${tenantSlug}.${TENANT_DOMAIN_SUFFIX}/connexion`);
+  }
+
+  return appendLoginSpace(`${DEFAULT_APP_ORIGIN.replace(/\/$/, "")}/connexion`);
+};
+
 const buildTemplateVariables = (
   clientEmail: string,
   clientName: string,
@@ -84,11 +124,7 @@ const buildTemplateVariables = (
 ): TemplateVariables => {
   const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
   const companyWebsiteUrl = normalizeWebsiteUrl(branding?.company_website);
-  const loginUrl = typeof data?.loginUrl === "string" && data.loginUrl.trim()
-    ? data.loginUrl
-    : companyWebsiteUrl
-      ? `${companyWebsiteUrl.replace(/\/$/, "")}/connexion`
-      : "https://app.lyta.ch/connexion";
+  const loginUrl = buildTenantLoginUrl(data);
 
   const variables: TemplateVariables = {};
 
@@ -449,8 +485,7 @@ const getEmailContent = (
   const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
   const primaryColor = branding?.primary_color || '#1800AD';
   const logoUrl = branding?.logo_url || '';
-  const companyWebsite = branding?.company_website || '';
-  const loginUrl = data?.loginUrl || (companyWebsite ? `https://${companyWebsite.replace(/^https?:\/\//, '')}/connexion` : 'https://app.lyta.ch/connexion');
+  const loginUrl = buildTenantLoginUrl(data);
 
   const logoHtml = logoUrl 
     ? `<img src="${logoUrl}" alt="${displayName}" style="height: 40px; max-width: 160px; object-fit: contain;" />`
@@ -733,6 +768,7 @@ async function fetchTenantWithBranding(
     .select(`
       id,
       name,
+      slug,
       tenant_branding (
         display_name,
         logo_url,
@@ -897,7 +933,14 @@ const handler = async (req: Request): Promise<Response> => {
       quotaReserved = true;
     }
 
-    let emailData: EmailData = data || {};
+    let emailData: EmailData = { ...(data || {}) };
+    if (tenant?.slug && !emailData.tenantSlug) {
+      emailData.tenantSlug = tenant.slug;
+    }
+    if (resolvedTenantId && !emailData.tenantId) {
+      emailData.tenantId = resolvedTenantId;
+    }
+    emailData.loginUrl = buildTenantLoginUrl(emailData);
     let createdUserId: string | null = null;
 
     // If mandat signed, create user account first
@@ -970,15 +1013,11 @@ const handler = async (req: Request): Promise<Response> => {
           }
         }
 
-        const loginUrl = branding?.company_website 
-          ? `https://${branding.company_website.replace(/^https?:\/\//, '')}/connexion`
-          : 'https://app.lyta.ch/connexion';
-
         emailData = {
           ...emailData,
           temporaryPassword,
           clientEmail,
-          loginUrl,
+          loginUrl: buildTenantLoginUrl(emailData),
         };
 
         log.info(`User account created`, { email: clientEmail });
@@ -986,7 +1025,14 @@ const handler = async (req: Request): Promise<Response> => {
         log.info(`User already exists, resetting password`, { email: clientEmail });
         
         const newTemporaryPassword = generateTemporaryPassword();
-        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { password: newTemporaryPassword });
+        const { error: updatePasswordError } = await supabaseAdmin.auth.admin.updateUserById(
+          existingUser.id,
+          { password: newTemporaryPassword },
+        );
+
+        if (updatePasswordError) {
+          throw new Error(`Failed to reset user password: ${updatePasswordError.message}`);
+        }
 
         await supabaseAdmin
           .from('user_roles')
@@ -1019,15 +1065,11 @@ const handler = async (req: Request): Promise<Response> => {
             .eq('id', clientRecord.id);
         }
 
-        const loginUrl = branding?.company_website 
-          ? `https://${branding.company_website.replace(/^https?:\/\//, '')}/connexion`
-          : 'https://app.lyta.ch/connexion';
-
         emailData = {
           ...emailData,
           temporaryPassword: newTemporaryPassword,
           clientEmail,
-          loginUrl,
+          loginUrl: buildTenantLoginUrl(emailData),
         };
       }
     }

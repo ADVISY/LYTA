@@ -21,6 +21,7 @@ import { useDocuments } from "@/hooks/useDocuments";
 import { useTenant } from "@/contexts/TenantContext";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+import { buildTenantLoginUrl } from "@/lib/tenantUrls";
 
 interface MandatGestionFormProps {
   client: Client;
@@ -250,6 +251,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
 
       const deliveryWarnings: string[] = [];
       const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
+      const clientLoginUrl = buildTenantLoginUrl(tenant?.slug, "client");
 
       // Send mandat signed email with account creation
       if (client.email) {
@@ -268,7 +270,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
             body: {
               recipients: [{ phone, name: clientName }],
               tenantId,
-              message: `Bonjour ${clientName}, votre mandat de gestion a été signé. Votre espace client est disponible ici: ${window.location.origin}/connexion`,
+              message: `Bonjour ${clientName}, votre mandat de gestion a été signé. Votre espace client est disponible ici: ${clientLoginUrl}`,
             },
           });
         } catch (smsError) {

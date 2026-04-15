@@ -7,6 +7,8 @@ import { createLogger } from "../_shared/logger.ts";
 const log = createLogger("create-user-account");
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const TENANT_DOMAIN_SUFFIX = Deno.env.get("TENANT_DOMAIN_SUFFIX") ?? "lyta.ch";
+const DEFAULT_APP_ORIGIN = Deno.env.get("PUBLIC_APP_ORIGIN") ?? "https://app.lyta.ch";
 
 interface TenantBranding {
   display_name: string | null;
@@ -49,6 +51,26 @@ function generateReadablePassword(): string {
   const special = specials[Math.floor(Math.random() * specials.length)];
   
   return `${adj}${noun}${numbers}${special}`;
+}
+
+function appendLoginSpace(url: string, space: "client" | "team"): string {
+  try {
+    const parsedUrl = new URL(url);
+    if (!parsedUrl.searchParams.has("space")) {
+      parsedUrl.searchParams.set("space", space);
+    }
+    return parsedUrl.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return url.includes("space=") ? url : `${url}${separator}space=${space}`;
+  }
+}
+
+function buildTenantLoginUrl(tenant: TenantRecord, role: string): string {
+  const origin = tenant.slug
+    ? `https://${tenant.slug}.${TENANT_DOMAIN_SUFFIX}`
+    : DEFAULT_APP_ORIGIN.replace(/\/$/, "");
+  return appendLoginSpace(`${origin}/connexion`, role === "client" ? "client" : "team");
 }
 
 // Generate HTML email for account creation with password
@@ -684,8 +706,7 @@ Deno.serve(async (req) => {
       }
 
       const clientName = `${firstName || targetRecord.first_name || ''} ${lastName || targetRecord.last_name || ''}`.trim() || email;
-      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
-      const loginUrl = `${baseUrl}/connexion`;
+      const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
 
       // Send email with new password
       if (RESEND_API_KEY) {
@@ -824,8 +845,7 @@ Deno.serve(async (req) => {
       }
 
       // Existing user - just notify them they have access to a new portal
-      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
-      const loginUrl = `${baseUrl}/connexion`;
+      const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
       log.info(`Existing user linked to tenant, sending notification email`, { email });
       
       if (RESEND_API_KEY) {
@@ -976,8 +996,7 @@ Deno.serve(async (req) => {
         .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: "user_id,tenant_id" });
 
       // Send welcome email with credentials
-      const baseUrl = tenant.slug ? `https://${tenant.slug}.lyta.ch` : 'https://lyta.ch';
-      const loginUrl = `${baseUrl}/connexion`;
+      const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
       log.info(`Sending welcome email with credentials`, { to: email });
       
       if (RESEND_API_KEY) {
