@@ -4,7 +4,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
-import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { buildAiError, fetchAiChatCompletions, getAiModel, isAiTimeoutError } from "../_shared/ai.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
 
@@ -956,7 +956,7 @@ serve(async (req) => {
     log.error("Scan document error", { error: error instanceof Error ? error.message : String(error) });
 
     // Handle AI request timeout
-    if (error instanceof Error && error.name === "AbortError") {
+    if (isAiTimeoutError(error)) {
       return new Response(
         JSON.stringify({ error: "AI analysis timed out after 120 seconds" }),
         { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }

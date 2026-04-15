@@ -1,6 +1,16 @@
 const DEFAULT_AI_GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_AI_MODEL = "gpt-5-mini";
 
+export class AiTimeoutError extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(`AI request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
+    this.name = "AiTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 type AiErrorPayload = {
   message: string;
   code: string;
@@ -25,6 +35,14 @@ export function getAiModel(): string {
 
 export function getAiGatewayUrl(): string {
   return Deno.env.get("AI_GATEWAY_URL") ?? DEFAULT_AI_GATEWAY_URL;
+}
+
+export function isAiTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof AiTimeoutError ||
+    (error instanceof Error &&
+      (error.name === "AbortError" || error.message.startsWith("AI request timed out after ")))
+  );
 }
 
 function shouldUseDefaultSampling(model: unknown): boolean {
@@ -143,7 +161,7 @@ export async function fetchAiChatCompletions(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(`AI request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
+      throw new AiTimeoutError(timeoutMs);
     }
 
     throw error;

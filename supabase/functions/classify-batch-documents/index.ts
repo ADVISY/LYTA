@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
-import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
+import { buildAiError, fetchAiChatCompletions, getAiModel, isAiTimeoutError } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
@@ -43,6 +43,25 @@ interface ClassificationResult {
 }
 
 type AuthContext = Awaited<ReturnType<typeof requireAuth>>;
+
+type FileContent = {
+  docId: string;
+  fileName: string;
+  base64: string;
+  mimeType: string;
+};
+
+const DEFAULT_BATCH_CLASSIFICATION_TIMEOUT_MS = 120000;
+const DOC_CLASSIFICATION_SET = new Set<string>(DOC_CLASSIFICATIONS);
+
+function getBatchClassificationTimeoutMs(): number {
+  const rawValue = Deno.env.get("AI_BATCH_CLASSIFICATION_TIMEOUT_MS");
+  const parsedValue = rawValue ? Number(rawValue) : DEFAULT_BATCH_CLASSIFICATION_TIMEOUT_MS;
+
+  return Number.isFinite(parsedValue) && parsedValue >= 30000
+    ? parsedValue
+    : DEFAULT_BATCH_CLASSIFICATION_TIMEOUT_MS;
+}
 
 async function getOptionalAuth(req: Request): Promise<AuthContext | null> {
   try {
@@ -121,6 +140,116 @@ Réponds UNIQUEMENT en JSON:
 }`;
 }
 
+function parseClassificationResponse(aiContent: string): ClassificationResult {
+  let jsonStr = aiContent;
+  const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1];
+  }
+
+  return JSON.parse(jsonStr.trim());
+}
+
+function normalizeClassifiedDocument(
+  value: unknown,
+  fallbackFile: FileContent,
+  index: number,
+): ClassifiedDocument {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawClassification = typeof record.classification === "string" ? record.classification : "unknown";
+  const classification = DOC_CLASSIFICATION_SET.has(rawClassification)
+    ? rawClassification as DocClassification
+    : "unknown";
+  const rawConfidence = typeof record.confidence === "number" ? record.confidence : 0;
+  const confidence = Math.max(0, Math.min(1, rawConfidence));
+  const description = typeof record.description === "string" && record.description.trim()
+    ? record.description.trim()
+    : "Document classe automatiquement.";
+  const extractedSummary = typeof record.extracted_summary === "string" && record.extracted_summary.trim()
+    ? record.extracted_summary.trim()
+    : undefined;
+
+  return {
+    doc_id: typeof record.doc_id === "string" && record.doc_id.trim()
+      ? record.doc_id
+      : fallbackFile.docId || String(index + 1),
+    file_name: fallbackFile.fileName,
+    classification,
+    confidence,
+    description,
+    extracted_summary: extractedSummary,
+  };
+}
+
+function buildConsolidationHints(classifiedDocuments: ClassifiedDocument[]): ClassificationResult["consolidation_hints"] {
+  const oldPolicyCount = classifiedDocuments.filter(doc => doc.classification === "old_policy").length;
+  const newContractCount = classifiedDocuments.filter(doc => doc.classification === "new_contract").length;
+  const terminationFound = classifiedDocuments.some(doc => doc.classification === "termination");
+  const primaryHolderFound = classifiedDocuments.some(doc => doc.classification === "identity_doc");
+
+  let recommendedAction = "Verifier les pieces classees puis rattacher le dossier au client.";
+  if (oldPolicyCount > 0 && newContractCount > 0 && terminationFound) {
+    recommendedAction = "Changement de police avec resiliation detectee.";
+  } else if (oldPolicyCount > 0 && newContractCount > 0) {
+    recommendedAction = "Changement de police a verifier, resiliation a controler.";
+  } else if (newContractCount > 0) {
+    recommendedAction = "Nouveau contrat a verifier et importer.";
+  } else if (terminationFound) {
+    recommendedAction = "Resiliation a traiter.";
+  }
+
+  return {
+    primary_holder_found: primaryHolderFound,
+    old_policy_count: oldPolicyCount,
+    new_contract_count: newContractCount,
+    termination_found: terminationFound,
+    recommended_action: recommendedAction,
+  };
+}
+
+async function classifySingleDocument(
+  fileContent: FileContent,
+  index: number,
+  total: number,
+): Promise<ClassifiedDocument> {
+  const userContent: Record<string, unknown>[] = [
+    {
+      type: "text",
+      text:
+        `Classifie uniquement ce document (${index + 1}/${total}): ${fileContent.fileName}.\n` +
+        `Retourne un JSON avec un tableau "documents" contenant un seul objet. ` +
+        `Utilise doc_id="${fileContent.docId}" et file_name="${fileContent.fileName}".`,
+    },
+    buildChatDocumentContent(fileContent),
+  ];
+
+  const aiResponse = await fetchAiChatCompletions({
+    model: getAiModel(),
+    messages: [
+      { role: "system", content: buildClassificationPrompt(1) },
+      { role: "user", content: userContent },
+    ],
+    max_tokens: 1200,
+    temperature: 0.1,
+  }, getBatchClassificationTimeoutMs());
+
+  if (!aiResponse.ok) {
+    const aiError = await buildAiError(aiResponse);
+    log.error("AI Gateway error", { status: aiResponse.status, error: aiError.message, fileName: fileContent.fileName });
+    throw aiError;
+  }
+
+  const aiData = await aiResponse.json();
+  const aiContent = aiData.choices?.[0]?.message?.content;
+
+  if (!aiContent) {
+    throw new Error("No response from AI");
+  }
+
+  const classificationResult = parseClassificationResponse(aiContent);
+  return normalizeClassifiedDocument(classificationResult.documents?.[0], fileContent, index);
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -129,10 +258,12 @@ serve(async (req) => {
   let supabase: ReturnType<typeof createClient> | null = null;
   let reservedTenantId: string | null = null;
   let reservedAmount = 0;
+  let batchIdForErrorHandling: string | null = null;
 
   try {
     const body = await req.json();
     const { batchId, tenantId, verifiedPartnerEmail, verifiedPartnerId } = body;
+    batchIdForErrorHandling = typeof batchId === "string" ? batchId : null;
 
     if (!batchId) {
       throw new Error("Missing required parameter: batchId");
@@ -217,7 +348,7 @@ serve(async (req) => {
     }
 
     // Download and encode all files
-    const fileContents: { docId: string; fileName: string; base64: string; mimeType: string }[] = [];
+    const fileContents: FileContent[] = [];
     
     for (const doc of batchDocs) {
       // Update doc status
@@ -259,60 +390,15 @@ serve(async (req) => {
       reservedAmount = fileContents.length;
     }
 
-    // Build AI request with images and classic document file inputs.
-    const userContent: any[] = [
-      { type: "text", text: `Classifie ces ${fileContents.length} documents:\n` + 
-        fileContents.map((f, i) => `Document ${i + 1}: ${f.fileName}`).join('\n') }
-    ];
-
-    for (const fileContent of fileContents) {
-      userContent.push(buildChatDocumentContent(fileContent));
-    }
-
-    const aiResponse = await fetchAiChatCompletions({
-      model: getAiModel(),
-      messages: [
-        { role: "system", content: buildClassificationPrompt(fileContents.length) },
-        { role: "user", content: userContent },
-      ],
-      max_tokens: 4000,
-      temperature: 0.1,
-    }, 30000);
-
-    if (!aiResponse.ok) {
-      const aiError = await buildAiError(aiResponse);
-      log.error("AI Gateway error", { status: aiResponse.status, error: aiError.message });
-      throw aiError;
-    }
-
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content;
-
-    if (!aiContent) {
-      throw new Error("No response from AI");
-    }
-
-    // Parse AI response
-    let classificationResult: ClassificationResult;
-    try {
-      let jsonStr = aiContent;
-      const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[1];
-      }
-      classificationResult = JSON.parse(jsonStr.trim());
-    } catch (parseError) {
-      log.error("Failed to parse AI response", { aiContent });
-      throw new Error("Failed to parse classification result");
-    }
-
-    // Update each document with classification
     let classifiedCount = 0;
+    let failedCount = batchDocs.length - fileContents.length;
+    let firstClassificationError: string | null = null;
+    const classifiedDocuments: ClassifiedDocument[] = [];
+
     for (let i = 0; i < fileContents.length; i++) {
       const fileInfo = fileContents[i];
-      const classification = classificationResult.documents?.[i];
-      
-      if (classification) {
+      try {
+        const classification = await classifySingleDocument(fileInfo, i, fileContents.length);
         const { error: updateError } = await supabase
           .from("scan_batch_documents")
           .update({
@@ -328,11 +414,41 @@ serve(async (req) => {
 
         if (!updateError) {
           classifiedCount++;
+          classifiedDocuments.push(classification);
         } else {
           log.error(`Failed to update doc`, { docId: fileInfo.docId, error: updateError });
+          failedCount++;
         }
+      } catch (docError) {
+        failedCount++;
+        const errorMessage = docError instanceof Error ? docError.message : String(docError);
+        firstClassificationError ??= errorMessage;
+        log.error("Failed to classify document", { docId: fileInfo.docId, fileName: fileInfo.fileName, error: errorMessage });
+
+        await supabase
+          .from("scan_batch_documents")
+          .update({
+            status: "error",
+            extracted_data: { error: errorMessage },
+          })
+          .eq("id", fileInfo.docId);
       }
     }
+
+    if (classifiedCount === 0) {
+      await supabase
+        .from("scan_batches")
+        .update({
+          status: "error",
+          documents_classified: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", batchId);
+
+      throw new Error(firstClassificationError || "No documents could be classified");
+    }
+
+    const consolidationHints = buildConsolidationHints(classifiedDocuments);
 
     // Update batch status
     const { error: batchUpdateError } = await supabase
@@ -340,7 +456,7 @@ serve(async (req) => {
       .update({
         status: "classified",
         documents_classified: classifiedCount,
-        consolidation_summary: classificationResult.consolidation_hints,
+        consolidation_summary: consolidationHints,
         updated_at: new Date().toISOString(),
       })
       .eq("id", batchId);
@@ -350,15 +466,23 @@ serve(async (req) => {
     }
 
     const processingTime = Date.now() - startTime;
-    log.info(`Classification completed`, { processingTimeMs: processingTime, classified: classifiedCount, total: fileContents.length });
+    log.info(`Classification completed`, {
+      processingTimeMs: processingTime,
+      classified: classifiedCount,
+      failed: failedCount,
+      total: batchDocs.length,
+      downloaded: fileContents.length,
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
         batchId,
-        documentsProcessed: fileContents.length,
+        documentsProcessed: batchDocs.length,
         documentsClassified: classifiedCount,
-        consolidationHints: classificationResult.consolidation_hints,
+        documentsFailed: failedCount,
+        partial: failedCount > 0,
+        consolidationHints,
         processingTimeMs: processingTime,
       }),
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
@@ -379,10 +503,31 @@ serve(async (req) => {
       );
     }
 
+    if (supabase && batchIdForErrorHandling) {
+      try {
+        await supabase
+          .from("scan_batches")
+          .update({ status: "error", updated_at: new Date().toISOString() })
+          .eq("id", batchIdForErrorHandling);
+      } catch (statusError) {
+        log.error("Failed to update batch error status", { error: statusError });
+      }
+    }
+
     if (error instanceof QuotaError) {
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: error.status, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    if (isAiTimeoutError(error)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : "AI request timed out",
+        }),
+        { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 

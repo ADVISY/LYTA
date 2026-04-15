@@ -178,7 +178,14 @@ export function useScanBatches() {
     verifiedPartnerId?: string
   ): Promise<boolean> => {
     try {
-      const data = await invokeSupabaseFunction<{ success?: boolean; error?: string; documentsClassified?: number; documentsProcessed?: number }>(
+      const data = await invokeSupabaseFunction<{
+        success?: boolean;
+        error?: string;
+        documentsClassified?: number;
+        documentsProcessed?: number;
+        documentsFailed?: number;
+        partial?: boolean;
+      }>(
         'classify-batch-documents',
         {
           requireAuth: !verifiedPartnerEmail,
@@ -192,9 +199,15 @@ export function useScanBatches() {
       );
       if (!data.success) throw new Error(data.error || 'Classification failed');
 
+      const classified = data.documentsClassified ?? 0;
+      const processed = data.documentsProcessed ?? 0;
+      const failed = data.documentsFailed ?? Math.max(processed - classified, 0);
+
       toast({
-        title: "Classification terminée",
-        description: `${data.documentsClassified}/${data.documentsProcessed} documents classifiés`,
+        title: failed > 0 ? "Classification partielle" : "Classification terminée",
+        description: failed > 0
+          ? `${classified}/${processed} documents classifiés, ${failed} à vérifier manuellement`
+          : `${classified}/${processed} documents classifiés`,
       });
 
       refetch();
