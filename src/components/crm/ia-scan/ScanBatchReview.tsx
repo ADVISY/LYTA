@@ -23,7 +23,7 @@ import {
 interface ScanBatchReviewProps {
   batch: ScanBatch;
   clientId?: string; // If provided, documents will be imported to this client
-  onValidate?: (batchId: string) => void;
+  onValidate?: (batchId: string) => void | Promise<void>;
   onImportSuccess?: () => void;
   primaryColor?: string;
 }
@@ -108,20 +108,23 @@ export default function ScanBatchReview({
   };
 
   const handleImportDocuments = async () => {
-    if (!clientId) {
-      // If no client ID provided, use onValidate callback to let parent handle it
-      if (onValidate) {
-        onValidate(batch.id);
-      }
-      return;
-    }
-
     setIsImporting(true);
-    const success = await validateBatchAndImportDocuments(batch.id, clientId);
-    setIsImporting(false);
+    try {
+      if (!clientId) {
+        // If no client ID provided, use onValidate callback to let parent handle it
+        if (onValidate) {
+          await onValidate(batch.id);
+        }
+        return;
+      }
 
-    if (success && onImportSuccess) {
-      onImportSuccess();
+      const success = await validateBatchAndImportDocuments(batch.id, clientId);
+
+      if (success && onImportSuccess) {
+        onImportSuccess();
+      }
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -280,7 +283,7 @@ export default function ScanBatchReview({
               className="gap-2"
             >
               {isImporting ? (
-                <>Importation en cours...</>
+                <>{clientId ? 'Importation en cours...' : 'Consolidation en cours...'}</>
               ) : clientId ? (
                 <>
                   Importer les documents

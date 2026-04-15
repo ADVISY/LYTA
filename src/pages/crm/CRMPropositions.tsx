@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { PendingScanCard, ScanValidationDialog } from "@/components/crm/propositions";
 import { ScanBatchUpload, ScanBatchReview } from "@/components/crm/ia-scan";
-import { savePolicy } from "@/lib/policiesApi";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import {
   FileText,
   Plus,
@@ -31,21 +31,9 @@ import {
 import { cn } from "@/lib/utils";
 import lytaSmartFlowLogo from "@/assets/lyta-smartflow-logo.png";
 
-interface ClassificationResult {
-  product_type?: string;
-  company_name?: string | null;
-  premiums?: {
-    monthly?: number | null;
-    annual?: number | null;
-  };
-}
-
-interface DocumentScanWithClassification {
-  id: string;
-  client_id?: string | null;
-  batch_id?: string | null;
-  status: string;
-  classification_result?: ClassificationResult | null;
+interface ScanDocumentResponse {
+  success?: boolean;
+  error?: string;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -65,6 +53,26 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const normalizeArray = <T,>(value: any): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed as T[];
+    } catch {
+      // ignore non-JSON strings
+    }
+    return [];
+  }
+  if (value && typeof value === "object") return [value as T];
+  return [];
+};
+
+const normalizeStringArray = (value: any): string[] =>
+  normalizeArray<unknown>(value).filter((item): item is string => typeof item === "string");
+
 export default function CRMPropositions() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -79,6 +87,7 @@ export default function CRMPropositions() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scans' | 'batches'>('scans');
   const [showBatchUpload, setShowBatchUpload] = useState(false);
+  const [batchIdForSelectedScan, setBatchIdForSelectedScan] = useState<string | null>(null);
 
   // Filter batches - only show classified ones
   const pendingBatches = batches.filter(b => b.status === 'classified');
@@ -102,6 +111,7 @@ export default function CRMPropositions() {
   ];
 
   const handleValidate = (scan: PendingScan) => {
+    setBatchIdForSelectedScan(null);
     setSelectedScan(scan);
     setValidationDialogOpen(true);
   };
@@ -126,9 +136,106 @@ export default function CRMPropositions() {
     }
   };
 
+  const fetchScanForValidation = async (scanId: string): Promise<PendingScan> => {
+    const { data: scan, error: scanError } = await supabase
+      .from('document_scans')
+      .select('*')
+      .eq('id', scanId)
+      .single();
+
+    if (scanError) throw scanError;
+
+    const [fieldsResult, auditResult] = await Promise.all([
+      supabase
+        .from('document_scan_results')
+        .select('*')
+        .eq('scan_id', scanId),
+      supabase
+        .from('document_scan_audit')
+        .select('*')
+        .eq('scan_id', scanId)
+        .eq('action', 'extracted')
+        .order('performed_at', { ascending: false })
+        .limit(1),
+    ]);
+
+    if (fieldsResult.error) throw fieldsResult.error;
+    if (auditResult.error) throw auditResult.error;
+
+    const aiSnapshot = (auditResult.data?.[0]?.ai_response_snapshot as any) || {};
+    const rawEngagement = (aiSnapshot.engagement_analysis && typeof aiSnapshot.engagement_analysis === 'object')
+      ? aiSnapshot.engagement_analysis
+      : undefined;
+
+    return {
+      id: scan.id,
+      created_at: scan.created_at,
+      source_form_type: scan.source_form_type,
+      original_file_name: scan.original_file_name,
+      original_file_key: scan.original_file_key,
+      detected_doc_type: scan.detected_doc_type,
+      doc_type_confidence: scan.doc_type_confidence,
+      quality_score: scan.quality_score,
+      overall_confidence: scan.overall_confidence,
+      status: scan.status,
+      verified_partner_email: scan.verified_partner_email,
+      error_message: scan.error_message,
+      dossier_summary: aiSnapshot.dossier_summary,
+      documents_detected: normalizeArray(aiSnapshot.documents_detected),
+      products_detected: normalizeArray(aiSnapshot.products_detected),
+      old_products_detected: normalizeArray(aiSnapshot.old_products_detected),
+      new_products_detected: normalizeArray(aiSnapshot.new_products_detected),
+      family_members_detected: normalizeArray(aiSnapshot.family_members_detected),
+      primary_holder: aiSnapshot.primary_holder,
+      has_old_policy: aiSnapshot.has_old_policy,
+      has_new_policy: aiSnapshot.has_new_policy,
+      has_termination: aiSnapshot.has_termination,
+      has_identity_doc: aiSnapshot.has_identity_doc,
+      has_multiple_products: aiSnapshot.has_multiple_products,
+      has_family_members: aiSnapshot.has_family_members,
+      engagement_analysis: rawEngagement
+        ? {
+            ...rawEngagement,
+            warnings: normalizeStringArray(rawEngagement.warnings),
+          }
+        : undefined,
+      workflow_actions: normalizeArray(aiSnapshot.workflow_actions),
+      inconsistencies: normalizeStringArray(aiSnapshot.inconsistencies),
+      missing_documents: normalizeStringArray(aiSnapshot.missing_documents),
+      fields: (fieldsResult.data || []).map((field: any) => ({
+        id: field.id,
+        field_category: field.field_category,
+        field_name: field.field_name,
+        extracted_value: field.extracted_value,
+        confidence: field.confidence,
+        confidence_score: field.confidence_score,
+        extraction_notes: field.extraction_notes,
+        validated_value: field.validated_value,
+      })),
+    };
+  };
+
   const handleValidated = () => {
+    if (batchIdForSelectedScan) {
+      supabase
+        .from("scan_batches")
+        .update({ status: "validated" })
+        .eq("id", batchIdForSelectedScan)
+        .then(({ error }) => {
+          if (error) {
+            toast({
+              title: "Erreur",
+              description: getErrorMessage(error, "Impossible de marquer le dossier comme validé"),
+              variant: "destructive",
+            });
+          }
+          fetchBatches();
+        });
+    }
+
     refresh();
     setSelectedScan(null);
+    setBatchIdForSelectedScan(null);
   };
 
   return (
@@ -373,61 +480,69 @@ export default function CRMPropositions() {
                       onValidate={async (batchId: string) => {
                         try {
                           if (!tenantId) {
-                            throw new Error("Cabinet introuvable pour creer les contrats");
+                            throw new Error("Cabinet introuvable pour consolider le dossier");
                           }
 
-                          // Fetch classified scans for this batch
-                          const { data: scansData, error: scansErr } = await supabase
+                          const batchToConsolidate = batches.find(item => item.id === batchId);
+                          const batchDocuments = [...(batchToConsolidate?.documents || [])]
+                            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+                          if (batchDocuments.length === 0) {
+                            throw new Error("Aucun document à consolider dans ce dossier");
+                          }
+
+                          const { data: { user } } = await supabase.auth.getUser();
+                          const primaryDocument = batchDocuments[0];
+
+                          const { data: scanRecord, error: scanCreateError } = await supabase
                             .from("document_scans")
-                            .select("*")
-                            .eq("batch_id", batchId)
-                            .eq("status", "classified")
-                            .not("classification_result", "is", null);
+                            .insert({
+                              tenant_id: tenantId,
+                              uploaded_by: user?.id ?? null,
+                              source_type: "backoffice",
+                              original_file_key: primaryDocument.file_key,
+                              original_file_name: `Dossier (${batchDocuments.length} documents)`,
+                              mime_type: "batch",
+                              status: "pending",
+                            })
+                            .select("id")
+                            .single();
 
-                          if (scansErr) throw scansErr;
+                          if (scanCreateError) throw scanCreateError;
 
-                          const validScans = (scansData || []) as DocumentScanWithClassification[];
-                          let createdCount = 0;
+                          await supabase
+                            .from("scan_batch_documents")
+                            .update({ scan_id: scanRecord.id })
+                            .eq("batch_id", batchId);
 
-                          for (const scan of validScans) {
-                            const result = scan.classification_result || {};
-
-                            await savePolicy({
-                              action: "create",
+                          const scanResult = await invokeSupabaseFunction<ScanDocumentResponse>("scan-document", {
+                            body: {
+                              scanId: scanRecord.id,
                               tenantId,
-                              policyData: {
-                                product_type: result.product_type || "autre",
-                                company_name: result.company_name || null,
-                                premium_monthly: result.premiums?.monthly || null,
-                                premium_yearly: result.premiums?.annual || null,
-                                client_id: scan.client_id || null,
-                                status: "draft",
-                                notes: `Import auto depuis scan batch ${batchId}`,
-                              },
-                            });
+                              batchMode: true,
+                              files: batchDocuments.map(doc => ({
+                                path: doc.file_key,
+                                fileName: doc.file_name,
+                                mimeType: doc.mime_type,
+                              })),
+                            },
+                          });
 
-                            createdCount++;
-
-                            // Mark scan as processed
-                            await supabase
-                              .from("document_scans")
-                              .update({ status: "processed" })
-                              .eq("id", scan.id);
+                          if (!scanResult.success) {
+                            throw new Error(scanResult.error || "La consolidation IA a échoué");
                           }
 
-                          // Update batch status to validated
-                          await supabase
-                            .from("scan_batches")
-                            .update({ status: "validated" })
-                            .eq("id", batchId);
+                          const completedScan = await fetchScanForValidation(scanRecord.id);
+                          setSelectedScan(completedScan);
+                          setBatchIdForSelectedScan(batchId);
+                          setValidationDialogOpen(true);
+                          setActiveTab("scans");
 
                           toast({
                             title: "Consolidation terminée",
-                            description: `${createdCount} contrat(s) créé(s) à partir de ${validScans.length} document(s)`,
+                            description: "Vérifiez les données extraites avant de créer le client.",
                           });
 
-                          // Refresh data
-                          fetchBatches();
                           refresh();
                         } catch (err: unknown) {
                           toast({
