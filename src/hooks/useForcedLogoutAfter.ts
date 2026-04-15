@@ -7,7 +7,7 @@ import {
   writeSessionEnforcerState,
 } from "@/lib/sessionEnforcerStorage";
 
-export function useForcedLogoutAfter(durationMinutes: number) {
+export function useForcedLogoutAfter(durationMinutes: number | null) {
   const { user, loading, signOut } = useAuth();
   const { toast } = useToast();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -19,6 +19,10 @@ export function useForcedLogoutAfter(durationMinutes: number) {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+
+    if (!durationMinutes || durationMinutes <= 0) {
+      return;
     }
 
     if (loading) {

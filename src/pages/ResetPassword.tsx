@@ -8,6 +8,7 @@ import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { clearSessionEnforcerState } from "@/lib/sessionEnforcerStorage";
 
 type LoginSpace = "client" | "team" | "king";
 
@@ -77,6 +78,7 @@ const ResetPassword = () => {
         const accessToken = hashParams.get('access_token') ?? queryParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token') ?? queryParams.get('refresh_token');
         const tokenType = hashParams.get('type') ?? queryParams.get('type');
+        const hasRecoveryToken = (tokenHash && tokenType === 'recovery') || code || (accessToken && refreshToken);
 
         console.log("[ResetPassword] Processing token...", { 
           hasAccessToken: !!accessToken, 
@@ -85,6 +87,12 @@ const ResetPassword = () => {
           hasCode: !!code,
           hasTokenHash: !!tokenHash,
         });
+
+        if (hasRecoveryToken) {
+          // A recovery link creates a short-lived auth session. Clear stale inactivity
+          // state so the global session enforcer cannot sign it out immediately.
+          clearSessionEnforcerState();
+        }
 
         // Preferred flow: token_hash (most robust, no redirect verification needed)
         if (tokenHash && tokenType === 'recovery') {

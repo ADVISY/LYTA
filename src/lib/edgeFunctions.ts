@@ -48,6 +48,19 @@ function isExpiredTokenMessage(message: string): boolean {
   return normalized.includes("invalid or expired token") || normalized.includes("jwt expired");
 }
 
+function isTransientNetworkMessage(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("load failed") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("network request failed") ||
+    normalized.includes("networkerror")
+  );
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function getFreshAccessToken(forceRefresh = false): Promise<string> {
   const {
     data: { session: currentSession },
@@ -140,6 +153,24 @@ export async function invokeSupabaseFunction<T = unknown>(
     const message = error instanceof Error ? error.message : "";
     if (options.requireAuth !== false && isExpiredTokenMessage(message)) {
       return await invokeWithToken<T>(name, options, true);
+    }
+
+    if (isTransientNetworkMessage(message)) {
+      try {
+        await sleep(500);
+        return await invokeWithToken<T>(name, options, false);
+      } catch (retryError) {
+        const retryMessage = retryError instanceof Error ? retryError.message : "";
+        if (options.requireAuth !== false && isExpiredTokenMessage(retryMessage)) {
+          return await invokeWithToken<T>(name, options, true);
+        }
+
+        if (isTransientNetworkMessage(retryMessage)) {
+          throw new Error("Connexion au service interrompue. Veuillez reessayer dans quelques secondes.");
+        }
+
+        throw retryError;
+      }
     }
 
     throw error;

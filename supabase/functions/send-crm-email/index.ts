@@ -845,6 +845,67 @@ const generateTemporaryPassword = (): string => {
   return password;
 };
 
+interface ResendEmailPayload {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function sendViaResend(payload: ResendEmailPayload) {
+  let lastNetworkError: unknown = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    let response: Response;
+
+    try {
+      response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      lastNetworkError = error;
+      log.warn("Resend network error", {
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      if (attempt < 2) {
+        await sleep(500);
+        continue;
+      }
+
+      throw new Error("Service d'envoi email momentanement indisponible. Veuillez reessayer.");
+    }
+
+    const responseText = await response.text();
+    let responseData: any = null;
+
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = null;
+      }
+    }
+
+    if (!response.ok) {
+      const message = responseData?.message || responseData?.error || responseText || `Erreur Resend (${response.status})`;
+      throw new Error(`Resend API error: ${message}`);
+    }
+
+    return responseData;
+  }
+
+  throw lastNetworkError instanceof Error ? lastNetworkError : new Error("Service d'envoi email indisponible");
+}
+
 const handler = async (req: Request): Promise<Response> => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -1084,26 +1145,12 @@ const handler = async (req: Request): Promise<Response> => {
     const { fromAddress, senderName } = getSenderAddress(branding, tenantName);
 
     // Send email via Resend API
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromAddress,
-        to: [clientEmail],
-        subject,
-        html,
-      }),
+    const emailResult = await sendViaResend({
+      from: fromAddress,
+      to: [clientEmail],
+      subject,
+      html,
     });
-    
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      throw new Error(`Resend API error: ${errorText}`);
-    }
-    
-    const emailResult = await emailResponse.json();
 
     log.info("Email sent successfully", { emailId: emailResult.id });
 
