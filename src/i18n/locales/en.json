@@ -2272,7 +2272,7 @@
     "fileTooLarge": "File too large",
     "fileSizeLimit": "{{name}} exceeds 20MB limit",
     "unsupportedType": "Unsupported type",
-    "supportedFormats": "{{name}}: accepted formats PDF, JPG, PNG, WEBP",
+    "supportedFormats": "{{name}}: accepted formats PDF, Word, Excel, PowerPoint, TXT/CSV, JPG, PNG, WEBP",
     "addDocuments": "Add documents",
     "classifyDocuments_one": "Classify {{count}} document",
     "classifyDocuments_other": "Classify {{count}} documents",

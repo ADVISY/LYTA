@@ -6,6 +6,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useScanBatches } from "@/hooks/useScanBatches";
+import {
+  SCAN_DOCUMENT_ACCEPT,
+  SCAN_DOCUMENT_MAX_SIZE_BYTES,
+  isAcceptedScanDocument,
+} from "@/lib/documentUpload";
 import { 
   Upload, 
   Loader2, 
@@ -53,12 +58,9 @@ export default function ScanBatchUpload({
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 20 * 1024 * 1024; // 20MB
-
     const validFiles: PendingFile[] = [];
     for (const file of files) {
-      if (file.size > maxSize) {
+      if (file.size > SCAN_DOCUMENT_MAX_SIZE_BYTES) {
         toast({
           title: t('iaScan.fileTooLarge'),
           description: t('iaScan.fileSizeLimit', { name: file.name }),
@@ -66,7 +68,7 @@ export default function ScanBatchUpload({
         });
         continue;
       }
-      if (!allowedTypes.includes(file.type)) {
+      if (!isAcceptedScanDocument(file)) {
         toast({
           title: t('iaScan.unsupportedType'),
           description: t('iaScan.supportedFormats', { name: file.name }),
@@ -188,7 +190,7 @@ export default function ScanBatchUpload({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          accept={SCAN_DOCUMENT_ACCEPT}
           onChange={handleFileSelect}
           className="hidden"
           id="batch-upload"

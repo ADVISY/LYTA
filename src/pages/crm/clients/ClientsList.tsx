@@ -188,7 +188,7 @@ export default function ClientsList() {
           >
             <type.icon className="h-4 w-4 mr-2" />
             {type.label}
-            {type.badge && type.badge > 0 && (
+            {(type.badge ?? 0) > 0 && (
               <Badge 
                 variant="destructive" 
                 className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center text-xs px-1.5"

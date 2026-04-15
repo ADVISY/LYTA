@@ -5,6 +5,7 @@ import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts"
 import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
+import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
 
 const log = createLogger("classify-batch-documents");
 
@@ -245,7 +246,7 @@ serve(async (req) => {
         docId: doc.id,
         fileName: doc.file_name,
         base64: base64File,
-        mimeType: doc.mime_type || 'application/pdf'
+        mimeType: normalizeDocumentMimeType(doc.file_name, doc.mime_type)
       });
     }
 
@@ -258,19 +259,14 @@ serve(async (req) => {
       reservedAmount = fileContents.length;
     }
 
-    // Build AI request with all images
+    // Build AI request with images and classic document file inputs.
     const userContent: any[] = [
       { type: "text", text: `Classifie ces ${fileContents.length} documents:\n` + 
         fileContents.map((f, i) => `Document ${i + 1}: ${f.fileName}`).join('\n') }
     ];
 
     for (const fileContent of fileContents) {
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: `data:${fileContent.mimeType};base64,${fileContent.base64}`,
-        },
-      });
+      userContent.push(buildChatDocumentContent(fileContent));
     }
 
     const aiResponse = await fetchAiChatCompletions({

@@ -6,6 +6,7 @@ import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
+import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
 
 const log = createLogger("scan-document");
 
@@ -496,7 +497,7 @@ serve(async (req) => {
         fileName: fileInfo.fileName,
         fileKey: fileInfo.path,  // Preserve the storage path for document mapping
         base64: base64File,
-        mimeType: fileInfo.mimeType || 'application/pdf'
+        mimeType: normalizeDocumentMimeType(fileInfo.fileName, fileInfo.mimeType)
       });
     }
 
@@ -516,18 +517,13 @@ serve(async (req) => {
     ).join('\n');
     const userPrompt = buildUserPrompt(documentsDescription, formType);
 
-    // Build messages with all document images
+    // Build messages with all documents. Images use vision input; PDFs/office/text files use file input.
     const userContent: any[] = [
       { type: "text", text: userPrompt }
     ];
 
     for (const fileContent of fileContents) {
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: `data:${fileContent.mimeType};base64,${fileContent.base64}`,
-        },
-      });
+      userContent.push(buildChatDocumentContent(fileContent));
     }
 
     const aiResponse = await fetchAiChatCompletions({

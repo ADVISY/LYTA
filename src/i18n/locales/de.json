@@ -2371,7 +2371,7 @@
     "fileTooLarge": "Datei zu gross",
     "fileSizeLimit": "{{name}} überschreitet die 20MB-Grenze",
     "unsupportedType": "Typ nicht unterstützt",
-    "supportedFormats": "{{name}}: akzeptierte Formate PDF, JPG, PNG, WEBP",
+    "supportedFormats": "{{name}}: akzeptierte Formate PDF, Word, Excel, PowerPoint, TXT/CSV, JPG, PNG, WEBP",
     "addDocuments": "Dokumente hinzufügen",
     "classifyDocuments_one": "{{count}} Dokument klassifizieren",
     "classifyDocuments_other": "{{count}} Dokumente klassifizieren",

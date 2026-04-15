@@ -22,6 +22,11 @@ import { Badge } from "@/components/ui/badge";
 import { TenantPlan, isModuleEnabled, PLAN_CONFIGS } from "@/config/plans";
 import lytaSmartFlowLogo from "@/assets/lyta-smartflow-logo.png";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+import {
+  SCAN_DOCUMENT_ACCEPT,
+  SCAN_DOCUMENT_MAX_SIZE_BYTES,
+  isAcceptedScanDocument,
+} from "@/lib/documentUpload";
 
 interface IAScanUploadProps {
   formType: 'sana' | 'vita' | 'medio' | 'business';
@@ -98,12 +103,9 @@ export default function IAScanUpload({
     if (files.length === 0) return;
 
     // Validate files
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 20 * 1024 * 1024; // 20MB
-
     const validFiles: UploadedFile[] = [];
     for (const file of files) {
-      if (file.size > maxSize) {
+      if (file.size > SCAN_DOCUMENT_MAX_SIZE_BYTES) {
         toast({
           title: t('iaScan.fileTooLarge'),
           description: t('iaScan.fileSizeLimit', { name: file.name }),
@@ -111,7 +113,7 @@ export default function IAScanUpload({
         });
         continue;
       }
-      if (!allowedTypes.includes(file.type)) {
+      if (!isAcceptedScanDocument(file)) {
         toast({
           title: t('iaScan.unsupportedType'),
           description: t('iaScan.supportedFormats', { name: file.name }),
@@ -374,7 +376,7 @@ export default function IAScanUpload({
         <Input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          accept={SCAN_DOCUMENT_ACCEPT}
           onChange={handleFileSelect}
           className="hidden"
           id="ia-scan-upload"
