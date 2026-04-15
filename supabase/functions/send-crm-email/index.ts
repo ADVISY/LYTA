@@ -27,6 +27,7 @@ interface TenantBranding {
 }
 
 interface EmailData {
+  [key: string]: unknown;
   subject?: string;
   html?: string;
   contractDetails?: string;
@@ -38,6 +39,98 @@ interface EmailData {
   tenantSlug?: string;
   tenantId?: string;
 }
+
+type TemplateVariables = Record<string, string | number | boolean | null | undefined>;
+
+const toSnakeCase = (value: string): string =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[\s.-]+/g, "_")
+    .toLowerCase();
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const addTemplateVariable = (
+  variables: TemplateVariables,
+  key: string,
+  value: unknown,
+) => {
+  if (value === null || value === undefined) return;
+  if (typeof value === "object" || typeof value === "function") return;
+
+  const text = String(value);
+  variables[key] = text;
+  variables[toSnakeCase(key)] = text;
+};
+
+const normalizeWebsiteUrl = (website: string | null | undefined): string => {
+  const cleanWebsite = website?.trim();
+  if (!cleanWebsite) return "";
+  return /^https?:\/\//i.test(cleanWebsite) ? cleanWebsite : `https://${cleanWebsite}`;
+};
+
+const buildTemplateVariables = (
+  clientEmail: string,
+  clientName: string,
+  data: EmailData | undefined,
+  branding: TenantBranding | null,
+  tenantName: string,
+): TemplateVariables => {
+  const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
+  const companyWebsiteUrl = normalizeWebsiteUrl(branding?.company_website);
+  const loginUrl = typeof data?.loginUrl === "string" && data.loginUrl.trim()
+    ? data.loginUrl
+    : companyWebsiteUrl
+      ? `${companyWebsiteUrl.replace(/\/$/, "")}/connexion`
+      : "https://app.lyta.ch/connexion";
+
+  const variables: TemplateVariables = {};
+
+  Object.entries(data ?? {}).forEach(([key, value]) => {
+    addTemplateVariable(variables, key, value);
+  });
+
+  addTemplateVariable(variables, "client_name", clientName);
+  addTemplateVariable(variables, "recipient_name", clientName);
+  addTemplateVariable(variables, "client_email", clientEmail);
+  addTemplateVariable(variables, "recipient_email", clientEmail);
+  addTemplateVariable(variables, "company_name", displayName);
+  addTemplateVariable(variables, "tenant_name", tenantName);
+  addTemplateVariable(variables, "brand_name", displayName);
+  addTemplateVariable(variables, "agent_name", data?.agentName || displayName);
+  addTemplateVariable(variables, "login_url", loginUrl);
+  addTemplateVariable(variables, "company_email", branding?.company_email || "");
+  addTemplateVariable(variables, "company_phone", branding?.company_phone || "");
+  addTemplateVariable(variables, "company_address", branding?.company_address || "");
+  addTemplateVariable(variables, "company_website", branding?.company_website || "");
+  addTemplateVariable(variables, "company_website_url", companyWebsiteUrl);
+  addTemplateVariable(variables, "current_year", new Date().getFullYear());
+
+  if (data?.companyName) {
+    addTemplateVariable(variables, "insurance_company_name", data.companyName);
+  }
+
+  return variables;
+};
+
+const renderTemplate = (
+  template: string,
+  variables: TemplateVariables,
+  escapeValues: boolean,
+): string =>
+  template.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_match, rawKey: string) => {
+    const value = variables[rawKey] ?? variables[toSnakeCase(rawKey)];
+    if (value === null || value === undefined) return "";
+
+    const text = String(value);
+    return escapeValues ? escapeHtml(text) : text;
+  });
 
 interface EmailRequest {
   type: "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
@@ -607,17 +700,24 @@ const getCustomEmailContent = (
   html: string,
   branding: TenantBranding | null,
   tenantName: string,
+  variables: TemplateVariables,
 ) => {
   const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
+  const renderedSubject = renderTemplate(
+    subject?.trim() || `Message de ${displayName}`,
+    variables,
+    false,
+  ).trim() || `Message de ${displayName}`;
+  const renderedHtml = renderTemplate(html, variables, true);
 
   return {
-    subject: subject?.trim() || `Message de ${displayName}`,
+    subject: renderedSubject,
     html: getEmailWrapper(`
       <div class="header">
         <h1 class="header-title">${displayName}</h1>
       </div>
       <div class="content">
-        ${html}
+        ${renderedHtml}
       </div>
     `, branding, tenantName),
   };
@@ -933,8 +1033,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Get email content with branding
+    const templateVariables = buildTemplateVariables(clientEmail, clientName, emailData, branding, tenantName);
     const { subject, html } = emailData.html
-      ? getCustomEmailContent(emailData.subject, emailData.html, branding, tenantName)
+      ? getCustomEmailContent(emailData.subject, emailData.html, branding, tenantName, templateVariables)
       : getEmailContent(type, clientName, emailData, branding, tenantName);
 
     // Determine sender
