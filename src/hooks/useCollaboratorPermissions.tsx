@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./use-toast";
+import { useUserTenant } from "@/hooks/useUserTenant";
 
 export type PermissionModule = 
   | 'adresses' 
@@ -39,33 +40,52 @@ export const MODULES: { value: PermissionModule; label: string }[] = [
   { value: 'collaborateurs', label: 'Collaborateurs' },
 ];
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return "Une erreur est survenue";
+};
+
 export function useCollaboratorPermissions() {
   const { toast } = useToast();
+  const { tenantId } = useUserTenant();
   const [permissions, setPermissions] = useState<CollaboratorPermission[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchPermissions = useCallback(async (collaboratorId: string) => {
     try {
       setLoading(true);
+      if (!tenantId) {
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
+      }
+
       const { data, error } = await supabase
         .from('collaborator_permissions')
         .select('*')
-        .eq('collaborator_id', collaboratorId);
+        .eq('collaborator_id', collaboratorId)
+        .eq('tenant_id', tenantId);
 
       if (error) throw error;
       setPermissions((data as CollaboratorPermission[]) || []);
       return (data as CollaboratorPermission[]) || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive"
       });
       return [];
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [tenantId, toast]);
 
   const savePermissions = useCallback(async (
     collaboratorId: string, 
@@ -73,12 +93,16 @@ export function useCollaboratorPermissions() {
   ) => {
     try {
       setLoading(true);
+      if (!tenantId) {
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
+      }
 
       // Delete existing permissions for this collaborator
       const { error: deleteError } = await supabase
         .from('collaborator_permissions')
         .delete()
-        .eq('collaborator_id', collaboratorId);
+        .eq('collaborator_id', collaboratorId)
+        .eq('tenant_id', tenantId);
 
       if (deleteError) throw deleteError;
 
@@ -87,6 +111,7 @@ export function useCollaboratorPermissions() {
         .filter(p => p.can_read || p.can_create || p.can_update || p.can_delete)
         .map(p => ({
           collaborator_id: collaboratorId,
+          tenant_id: tenantId,
           module: p.module,
           can_read: p.can_read,
           can_create: p.can_create,
@@ -108,17 +133,17 @@ export function useCollaboratorPermissions() {
       });
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erreur",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive"
       });
       return false;
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [tenantId, toast]);
 
   // Helper to get permission for a specific module
   const getModulePermission = (module: PermissionModule): CollaboratorPermission | undefined => {
@@ -127,7 +152,7 @@ export function useCollaboratorPermissions() {
 
   // Get all modules with their current permissions (for UI)
   const getPermissionsMap = (): Record<PermissionModule, PermissionUpdate> => {
-    const map: Record<PermissionModule, PermissionUpdate> = {} as any;
+    const map = {} as Record<PermissionModule, PermissionUpdate>;
     
     MODULES.forEach(m => {
       const existing = permissions.find(p => p.module === m.value);
