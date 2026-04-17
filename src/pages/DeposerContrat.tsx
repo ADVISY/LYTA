@@ -64,6 +64,27 @@ type VerifiedPartner = {
 
 type FormType = 'sana' | 'vita' | 'medio' | 'business' | null;
 
+type InsuranceCompanyOption = {
+  id: string;
+  name: string;
+};
+
+type InsuranceProductOption = {
+  id: string;
+  name: string;
+  category: string | null;
+  company_id: string;
+};
+
+type SelectedDepositProduct = {
+  productId: string;
+  name: string;
+  category: string;
+  premium: number | null;
+  deductible: number | null;
+  durationYears: number | null;
+};
+
 // SANA Form - LAMal/LCA (Assurance Maladie)
 type SanaFormData = {
   clientNom: string;
@@ -267,6 +288,13 @@ export default function DeposerContrat() {
   const [selectedFormType, setSelectedFormType] = useState<FormType>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [companies, setCompanies] = useState<InsuranceCompanyOption[]>([]);
+  const [products, setProducts] = useState<InsuranceProductOption[]>([]);
+  const [companySearch, setCompanySearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
   const isPartnerVerified = Boolean(verifiedPartner?.id) && normalizedPartnerEmail.length > 0;
@@ -353,6 +381,207 @@ export default function DeposerContrat() {
 
   const formTypes = getFormTypes(t);
 
+  const normalizeCatalogText = (value: string | null | undefined) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const isGenericDepositCompany = (name: string | null | undefined) => {
+    const normalized = normalizeCatalogText(name);
+    return normalized.includes('depot generique') || normalized.includes('depot contrat');
+  };
+
+  const selectedCompany = companies.find(company => company.id === selectedCompanyId) || null;
+  const filteredCompanies = companies.filter(company =>
+    normalizeCatalogText(company.name).includes(normalizeCatalogText(companySearch))
+  );
+  const companyProducts = products.filter(product => product.company_id === selectedCompanyId);
+  const filteredProducts = companyProducts.filter(product => {
+    const search = normalizeCatalogText(productSearch);
+    if (!search) return true;
+    return (
+      normalizeCatalogText(product.name).includes(search) ||
+      normalizeCatalogText(product.category).includes(search)
+    );
+  });
+
+  const resetCatalogSelection = () => {
+    setCompanySearch("");
+    setProductSearch("");
+    setSelectedCompanyId("");
+    setSelectedProductIds([]);
+  };
+
+  const fetchCatalog = async () => {
+    setCatalogLoading(true);
+    try {
+      const [companiesRes, productsRes] = await Promise.all([
+        supabase.from('insurance_companies').select('id, name').order('name', { ascending: true }),
+        supabase.from('insurance_products').select('id, name, category, company_id').order('category, name', { ascending: true }),
+      ]);
+
+      if (companiesRes.error) throw companiesRes.error;
+      if (productsRes.error) throw productsRes.error;
+
+      const visibleCompanies = (companiesRes.data || []).filter(company => !isGenericDepositCompany(company.name));
+      const visibleCompanyIds = new Set(visibleCompanies.map(company => company.id));
+
+      setCompanies(visibleCompanies);
+      setProducts((productsRes.data || []).filter(product => visibleCompanyIds.has(product.company_id)));
+    } catch (error: any) {
+      toast({
+        title: t('common.error'),
+        description: error?.message || "Impossible de charger les compagnies et produits",
+        variant: "destructive",
+      });
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
+  const handleCompanyCatalogChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    setSelectedProductIds([]);
+    setProductSearch("");
+    setFormErrors(prev => ({ ...prev, catalogCompany: undefined, catalogProducts: undefined }));
+  };
+
+  const toggleCatalogProduct = (productId: string) => {
+    setSelectedProductIds(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+    setFormErrors(prev => ({ ...prev, catalogProducts: undefined }));
+  };
+
+  const getSelectedDepositProducts = (formData: any): SelectedDepositProduct[] => {
+    return selectedProductIds
+      .map(productId => products.find(product => product.id === productId))
+      .filter((product): product is InsuranceProductOption => Boolean(product))
+      .map(product => ({
+        productId: product.id,
+        name: product.name,
+        category: product.category || selectedFormType || 'other',
+        premium: selectedFormType === 'vita' ? (parseFloat(formData.vitaPrimeMensuelle) || null) : null,
+        deductible: null,
+        durationYears: selectedFormType === 'vita' && /^\d+$/.test(formData.vitaDureeContrat || '')
+          ? parseInt(formData.vitaDureeContrat, 10)
+          : null,
+      }));
+  };
+
+  const validateCatalogSelection = () => {
+    const errors: FormErrors = {};
+
+    if (!selectedCompanyId) {
+      errors.catalogCompany = "Compagnie d'assurance requise";
+    }
+
+    if (selectedProductIds.length === 0) {
+      errors.catalogProducts = "Selectionnez au moins un produit";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(prev => ({ ...prev, ...errors }));
+      toast({
+        title: t('common.error'),
+        description: "Selectionnez une compagnie d'assurance et au moins un produit",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const getDepositCatalogPayload = (formData: any) => {
+    const selectedProducts = getSelectedDepositProducts(formData);
+    return {
+      companyId: selectedCompanyId,
+      companyName: selectedCompany?.name || null,
+      productId: selectedProducts[0]?.productId,
+      productIds: selectedProducts.map(product => product.productId),
+      selectedProducts,
+    };
+  };
+
+  const renderCatalogSelector = () => (
+    <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+      <div className="space-y-1">
+        <h3 className="font-semibold text-lg">Compagnie et produits</h3>
+        <p className="text-sm text-muted-foreground">
+          Recherchez la compagnie d'assurance puis selectionnez les produits concernes.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Rechercher une compagnie *</Label>
+          <Input
+            value={companySearch}
+            onChange={(e) => setCompanySearch(e.target.value)}
+            placeholder="AXA, Assura, Swiss Life..."
+            disabled={catalogLoading}
+          />
+          <Select value={selectedCompanyId} onValueChange={handleCompanyCatalogChange} disabled={catalogLoading}>
+            <SelectTrigger className={formErrors.catalogCompany ? 'border-destructive' : ''}>
+              <SelectValue placeholder={catalogLoading ? "Chargement..." : "Choisir la compagnie"} />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredCompanies.map(company => (
+                <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {formErrors.catalogCompany && <p className="text-sm text-destructive">{formErrors.catalogCompany}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Rechercher un produit *</Label>
+          <Input
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder="LAMal, LCA, RC, 3e pilier..."
+            disabled={!selectedCompanyId || catalogLoading}
+          />
+          {formErrors.catalogProducts && <p className="text-sm text-destructive">{formErrors.catalogProducts}</p>}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {!selectedCompanyId ? (
+          <p className="text-sm text-muted-foreground">Choisissez d'abord une compagnie.</p>
+        ) : filteredProducts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun produit trouve pour cette compagnie.</p>
+        ) : (
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-2 ${formErrors.catalogProducts ? 'rounded-lg ring-2 ring-destructive p-2' : ''}`}>
+            {filteredProducts.map(product => {
+              const checked = selectedProductIds.includes(product.id);
+              return (
+                <label
+                  key={product.id}
+                  className="flex items-start gap-3 rounded-lg border bg-background p-3 cursor-pointer hover:bg-muted/40"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleCatalogProduct(product.id)}
+                  />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">{product.name}</span>
+                    {product.category && <span className="block text-xs text-muted-foreground">{product.category}</span>}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     if (verifiedPartner) {
       const agentName = verifiedPartner.name || `${verifiedPartner.firstName || ''} ${verifiedPartner.lastName || ''}`.trim();
@@ -361,6 +590,16 @@ export default function DeposerContrat() {
       setMedioForm(prev => ({ ...prev, agentName }));
     }
   }, [verifiedPartner]);
+
+  useEffect(() => {
+    if (isPartnerVerified) {
+      fetchCatalog();
+    } else {
+      setCompanies([]);
+      setProducts([]);
+      resetCatalogSelection();
+    }
+  }, [isPartnerVerified]);
 
   // Hard guard: prevent access to selection/form if partner isn't verified
   useEffect(() => {
@@ -485,12 +724,14 @@ export default function DeposerContrat() {
       return;
     }
     setSelectedFormType(formType);
+    resetCatalogSelection();
     setVerificationStep('form');
   };
 
   const handleBackToSelection = () => {
     setSelectedFormType(null);
     setFormErrors({});
+    resetCatalogSelection();
     setVerificationStep('selection');
   };
 
@@ -506,6 +747,13 @@ export default function DeposerContrat() {
 
   const sendContractDepositEmail = async (formType: string, formData: any, documents: any[]) => {
     try {
+      const selectedCatalogProducts = getSelectedDepositProducts(formData);
+      const enrichedFormData = {
+        ...formData,
+        compagnieAssurance: selectedCompany?.name || '',
+        produitsSelectionnes: selectedCatalogProducts.map(product => product.name).join(', '),
+      };
+
       const { data, error } = await supabase.functions.invoke('send-contract-deposit-email', {
         body: {
           contractData: {
@@ -516,7 +764,7 @@ export default function DeposerContrat() {
             clientTel: formData.clientTel || formData.preneurTel || '',
             agentName: formData.agentName || verifiedPartner?.name || '',
             agentEmail: normalizedPartnerEmail,
-            formData,
+            formData: enrichedFormData,
             documents: documents.map(d => ({ file_name: d.file_name, doc_kind: d.doc_kind, file_key: d.file_key })),
             tenantSlug: tenant?.slug,
           },
@@ -546,6 +794,7 @@ export default function DeposerContrat() {
       toast({ title: t('common.error'), description: t('depositContract.fillRequired'), variant: "destructive" });
       return;
     }
+    if (!validateCatalogSelection()) return;
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke('deposit-contract', {
@@ -555,6 +804,7 @@ export default function DeposerContrat() {
           formData: sanaForm,
           startDate: sanaForm.lamalDateEffet || new Date().toISOString().split("T")[0],
           productType: 'sana',
+          ...getDepositCatalogPayload(sanaForm),
         }
       });
       if (error) throw error;
@@ -581,6 +831,7 @@ export default function DeposerContrat() {
       toast({ title: t('common.error'), description: t('depositContract.fillRequired'), variant: "destructive" });
       return;
     }
+    if (!validateCatalogSelection()) return;
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke('deposit-contract', {
@@ -591,6 +842,7 @@ export default function DeposerContrat() {
           startDate: vitaForm.vitaDateEffet || new Date().toISOString().split("T")[0],
           premiumMonthly: parseFloat(vitaForm.vitaPrimeMensuelle) || 0,
           productType: 'vita',
+          ...getDepositCatalogPayload(vitaForm),
         }
       });
       if (error) throw error;
@@ -617,6 +869,7 @@ export default function DeposerContrat() {
       toast({ title: t('common.error'), description: t('depositContract.fillRequired'), variant: "destructive" });
       return;
     }
+    if (!validateCatalogSelection()) return;
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke('deposit-contract', {
@@ -626,6 +879,7 @@ export default function DeposerContrat() {
           formData: medioForm,
           startDate: medioForm.dateEffet || new Date().toISOString().split("T")[0],
           productType: 'medio',
+          ...getDepositCatalogPayload(medioForm),
         }
       });
       if (error) throw error;
@@ -652,6 +906,7 @@ export default function DeposerContrat() {
       toast({ title: t('common.error'), description: t('depositContract.fillRequired'), variant: "destructive" });
       return;
     }
+    if (!validateCatalogSelection()) return;
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke('deposit-contract', {
@@ -661,6 +916,7 @@ export default function DeposerContrat() {
           formData: businessForm,
           startDate: businessForm.dateEffet || new Date().toISOString().split("T")[0],
           productType: 'business',
+          ...getDepositCatalogPayload(businessForm),
         }
       });
       if (error) throw error;
@@ -827,6 +1083,8 @@ export default function DeposerContrat() {
                 />
               )}
 
+              {renderCatalogSelector()}
+
               {/* Client info */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.common.clientInfo')}</h3>
@@ -974,6 +1232,8 @@ export default function DeposerContrat() {
                 />
               )}
 
+              {renderCatalogSelector()}
+
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.common.clientInfo')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1114,6 +1374,8 @@ export default function DeposerContrat() {
                   verifiedPartnerId={verifiedPartner?.id}
                 />
               )}
+
+              {renderCatalogSelector()}
 
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2">{t('depositContract.medio.policyholderInfo')}</h3>
@@ -1308,6 +1570,8 @@ export default function DeposerContrat() {
               )}
 
               {/* Renseignements généraux */}
+              {renderCatalogSelector()}
+
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2"><Building2 className="h-5 w-5" /> {t('depositContract.business.generalInfo')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

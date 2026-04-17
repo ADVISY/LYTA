@@ -117,6 +117,97 @@ interface ParsedResult {
   }>;
 }
 
+type ScanFileContent = {
+  fileName: string;
+  fileKey: string;
+  base64: string;
+  mimeType: string;
+};
+
+type SingleAnalysisSuccess = {
+  ok: true;
+  file: ScanFileContent;
+  result: ParsedResult;
+  durationMs: number;
+};
+
+type SingleAnalysisFailure = {
+  ok: false;
+  file: ScanFileContent;
+  error: string;
+  durationMs: number;
+};
+
+type SingleAnalysisOutcome = SingleAnalysisSuccess | SingleAnalysisFailure;
+
+const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 75000;
+const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 6;
+const DEFAULT_PRODUCT_MATCH_CONCURRENCY = 6;
+
+function readPositiveIntegerEnv(
+  name: string,
+  fallback: number,
+  minValue: number,
+  maxValue: number,
+): number {
+  const rawValue = Deno.env.get(name);
+  const parsedValue = rawValue ? Number(rawValue) : fallback;
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.max(minValue, Math.min(maxValue, Math.floor(parsedValue)));
+}
+
+function getScanDocumentTimeoutMs(): number {
+  return readPositiveIntegerEnv(
+    "AI_SCAN_DOCUMENT_TIMEOUT_MS",
+    DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS,
+    30000,
+    110000,
+  );
+}
+
+function getScanDocumentConcurrency(): number {
+  return readPositiveIntegerEnv(
+    "AI_SCAN_DOCUMENT_CONCURRENCY",
+    DEFAULT_SCAN_DOCUMENT_CONCURRENCY,
+    1,
+    8,
+  );
+}
+
+function getProductMatchConcurrency(): number {
+  return readPositiveIntegerEnv(
+    "PRODUCT_MATCH_CONCURRENCY",
+    DEFAULT_PRODUCT_MATCH_CONCURRENCY,
+    1,
+    12,
+  );
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex++;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+
+  return results;
+}
+
 // Avoid `String.fromCharCode(...bytes)` on large buffers (causes RangeError: Maximum call stack size exceeded)
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -390,6 +481,414 @@ IMPORTANT:
 Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 }
 
+function buildSingleDocumentSystemPrompt(): string {
+  const today = new Date().toLocaleDateString('fr-CH');
+
+  return `Tu es un responsable back-office senior en assurance suisse. Analyse un fichier du dossier client. Le fichier peut contenir une ou plusieurs pages.
+
+Priorite: repondre vite avec les informations utiles, sans commentaire hors JSON.
+
+Classifie chaque document detecte avec doc_type parmi:
+police_active, ancienne_police, nouvelle_police, offre, avenant, resiliation, attestation, piece_identite, justificatif_domicile, bulletin_salaire, autre.
+
+Detecte tous les produits d'assurance visibles. Une ligne de prime = un produit separe. Precise la personne assuree quand elle est visible.
+
+Date du jour: ${today}
+
+Retourne uniquement un JSON valide avec cette structure:
+{
+  "dossier_summary": "resume court",
+  "documents_detected": [{"file_name":"nom.pdf","doc_type":"offre","doc_type_confidence":0.9,"description":"description courte"}],
+  "primary_holder": {"last_name":"Nom","first_name":"Prenom","birthdate":"YYYY-MM-DD"},
+  "family_members_detected": [],
+  "old_products_detected": [],
+  "new_products_detected": [],
+  "products_detected": [],
+  "has_old_policy": false,
+  "has_new_policy": false,
+  "has_termination": false,
+  "has_identity_doc": false,
+  "has_multiple_products": false,
+  "has_family_members": false,
+  "engagement_analysis": {"warnings":[]},
+  "inconsistencies": [],
+  "missing_documents": [],
+  "workflow_actions": [],
+  "quality_score": 0.8,
+  "fields": [
+    {"category":"client","name":"nom","value":"Dupont","confidence":"high","confidence_score":0.95,"source_document":"nom.pdf"}
+  ]
+}`;
+}
+
+function buildSingleDocumentUserPrompt(
+  fileName: string,
+  index: number,
+  total: number,
+  formType?: string,
+): string {
+  return `Analyse ce fichier (${index + 1}/${total})${formType ? ` pour le formulaire ${formType.toUpperCase()}` : ""}: ${fileName}.
+
+Extrait uniquement les informations visibles et utiles pour pre-remplir le dossier:
+- client: nom, prenom, date_naissance, nationalite, adresse, npa, localite, telephone, email, numero_avs
+- ancienne police: ancienne_compagnie, ancien_numero_police, ancien_type_produit, ancienne_date_debut, ancienne_date_fin, ancienne_prime_mensuelle, ancienne_franchise
+- nouvelle police/offre: nouvelle_compagnie, nouveau_numero_police, nouveau_type_produit, nouvelle_date_debut, nouvelle_date_fin, nouvelle_prime_mensuelle, nouvelle_franchise
+- produits: chaque produit separe avec product_name, product_category, company, insured_person_name, premium_monthly, franchise, start_date, end_date
+- resiliation: date_resiliation, motif_resiliation, compagnie_resiliee
+
+Si une information n'est pas visible, ne l'invente pas. Retourne uniquement le JSON.`;
+}
+
+function parseAiAnalysisResponse(aiContent: string, fallbackFileName?: string): ParsedResult {
+  let jsonStr = aiContent;
+  const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1];
+  }
+
+  return normalizeParsedResult(JSON.parse(jsonStr.trim()), fallbackFileName);
+}
+
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function normalizeParsedResult(value: unknown, fallbackFileName?: string): ParsedResult {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawFields = ensureArray<Record<string, unknown>>(record.fields);
+  const fields = rawFields
+    .map((field) => {
+      const category = typeof field.category === "string" && field.category.trim()
+        ? field.category.trim()
+        : "general";
+      const name = typeof field.name === "string" ? field.name.trim() : "";
+      if (!name) return null;
+
+      const rawConfidence = typeof field.confidence === "string" ? field.confidence : "medium";
+      const confidence = rawConfidence === "high" || rawConfidence === "medium" || rawConfidence === "low"
+        ? rawConfidence
+        : "medium";
+      const rawScore = typeof field.confidence_score === "number" ? field.confidence_score : 0.5;
+
+      return {
+        category,
+        name,
+        value: field.value === null || field.value === undefined ? "" : String(field.value),
+        confidence,
+        confidence_score: Math.max(0, Math.min(1, rawScore)),
+        source_document: typeof field.source_document === "string" ? field.source_document : fallbackFileName,
+        notes: typeof field.notes === "string" ? field.notes : undefined,
+      };
+    })
+    .filter((field): field is ParsedResult["fields"][number] => field !== null);
+
+  const qualityScore = typeof record.quality_score === "number"
+    ? Math.max(0, Math.min(1, record.quality_score))
+    : 0;
+
+  return {
+    dossier_summary: typeof record.dossier_summary === "string" ? record.dossier_summary : undefined,
+    documents_detected: ensureArray<DocumentDetected>(record.documents_detected),
+    products_detected: ensureArray<ProductDetected>(record.products_detected),
+    old_products_detected: ensureArray<ProductDetected>(record.old_products_detected),
+    new_products_detected: ensureArray<ProductDetected>(record.new_products_detected),
+    family_members_detected: ensureArray<FamilyMemberDetected>(record.family_members_detected),
+    primary_holder: record.primary_holder && typeof record.primary_holder === "object"
+      ? record.primary_holder as ParsedResult["primary_holder"]
+      : undefined,
+    has_old_policy: record.has_old_policy === true,
+    has_new_policy: record.has_new_policy === true,
+    has_termination: record.has_termination === true,
+    has_identity_doc: record.has_identity_doc === true,
+    has_multiple_products: record.has_multiple_products === true,
+    has_family_members: record.has_family_members === true,
+    engagement_analysis: record.engagement_analysis && typeof record.engagement_analysis === "object"
+      ? record.engagement_analysis as ParsedResult["engagement_analysis"]
+      : undefined,
+    inconsistencies: ensureArray<string>(record.inconsistencies).filter((item) => typeof item === "string"),
+    missing_documents: ensureArray<string>(record.missing_documents).filter((item) => typeof item === "string"),
+    workflow_actions: ensureArray<WorkflowAction>(record.workflow_actions),
+    quality_score: qualityScore,
+    fields,
+  };
+}
+
+async function analyzeSingleFile(
+  fileContent: ScanFileContent,
+  index: number,
+  total: number,
+  formType?: string,
+): Promise<ParsedResult> {
+  const userContent: Record<string, unknown>[] = [
+    {
+      type: "text",
+      text: buildSingleDocumentUserPrompt(fileContent.fileName, index, total, formType),
+    },
+    buildChatDocumentContent(fileContent),
+  ];
+
+  const aiResponse = await fetchAiChatCompletions({
+    model: getAiModel(),
+    messages: [
+      { role: "system", content: buildSingleDocumentSystemPrompt() },
+      { role: "user", content: userContent },
+    ],
+    max_tokens: 5000,
+    temperature: 0.1,
+  }, getScanDocumentTimeoutMs());
+
+  if (!aiResponse.ok) {
+    const aiError = await buildAiError(aiResponse);
+    log.error("AI Gateway error", {
+      status: aiResponse.status,
+      error: aiError.message,
+      fileName: fileContent.fileName,
+    });
+    throw aiError;
+  }
+
+  const aiData = await aiResponse.json();
+  const aiContent = aiData.choices?.[0]?.message?.content;
+
+  if (!aiContent) {
+    throw new Error("No response from AI");
+  }
+
+  return parseAiAnalysisResponse(aiContent, fileContent.fileName);
+}
+
+function uniqueStrings(values: Array<string | undefined | null>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const normalizedValue = typeof value === "string" ? value.trim() : "";
+    if (!normalizedValue) continue;
+
+    const key = normalizedValue.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(normalizedValue);
+  }
+
+  return result;
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    const key = getKey(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+}
+
+function attachFileKeyToDetectedDocuments(result: ParsedResult, file: ScanFileContent): DocumentDetected[] {
+  const detectedDocuments = result.documents_detected?.length
+    ? result.documents_detected
+    : [{
+      file_name: file.fileName,
+      doc_type: "autre",
+      doc_type_confidence: result.quality_score || 0,
+      description: result.dossier_summary || "Document analyse automatiquement",
+    }];
+
+  return detectedDocuments.map((document) => ({
+    ...document,
+    file_name: document.file_name || file.fileName,
+    file_key: document.file_key || file.fileKey,
+    doc_type: document.doc_type || "autre",
+    doc_type_confidence: typeof document.doc_type_confidence === "number"
+      ? Math.max(0, Math.min(1, document.doc_type_confidence))
+      : result.quality_score || 0,
+    description: document.description || result.dossier_summary || "Document analyse automatiquement",
+  }));
+}
+
+function getProductKey(product: ProductDetected): string {
+  return [
+    product.product_name,
+    product.company,
+    product.insured_person_name,
+    product.start_date,
+    product.policy_number,
+  ].map((value) => (value || "").trim().toLowerCase()).join("|");
+}
+
+function getFamilyMemberKey(member: FamilyMemberDetected): string {
+  return [
+    member.last_name,
+    member.first_name,
+    member.birthdate,
+  ].map((value) => (value || "").trim().toLowerCase()).join("|");
+}
+
+function confidenceRank(confidence: "high" | "medium" | "low"): number {
+  if (confidence === "high") return 3;
+  if (confidence === "medium") return 2;
+  return 1;
+}
+
+function mergeFields(successes: SingleAnalysisSuccess[]): ParsedResult["fields"] {
+  const fieldsByKey = new Map<string, ParsedResult["fields"][number]>();
+
+  for (const success of successes) {
+    for (const field of success.result.fields) {
+      const key = `${field.category}:${field.name}`.toLowerCase();
+      const nextField = {
+        ...field,
+        source_document: field.source_document || success.file.fileName,
+      };
+      const existingField = fieldsByKey.get(key);
+
+      if (!existingField) {
+        fieldsByKey.set(key, nextField);
+        continue;
+      }
+
+      const existingValue = (existingField.value || "").trim();
+      const nextValue = (nextField.value || "").trim();
+      const valuesConflict =
+        existingValue &&
+        nextValue &&
+        existingValue.toLowerCase() !== nextValue.toLowerCase();
+
+      if (valuesConflict) {
+        const conflictNote = `Autre valeur detectee dans ${nextField.source_document}: ${nextValue}`;
+        existingField.notes = [existingField.notes, conflictNote].filter(Boolean).join(" | ");
+        existingField.confidence = existingField.confidence === "low" ? "low" : "medium";
+        existingField.confidence_score = Math.min(existingField.confidence_score, 0.7);
+      }
+
+      const shouldReplace =
+        (!existingValue && nextValue) ||
+        nextField.confidence_score > existingField.confidence_score + 0.05 ||
+        (
+          nextField.confidence_score === existingField.confidence_score &&
+          confidenceRank(nextField.confidence) > confidenceRank(existingField.confidence)
+        );
+
+      if (shouldReplace) {
+        fieldsByKey.set(key, {
+          ...nextField,
+          notes: [nextField.notes, existingField.notes].filter(Boolean).join(" | ") || undefined,
+        });
+      }
+    }
+  }
+
+  return Array.from(fieldsByKey.values());
+}
+
+function mergeEngagementAnalysis(successes: SingleAnalysisSuccess[]): ParsedResult["engagement_analysis"] | undefined {
+  const analyses = successes
+    .map((success) => success.result.engagement_analysis)
+    .filter((analysis): analysis is NonNullable<ParsedResult["engagement_analysis"]> => Boolean(analysis));
+
+  if (analyses.length === 0) {
+    return undefined;
+  }
+
+  const firstWith = <K extends keyof NonNullable<ParsedResult["engagement_analysis"]>>(key: K) =>
+    analyses.find((analysis) => analysis[key] !== undefined)?.[key];
+
+  return {
+    old_policy_end_date: firstWith("old_policy_end_date") as string | undefined,
+    new_policy_start_date: firstWith("new_policy_start_date") as string | undefined,
+    termination_deadline: firstWith("termination_deadline") as string | undefined,
+    is_termination_on_time: firstWith("is_termination_on_time") as boolean | undefined,
+    days_until_deadline: firstWith("days_until_deadline") as number | undefined,
+    warnings: uniqueStrings(analyses.flatMap((analysis) => analysis.warnings || [])),
+  };
+}
+
+function mergeParsedResults(outcomes: SingleAnalysisOutcome[]): ParsedResult {
+  const successes = outcomes.filter((outcome): outcome is SingleAnalysisSuccess => outcome.ok);
+  const failures = outcomes.filter((outcome): outcome is SingleAnalysisFailure => !outcome.ok);
+
+  if (successes.length === 0) {
+    throw new Error(failures[0]?.error || "No documents could be analyzed");
+  }
+
+  const documentsDetected = successes.flatMap((success) =>
+    attachFileKeyToDetectedDocuments(success.result, success.file)
+  );
+  const documentTypes = documentsDetected.map((document) => (document.doc_type || "").toLowerCase());
+  const oldProducts = uniqueBy(
+    successes.flatMap((success) => success.result.old_products_detected || []),
+    getProductKey,
+  );
+  const newProducts = uniqueBy(
+    successes.flatMap((success) => success.result.new_products_detected || []),
+    getProductKey,
+  );
+  const genericProducts = uniqueBy(
+    successes.flatMap((success) => success.result.products_detected || []),
+    getProductKey,
+  );
+  const familyMembers = uniqueBy(
+    successes.flatMap((success) => success.result.family_members_detected || []),
+    getFamilyMemberKey,
+  );
+  const totalProducts = oldProducts.length + newProducts.length + genericProducts.length;
+  const qualityScores = successes
+    .map((success) => success.result.quality_score)
+    .filter((score) => typeof score === "number" && Number.isFinite(score));
+  const qualityScore = qualityScores.length > 0
+    ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
+    : 0;
+  const primaryHolderSource =
+    successes.find((success) => success.result.has_identity_doc && success.result.primary_holder)?.result.primary_holder ||
+    successes.find((success) => success.result.primary_holder)?.result.primary_holder;
+  const summaries = uniqueStrings(successes.map((success) => success.result.dossier_summary));
+  const failureMessages = failures.map((failure) =>
+    `Analyse IA non terminee pour ${failure.file.fileName}: ${failure.error}`
+  );
+
+  return {
+    dossier_summary: [
+      `${successes.length}/${outcomes.length} fichier(s) analyses.`,
+      summaries.slice(0, 3).join(" "),
+      failures.length > 0 ? `${failures.length} fichier(s) a verifier manuellement.` : "",
+    ].filter(Boolean).join(" "),
+    documents_detected: documentsDetected,
+    products_detected: genericProducts,
+    old_products_detected: oldProducts,
+    new_products_detected: newProducts,
+    family_members_detected: familyMembers,
+    primary_holder: primaryHolderSource,
+    has_old_policy: successes.some((success) => success.result.has_old_policy) ||
+      oldProducts.length > 0 ||
+      documentTypes.some((type) => type === "ancienne_police" || type === "police_active"),
+    has_new_policy: successes.some((success) => success.result.has_new_policy) ||
+      newProducts.length > 0 ||
+      documentTypes.some((type) => type === "nouvelle_police" || type === "offre"),
+    has_termination: successes.some((success) => success.result.has_termination) ||
+      documentTypes.includes("resiliation"),
+    has_identity_doc: successes.some((success) => success.result.has_identity_doc) ||
+      documentTypes.includes("piece_identite"),
+    has_multiple_products: successes.some((success) => success.result.has_multiple_products) ||
+      totalProducts > 1,
+    has_family_members: successes.some((success) => success.result.has_family_members) ||
+      familyMembers.length > 0,
+    engagement_analysis: mergeEngagementAnalysis(successes),
+    inconsistencies: uniqueStrings([
+      ...successes.flatMap((success) => success.result.inconsistencies || []),
+      ...failureMessages,
+    ]),
+    missing_documents: uniqueStrings(successes.flatMap((success) => success.result.missing_documents || [])),
+    workflow_actions: successes.flatMap((success) => success.result.workflow_actions || []),
+    quality_score: qualityScore,
+    fields: mergeFields(successes),
+  };
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -477,29 +976,32 @@ serve(async (req) => {
       log.warn("Scan has no tenant_id, skipping quota enforcement", { tenantId });
     }
 
-    // Download and encode all files - preserve file_key for document mapping
-    const fileContents: { fileName: string; fileKey: string; base64: string; mimeType: string }[] = [];
-    
-    for (const fileInfo of filesToProcess) {
+    const concurrency = getScanDocumentConcurrency();
+
+    // Download and encode files in parallel - preserve file_key for document mapping.
+    const downloadResults = await mapWithConcurrency(filesToProcess, concurrency, async (fileInfo) => {
       const { data: fileData, error: downloadError } = await supabase.storage
         .from("documents")
         .download(fileInfo.path);
 
       if (downloadError || !fileData) {
         log.error(`Failed to download file`, { fileName: fileInfo.fileName, error: downloadError?.message });
-        continue;
+        return null;
       }
 
       const arrayBuffer = await fileData.arrayBuffer();
       const base64File = arrayBufferToBase64(arrayBuffer);
       
-      fileContents.push({
+      return {
         fileName: fileInfo.fileName,
         fileKey: fileInfo.path,  // Preserve the storage path for document mapping
         base64: base64File,
         mimeType: normalizeDocumentMimeType(fileInfo.fileName, fileInfo.mimeType)
-      });
-    }
+      };
+    });
+
+    const fileContents: ScanFileContent[] = downloadResults
+      .filter((file): file is ScanFileContent => Boolean(file));
 
     if (fileContents.length === 0) {
       throw new Error("No files could be processed");
@@ -510,60 +1012,49 @@ serve(async (req) => {
       reservedAmount = fileContents.length;
     }
 
-    // Build prompts
-    const systemPrompt = buildSystemPrompt(fileContents.length);
-    const documentsDescription = fileContents.map((f, i) => 
-      `Document ${i + 1}: ${f.fileName}`
-    ).join('\n');
-    const userPrompt = buildUserPrompt(documentsDescription, formType);
+    // Analyze each file independently and in parallel, then merge results.
+    // This keeps wall-clock time under the Edge Function limit for folders with several PDFs.
+    const analysisResults = await mapWithConcurrency(fileContents, concurrency, async (fileContent, index): Promise<SingleAnalysisOutcome> => {
+      const fileStartTime = Date.now();
 
-    // Build messages with all documents. Images use vision input; PDFs/office/text files use file input.
-    const userContent: any[] = [
-      { type: "text", text: userPrompt }
-    ];
+      try {
+        const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType);
+        return {
+          ok: true,
+          file: fileContent,
+          result,
+          durationMs: Date.now() - fileStartTime,
+        };
+      } catch (fileError) {
+        const errorMessage = fileError instanceof Error ? fileError.message : String(fileError);
+        log.error("Failed to analyze file", {
+          scanId,
+          fileName: fileContent.fileName,
+          error: errorMessage,
+        });
 
-    for (const fileContent of fileContents) {
-      userContent.push(buildChatDocumentContent(fileContent));
-    }
-
-    const aiResponse = await fetchAiChatCompletions({
-      model: getAiModel(),
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      max_tokens: 12000,
-      temperature: 0.1,
-    }, 120000);
-
-    if (!aiResponse.ok) {
-      const aiError = await buildAiError(aiResponse);
-      log.error("AI Gateway error", { status: aiResponse.status, error: aiError.message, scanId });
-      throw aiError;
-    }
-
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content;
-
-    if (!aiContent) {
-      throw new Error("No response from AI");
-    }
-
-    // Parse AI response
-    let parsedResult: ParsedResult;
-
-    try {
-      // Extract JSON from response (handle markdown code blocks)
-      let jsonStr = aiContent;
-      const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[1];
+        return {
+          ok: false,
+          file: fileContent,
+          error: errorMessage,
+          durationMs: Date.now() - fileStartTime,
+        };
       }
-      parsedResult = JSON.parse(jsonStr.trim());
-    } catch (parseError) {
-      log.error("Failed to parse AI response", { scanId, rawContent: aiContent?.slice(0, 200) });
-      throw new Error("Failed to parse AI analysis result");
-    }
+    });
+
+    const parsedResult = mergeParsedResults(analysisResults);
+
+    log.info("AI file analysis completed", {
+      scanId,
+      files: fileContents.length,
+      success: analysisResults.filter((result) => result.ok).length,
+      failed: analysisResults.filter((result) => !result.ok).length,
+      durationsMs: analysisResults.map((result) => ({
+        fileName: result.file.fileName,
+        durationMs: result.durationMs,
+        ok: result.ok,
+      })),
+    });
 
     // ============================================
     // MAP FILE KEYS TO DOCUMENTS DETECTED
@@ -610,19 +1101,16 @@ serve(async (req) => {
     // For each detected product, try to match with existing catalog
     // If no match found, create a candidate product
     
-    const matchedProducts: ProductDetected[] = [];
-    let productMatchFailures = 0;
     const allDetectedProducts = [
       ...(parsedResult.new_products_detected || []),
       ...(parsedResult.old_products_detected || []),
       ...(parsedResult.products_detected || [])
     ];
+    const productsToMatch = allDetectedProducts.filter((product) =>
+      product.product_name && product.product_name.toLowerCase() !== 'autres assurances'
+    );
 
-    for (const product of allDetectedProducts) {
-      if (!product.product_name || product.product_name.toLowerCase() === 'autres assurances') {
-        continue; // Skip empty or fallback products
-      }
-
+    const productMatchResults = await mapWithConcurrency(productsToMatch, getProductMatchConcurrency(), async (product) => {
       try {
         // Try to find a matching product using fuzzy matching
         const { data: matches, error: matchError } = await supabase.rpc('find_product_by_alias', {
@@ -678,13 +1166,22 @@ serve(async (req) => {
             log.info(`Created candidate product: ${candidateId} for "${product.product_name}"`);
           }
         }
+
+        return {
+          ok: true as const,
+          product,
+        };
       } catch (e) {
         log.error(`Error matching product "${product.product_name}"`, { error: e });
-        productMatchFailures++;
+        return {
+          ok: false as const,
+          product,
+        };
       }
+    });
 
-      matchedProducts.push(product);
-    }
+    const matchedProducts = productMatchResults.map((result) => result.product);
+    const productMatchFailures = productMatchResults.filter((result) => !result.ok).length;
 
     // Update parsed result with matched products
     if (parsedResult.new_products_detected) {

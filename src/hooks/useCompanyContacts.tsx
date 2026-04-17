@@ -64,7 +64,9 @@ export function useCompanyContacts(companyId?: string) {
         .from('company_contacts')
         .select('*')
         .eq('company_id', companyId)
-        .order('contact_type, is_primary desc, created_at');
+        .order('contact_type', { ascending: true })
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setContacts((data || []) as CompanyContact[]);

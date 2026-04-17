@@ -52,6 +52,7 @@ type FileContent = {
 };
 
 const DEFAULT_BATCH_CLASSIFICATION_TIMEOUT_MS = 120000;
+const DEFAULT_BATCH_CLASSIFICATION_CONCURRENCY = 6;
 const DOC_CLASSIFICATION_SET = new Set<string>(DOC_CLASSIFICATIONS);
 
 function getBatchClassificationTimeoutMs(): number {
@@ -61,6 +62,38 @@ function getBatchClassificationTimeoutMs(): number {
   return Number.isFinite(parsedValue) && parsedValue >= 30000
     ? parsedValue
     : DEFAULT_BATCH_CLASSIFICATION_TIMEOUT_MS;
+}
+
+function getBatchClassificationConcurrency(): number {
+  const rawValue = Deno.env.get("AI_BATCH_CLASSIFICATION_CONCURRENCY");
+  const parsedValue = rawValue ? Number(rawValue) : DEFAULT_BATCH_CLASSIFICATION_CONCURRENCY;
+
+  if (!Number.isFinite(parsedValue)) {
+    return DEFAULT_BATCH_CLASSIFICATION_CONCURRENCY;
+  }
+
+  return Math.max(1, Math.min(8, Math.floor(parsedValue)));
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex++;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+
+  return results;
 }
 
 async function getOptionalAuth(req: Request): Promise<AuthContext | null> {
@@ -347,11 +380,11 @@ serve(async (req) => {
       }
     }
 
-    // Download and encode all files
-    const fileContents: FileContent[] = [];
-    
-    for (const doc of batchDocs) {
-      // Update doc status
+    const concurrency = getBatchClassificationConcurrency();
+
+    // Download and encode files in parallel. This avoids spending most of the
+    // 120s window on storage round trips before the AI work even starts.
+    const downloadResults = await mapWithConcurrency(batchDocs, concurrency, async (doc) => {
       await supabase
         .from("scan_batch_documents")
         .update({ status: "analyzing" })
@@ -367,19 +400,29 @@ serve(async (req) => {
           .from("scan_batch_documents")
           .update({ status: "error" })
           .eq("id", doc.id);
-        continue;
+        return {
+          ok: false as const,
+          error: downloadError?.message || "Failed to download file",
+        };
       }
 
       const arrayBuffer = await fileData.arrayBuffer();
       const base64File = arrayBufferToBase64(arrayBuffer);
       
-      fileContents.push({
-        docId: doc.id,
-        fileName: doc.file_name,
-        base64: base64File,
-        mimeType: normalizeDocumentMimeType(doc.file_name, doc.mime_type)
-      });
-    }
+      return {
+        ok: true as const,
+        file: {
+          docId: doc.id,
+          fileName: doc.file_name,
+          base64: base64File,
+          mimeType: normalizeDocumentMimeType(doc.file_name, doc.mime_type)
+        },
+      };
+    });
+
+    const fileContents: FileContent[] = downloadResults
+      .filter((result): result is { ok: true; file: FileContent } => result.ok)
+      .map((result) => result.file);
 
     if (fileContents.length === 0) {
       throw new Error("No files could be processed");
@@ -390,13 +433,7 @@ serve(async (req) => {
       reservedAmount = fileContents.length;
     }
 
-    let classifiedCount = 0;
-    let failedCount = batchDocs.length - fileContents.length;
-    let firstClassificationError: string | null = null;
-    const classifiedDocuments: ClassifiedDocument[] = [];
-
-    for (let i = 0; i < fileContents.length; i++) {
-      const fileInfo = fileContents[i];
+    const classificationResults = await mapWithConcurrency(fileContents, concurrency, async (fileInfo, i) => {
       try {
         const classification = await classifySingleDocument(fileInfo, i, fileContents.length);
         const { error: updateError } = await supabase
@@ -412,17 +449,20 @@ serve(async (req) => {
           })
           .eq("id", fileInfo.docId);
 
-        if (!updateError) {
-          classifiedCount++;
-          classifiedDocuments.push(classification);
-        } else {
+        if (updateError) {
           log.error(`Failed to update doc`, { docId: fileInfo.docId, error: updateError });
-          failedCount++;
+          return {
+            ok: false as const,
+            error: updateError.message,
+          };
         }
+
+        return {
+          ok: true as const,
+          classification,
+        };
       } catch (docError) {
-        failedCount++;
         const errorMessage = docError instanceof Error ? docError.message : String(docError);
-        firstClassificationError ??= errorMessage;
         log.error("Failed to classify document", { docId: fileInfo.docId, fileName: fileInfo.fileName, error: errorMessage });
 
         await supabase
@@ -432,8 +472,24 @@ serve(async (req) => {
             extracted_data: { error: errorMessage },
           })
           .eq("id", fileInfo.docId);
+
+        return {
+          ok: false as const,
+          error: errorMessage,
+        };
       }
-    }
+    });
+
+    const classifiedDocuments = classificationResults
+      .filter((result): result is { ok: true; classification: ClassifiedDocument } => result.ok)
+      .map((result) => result.classification);
+    const classifiedCount = classifiedDocuments.length;
+    const failedCount = (batchDocs.length - fileContents.length) +
+      classificationResults.filter((result) => !result.ok).length;
+    const firstFailedClassification = classificationResults.find(
+      (result): result is { ok: false; error: string } => !result.ok,
+    );
+    const firstClassificationError = firstFailedClassification?.error ?? null;
 
     if (classifiedCount === 0) {
       await supabase

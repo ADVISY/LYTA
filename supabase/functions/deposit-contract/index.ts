@@ -7,6 +7,121 @@ import { resolvePartnerAccessByEmail } from "../_shared/partner-access.ts";
 
 const log = createLogger("deposit-contract");
 
+type SelectedProductInput = {
+  productId?: unknown;
+  id?: unknown;
+  name?: unknown;
+  category?: unknown;
+  premium?: unknown;
+  deductible?: unknown;
+  durationYears?: unknown;
+};
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function uniqueStrings(values: unknown[]): string[] {
+  return [...new Set(values.map(asString).filter((value): value is string => Boolean(value)))];
+}
+
+function selectedProductId(product: SelectedProductInput): string | null {
+  return asString(product.productId) || asString(product.id);
+}
+
+async function resolveCatalogProductSelection(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  companyId: string | null,
+  productId: string | null,
+  productIds: unknown,
+  selectedProducts: unknown,
+) {
+  const selectedProductInputs = Array.isArray(selectedProducts)
+    ? selectedProducts.filter((product): product is SelectedProductInput => product && typeof product === "object")
+    : [];
+
+  const requestedProductIds = uniqueStrings([
+    productId,
+    ...(Array.isArray(productIds) ? productIds : []),
+    ...selectedProductInputs.map(selectedProductId),
+  ]);
+
+  if (requestedProductIds.length === 0) {
+    return null;
+  }
+
+  let query = supabaseAdmin
+    .from("insurance_products")
+    .select(`
+      id,
+      name,
+      category,
+      company_id,
+      company:insurance_companies!company_id (
+        name
+      )
+    `)
+    .in("id", requestedProductIds);
+
+  if (companyId) {
+    query = query.eq("company_id", companyId);
+  }
+
+  const { data: catalogProducts, error } = await query;
+
+  if (error) {
+    throw new Error(`Could not resolve selected products: ${error.message}`);
+  }
+
+  if (!catalogProducts || catalogProducts.length !== requestedProductIds.length) {
+    throw new Error("Selected company or products are invalid");
+  }
+
+  const distinctCompanyIds = new Set(catalogProducts.map((product: any) => product.company_id));
+  if (distinctCompanyIds.size !== 1) {
+    throw new Error("Selected products must belong to the same company");
+  }
+
+  const productInputById = new Map(
+    selectedProductInputs
+      .map(input => [selectedProductId(input), input] as const)
+      .filter(([id]) => Boolean(id)),
+  );
+
+  const productsById = new Map(catalogProducts.map((product: any) => [product.id, product]));
+  const orderedProducts = requestedProductIds
+    .map(id => productsById.get(id))
+    .filter(Boolean);
+
+  const companyName = orderedProducts[0]?.company?.name ?? null;
+  const productsData = orderedProducts.map((product: any) => {
+    const input = productInputById.get(product.id);
+    return {
+      productId: product.id,
+      name: product.name,
+      category: product.category || "other",
+      premium: input ? asNumber(input.premium) : null,
+      deductible: input ? asNumber(input.deductible) : null,
+      durationYears: input ? asNumber(input.durationYears) : null,
+    };
+  });
+
+  return {
+    productId: orderedProducts[0].id,
+    companyName,
+    productsData,
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   const corsResponse = handleCors(req);
@@ -21,7 +136,12 @@ serve(async (req) => {
       formData, 
       startDate,
       premiumMonthly,
-      productType
+      productType,
+      companyId,
+      productId: requestedProductId,
+      productIds,
+      selectedProducts,
+      companyName: requestedCompanyName,
     } = await req.json()
 
     if (!partnerEmail || !formType) {
@@ -50,6 +170,14 @@ serve(async (req) => {
     const tenantId = access.tenantId
     const partnerId = access.partnerId
 
+    const catalogSelection = await resolveCatalogProductSelection(
+      supabaseAdmin,
+      asString(companyId),
+      asString(requestedProductId),
+      productIds,
+      selectedProducts,
+    )
+
     // Resolve product ID dynamically — upsert placeholder company & product if needed
     const categoryMap: Record<string, string> = {
       'sana': 'health',
@@ -61,7 +189,9 @@ serve(async (req) => {
     const productCategory = categoryMap[formType] || 'health'
 
     // Ensure placeholder company exists
-    const { data: company } = await supabaseAdmin
+    const { data: company } = catalogSelection?.productId
+      ? { data: { id: null } }
+      : await supabaseAdmin
       .from('insurance_companies')
       .upsert({ name: 'Dépôt générique' }, { onConflict: 'name' })
       .select('id')
@@ -75,7 +205,9 @@ serve(async (req) => {
     }
 
     // Ensure product exists for this form type
-    const { data: product } = await supabaseAdmin
+    const { data: product } = catalogSelection?.productId
+      ? { data: { id: catalogSelection.productId } }
+      : await supabaseAdmin
       .from('insurance_products')
       .upsert(
         { company_id: company.id, name: productName, category: productCategory, source: 'manual' },
@@ -91,7 +223,16 @@ serve(async (req) => {
       )
     }
 
-    const productId = product.id
+    const productId = catalogSelection?.productId ?? product.id
+    const resolvedCompanyName = catalogSelection?.companyName ?? asString(requestedCompanyName) ?? 'Depot generique'
+    const productsData = catalogSelection?.productsData ?? [{
+      productId: product.id,
+      name: productName,
+      category: productCategory,
+      premium: asNumber(premiumMonthly),
+      deductible: null,
+      durationYears: null,
+    }]
 
     // Insert the policy with proper tenant_id
     const { data: policy, error: insertError } = await supabaseAdmin
@@ -102,8 +243,16 @@ serve(async (req) => {
         start_date: startDate || new Date().toISOString().split('T')[0],
         premium_monthly: premiumMonthly || null,
         status: 'pending',
-        notes: JSON.stringify({ formType, ...formData, agentEmail: partnerEmail }),
+        notes: JSON.stringify({
+          formType,
+          ...formData,
+          agentEmail: partnerEmail,
+          companyName: resolvedCompanyName,
+          products: productsData,
+        }),
+        company_name: resolvedCompanyName,
         product_type: productType || formType,
+        products_data: productsData,
         tenant_id: tenantId,
         partner_id: partnerId,
       })
