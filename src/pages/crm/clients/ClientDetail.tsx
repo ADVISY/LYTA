@@ -385,7 +385,7 @@ export default function ClientDetail() {
       const response = await supabase.functions.invoke('send-password-reset', {
         body: {
           email: client.email,
-          redirectUrl: `${window.location.origin}/reset-password`,
+          redirectUrl: `${window.location.origin}/reset-password?space=client`,
         },
       });
 

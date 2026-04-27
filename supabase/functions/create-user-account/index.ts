@@ -73,6 +73,58 @@ function buildTenantLoginUrl(tenant: TenantRecord, role: string): string {
   return appendLoginSpace(`${origin}/connexion`, role === "client" ? "client" : "team");
 }
 
+function buildTenantResetUrl(tenant: TenantRecord, role: string): string {
+  const origin = tenant.slug
+    ? `https://${tenant.slug}.${TENANT_DOMAIN_SUFFIX}`
+    : DEFAULT_APP_ORIGIN.replace(/\/$/, "");
+  return appendLoginSpace(`${origin}/reset-password`, role === "client" ? "client" : "team");
+}
+
+function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
+  const actionLink = linkData?.properties?.action_link;
+  let hashedToken = linkData?.properties?.hashed_token;
+
+  if (!hashedToken && actionLink) {
+    try {
+      hashedToken = new URL(actionLink).searchParams.get("token");
+    } catch {
+      hashedToken = null;
+    }
+  }
+
+  if (hashedToken) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("type", "recovery");
+    return url.toString();
+  }
+
+  return actionLink ?? null;
+}
+
+async function createPasswordSetupLink(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  email: string,
+  redirectTo: string,
+): Promise<string> {
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo },
+  });
+
+  if (linkError) {
+    throw new AuthError(`Erreur lors de la generation du lien d'invitation: ${linkError.message}`, 500);
+  }
+
+  const link = buildRecoveryLink(redirectTo, linkData);
+  if (!link) {
+    throw new AuthError("Erreur lors de la generation du lien d'invitation", 500);
+  }
+
+  return link;
+}
+
 // Generate HTML email for account creation with password
 function generateWelcomeEmailWithPassword(
   clientName: string,
@@ -342,6 +394,63 @@ function getBranding(tenant: TenantRecord): TenantBranding | null {
   }
 
   return tenant.tenant_branding || null;
+}
+
+function generatePasswordSetupEmail(
+  clientName: string,
+  email: string,
+  resetLink: string,
+  loginUrl: string,
+  branding: TenantBranding | null,
+  tenantName: string,
+): { subject: string; html: string } {
+  const displayName = branding?.display_name || branding?.email_sender_name || tenantName;
+  const primaryColor = branding?.primary_color || "#0066FF";
+  const logoUrl = branding?.logo_url || "";
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" alt="${displayName}" style="height: 40px; max-width: 160px; object-fit: contain;" />`
+    : `<div style="font-size: 36px; font-weight: 700; color: #ffffff;">${displayName}</div>`;
+
+  return {
+    subject: `Invitation à votre espace ${displayName}`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invitation - ${displayName}</title>
+</head>
+<body style="font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f0f2f5; margin: 0; padding: 40px 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 100%); padding: 40px; text-align: center;">
+      ${logoHtml}
+      <h1 style="color: #fff; font-size: 26px; margin: 20px 0 0;">Votre espace est prêt</h1>
+    </div>
+    <div style="padding: 30px 40px;">
+      <p style="font-size: 20px; font-weight: 600; color: ${primaryColor};">Bonjour ${clientName}</p>
+      <p style="color: #4a4a68; font-size: 15px; line-height: 1.7;">
+        Votre accès ${displayName} a été activé pour l'adresse <strong>${email}</strong>.
+        Cliquez sur le bouton ci-dessous pour définir votre mot de passe et accéder à votre espace.
+      </p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetLink}" style="display: inline-block; background: ${primaryColor}; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600;">
+          Créer mon mot de passe
+        </a>
+      </div>
+      <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
+        Ce lien est temporaire. S'il expire, demandez un nouvel email d'invitation depuis votre cabinet.
+      </p>
+      <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
+        Après création du mot de passe, vous pourrez aussi vous connecter ici:
+        <a href="${loginUrl}" style="color: ${primaryColor};">${loginUrl}</a>
+      </p>
+      <p style="color: #4a4a68; font-size: 15px; margin-top: 32px;">Cordialement,<br><strong>L'équipe ${displayName}</strong></p>
+    </div>
+  </div>
+</body>
+</html>`,
+  };
 }
 
 function generateAccessEnabledEmail(
@@ -844,52 +953,26 @@ Deno.serve(async (req) => {
           .insert({ user_id: userId, tenant_id: tenantId });
       }
 
-      // Existing user - just notify them they have access to a new portal
+      // Existing user - send a password setup link so they can access this tenant even
+      // if they do not remember an existing password.
       const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
-      log.info(`Existing user linked to tenant, sending notification email`, { email });
+      const resetUrl = buildTenantResetUrl(tenant as TenantRecord, role);
+      const resetLink = await createPasswordSetupLink(supabaseAdmin, email, resetUrl);
+      log.info(`Existing user linked to tenant, sending password setup email`, { email });
       
       if (RESEND_API_KEY) {
-        const displayName = branding?.display_name || branding?.email_sender_name || tenant.name;
-        const primaryColor = branding?.primary_color || '#0066FF';
-        const logoUrl = branding?.logo_url || '';
-        
-        const logoHtml = logoUrl 
-          ? `<img src="${logoUrl}" alt="${displayName}" style="height: 40px; max-width: 160px; object-fit: contain;" />`
-          : `<div style="font-size: 36px; font-weight: 700; color: #ffffff; letter-spacing: -1px;">${displayName}<span style="color: #7C3AED;">.</span></div>`;
-        
-        const existingUserHtml = `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Accès activé - ${displayName}</title>
-</head>
-<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f0f2f5; margin: 0; padding: 40px 20px;">
-  <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
-    <div style="background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 50%, #7C3AED 100%); padding: 40px; text-align: center;">
-      ${logoHtml}
-      <h1 style="color: #fff; font-size: 26px; margin: 20px 0 0;">Accès activé !</h1>
-    </div>
-    <div style="padding: 30px 40px;">
-      <p style="font-size: 20px; font-weight: 600; color: ${primaryColor};">Bonjour ${clientName} 👋</p>
-      <p style="color: #4a4a68; font-size: 15px; line-height: 1.7;">
-        Bonne nouvelle ! Vous avez maintenant accès à votre espace client ${displayName}. Connectez-vous avec vos identifiants habituels.
-      </p>
-      <div style="text-align: center; margin: 32px 0;">
-        <a href="${loginUrl}" style="display: inline-block; background: linear-gradient(135deg, ${primaryColor} 0%, #4F46E5 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 50px; font-weight: 600;">
-          Me connecter →
-        </a>
-      </div>
-      <p style="color: #4a4a68; font-size: 15px;">Cordialement,<br><strong>L'équipe ${displayName}</strong></p>
-    </div>
-  </div>
-</body>
-</html>`;
+        const { subject, html } = generatePasswordSetupEmail(
+          clientName,
+          email,
+          resetLink,
+          loginUrl,
+          branding,
+          tenant.name
+        );
         
         const { fromAddress } = getSenderAddress(branding, tenant.name);
 
-        log.info(`Sending access notification email to existing user`, { from: fromAddress, to: email });
+        log.info(`Sending password setup email to existing user`, { from: fromAddress, to: email });
 
         const emailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -900,14 +983,14 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             from: fromAddress,
             to: [email],
-            subject: `✅ Votre accès ${displayName} est activé`,
-            html: existingUserHtml,
+            subject,
+            html,
           }),
         });
 
         if (emailResponse.ok) {
           const emailResult = await emailResponse.json();
-          log.info(`Access notification email sent to existing user`, { to: email, emailId: emailResult.id });
+          log.info(`Password setup email sent to existing user`, { to: email, emailId: emailResult.id });
         } else {
           const errorText = await emailResponse.text();
           log.error(`Failed to send email to existing user`, { to: email, error: errorText });
@@ -995,15 +1078,17 @@ Deno.serve(async (req) => {
         .from("user_tenant_assignments")
         .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: "user_id,tenant_id" });
 
-      // Send welcome email with credentials
+      // Send welcome email with a password setup link
       const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
-      log.info(`Sending welcome email with credentials`, { to: email });
+      const resetUrl = buildTenantResetUrl(tenant as TenantRecord, role);
+      const resetLink = await createPasswordSetupLink(supabaseAdmin, email, resetUrl);
+      log.info(`Sending welcome email with password setup link`, { to: email });
       
       if (RESEND_API_KEY) {
-        const { subject, html } = generateWelcomeEmailWithPassword(
+        const { subject, html } = generatePasswordSetupEmail(
           clientName, 
           email, 
-          generatedPassword, 
+          resetLink,
           loginUrl, 
           branding, 
           tenant.name
@@ -1029,7 +1114,7 @@ Deno.serve(async (req) => {
 
         if (emailResponse.ok) {
           const emailResult = await emailResponse.json();
-          log.info(`Welcome email with credentials sent successfully`, { to: email, emailId: emailResult.id });
+          log.info(`Welcome email with password setup link sent successfully`, { to: email, emailId: emailResult.id });
         } else {
           const errorText = await emailResponse.text();
           log.error(`Failed to send email`, { to: email, error: errorText });
