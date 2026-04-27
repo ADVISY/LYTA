@@ -1261,7 +1261,6 @@
     "professions": {
       "agent": "Agent",
       "manager": "Manager",
-      "partner": "Partenaire",
       "admin": "Administrateur",
       "backoffice": "Backoffice",
       "comptabilite": "Comptabilité",

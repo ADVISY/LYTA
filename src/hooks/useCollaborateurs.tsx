@@ -59,6 +59,21 @@ export type CollaborateurFormData = {
   reserve_rate?: number;
 };
 
+function getAccountRoleFromProfession(profession?: string): string {
+  switch (profession?.toLowerCase()) {
+    case 'admin':
+    case 'manager':
+    case 'backoffice':
+      return profession.toLowerCase();
+    case 'comptabilite':
+      return 'compta';
+    case 'direction':
+      return 'admin';
+    default:
+      return 'agent';
+  }
+}
+
 export function useCollaborateurs() {
   const { toast } = useToast();
   const { tenantId } = useUserTenant();
@@ -117,13 +132,12 @@ export function useCollaborateurs() {
 
       if (error) throw error;
 
-      const profession = data.profession?.toLowerCase();
-      if (newCollaborateur?.id && data.email && profession === 'partner') {
+      if (newCollaborateur?.id && data.email) {
         try {
           await invokeSupabaseFunction('create-user-account', {
             body: {
               email: data.email,
-              role: 'partner',
+              role: getAccountRoleFromProfession(data.profession),
               collaborateurId: newCollaborateur.id,
               firstName: data.first_name,
               lastName: data.last_name,
@@ -132,10 +146,10 @@ export function useCollaborateurs() {
           });
         } catch (accountError) {
           toast({
-            title: "Partenaire ajouté, invitation non envoyée",
+            title: "Collaborateur ajouté, invitation non envoyée",
             description: accountError instanceof Error
               ? accountError.message
-              : "Impossible de créer le compte partenaire.",
+              : "Impossible de créer le compte utilisateur.",
             variant: "destructive",
           });
           refetch();
@@ -144,8 +158,8 @@ export function useCollaborateurs() {
       }
 
       toast({
-        title: profession === 'partner' ? "Partenaire ajouté" : "Collaborateur ajouté",
-        description: profession === 'partner'
+        title: "Collaborateur ajouté",
+        description: data.email
           ? `${data.first_name} ${data.last_name} a été ajouté et invité par email`
           : `${data.first_name} ${data.last_name} a été ajouté avec succès`
       });

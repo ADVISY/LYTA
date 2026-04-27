@@ -1165,7 +1165,6 @@ export default function CRMParametres() {
                           <SelectItem value="admin">Administrateur</SelectItem>
                           <SelectItem value="manager">Manager</SelectItem>
                           <SelectItem value="agent">Agent</SelectItem>
-                          <SelectItem value="partner">Partenaire</SelectItem>
                           <SelectItem value="backoffice">Backoffice</SelectItem>
                           <SelectItem value="compta">Comptabilité</SelectItem>
                         </SelectContent>
