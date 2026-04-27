@@ -321,11 +321,11 @@ export default function CRMParametres() {
       return;
     }
 
-    // Get linked collaborateurs and partners for this tenant
+    // Get linked collaborateurs for this tenant
     const { data: linkedCollabs } = await supabase
       .from("clients")
       .select("id, user_id, first_name, last_name")
-      .in("type_adresse", ["collaborateur", "partenaire"])
+      .eq("type_adresse", "collaborateur")
       .eq("tenant_id", tenantId)
       .not("user_id", "is", null);
 
@@ -363,11 +363,11 @@ export default function CRMParametres() {
   const loadCollaborateurs = async () => {
     if (!tenantId) return;
     
-    // Get collaborateurs and partners without linked user accounts for this tenant
+    // Get collaborateurs without linked user accounts for this tenant
     const { data } = await supabase
       .from("clients")
       .select("id, first_name, last_name, email")
-      .in("type_adresse", ["collaborateur", "partenaire"])
+      .eq("type_adresse", "collaborateur")
       .eq("tenant_id", tenantId)
       .is("user_id", null)
       .order("last_name");

@@ -8,9 +8,6 @@ import { useClients } from "@/hooks/useClients";
 import { useAgents } from "@/hooks/useAgents";
 import { useCrmEmails } from "@/hooks/useCrmEmails";
 import { useCelebration } from "@/hooks/useCelebration";
-import { useUserTenant } from "@/hooks/useUserTenant";
-import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,8 +65,6 @@ export default function ClientForm() {
   const { agents, loading: agentsLoading, getManagerForAgent } = useAgents();
   const { sendWelcomeEmail } = useCrmEmails();
   const { celebrate } = useCelebration();
-  const { tenantId } = useUserTenant();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
   const [selectedManager, setSelectedManager] = useState<{ id: string; name: string } | null>(null);
@@ -216,38 +211,10 @@ export default function ClientForm() {
         // Celebrate the new client!
         celebrate('client_added');
         
-        // Clients receive a simple welcome email. Partners need a CRM account invitation.
+        // Send welcome email for new clients only.
         if (clientData.type_adresse === "client" && clientData.email) {
           const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
           sendWelcomeEmail(clientData.email, clientName);
-        }
-
-        if (clientData.type_adresse === "partenaire" && clientData.email) {
-          try {
-            await invokeSupabaseFunction("create-user-account", {
-              body: {
-                email: clientData.email,
-                role: "partner",
-                clientId: newClient.id,
-                firstName: clientData.first_name,
-                lastName: clientData.last_name,
-                tenantId,
-              },
-            });
-            toast({
-              title: "Invitation partenaire envoyée",
-              description: `Un email de création de mot de passe a été envoyé à ${clientData.email}.`,
-            });
-          } catch (accountError) {
-            console.error("Error creating partner account:", accountError);
-            toast({
-              title: "Partenaire créé, compte non envoyé",
-              description: accountError instanceof Error
-                ? accountError.message
-                : "Impossible de créer le compte partenaire.",
-              variant: "destructive",
-            });
-          }
         }
         navigate(`/crm/clients/${newClient.id}`);
       }

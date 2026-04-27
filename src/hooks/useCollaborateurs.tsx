@@ -4,6 +4,7 @@ import { useToast } from "./use-toast";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { translateError } from "@/lib/errorTranslations";
 import { usePaginatedQuery } from "./usePaginatedQuery";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 export interface Collaborateur {
   id: string;
@@ -103,20 +104,50 @@ export function useCollaborateurs() {
         throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
-      const { error } = await supabase
+      const { data: newCollaborateur, error } = await supabase
         .from('clients')
         .insert([{
           ...data,
           type_adresse: 'collaborateur',
           status: data.status || 'actif',
           tenant_id: tenantId
-        }]);
+        }])
+        .select('id')
+        .single();
 
       if (error) throw error;
 
+      const profession = data.profession?.toLowerCase();
+      if (newCollaborateur?.id && data.email && profession === 'partner') {
+        try {
+          await invokeSupabaseFunction('create-user-account', {
+            body: {
+              email: data.email,
+              role: 'partner',
+              collaborateurId: newCollaborateur.id,
+              firstName: data.first_name,
+              lastName: data.last_name,
+              tenantId,
+            },
+          });
+        } catch (accountError) {
+          toast({
+            title: "Partenaire ajouté, invitation non envoyée",
+            description: accountError instanceof Error
+              ? accountError.message
+              : "Impossible de créer le compte partenaire.",
+            variant: "destructive",
+          });
+          refetch();
+          return true;
+        }
+      }
+
       toast({
-        title: "Collaborateur ajouté",
-        description: `${data.first_name} ${data.last_name} a été ajouté avec succès`
+        title: profession === 'partner' ? "Partenaire ajouté" : "Collaborateur ajouté",
+        description: profession === 'partner'
+          ? `${data.first_name} ${data.last_name} a été ajouté et invité par email`
+          : `${data.first_name} ${data.last_name} a été ajouté avec succès`
       });
 
       refetch();

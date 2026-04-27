@@ -32,6 +32,7 @@ import { useTranslation } from "react-i18next";
 const getProfessionLabels = (t: (key: string) => string): Record<string, string> => ({
   agent: t('collaborators.agent'),
   manager: t('collaborators.manager'),
+  partner: t('settings.partner'),
   admin: t('collaborators.admin'),
   backoffice: t('collaborators.backoffice'),
   comptabilite: t('settings.compta'),

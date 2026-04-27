@@ -20,7 +20,7 @@ export async function resolvePartnerAccessByEmail(email: string): Promise<Resolv
     .from("clients")
     .select("id, tenant_id")
     .eq("email", normalizedEmail)
-    .in("type_adresse", ["collaborateur", "partenaire"])
+    .eq("type_adresse", "collaborateur")
     .maybeSingle();
 
   if (collabError) {

@@ -37,6 +37,7 @@ interface CollaborateurFormProps {
 const getProfessionOptions = (t: (key: string) => string) => [
   { value: "agent", label: t("forms.professions.agent") },
   { value: "manager", label: t("forms.professions.manager") },
+  { value: "partner", label: t("forms.professions.partner") },
   { value: "admin", label: t("forms.professions.admin") },
   { value: "backoffice", label: t("forms.professions.backoffice") },
   { value: "comptabilite", label: t("forms.professions.comptabilite") },

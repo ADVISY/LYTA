@@ -1374,6 +1374,7 @@
     "professions": {
       "agent": "Agent",
       "manager": "Manager",
+      "partner": "Partner",
       "admin": "Administrator",
       "backoffice": "Backoffice",
       "comptabilite": "Accounting",
