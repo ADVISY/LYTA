@@ -63,7 +63,7 @@ export default function ClientForm() {
   const navigate = useNavigate();
   const { createClient, updateClient, getClientById } = useClients();
   const { agents, loading: agentsLoading, getManagerForAgent } = useAgents();
-  const { sendWelcomeEmail } = useCrmEmails();
+  const { sendWelcomeEmail, sendPartnerWelcomeEmail } = useCrmEmails();
   const { celebrate } = useCelebration();
   const [loading, setLoading] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
@@ -211,10 +211,14 @@ export default function ClientForm() {
         // Celebrate the new client!
         celebrate('client_added');
         
-        // Send welcome email for new clients (not collaborateurs/partenaires)
-        if (clientData.type_adresse === "client" && clientData.email) {
+        // Send welcome email for new clients and partners.
+        if ((clientData.type_adresse === "client" || clientData.type_adresse === "partenaire") && clientData.email) {
           const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
-          sendWelcomeEmail(clientData.email, clientName);
+          if (clientData.type_adresse === "partenaire") {
+            sendPartnerWelcomeEmail(clientData.email, clientName);
+          } else {
+            sendWelcomeEmail(clientData.email, clientName);
+          }
         }
         navigate(`/crm/clients/${newClient.id}`);
       }

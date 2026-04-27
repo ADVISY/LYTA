@@ -4,7 +4,7 @@ import { useUserTenant } from "@/hooks/useUserTenant";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { buildTenantLoginUrl } from "@/lib/tenantUrls";
 
-type EmailType = "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
+type EmailType = "welcome" | "partner_welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
 
 interface EmailData {
   subject?: string;
@@ -56,6 +56,7 @@ export const useCrmEmails = () => {
 
       const messages: Record<EmailType, string> = {
         welcome: "Email de bienvenue envoyé",
+        partner_welcome: "Email de bienvenue partenaire envoyé",
         contract_signed: "Confirmation de signature envoyée",
         mandat_signed: "Email avec identifiants envoyé",
         account_created: "Identifiants de connexion envoyés",
@@ -87,6 +88,10 @@ export const useCrmEmails = () => {
 
   const sendWelcomeEmail = async (clientEmail: string, clientName: string) => {
     return sendEmail({ type: "welcome", clientEmail, clientName });
+  };
+
+  const sendPartnerWelcomeEmail = async (clientEmail: string, clientName: string) => {
+    return sendEmail({ type: "partner_welcome", clientEmail, clientName });
   };
 
   const sendContractSignedEmail = async (
@@ -132,6 +137,7 @@ export const useCrmEmails = () => {
   return {
     sendEmail,
     sendWelcomeEmail,
+    sendPartnerWelcomeEmail,
     sendContractSignedEmail,
     sendMandatSignedEmail,
     sendAccountCreatedEmail,

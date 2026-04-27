@@ -169,7 +169,7 @@ const renderTemplate = (
   });
 
 interface EmailRequest {
-  type: "welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
+  type: "welcome" | "partner_welcome" | "contract_signed" | "mandat_signed" | "account_created" | "relation_client" | "offre_speciale";
   clientEmail: string;
   clientName: string;
   data?: EmailData;
@@ -519,6 +519,38 @@ const getEmailContent = (
             <div class="signature">
               <p class="signature-text">À très bientôt,</p>
               <p class="signature-name">L'équipe ${displayName}</p>
+            </div>
+          </div>
+        `, branding, tenantName),
+      };
+
+    case "partner_welcome":
+      return {
+        subject: `Bienvenue dans notre reseau partenaire - ${displayName}`,
+        html: getEmailWrapper(`
+          <div class="header">
+            <div class="logo-container">${logoHtml}</div>
+            <h1 class="header-title">Bienvenue dans le r&eacute;seau partenaire ${displayName}</h1>
+            <p class="header-subtitle">Une collaboration assurance en Suisse</p>
+          </div>
+          <div class="content">
+            <p class="greeting">Bonjour ${clientName}</p>
+            <p class="text">
+              Nous sommes ravis de vous compter parmi nos partenaires. Merci pour votre confiance et pour cette collaboration.
+            </p>
+            <div class="highlight-box">
+              <strong>Votre contact chez ${displayName}</strong> reste &agrave; votre disposition pour coordonner les demandes, les suivis et les prochaines &eacute;tapes.
+            </div>
+            <p class="text">Chez ${displayName}, notre collaboration s'appuie sur :</p>
+            <ul class="features-list">
+              <li>Un suivi clair et r&eacute;actif des dossiers transmis</li>
+              <li>Une communication simple avec l'&eacute;quipe</li>
+              <li>Un accompagnement professionnel dans les d&eacute;marches assurance</li>
+              <li>Une relation durable et transparente</li>
+            </ul>
+            <div class="signature">
+              <p class="signature-text">&Agrave; tr&egrave;s bient&ocirc;t,</p>
+              <p class="signature-name">L'&eacute;quipe ${displayName}</p>
             </div>
           </div>
         `, branding, tenantName),
