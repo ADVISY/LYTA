@@ -39,6 +39,167 @@ interface TenantRecord {
   tenant_branding?: TenantBranding[] | TenantBranding | null;
 }
 
+interface PermissionSpec {
+  module: string;
+  action: string;
+}
+
+interface TenantRoleConfig {
+  names: string[];
+  createName: string;
+  description: string;
+  dashboard_scope: "personal" | "team" | "global";
+  can_see_own_commissions: boolean;
+  can_see_team_commissions: boolean;
+  can_see_all_commissions: boolean;
+  permissions: PermissionSpec[];
+}
+
+const ADMIN_PERMISSIONS: PermissionSpec[] = [
+  { module: "clients", action: "view" },
+  { module: "clients", action: "create" },
+  { module: "clients", action: "update" },
+  { module: "clients", action: "delete" },
+  { module: "clients", action: "export" },
+  { module: "contracts", action: "view" },
+  { module: "contracts", action: "deposit" },
+  { module: "contracts", action: "update" },
+  { module: "contracts", action: "cancel" },
+  { module: "contracts", action: "export" },
+  { module: "partners", action: "view" },
+  { module: "partners", action: "create" },
+  { module: "partners", action: "update" },
+  { module: "partners", action: "delete" },
+  { module: "products", action: "view" },
+  { module: "products", action: "create" },
+  { module: "products", action: "update" },
+  { module: "products", action: "delete" },
+  { module: "collaborators", action: "view" },
+  { module: "collaborators", action: "create" },
+  { module: "collaborators", action: "update" },
+  { module: "collaborators", action: "delete" },
+  { module: "collaborators", action: "export" },
+  { module: "commissions", action: "view" },
+  { module: "commissions", action: "modify_rules" },
+  { module: "commissions", action: "export" },
+  { module: "decomptes", action: "view" },
+  { module: "decomptes", action: "generate" },
+  { module: "decomptes", action: "export" },
+  { module: "payout", action: "view" },
+  { module: "payout", action: "generate" },
+  { module: "payout", action: "validate" },
+  { module: "payout", action: "export" },
+  { module: "dashboard", action: "view" },
+  { module: "settings", action: "view" },
+  { module: "settings", action: "update" },
+];
+
+const TENANT_ROLE_CONFIGS: Record<string, TenantRoleConfig> = {
+  admin: {
+    names: ["Admin Cabinet", "Administrateur", "Admin"],
+    createName: "Admin Cabinet",
+    description: "Acces complet a toutes les fonctionnalites",
+    dashboard_scope: "global",
+    can_see_own_commissions: true,
+    can_see_team_commissions: true,
+    can_see_all_commissions: true,
+    permissions: ADMIN_PERMISSIONS,
+  },
+  manager: {
+    names: ["Manager"],
+    createName: "Manager",
+    description: "Acces equipe + clients personnels",
+    dashboard_scope: "team",
+    can_see_own_commissions: true,
+    can_see_team_commissions: true,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: "clients", action: "view" },
+      { module: "clients", action: "create" },
+      { module: "clients", action: "update" },
+      { module: "clients", action: "export" },
+      { module: "contracts", action: "view" },
+      { module: "contracts", action: "deposit" },
+      { module: "contracts", action: "update" },
+      { module: "contracts", action: "export" },
+      { module: "collaborators", action: "view" },
+      { module: "commissions", action: "view" },
+      { module: "decomptes", action: "view" },
+      { module: "dashboard", action: "view" },
+      { module: "settings", action: "view" },
+    ],
+  },
+  agent: {
+    names: ["Agent"],
+    createName: "Agent",
+    description: "Acces uniquement a ses clients et contrats",
+    dashboard_scope: "personal",
+    can_see_own_commissions: true,
+    can_see_team_commissions: false,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: "clients", action: "view" },
+      { module: "clients", action: "create" },
+      { module: "clients", action: "update" },
+      { module: "contracts", action: "view" },
+      { module: "contracts", action: "deposit" },
+      { module: "commissions", action: "view" },
+      { module: "dashboard", action: "view" },
+    ],
+  },
+  backoffice: {
+    names: ["Back-office", "Backoffice", "Back Office"],
+    createName: "Back-office",
+    description: "Voit tous les clients et contrats, aucun acces finance",
+    dashboard_scope: "global",
+    can_see_own_commissions: false,
+    can_see_team_commissions: false,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: "clients", action: "view" },
+      { module: "clients", action: "create" },
+      { module: "clients", action: "update" },
+      { module: "clients", action: "export" },
+      { module: "contracts", action: "view" },
+      { module: "contracts", action: "deposit" },
+      { module: "contracts", action: "update" },
+      { module: "contracts", action: "export" },
+      { module: "partners", action: "view" },
+      { module: "products", action: "view" },
+      { module: "collaborators", action: "view" },
+      { module: "dashboard", action: "view" },
+      { module: "settings", action: "view" },
+    ],
+  },
+  compta: {
+    names: ["Comptabilite", "Comptabilité", "Compta"],
+    createName: "Comptabilite",
+    description: "Acces comptabilite, commissions et decomptes",
+    dashboard_scope: "global",
+    can_see_own_commissions: true,
+    can_see_team_commissions: true,
+    can_see_all_commissions: true,
+    permissions: [
+      { module: "clients", action: "view" },
+      { module: "clients", action: "export" },
+      { module: "contracts", action: "view" },
+      { module: "contracts", action: "export" },
+      { module: "commissions", action: "view" },
+      { module: "commissions", action: "modify_rules" },
+      { module: "commissions", action: "export" },
+      { module: "decomptes", action: "view" },
+      { module: "decomptes", action: "generate" },
+      { module: "decomptes", action: "export" },
+      { module: "payout", action: "view" },
+      { module: "payout", action: "generate" },
+      { module: "payout", action: "validate" },
+      { module: "payout", action: "export" },
+      { module: "dashboard", action: "view" },
+      { module: "settings", action: "view" },
+    ],
+  },
+};
+
 // Generate a human-readable password
 function generateReadablePassword(): string {
   const adjectives = ['Blue', 'Swift', 'Brave', 'Smart', 'Cool', 'Fast', 'Gold', 'Star', 'Mega', 'Super'];
@@ -674,6 +835,102 @@ async function ensureUserRole(
   }
 }
 
+async function ensureTenantRolePermissions(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  roleId: string,
+  permissions: PermissionSpec[],
+): Promise<void> {
+  if (permissions.length === 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("tenant_role_permissions")
+    .upsert(
+      permissions.map((permission) => ({
+        role_id: roleId,
+        module: permission.module,
+        action: permission.action,
+        allowed: true,
+      })),
+      { onConflict: "role_id,module,action", ignoreDuplicates: true },
+    );
+
+  if (error) {
+    throw new AuthError(`Erreur lors de l'initialisation des permissions tenant: ${error.message}`, 500);
+  }
+}
+
+async function ensureTenantRoleAssignment(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  tenantId: string,
+  role: string,
+  assignedBy: string,
+): Promise<void> {
+  const roleConfig = TENANT_ROLE_CONFIGS[role];
+  if (!roleConfig) {
+    return;
+  }
+
+  const { data: existingRoles, error: fetchError } = await supabaseAdmin
+    .from("tenant_roles")
+    .select("id, is_system_role")
+    .eq("tenant_id", tenantId)
+    .in("name", roleConfig.names)
+    .order("is_system_role", { ascending: false })
+    .limit(1);
+
+  if (fetchError) {
+    throw new AuthError(`Erreur lors de la recherche du role tenant: ${fetchError.message}`, 500);
+  }
+
+  let roleId = existingRoles?.[0]?.id ?? null;
+  let shouldEnsurePermissions = Boolean(existingRoles?.[0]?.is_system_role);
+
+  if (!roleId) {
+    const { data: createdRole, error: createError } = await supabaseAdmin
+      .from("tenant_roles")
+      .insert({
+        tenant_id: tenantId,
+        name: roleConfig.createName,
+        description: roleConfig.description,
+        is_system_role: true,
+        dashboard_scope: roleConfig.dashboard_scope,
+        can_see_own_commissions: roleConfig.can_see_own_commissions,
+        can_see_team_commissions: roleConfig.can_see_team_commissions,
+        can_see_all_commissions: roleConfig.can_see_all_commissions,
+      })
+      .select("id")
+      .single();
+
+    if (createError) {
+      throw new AuthError(`Erreur lors de la creation du role tenant: ${createError.message}`, 500);
+    }
+
+    roleId = createdRole.id;
+    shouldEnsurePermissions = true;
+  }
+
+  if (shouldEnsurePermissions) {
+    await ensureTenantRolePermissions(supabaseAdmin, roleId, roleConfig.permissions);
+  }
+
+  const { error: assignError } = await supabaseAdmin
+    .from("user_tenant_roles")
+    .upsert(
+      {
+        user_id: userId,
+        tenant_id: tenantId,
+        role_id: roleId,
+        assigned_by: assignedBy,
+      },
+      { onConflict: "user_id,role_id,tenant_id" },
+    );
+
+  if (assignError) {
+    throw new AuthError(`Erreur lors de l'attribution du role tenant: ${assignError.message}`, 500);
+  }
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -814,6 +1071,11 @@ Deno.serve(async (req) => {
         );
       }
 
+      const passwordResetConsumesSeat = role !== "client";
+      await ensureUserRole(supabaseAdmin, targetRecord.user_id, role);
+      await ensureTenantAssignment(supabaseAdmin, targetRecord.user_id, tenantId, tenant as TenantRecord, passwordResetConsumesSeat);
+      await ensureTenantRoleAssignment(supabaseAdmin, targetRecord.user_id, tenantId, role, requestingUser.id);
+
       const clientName = `${firstName || targetRecord.first_name || ''} ${lastName || targetRecord.last_name || ''}`.trim() || email;
       const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
 
@@ -921,6 +1183,7 @@ Deno.serve(async (req) => {
       }
 
       await ensureTenantAssignment(supabaseAdmin, userId, tenantId, tenant as TenantRecord, consumesSeat);
+      await ensureTenantRoleAssignment(supabaseAdmin, userId, tenantId, role, requestingUser.id);
 
       // Check if user is already assigned to this tenant
       const { data: existingTenantAssignment } = await supabaseAdmin
@@ -1074,9 +1337,15 @@ Deno.serve(async (req) => {
       await ensureUserRole(supabaseAdmin, userId, role);
 
       // Assign user to tenant
-      await supabaseAdmin
+      const { error: tenantAssignmentError } = await supabaseAdmin
         .from("user_tenant_assignments")
         .upsert({ user_id: userId, tenant_id: tenantId }, { onConflict: "user_id,tenant_id" });
+
+      if (tenantAssignmentError) {
+        throw new AuthError(`Erreur lors de l'assignation au tenant: ${tenantAssignmentError.message}`, 500);
+      }
+
+      await ensureTenantRoleAssignment(supabaseAdmin, userId, tenantId, role, requestingUser.id);
 
       // Send welcome email with a password setup link
       const loginUrl = buildTenantLoginUrl(tenant as TenantRecord, role);
