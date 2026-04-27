@@ -46,12 +46,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // First, check if email exists as collaborateur in clients table
+    // First, check if email exists as collaborateur or partenaire in clients table
     const { data: collaborateur, error: collabError } = await supabaseAdmin
       .from('clients')
       .select('id, first_name, last_name, company_name')
       .eq('email', normalizedEmail)
-      .eq('type_adresse', 'collaborateur')
+      .in('type_adresse', ['collaborateur', 'partenaire'])
       .maybeSingle()
 
     if (collabError) {

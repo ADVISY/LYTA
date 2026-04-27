@@ -198,6 +198,25 @@ const TENANT_ROLE_CONFIGS: Record<string, TenantRoleConfig> = {
       { module: "settings", action: "view" },
     ],
   },
+  partner: {
+    names: ["Partenaire", "Partner"],
+    createName: "Partenaire",
+    description: "Acces partenaire au CRM",
+    dashboard_scope: "personal",
+    can_see_own_commissions: true,
+    can_see_team_commissions: false,
+    can_see_all_commissions: false,
+    permissions: [
+      { module: "clients", action: "view" },
+      { module: "clients", action: "create" },
+      { module: "clients", action: "update" },
+      { module: "contracts", action: "view" },
+      { module: "contracts", action: "deposit" },
+      { module: "partners", action: "view" },
+      { module: "commissions", action: "view" },
+      { module: "dashboard", action: "view" },
+    ],
+  },
 };
 
 // Generate a human-readable password
@@ -1018,7 +1037,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate role
-    const validRoles = ["admin", "manager", "agent", "backoffice", "compta", "client"];
+    const validRoles = ["admin", "manager", "agent", "backoffice", "compta", "client", "partner"];
     if (!validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ error: "Rôle invalide" }),

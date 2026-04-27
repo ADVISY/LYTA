@@ -308,7 +308,7 @@ export default function ClientDetail() {
     if (!canManageClientPortal) {
       toast({
         title: "Acces refuse",
-        description: "Vous n'avez pas les droits pour creer un espace client.",
+        description: "Vous n'avez pas les droits pour creer ce compte.",
         variant: "destructive",
       });
       return;
@@ -317,7 +317,7 @@ export default function ClientDetail() {
     if (!client || !client.email) {
       toast({
         title: "Erreur",
-        description: "Email du client requis",
+        description: "Email requis",
         variant: "destructive",
       });
       return;
@@ -327,11 +327,12 @@ export default function ClientDetail() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non authentifié");
+      const targetRole = client.type_adresse === "partenaire" ? "partner" : "client";
 
       await invokeSupabaseFunction('create-user-account', {
         body: {
           email: client.email,
-          role: 'client',
+          role: targetRole,
           clientId: client.id,
           firstName: client.first_name,
           lastName: client.last_name,
@@ -370,7 +371,7 @@ export default function ClientDetail() {
     if (!client || !client.email) {
       toast({
         title: "Erreur",
-        description: "Email du client requis",
+        description: "Email requis",
         variant: "destructive",
       });
       return;
@@ -385,7 +386,7 @@ export default function ClientDetail() {
       const response = await supabase.functions.invoke('send-password-reset', {
         body: {
           email: client.email,
-          redirectUrl: `${window.location.origin}/reset-password?space=client`,
+          redirectUrl: `${window.location.origin}/reset-password?space=${client.type_adresse === "partenaire" ? "team" : "client"}`,
         },
       });
 
@@ -515,21 +516,25 @@ export default function ClientDetail() {
         </div>
         <div className="flex items-center gap-2">
           {/* Bouton créer compte client - uniquement si pas de user_id, type client, et module client_portal actif */}
-          {hasClientPortal && !permissionsLoading && canManageClientPortal && client.type_adresse === 'client' && !client.user_id && client.email && (
+          {!permissionsLoading && canManageClientPortal && !client.user_id && client.email && (
+            client.type_adresse === 'partenaire' || (hasClientPortal && client.type_adresse === 'client')
+          ) && (
             <Button 
               variant="outline" 
               onClick={() => setClientAccountDialogOpen(true)}
               className="gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              {t('clientDetail.createClientSpace')}
+              {client.type_adresse === 'partenaire' ? "Créer le compte partenaire" : t('clientDetail.createClientSpace')}
             </Button>
           )}
-          {hasClientPortal && !permissionsLoading && canManageClientPortal && client.user_id && client.type_adresse === 'client' && (
+          {!permissionsLoading && canManageClientPortal && client.user_id && (
+            client.type_adresse === 'partenaire' || (hasClientPortal && client.type_adresse === 'client')
+          ) && (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                {t('clientDetail.clientSpaceActive')}
+                {client.type_adresse === 'partenaire' ? "Compte partenaire actif" : t('clientDetail.clientSpaceActive')}
               </Badge>
               <Button 
                 variant="ghost" 
@@ -558,9 +563,9 @@ export default function ClientDetail() {
       <Dialog open={clientAccountDialogOpen} onOpenChange={setClientAccountDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer un espace client</DialogTitle>
+            <DialogTitle>{client.type_adresse === 'partenaire' ? "Créer un compte partenaire" : "Créer un espace client"}</DialogTitle>
             <DialogDescription>
-              Un email sera envoyé à {getClientName()} avec un lien pour définir son mot de passe et accéder à son espace client.
+              Un email sera envoyé à {getClientName()} avec un lien pour définir son mot de passe et accéder à {client.type_adresse === 'partenaire' ? "son accès CRM partenaire" : "son espace client"}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -569,7 +574,7 @@ export default function ClientDetail() {
               <Input value={client.email || ""} disabled />
             </div>
             <p className="text-sm text-muted-foreground">
-              Le client recevra un email personnalisé avec le branding de votre cabinet pour créer son mot de passe.
+              {client.type_adresse === 'partenaire' ? "Le partenaire recevra une invitation personnalisée pour créer son mot de passe." : "Le client recevra un email personnalisé avec le branding de votre cabinet pour créer son mot de passe."}
             </p>
           </div>
           <DialogFooter>

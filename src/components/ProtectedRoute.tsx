@@ -155,7 +155,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
           const isCrmPath = currentPath.startsWith('/crm');
           const isClientPath = currentPath.startsWith('/espace-client');
           const isKing = roles.includes('king');
-          const isTeam = roles.includes('admin') || roles.includes('agent') || roles.includes('manager') || roles.includes('backoffice');
+          const isTeam = roles.includes('admin') || roles.includes('agent') || roles.includes('manager') || roles.includes('backoffice') || roles.includes('compta') || roles.includes('partner');
 
           if (isKingPath && isKing) {
             sessionStorage.setItem('lyta_login_space', 'king');

@@ -321,11 +321,11 @@ export default function CRMParametres() {
       return;
     }
 
-    // Get linked collaborateurs for this tenant
+    // Get linked collaborateurs and partners for this tenant
     const { data: linkedCollabs } = await supabase
       .from("clients")
       .select("id, user_id, first_name, last_name")
-      .eq("type_adresse", "collaborateur")
+      .in("type_adresse", ["collaborateur", "partenaire"])
       .eq("tenant_id", tenantId)
       .not("user_id", "is", null);
 
@@ -363,11 +363,11 @@ export default function CRMParametres() {
   const loadCollaborateurs = async () => {
     if (!tenantId) return;
     
-    // Get collaborateurs without linked user accounts for this tenant
+    // Get collaborateurs and partners without linked user accounts for this tenant
     const { data } = await supabase
       .from("clients")
       .select("id, first_name, last_name, email")
-      .eq("type_adresse", "collaborateur")
+      .in("type_adresse", ["collaborateur", "partenaire"])
       .eq("tenant_id", tenantId)
       .is("user_id", null)
       .order("last_name");
@@ -1165,6 +1165,7 @@ export default function CRMParametres() {
                           <SelectItem value="admin">Administrateur</SelectItem>
                           <SelectItem value="manager">Manager</SelectItem>
                           <SelectItem value="agent">Agent</SelectItem>
+                          <SelectItem value="partner">Partenaire</SelectItem>
                           <SelectItem value="backoffice">Backoffice</SelectItem>
                           <SelectItem value="compta">Comptabilité</SelectItem>
                         </SelectContent>
