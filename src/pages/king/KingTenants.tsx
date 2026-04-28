@@ -268,6 +268,9 @@ export default function KingTenants() {
                 const primaryColor = branding?.primary_color;
                 const isExpanded = expandedTenantId === tenant.id;
                 const consumption = consumptionMap.get(tenant.id);
+                const totalUserSeats = consumption?.users_limit ?? ((tenant.seats_included || 1) + (tenant.extra_users || 0));
+                const activeUsers = consumption?.active_users ?? stats.active_users;
+                const usersOverLimit = activeUsers > totalUserSeats;
                 
                 return (
                   <div
@@ -423,19 +426,19 @@ export default function KingTenants() {
                         </div>
                         {/* Users count with seat info */}
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${stats.active_users > (tenant.seats_included || 1) ? 'bg-destructive/10' : 'bg-muted'}`}>
-                            <Users className={`h-4 w-4 ${stats.active_users > (tenant.seats_included || 1) ? 'text-destructive' : 'text-muted-foreground'}`} />
+                          <div className={`p-2 rounded-lg ${usersOverLimit ? 'bg-destructive/10' : 'bg-muted'}`}>
+                            <Users className={`h-4 w-4 ${usersOverLimit ? 'text-destructive' : 'text-muted-foreground'}`} />
                           </div>
                           <div>
                             <p className="text-xl font-bold">
-                              {stats.active_users}
-                              <span className="text-sm font-normal text-muted-foreground">/{tenant.seats_included || 1}</span>
+                              {activeUsers}
+                              <span className="text-sm font-normal text-muted-foreground">/{totalUserSeats}</span>
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Utilisateurs
-                              {stats.active_users > (tenant.seats_included || 1) && (
+                              {usersOverLimit && (
                                 <span className="text-destructive ml-1">
-                                  (+{stats.active_users - (tenant.seats_included || 1)} supp.)
+                                  (+{activeUsers - totalUserSeats} supp.)
                                 </span>
                               )}
                             </p>
