@@ -95,9 +95,24 @@ export function TenantConsumptionLimits({ tenantId, tenantName }: TenantConsumpt
   };
 
   const handleSave = async () => {
+    if (!limits) return;
+
+    const updates: Partial<typeof formLimits> = {};
+    for (const key of Object.keys(formLimits) as Array<keyof typeof formLimits>) {
+      if (formLimits[key] !== limits[key]) {
+        updates[key] = formLimits[key] as never;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setHasChanges(false);
+      setChangeReason("");
+      return;
+    }
+
     await updateLimits.mutateAsync({
       tenantId,
-      updates: formLimits,
+      updates,
       reason: changeReason || undefined,
     });
     setHasChanges(false);

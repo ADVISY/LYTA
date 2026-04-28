@@ -5126,6 +5126,18 @@ export type Database = {
           users_percent: number
         }[]
       }
+      get_tenant_seat_summary: {
+        Args: { p_tenant_id?: string | null }
+        Returns: {
+          active_users: number
+          available_seats: number
+          extra_users: number
+          seat_price: number
+          seats_included: number
+          tenant_id: string
+          total_seats: number
+        }[]
+      }
       get_user_dashboard_scope: {
         Args: never
         Returns: Database["public"]["Enums"]["dashboard_scope"]

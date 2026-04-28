@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserTenant } from '@/hooks/useUserTenant';
 
+interface TenantSeatSummaryRow {
+  seats_included: number | null;
+  extra_users: number | null;
+  total_seats: number | null;
+  active_users: number | null;
+  available_seats: number | null;
+  seat_price: number | null;
+}
+
 interface TenantSeatsData {
   /** Number of seats included in the plan */
   seatsIncluded: number;
@@ -44,7 +53,24 @@ export function useTenantSeats(): TenantSeatsData {
       setLoading(true);
       setError(null);
 
-      // Get tenant seat info
+      const { data: seatSummary, error: seatSummaryError } = await supabase
+        .rpc('get_tenant_seat_summary', { p_tenant_id: tenantId });
+
+      if (!seatSummaryError) {
+        const summary = (Array.isArray(seatSummary) ? seatSummary[0] : null) as TenantSeatSummaryRow | null;
+
+        if (summary) {
+          setSeatsIncluded(summary.seats_included ?? 1);
+          setExtraUsers(summary.extra_users ?? 0);
+          setSeatPrice(summary.seat_price ?? 20);
+          setActiveUsers(summary.active_users ?? 0);
+          return;
+        }
+      } else {
+        console.warn('Tenant seat summary RPC failed, using fallback:', seatSummaryError);
+      }
+
+      // Fallback for environments where the latest migration is not deployed yet.
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
         .select('seats_included, extra_users, seats_price')
@@ -61,11 +87,13 @@ export function useTenantSeats(): TenantSeatsData {
         setSeatPrice(tenant.seats_price || 20);
       }
 
-      // Count active users in the tenant
+      // Count collaborator accounts that consume seats.
       const { count, error: countError } = await supabase
-        .from('user_tenant_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId);
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('type_adresse', 'collaborateur')
+        .not('user_id', 'is', null);
 
       if (countError) {
         throw new Error('Erreur lors du comptage des utilisateurs');
@@ -85,6 +113,44 @@ export function useTenantSeats(): TenantSeatsData {
       fetchData();
     }
   }, [tenantId, tenantLoading, fetchData]);
+
+  useEffect(() => {
+    if (!tenantId || tenantLoading) return;
+
+    const channel = supabase
+      .channel(`tenant-seats-${tenantId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tenants', filter: `id=eq.${tenantId}` },
+        () => void fetchData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tenant_limits', filter: `tenant_id=eq.${tenantId}` },
+        () => void fetchData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_tenant_assignments', filter: `tenant_id=eq.${tenantId}` },
+        () => void fetchData(),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [tenantId, tenantLoading, fetchData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleFocus = () => {
+      void fetchData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchData]);
 
   const totalSeats = seatsIncluded + extraUsers;
   const availableSeats = totalSeats - activeUsers;

@@ -9,6 +9,27 @@ const FALLBACK_USER_PRICE_ID = "price_1SmZtZF7ZITS358Au3FHsdBA";
 
 const log = createLogger("add-user-seat");
 
+async function syncTenantUserLimit(
+  supabaseClient: ReturnType<typeof createClient>,
+  tenantId: string,
+  totalSeats: number,
+) {
+  const { error } = await supabaseClient
+    .from("tenant_limits")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        users_limit: totalSeats,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "tenant_id" },
+    );
+
+  if (error) {
+    log.warn("Failed to sync tenant user limit", { tenantId, totalSeats, error: error.message });
+  }
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -108,6 +129,8 @@ serve(async (req) => {
         .update({ extra_users: nextExtraUsers })
         .eq("id", tenantId);
 
+      await syncTenantUserLimit(supabaseClient, tenantId, (tenant.seats_included || 1) + nextExtraUsers);
+
       log.info("Seat added via subscription update", { newExtraUsers: nextExtraUsers });
 
       return new Response(JSON.stringify({ 
@@ -141,6 +164,8 @@ serve(async (req) => {
         .from("tenants")
         .update({ extra_users: nextExtraUsers })
         .eq("id", tenantId);
+
+      await syncTenantUserLimit(supabaseClient, tenantId, (tenant.seats_included || 1) + nextExtraUsers);
 
       log.info("Seat added via subscription item creation", { newExtraUsers: nextExtraUsers });
 

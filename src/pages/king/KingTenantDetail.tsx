@@ -290,6 +290,8 @@ export default function KingTenantDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-limits', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-consumption-summary'] });
       toast({
         title: "Abonnement mis à jour",
         description: "Les informations d'abonnement ont été enregistrées.",

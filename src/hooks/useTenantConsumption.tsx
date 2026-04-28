@@ -185,6 +185,7 @@ export function useUpdateTenantLimits() {
       queryClient.invalidateQueries({ queryKey: ["tenant-limits", variables.tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenant-limit-audit", variables.tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenant-consumption-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["king-tenant", variables.tenantId] });
       toast({
         title: "Limites mises à jour",
         description: "Les modifications ont été enregistrées et auditées.",

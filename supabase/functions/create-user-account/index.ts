@@ -801,12 +801,44 @@ async function assertSeatAvailable(
     billableUsersCount = new Set((billableRoles ?? []).map(({ user_id }) => user_id)).size;
   }
 
-  const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+  const totalSeats = await getTenantSeatCapacity(supabaseAdmin, tenantId, tenant);
   const availableSeats = totalSeats - billableUsersCount;
 
   if (availableSeats <= 0) {
     throw new AuthError("Aucun siege disponible. Debloquez un siege supplementaire.", 400);
   }
+}
+
+async function getTenantSeatCapacity(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  tenantId: string,
+  tenant: TenantRecord,
+): Promise<number> {
+  const baseCapacity = (tenant.seats_included || 1) + (tenant.extra_users || 0);
+
+  const { data: limit } = await supabaseAdmin
+    .from("tenant_limits")
+    .select("users_limit")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (!limit?.users_limit) {
+    return baseCapacity;
+  }
+
+  const { data: limitAudit } = await supabaseAdmin
+    .from("tenant_limits_audit")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .in("limit_type", ["users_limit", "users"])
+    .limit(1)
+    .maybeSingle();
+
+  if (limitAudit) {
+    return Math.max(tenant.seats_included || 1, limit.users_limit);
+  }
+
+  return baseCapacity;
 }
 
 async function ensureTenantAssignment(

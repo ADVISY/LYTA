@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePlanFeatures, useTenantSeats } from '@/hooks/usePlanFeatures';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { useTenantSeats } from '@/hooks/useTenantSeats';
 import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, MODULE_TRANSLATION_KEYS, getPlansInOrder, PlanModule } from '@/config/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

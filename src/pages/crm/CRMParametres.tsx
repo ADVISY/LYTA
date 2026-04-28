@@ -634,6 +634,7 @@ export default function CRMParametres() {
       });
       loadUserAccounts();
       loadCollaborateurs();
+      tenantSeats.refresh();
     } catch (error: unknown) {
       console.error("Error creating account:", error);
       toast.error(getErrorMessage(error, t('settings.accountCreationError')));
