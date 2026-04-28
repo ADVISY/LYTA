@@ -24,6 +24,13 @@ interface User {
   last_name: string | null;
 }
 
+interface LinkedCollaborator {
+  user_id: string | null;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+}
+
 export function UserRolesManager() {
   const { tenantId } = useTenant();
   const { roles, isLoading: rolesLoading } = useTenantRoles();
@@ -42,21 +49,42 @@ export function UserRolesManager() {
       if (!tenantId) return;
 
       try {
-        // Get user IDs assigned to this tenant
-        const { data: tenantUsers, error: tenantError } = await supabase
-          .from('user_tenant_assignments')
-          .select('user_id')
-          .eq('tenant_id', tenantId);
+        const [{ data: tenantUsers, error: tenantError }, { data: linkedCollaborators, error: linkedError }] =
+          await Promise.all([
+            supabase
+              .from('user_tenant_assignments')
+              .select('user_id')
+              .eq('tenant_id', tenantId),
+            supabase
+              .from('clients')
+              .select('user_id, email, first_name, last_name')
+              .eq('tenant_id', tenantId)
+              .eq('type_adresse', 'collaborateur')
+              .not('user_id', 'is', null),
+          ]);
 
         if (tenantError) throw tenantError;
+        if (linkedError) throw linkedError;
 
-        if (!tenantUsers || tenantUsers.length === 0) {
+        const linkedMap = new Map<string, LinkedCollaborator>();
+        (linkedCollaborators as LinkedCollaborator[] | null)?.forEach((collaborator) => {
+          if (collaborator.user_id) {
+            linkedMap.set(collaborator.user_id, collaborator);
+          }
+        });
+
+        const userIds = Array.from(new Set([
+          ...(tenantUsers
+            ?.map((tenantUser) => tenantUser.user_id)
+            .filter((userId): userId is string => Boolean(userId)) || []),
+          ...Array.from(linkedMap.keys()),
+        ]));
+
+        if (userIds.length === 0) {
           setUsers([]);
           setUsersLoading(false);
           return;
         }
-
-        const userIds = tenantUsers.map(tu => tu.user_id);
 
         // Get profiles for these users
         const { data: profiles, error: profilesError } = await supabase
@@ -67,7 +95,22 @@ export function UserRolesManager() {
 
         if (profilesError) throw profilesError;
 
-        setUsers(profiles || []);
+        const profileMap = new Map<string, User>();
+        (profiles || []).forEach((profile) => {
+          profileMap.set(profile.id, profile);
+        });
+
+        linkedMap.forEach((collaborator, userId) => {
+          if (profileMap.has(userId)) return;
+          profileMap.set(userId, {
+            id: userId,
+            email: collaborator.email || '',
+            first_name: collaborator.first_name,
+            last_name: collaborator.last_name,
+          });
+        });
+
+        setUsers(Array.from(profileMap.values()));
       } catch (error) {
         console.error('Error loading users:', error);
       } finally {

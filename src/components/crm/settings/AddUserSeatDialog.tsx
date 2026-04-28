@@ -10,8 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, UserPlus, CreditCard } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 interface AddUserSeatDialogProps {
   open: boolean;
@@ -38,25 +38,12 @@ export function AddUserSeatDialog({
       setLoading(true);
       setError(null);
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error("Non authentifié");
-      }
-
-      const { data, error: fnError } = await supabase.functions.invoke("add-user-seat", {
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      if (fnError) {
-        throw new Error(fnError.message);
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
+      const data = await invokeSupabaseFunction<{
+        success?: boolean;
+        method?: string;
+        url?: string;
+        error?: string;
+      }>("add-user-seat");
       if (data.method === "checkout" && data.url) {
         // Redirect to Stripe checkout
         window.open(data.url, "_blank");
@@ -64,6 +51,10 @@ export function AddUserSeatDialog({
         onOpenChange(false);
       } else if (data.method === "subscription_update") {
         // Seat added directly
+        toast.success("Siège utilisateur ajouté avec succès!");
+        onSuccess?.();
+        onOpenChange(false);
+      } else if (data.success) {
         toast.success("Siège utilisateur ajouté avec succès!");
         onSuccess?.();
         onOpenChange(false);

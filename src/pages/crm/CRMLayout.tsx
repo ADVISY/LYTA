@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useTenant } from "@/contexts/TenantContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useLytaToolsEnabled } from "@/hooks/useLytaTools";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
@@ -31,6 +32,7 @@ import {
   Lock,
   Crown,
   Puzzle,
+  User,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -55,7 +57,7 @@ interface MenuItem {
   requiredModule?: PlanModule;
 }
 
-const getMenuItems = (t: (key: string) => string): MenuItem[] => [
+const getMenuItems = (t: (key: string) => string, canManageAdminSettings: boolean): MenuItem[] => [
   { to: "/crm", icon: LayoutDashboard, label: t('nav.drive'), end: true, color: "from-blue-500 to-indigo-500" },
   { to: "/crm/clients", icon: Users, label: t('nav.clients'), color: "from-emerald-500 to-teal-500", requiredModule: "clients" },
   { to: "/crm/contrats", icon: FileCheck, label: t('nav.contracts'), color: "from-violet-500 to-purple-500", requiredModule: "contracts" },
@@ -65,7 +67,9 @@ const getMenuItems = (t: (key: string) => string): MenuItem[] => [
   { to: "/crm/compagnies", icon: Building2, label: t('nav.partners'), color: "from-red-500 to-orange-500" },
   { to: "/crm/collaborateurs", icon: UserCog, label: t('nav.team'), color: "from-pink-500 to-rose-500" },
   { to: "/crm/rapports", icon: BarChart3, label: t('nav.reports'), color: "from-indigo-500 to-violet-500" },
-  { to: "/crm/parametres", icon: Settings, label: t('nav.settings'), color: "from-slate-500 to-gray-500" },
+  canManageAdminSettings
+    ? { to: "/crm/parametres", icon: Settings, label: t('nav.settings'), color: "from-slate-500 to-gray-500" }
+    : { to: "/crm/parametres?tab=profil", icon: User, label: t('settings.profile'), color: "from-slate-500 to-gray-500" },
 ];
 
 export default function CRMLayout() {
@@ -74,6 +78,7 @@ export default function CRMLayout() {
   const { role, loading } = useUserRole();
   const { tenant } = useTenant();
   const { hasModule, loading: planLoading } = usePlanFeatures();
+  const { can, isAdmin: hasTenantAdminRole, isLoading: permissionsLoading } = usePermissions();
   const { enabled: lytaToolsEnabled } = useLytaToolsEnabled();
   const { theme } = useTheme();
   useLanguage(); // Initialize language based on user/tenant preferences
@@ -83,10 +88,11 @@ export default function CRMLayout() {
   const [showWelcome, setShowWelcome] = useState(false);
 
   const navigate = useNavigate();
+  const canManageAdminSettings = role === "admin" || hasTenantAdminRole || can("settings", "update");
   
   // Get all menu items + conditionally add LYTA Tools (Pilot: Advisy only)
   const allMenuItems = useMemo(() => {
-    const items = getMenuItems(t);
+    const items = getMenuItems(t, canManageAdminSettings);
     if (lytaToolsEnabled) {
       // Insert LYTA Tools before settings (second to last)
       const settingsIndex = items.findIndex(i => i.to === '/crm/parametres');
@@ -103,7 +109,7 @@ export default function CRMLayout() {
       }
     }
     return items;
-  }, [t, lytaToolsEnabled]);
+  }, [t, lytaToolsEnabled, canManageAdminSettings]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {
@@ -154,7 +160,7 @@ export default function CRMLayout() {
     return user?.email?.charAt(0).toUpperCase() || 'U';
   };
 
-  if (loading || planLoading) {
+  if (loading || planLoading || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-muted border-t-primary" />

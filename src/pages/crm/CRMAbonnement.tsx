@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useTenantSeats } from '@/hooks/useTenantSeats';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PLAN_CONFIGS, MODULE_DISPLAY_NAMES, MODULE_TRANSLATION_KEYS, getPlansInOrder, PlanModule } from '@/config/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +43,9 @@ export default function CRMAbonnement() {
   } = usePlanFeatures();
   
   const { activeUsers, loading: seatsLoading } = useTenantSeats();
+  const { can, isAdmin, isLoading: permissionsLoading } = usePermissions();
 
-  const loading = planLoading || seatsLoading;
+  const loading = planLoading || seatsLoading || permissionsLoading;
   const extraUsers = Math.max(0, activeUsers - seatsIncluded);
   const estimatedCost = extraUsers * seatsPrice;
   const availablePlans = getPlansInOrder();
@@ -66,6 +68,18 @@ export default function CRMAbonnement() {
           <Skeleton className="h-64" />
         </div>
       </div>
+    );
+  }
+
+  if (!isAdmin && !can('settings', 'update')) {
+    return (
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Acces restreint</AlertTitle>
+        <AlertDescription>
+          Seul un administrateur du cabinet peut consulter l'abonnement.
+        </AlertDescription>
+      </Alert>
     );
   }
 

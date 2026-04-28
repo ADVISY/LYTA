@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { useTenantSeats } from "@/hooks/useTenantSeats";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -41,7 +42,7 @@ type ProfileRow = Tables<"profiles">;
 type UserRoleRow = Tables<"user_roles">;
 
 type CompanyOption = Pick<InsuranceCompany, "id" | "name" | "logo_url">;
-type CollaboratorLink = Pick<ClientRow, "id" | "user_id" | "first_name" | "last_name">;
+type CollaboratorLink = Pick<ClientRow, "id" | "user_id" | "first_name" | "last_name" | "email" | "created_at">;
 type CollaboratorOption = Pick<ClientRow, "id" | "first_name" | "last_name" | "email">;
 type UserProfile = Pick<ProfileRow, "id" | "email" | "first_name" | "last_name">;
 type ClientProfile = Pick<ProfileRow, "id" | "email">;
@@ -54,13 +55,17 @@ interface ProductOption extends Pick<InsuranceProduct, "id" | "name" | "category
   company?: { name: string } | null;
 }
 
-interface UserAccountRole extends Pick<UserRoleRow, "id" | "user_id" | "role" | "created_at"> {
-  profiles: UserProfile | null;
-}
+type UserAccountRole = Pick<UserRoleRow, "id" | "user_id" | "role" | "created_at">;
 
-interface UserAccount extends UserAccountRole {
+interface UserAccount {
+  id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+  profiles: UserProfile | null;
   roles: string[];
   collaborateur: CollaboratorLink | null;
+  isIncomplete: boolean;
 }
 
 interface ClientAccount extends ClientAccountRow {
@@ -116,12 +121,15 @@ const roleBadgeColors: Record<string, string> = {
   partner: "bg-teal-500",
 };
 
+const STAFF_ROLES = new Set(["admin", "manager", "agent", "backoffice", "compta", "partner"]);
+
 export default function CRMParametres() {
   const { t } = useTranslation();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { tenantId } = useUserTenant();
   const tenantSeats = useTenantSeats();
   const { role } = useUserRole();
+  const { can, isAdmin: hasTenantAdminRole, isLoading: permissionsLoading } = usePermissions();
   
   // Check URL params for tab selection (e.g., ?tab=abonnement)
   const urlParams = new URLSearchParams(window.location.search);
@@ -130,6 +138,7 @@ export default function CRMParametres() {
   const [showUnlockSeatDialog, setShowUnlockSeatDialog] = useState(false);
   
   const isAdmin = role === "admin";
+  const canManageAdminSettings = isAdmin || hasTenantAdminRole || can("settings", "update");
   const themeColors = getThemeColors(t);
   const roleLabels = getRoleLabels(t);
   
@@ -229,6 +238,15 @@ export default function CRMParametres() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, tenantId]);
 
+  useEffect(() => {
+    if (permissionsLoading || canManageAdminSettings) return;
+
+    const allowedTabs = new Set(["profil", "support"]);
+    if (!allowedTabs.has(activeTab)) {
+      setActiveTab("profil");
+    }
+  }, [activeTab, canManageAdminSettings, permissionsLoading]);
+
   const loadProfile = async () => {
     if (!user) return;
     const { data } = await supabase
@@ -277,57 +295,27 @@ export default function CRMParametres() {
   const loadUserAccounts = async () => {
     if (!tenantId) return;
 
-    // Get user IDs assigned to this tenant
-    const { data: tenantUsers, error: tenantError } = await supabase
-      .from("user_tenant_assignments")
-      .select("user_id")
-      .eq("tenant_id", tenantId);
+    const [{ data: tenantUsers, error: tenantError }, { data: linkedCollabs, error: collabsError }] =
+      await Promise.all([
+        supabase
+          .from("user_tenant_assignments")
+          .select("user_id")
+          .eq("tenant_id", tenantId),
+        supabase
+          .from("clients")
+          .select("id, user_id, first_name, last_name, email, created_at")
+          .eq("type_adresse", "collaborateur")
+          .eq("tenant_id", tenantId)
+          .not("user_id", "is", null),
+      ]);
 
     if (tenantError) {
       console.error("Error loading tenant users:", tenantError);
-      return;
     }
 
-    const tenantUserIds =
-      tenantUsers
-        ?.map((tenantUser) => tenantUser.user_id)
-        .filter((userId): userId is string => Boolean(userId)) || [];
-    
-    if (tenantUserIds.length === 0) {
-      setUserAccounts([]);
-      return;
+    if (collabsError) {
+      console.error("Error loading linked collaborators:", collabsError);
     }
-
-    // Get user accounts with their roles filtered by tenant users
-    const { data: roles, error } = await supabase
-      .from("user_roles")
-      .select(`
-        id,
-        user_id,
-        role,
-        created_at,
-        profiles:user_id (
-          id,
-          email,
-          first_name,
-          last_name
-        )
-      `)
-      .in("user_id", tenantUserIds)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error loading user accounts:", error);
-      return;
-    }
-
-    // Get linked collaborateurs for this tenant
-    const { data: linkedCollabs } = await supabase
-      .from("clients")
-      .select("id, user_id, first_name, last_name")
-      .eq("type_adresse", "collaborateur")
-      .eq("tenant_id", tenantId)
-      .not("user_id", "is", null);
 
     const collabMap = new Map<string, CollaboratorLink>();
     (linkedCollabs as CollaboratorLink[] | null)?.forEach((collaborateur) => {
@@ -336,27 +324,95 @@ export default function CRMParametres() {
       }
     });
 
+    const allUserIds = Array.from(new Set([
+      ...(tenantUsers
+        ?.map((tenantUser) => tenantUser.user_id)
+        .filter((userId): userId is string => Boolean(userId)) || []),
+      ...Array.from(collabMap.keys()),
+    ]));
+
+    if (allUserIds.length === 0) {
+      setUserAccounts([]);
+      return;
+    }
+
+    const [{ data: roles, error: rolesError }, { data: profiles, error: profilesError }] =
+      await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("id, user_id, role, created_at")
+          .in("user_id", allUserIds)
+          .neq("role", "client")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("id, email, first_name, last_name")
+          .in("id", allUserIds),
+      ]);
+
+    if (rolesError) {
+      console.error("Error loading user accounts:", rolesError);
+    }
+
+    if (profilesError) {
+      console.error("Error loading user profiles:", profilesError);
+    }
+
+    const profileMap = new Map<string, UserProfile>();
+    (profiles as UserProfile[] | null)?.forEach((profileItem) => {
+      profileMap.set(profileItem.id, profileItem);
+    });
+
     // Group roles by user_id to avoid duplicate entries
     const userMap = new Map<string, UserAccount>();
     (roles as UserAccountRole[] | null)?.forEach((userRole) => {
+      if (!STAFF_ROLES.has(String(userRole.role))) return;
+
       const userId = userRole.user_id;
       if (!userMap.has(userId)) {
         userMap.set(userId, {
           ...userRole,
-          roles: [userRole.role],
+          role: String(userRole.role),
+          roles: [String(userRole.role)],
+          profiles: profileMap.get(userId) || null,
           collaborateur: collabMap.get(userId) || null,
+          isIncomplete: false,
         });
       } else {
         // Add role to existing user
         const existing = userMap.get(userId);
-        if (existing && !existing.roles.includes(userRole.role)) {
-          existing.roles.push(userRole.role);
+        const nextRole = String(userRole.role);
+        if (existing && !existing.roles.includes(nextRole)) {
+          existing.roles.push(nextRole);
         }
       }
     });
 
-    // Convert map to array
-    const accounts = Array.from(userMap.values());
+    collabMap.forEach((collaborateur, userId) => {
+      if (userMap.has(userId)) return;
+
+      userMap.set(userId, {
+        id: collaborateur.id,
+        user_id: userId,
+        role: "",
+        created_at: collaborateur.created_at,
+        profiles: profileMap.get(userId) || {
+          id: userId,
+          email: collaborateur.email || "",
+          first_name: collaborateur.first_name,
+          last_name: collaborateur.last_name,
+        },
+        roles: [],
+        collaborateur,
+        isIncomplete: true,
+      });
+    });
+
+    const accounts = Array.from(userMap.values()).sort((a, b) => {
+      if (a.isIncomplete !== b.isIncomplete) return a.isIncomplete ? -1 : 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
     setUserAccounts(accounts);
   };
 
@@ -734,44 +790,48 @@ export default function CRMParametres() {
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">{t('settings.profile')}</span>
             </TabsTrigger>
-            {isAdmin && (
+            {canManageAdminSettings && (
               <TabsTrigger value="abonnement" className="gap-2 whitespace-nowrap">
                 <CreditCard className="h-4 w-4" />
                 <span className="hidden sm:inline">{t('subscription.title')}</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="comptes" className="gap-2 whitespace-nowrap">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('settings.accounts')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="gap-2 whitespace-nowrap">
-              <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('settings.roles')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="utilisateurs" className="gap-2 whitespace-nowrap">
-              <KeyRound className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('collaborators.permissions')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="compagnies" className="gap-2 whitespace-nowrap">
-              <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('settings.companies')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="produits" className="gap-2 whitespace-nowrap">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('settings.products')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="commissions" className="gap-2 whitespace-nowrap">
-              <Percent className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('nav.commissions')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="apparence" className="gap-2 whitespace-nowrap">
-              <Palette className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('settings.appearance')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="emails" className="gap-2 whitespace-nowrap">
-              <Mail className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('emails.title')}</span>
-            </TabsTrigger>
+            {canManageAdminSettings && (
+              <>
+                <TabsTrigger value="comptes" className="gap-2 whitespace-nowrap">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.accounts')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="roles" className="gap-2 whitespace-nowrap">
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.roles')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="utilisateurs" className="gap-2 whitespace-nowrap">
+                  <KeyRound className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('collaborators.permissions')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="compagnies" className="gap-2 whitespace-nowrap">
+                  <Building2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.companies')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="produits" className="gap-2 whitespace-nowrap">
+                  <Package className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.products')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="commissions" className="gap-2 whitespace-nowrap">
+                  <Percent className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('nav.commissions')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="apparence" className="gap-2 whitespace-nowrap">
+                  <Palette className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.appearance')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="emails" className="gap-2 whitespace-nowrap">
+                  <Mail className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('emails.title')}</span>
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="support" className="gap-2 whitespace-nowrap">
               <AlertCircle className="h-4 w-4" />
               <span className="hidden sm:inline">{t('common.support')}</span>
@@ -899,17 +959,18 @@ export default function CRMParametres() {
           </Card>
 
           {/* Cabinet Info - Admin only */}
-          {isAdmin && <CabinetInfoSettings />}
+          {canManageAdminSettings && <CabinetInfoSettings />}
         </TabsContent>
 
         {/* ABONNEMENT - Admin only */}
-        {isAdmin && (
+        {canManageAdminSettings && (
           <TabsContent value="abonnement" className="space-y-6 mt-6">
             <CRMAbonnement />
           </TabsContent>
         )}
 
         {/* GESTION DES COMPTES */}
+        {canManageAdminSettings && (
         <TabsContent value="comptes" className="space-y-6 mt-6">
           {/* Sous-onglets Collaborateurs / Clients */}
           <div className="flex gap-2 border-b pb-2">
@@ -1029,19 +1090,26 @@ export default function CRMParametres() {
                         <TableRow key={account.user_id}>
                           <TableCell>
                             <span className="font-medium">
-                              {account.profiles?.first_name} {account.profiles?.last_name}
+                              {account.profiles?.first_name || account.collaborateur?.first_name}{" "}
+                              {account.profiles?.last_name || account.collaborateur?.last_name}
                             </span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {account.profiles?.email}
+                            {account.profiles?.email || account.collaborateur?.email || "-"}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {(account.roles || [account.role]).map((role: string) => (
-                                <Badge key={role} className={cn("text-white", roleBadgeColors[role] || "bg-gray-500")}>
-                                  {roleLabels[role] || role}
+                              {account.roles.length > 0 ? (
+                                account.roles.map((role: string) => (
+                                  <Badge key={role} className={cn("text-white", roleBadgeColors[role] || "bg-gray-500")}>
+                                    {roleLabels[role] || role}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Badge variant="outline" className="border-amber-300 text-amber-700">
+                                  Compte a reparer
                                 </Badge>
-                              ))}
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1329,18 +1397,24 @@ export default function CRMParametres() {
             </DialogContent>
           </Dialog>
         </TabsContent>
+        )}
 
         {/* RÔLES */}
+        {canManageAdminSettings && (
         <TabsContent value="roles" className="space-y-6 mt-6">
           <RolesManager />
         </TabsContent>
+        )}
 
         {/* UTILISATEURS & PERMISSIONS */}
+        {canManageAdminSettings && (
         <TabsContent value="utilisateurs" className="space-y-6 mt-6">
           <UserRolesManager />
         </TabsContent>
+        )}
 
         {/* COMPAGNIES */}
+        {canManageAdminSettings && (
         <TabsContent value="compagnies" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -1432,8 +1506,10 @@ export default function CRMParametres() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* PRODUITS */}
+        {canManageAdminSettings && (
         <TabsContent value="produits" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -1602,8 +1678,10 @@ export default function CRMParametres() {
             </DialogContent>
           </Dialog>
         </TabsContent>
+        )}
 
         {/* COMMISSIONS */}
+        {canManageAdminSettings && (
         <TabsContent value="commissions" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -1694,8 +1772,10 @@ export default function CRMParametres() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* APPARENCE */}
+        {canManageAdminSettings && (
         <TabsContent value="apparence" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -1753,11 +1833,14 @@ export default function CRMParametres() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* EMAILS */}
+        {canManageAdminSettings && (
         <TabsContent value="emails" className="space-y-6 mt-6">
           <EmailAutomationSettings />
         </TabsContent>
+        )}
 
         {/* SUPPORT */}
         <TabsContent value="support" className="space-y-6 mt-6">

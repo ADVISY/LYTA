@@ -55,6 +55,13 @@ interface TenantRoleConfig {
   permissions: PermissionSpec[];
 }
 
+interface RecoveryLinkData {
+  properties?: {
+    action_link?: string | null;
+    hashed_token?: string | null;
+  } | null;
+}
+
 const ADMIN_PERMISSIONS: PermissionSpec[] = [
   { module: "clients", action: "view" },
   { module: "clients", action: "create" },
@@ -260,7 +267,7 @@ function buildTenantResetUrl(tenant: TenantRecord, role: string): string {
   return appendLoginSpace(`${origin}/reset-password`, role === "client" ? "client" : "team");
 }
 
-function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
+function buildRecoveryLink(redirectTo: string, linkData: RecoveryLinkData | null | undefined): string | null {
   const actionLink = linkData?.properties?.action_link;
   let hashedToken = linkData?.properties?.hashed_token;
 
@@ -1214,58 +1221,8 @@ Deno.serve(async (req) => {
       userId = existingUser.id;
       await ensureUserRole(supabaseAdmin, userId, role);
 
-      // Check if user already has this role
-      const { data: existingRole } = await supabaseAdmin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .eq("role", role)
-        .maybeSingle();
-
-      if (!existingRole) {
-        // Add the new role (user can have multiple roles)
-        const { error: roleInsertError } = await supabaseAdmin
-          .from("user_roles")
-          .insert({ user_id: userId, role });
-
-        if (roleInsertError) {
-          log.error("Error adding role", { error: roleInsertError });
-        }
-      }
-
       await ensureTenantAssignment(supabaseAdmin, userId, tenantId, tenant as TenantRecord, consumesSeat);
       await ensureTenantRoleAssignment(supabaseAdmin, userId, tenantId, role, requestingUser.id);
-
-      // Check if user is already assigned to this tenant
-      const { data: existingTenantAssignment } = await supabaseAdmin
-        .from("user_tenant_assignments")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-
-      if (!existingTenantAssignment) {
-        // Check seat availability
-        const { count: activeUsersCount } = await supabaseAdmin
-          .from("user_tenant_assignments")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", tenantId);
-
-        const totalSeats = (tenant.seats_included || 1) + (tenant.extra_users || 0);
-        const availableSeats = totalSeats - (activeUsersCount || 0);
-
-        if (availableSeats <= 0) {
-          return new Response(
-            JSON.stringify({ error: "Aucun siège disponible. Veuillez d'abord débloquer un siège supplémentaire." }),
-            { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-          );
-        }
-
-        // Assign user to tenant
-        await supabaseAdmin
-          .from("user_tenant_assignments")
-          .insert({ user_id: userId, tenant_id: tenantId });
-      }
 
       // Existing user - send a password setup link so they can access this tenant even
       // if they do not remember an existing password.
