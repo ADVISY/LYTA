@@ -15,7 +15,7 @@ import {
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
   Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
-  CreditCard
+  CreditCard, Briefcase, MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,9 +46,26 @@ type CollaboratorLink = Pick<ClientRow, "id" | "user_id" | "first_name" | "last_
 type CollaboratorOption = Pick<ClientRow, "id" | "first_name" | "last_name" | "email">;
 type UserProfile = Pick<ProfileRow, "id" | "email" | "first_name" | "last_name">;
 type ClientProfile = Pick<ProfileRow, "id" | "email">;
+type CollaboratorAccountRow = Pick<
+  ClientRow,
+  "id" | "first_name" | "last_name" | "email" | "mobile" | "profession" | "status" | "user_id" | "created_at"
+>;
 type ClientAccountRow = Pick<
   ClientRow,
-  "id" | "first_name" | "last_name" | "email" | "user_id" | "created_at" | "status"
+  | "id"
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "user_id"
+  | "created_at"
+  | "status"
+  | "company_name"
+  | "mobile"
+  | "phone"
+  | "address"
+  | "city"
+  | "zip_code"
+  | "postal_code"
 >;
 
 interface ProductOption extends Pick<InsuranceProduct, "id" | "name" | "category" | "company_id" | "description"> {
@@ -68,7 +85,7 @@ interface UserAccount {
   isIncomplete: boolean;
 }
 
-interface ClientAccount extends ClientAccountRow {
+interface ClientAddress extends ClientAccountRow {
   profile: ClientProfile | null;
 }
 
@@ -185,11 +202,12 @@ export default function CRMParametres() {
 
   // Gestion des comptes
   const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
-  const [clientAccounts, setClientAccounts] = useState<ClientAccount[]>([]);
+  const [clientAddresses, setClientAddresses] = useState<ClientAddress[]>([]);
+  const [collaboratorRows, setCollaboratorRows] = useState<CollaboratorAccountRow[]>([]);
   const [collaborateurs, setCollaborateurs] = useState<CollaboratorOption[]>([]);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
-  const [accountSubTab, setAccountSubTab] = useState<"collaborateurs" | "clients">("collaborateurs");
+  const [accountSubTab, setAccountSubTab] = useState<"utilisateurs" | "collaborateurs" | "adresses">("utilisateurs");
   const [newAccount, setNewAccount] = useState({
     email: "",
     password: "",
@@ -203,7 +221,7 @@ export default function CRMParametres() {
   const [deletingClientAccountId, setDeletingClientAccountId] = useState<string | null>(null);
   const [resettingPasswordClientId, setResettingPasswordClientId] = useState<string | null>(null);
   const [confirmDeleteClientDialog, setConfirmDeleteClientDialog] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<ClientAccount | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<ClientAddress | null>(null);
 
   // Handler pour cliquer sur "Créer un compte"
   const handleAddUserClick = () => {
@@ -233,7 +251,7 @@ export default function CRMParametres() {
     if (tenantId) {
       loadUserAccounts();
       loadCollaborateurs();
-      loadClientAccounts();
+      loadClientAddresses();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, tenantId]);
@@ -419,58 +437,62 @@ export default function CRMParametres() {
   const loadCollaborateurs = async () => {
     if (!tenantId) return;
     
-    // Get collaborateurs without linked user accounts for this tenant
-    const { data } = await supabase
-      .from("clients")
-      .select("id, first_name, last_name, email")
-      .eq("type_adresse", "collaborateur")
-      .eq("tenant_id", tenantId)
-      .is("user_id", null)
-      .order("last_name");
-    
-    setCollaborateurs((data || []) as CollaboratorOption[]);
-  };
-
-  const loadClientAccounts = async () => {
-    if (!tenantId) return;
-
-    // Get all clients (type_adresse = 'client') with user accounts for this tenant
     const { data, error } = await supabase
       .from("clients")
-      .select("id, first_name, last_name, email, user_id, created_at, status")
+      .select("id, first_name, last_name, email, mobile, profession, status, user_id, created_at")
+      .eq("type_adresse", "collaborateur")
+      .eq("tenant_id", tenantId)
+      .order("last_name");
+
+    if (error) {
+      console.error("Error loading collaborators:", error);
+      return;
+    }
+    
+    const rows = (data || []) as CollaboratorAccountRow[];
+    setCollaboratorRows(rows);
+    setCollaborateurs(rows.filter((collaborateur) => !collaborateur.user_id));
+  };
+
+  const loadClientAddresses = async () => {
+    if (!tenantId) return;
+
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, first_name, last_name, email, user_id, created_at, status, company_name, mobile, phone, address, city, zip_code, postal_code")
       .eq("type_adresse", "client")
       .eq("tenant_id", tenantId)
-      .not("user_id", "is", null)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error loading client accounts:", error);
+      console.error("Error loading client addresses:", error);
       return;
     }
 
-    // Get user profiles for emails
     if (data && data.length > 0) {
       const userIds = data
         .map((client) => client.user_id)
         .filter((userId): userId is string => Boolean(userId));
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .in("id", userIds);
+      const { data: profiles } = userIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, email")
+            .in("id", userIds)
+        : { data: [] };
 
       const profileMap = new Map<string, ClientProfile>();
       (profiles as ClientProfile[] | null)?.forEach((profileItem) => {
         profileMap.set(profileItem.id, profileItem);
       });
 
-      const clientsWithProfiles: ClientAccount[] = (data as ClientAccountRow[]).map((client) => ({
+      const clientsWithProfiles: ClientAddress[] = (data as ClientAccountRow[]).map((client) => ({
         ...client,
         profile: client.user_id ? profileMap.get(client.user_id) || null : null,
       }));
 
-      setClientAccounts(clientsWithProfiles);
+      setClientAddresses(clientsWithProfiles);
     } else {
-      setClientAccounts([]);
+      setClientAddresses([]);
     }
   };
 
@@ -700,7 +722,7 @@ export default function CRMParametres() {
   };
 
   // Supprimer le compte client (retirer user_id et supprimer l'utilisateur auth)
-  const handleDeleteClientAccount = async (client: ClientAccount) => {
+  const handleDeleteClientAccount = async (client: ClientAddress) => {
     setDeletingClientAccountId(client.id);
     try {
       // Retirer le user_id du client
@@ -714,7 +736,7 @@ export default function CRMParametres() {
       toast.success(t('settings.clientAccountDeleted'));
       setConfirmDeleteClientDialog(false);
       setClientToDelete(null);
-      loadClientAccounts();
+      loadClientAddresses();
     } catch (error: unknown) {
       console.error("Error deleting client account:", error);
       toast.error(getErrorMessage(error, t('common.error')));
@@ -724,7 +746,7 @@ export default function CRMParametres() {
   };
 
   // Renvoyer un nouveau mot de passe au client
-  const handleResendPassword = async (client: ClientAccount) => {
+  const handleResendPassword = async (client: ClientAddress) => {
     const clientEmail = client.profile?.email || client.email;
     if (!clientEmail) {
       toast.error(t('settings.noEmailForClient') || "Aucun email trouvé pour ce client");
@@ -972,30 +994,41 @@ export default function CRMParametres() {
         {/* GESTION DES COMPTES */}
         {canManageAdminSettings && (
         <TabsContent value="comptes" className="space-y-6 mt-6">
-          {/* Sous-onglets Collaborateurs / Clients */}
-          <div className="flex gap-2 border-b pb-2">
+          <div className="flex gap-2 border-b pb-2 flex-wrap">
+            <Button
+              variant={accountSubTab === "utilisateurs" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAccountSubTab("utilisateurs")}
+              className="gap-2"
+            >
+              <Users className="h-4 w-4" />
+              {t('settings.users')}
+              <Badge variant="secondary" className="ml-1">{userAccounts.length}</Badge>
+            </Button>
             <Button
               variant={accountSubTab === "collaborateurs" ? "default" : "outline"}
               size="sm"
               onClick={() => setAccountSubTab("collaborateurs")}
               className="gap-2"
             >
-              <UserCheck className="h-4 w-4" />
+              <Briefcase className="h-4 w-4" />
               {t('nav.collaborators')}
+              <Badge variant="secondary" className="ml-1">{collaboratorRows.length}</Badge>
             </Button>
             <Button
-              variant={accountSubTab === "clients" ? "default" : "outline"}
+              variant={accountSubTab === "adresses" ? "default" : "outline"}
               size="sm"
-              onClick={() => setAccountSubTab("clients")}
+              onClick={() => setAccountSubTab("adresses")}
               className="gap-2"
             >
-              <User className="h-4 w-4" />
+              <MapPin className="h-4 w-4" />
               {t('nav.clients')}
+              <Badge variant="secondary" className="ml-1">{clientAddresses.length}</Badge>
             </Button>
           </div>
 
-          {/* SOUS-ONGLET COLLABORATEURS */}
-          {accountSubTab === "collaborateurs" && (
+          {/* SOUS-ONGLET UTILISATEURS */}
+          {accountSubTab === "utilisateurs" && (
             <>
               {/* Infos sur les sièges utilisateurs */}
               <Card className="border-primary/20 bg-primary/5">
@@ -1046,9 +1079,7 @@ export default function CRMParametres() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Workflow:</strong><br />
-                  1. {t('collaborators.addCollaborator')} dans <strong>{t('nav.collaborators')}</strong><br />
-                  2. {t('settings.createAccount')}
+                  Les utilisateurs sont les collaborateurs qui disposent d'un acces CRM. Les comptes client des adresses restent gratuits et sont visibles dans l'onglet Adresses.
                 </AlertDescription>
               </Alert>
 
@@ -1129,7 +1160,7 @@ export default function CRMParametres() {
                       {userAccounts.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            {t('settings.noCollaboratorsAvailable')}
+                            Aucun utilisateur CRM dans ce cabinet
                           </TableCell>
                         </TableRow>
                       )}
@@ -1278,80 +1309,172 @@ export default function CRMParametres() {
             </>
           )}
 
-          {/* SOUS-ONGLET CLIENTS */}
-          {accountSubTab === "clients" && (
+          {/* SOUS-ONGLET COLLABORATEURS */}
+          {accountSubTab === "collaborateurs" && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    {t('nav.collaborators')}
+                  </CardTitle>
+                  <Badge variant="outline">{collaboratorRows.length} total</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('nav.collaborators')}</TableHead>
+                      <TableHead>{t('common.email')}</TableHead>
+                      <TableHead>{t('collaborators.function')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>Acces CRM</TableHead>
+                      <TableHead>{t('settings.createdAt')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {collaboratorRows.map((collaborateur) => (
+                      <TableRow key={collaborateur.id}>
+                        <TableCell>
+                          <span className="font-medium">
+                            {[collaborateur.first_name, collaborateur.last_name].filter(Boolean).join(" ") || "-"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {collaborateur.email || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {collaborateur.profession ? (roleLabels[collaborateur.profession] || collaborateur.profession) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={collaborateur.status === "actif" ? "default" : "secondary"}>
+                            {collaborateur.status || "actif"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {collaborateur.user_id ? (
+                            <Badge className="bg-emerald-600 text-white">Utilisateur lie</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-300 text-amber-700">Sans acces</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(collaborateur.created_at).toLocaleDateString("fr-CH")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {collaboratorRows.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          Aucun collaborateur trouve
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* SOUS-ONGLET ADRESSES */}
+          {accountSubTab === "adresses" && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  {t('settings.clientAccounts')}
+                  <MapPin className="h-5 w-5" />
+                  {t('clients.addresses')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t('clients.client')}</TableHead>
-                      <TableHead>{t('common.email')}</TableHead>
+                      <TableHead>{t('clients.nameCompany')}</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>{t('clients.addresses')}</TableHead>
                       <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>Compte client</TableHead>
                       <TableHead>{t('settings.createdAt')}</TableHead>
                       <TableHead className="text-right">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {clientAccounts.map(client => (
+                    {clientAddresses.map(client => (
                       <TableRow key={client.id}>
                         <TableCell>
                           <span className="font-medium">
-                            {client.first_name} {client.last_name}
+                            {client.company_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || "-"}
                           </span>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {client.profile?.email || client.email}
+                          <div className="space-y-1 text-sm">
+                            <div>{client.profile?.email || client.email || "-"}</div>
+                            {(client.mobile || client.phone) && (
+                              <div>{client.mobile || client.phone}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <div className="space-y-1 text-sm">
+                            {client.address && <div>{client.address}</div>}
+                            <div>{[client.zip_code || client.postal_code, client.city].filter(Boolean).join(" ") || "-"}</div>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant={client.status === 'actif' ? 'default' : 'secondary'}>
                             {client.status || 'actif'}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {client.user_id ? (
+                            <Badge className="bg-emerald-600 text-white">Compte actif</Badge>
+                          ) : (
+                            <Badge variant="outline">Sans compte</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(client.created_at).toLocaleDateString("fr-CH")}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                              size="icon" 
-                              variant="ghost"
-                              title={t('settings.resendPassword')}
-                              onClick={() => handleResendPassword(client)}
-                              disabled={resettingPasswordClientId === client.id}
-                            >
-                              {resettingPasswordClientId === client.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Mail className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button 
-                              size="icon" 
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive"
-                              title={t('settings.deleteAccount')}
-                              onClick={() => {
-                                setClientToDelete(client);
-                                setConfirmDeleteClientDialog(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {client.user_id ? (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title={t('settings.resendPassword')}
+                                onClick={() => handleResendPassword(client)}
+                                disabled={resettingPasswordClientId === client.id}
+                              >
+                                {resettingPasswordClientId === client.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Mail className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                title={t('settings.deleteAccount')}
+                                onClick={() => {
+                                  setClientToDelete(client);
+                                  setConfirmDeleteClientDialog(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
-                    {clientAccounts.length === 0 && (
+                    {clientAddresses.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          {t('settings.noClientAccounts')}
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          Aucune adresse trouvee
                         </TableCell>
                       </TableRow>
                     )}

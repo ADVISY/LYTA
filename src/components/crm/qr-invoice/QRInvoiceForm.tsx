@@ -79,7 +79,7 @@ interface QRInvoiceFormProps {
 export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoiceFormProps) {
   const { t } = useTranslation();
   const { tenant } = useTenant();
-  const { clients, loading: loadingClients } = useClients();
+  const { clients, loading: loadingClients } = useClients("client");
   const [submitting, setSubmitting] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
