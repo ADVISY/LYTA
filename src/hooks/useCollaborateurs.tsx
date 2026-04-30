@@ -75,6 +75,11 @@ function getAccountRoleFromProfession(profession?: string): string {
   }
 }
 
+type CreateCollaboratorResponse = {
+  success: boolean;
+  id: string;
+};
+
 export function useCollaborateurs() {
   const { toast } = useToast();
   const { tenantId } = useUserTenant();
@@ -120,18 +125,13 @@ export function useCollaborateurs() {
         throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
-      const { data: newCollaborateur, error } = await supabase
-        .from('clients')
-        .insert([{
+      const newCollaborateur = await invokeSupabaseFunction<CreateCollaboratorResponse>('create-collaborator', {
+        body: {
           ...data,
-          type_adresse: 'collaborateur',
           status: data.status || 'actif',
-          tenant_id: tenantId
-        }])
-        .select('id')
-        .single();
-
-      if (error) throw error;
+          tenantId,
+        },
+      });
 
       if (newCollaborateur?.id && data.email) {
         try {
