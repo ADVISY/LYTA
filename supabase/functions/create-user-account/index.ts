@@ -762,17 +762,31 @@ async function canCreateAccount(
     return false;
   }
 
-  const allowedModules = isClientAccount ? ["clients", "settings"] : ["settings"];
+  const requiredPermissions: PermissionSpec[] = isClientAccount
+    ? [
+        { module: "clients", action: "update" },
+        { module: "clients", action: "create" },
+        { module: "settings", action: "update" },
+      ]
+    : [
+        { module: "collaborators", action: "create" },
+        { module: "collaborators", action: "update" },
+        { module: "settings", action: "update" },
+      ];
+
   const { data: permissions } = await supabaseAdmin
     .from("tenant_role_permissions")
-    .select("role_id")
+    .select("module, action")
     .in("role_id", activeRoleIds)
-    .in("module", allowedModules)
-    .eq("action", "update")
-    .eq("allowed", true)
-    .limit(1);
+    .eq("allowed", true);
 
-  return (permissions?.length ?? 0) > 0;
+  return (permissions ?? []).some((permission) =>
+    requiredPermissions.some(
+      (required) =>
+        permission.module === required.module &&
+        permission.action === required.action,
+    ),
+  );
 }
 
 async function assertSeatAvailable(

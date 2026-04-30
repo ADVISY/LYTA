@@ -167,9 +167,15 @@ export function useCollaborateurs() {
       refetch();
       return true;
     } catch (error: any) {
+      const errorMessage = error?.message || "";
+      const description = errorMessage.toLowerCase().includes("row-level security")
+        && errorMessage.toLowerCase().includes('table "clients"')
+          ? "Accès refusé : vous n'avez pas les permissions pour créer un collaborateur"
+          : translateError(errorMessage);
+
       toast({
         title: "Erreur",
-        description: translateError(error.message),
+        description,
         variant: "destructive"
       });
       return false;
