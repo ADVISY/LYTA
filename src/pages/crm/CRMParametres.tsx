@@ -39,7 +39,6 @@ type InsuranceCompany = Tables<"insurance_companies">;
 type InsuranceProduct = Tables<"insurance_products">;
 type ClientRow = Tables<"clients">;
 type ProfileRow = Tables<"profiles">;
-type UserRoleRow = Tables<"user_roles">;
 
 type CompanyOption = Pick<InsuranceCompany, "id" | "name" | "logo_url">;
 type CollaboratorLink = Pick<ClientRow, "id" | "user_id" | "first_name" | "last_name" | "email" | "created_at">;
@@ -72,7 +71,12 @@ interface ProductOption extends Pick<InsuranceProduct, "id" | "name" | "category
   company?: { name: string } | null;
 }
 
-type UserAccountRole = Pick<UserRoleRow, "id" | "user_id" | "role" | "created_at">;
+interface TenantRoleAssignmentAccountRow {
+  id: string;
+  user_id: string;
+  assigned_at: string;
+  tenant_roles: { name: string | null } | { name: string | null }[] | null;
+}
 
 interface UserAccount {
   id: string;
@@ -139,6 +143,30 @@ const roleBadgeColors: Record<string, string> = {
 };
 
 const STAFF_ROLES = new Set(["admin", "manager", "agent", "backoffice", "compta", "partner"]);
+
+function normalizeRoleName(roleName: string): string {
+  const normalized = roleName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (["admin cabinet", "administrateur", "admin"].includes(normalized)) return "admin";
+  if (normalized === "manager") return "manager";
+  if (normalized === "agent") return "agent";
+  if (["back-office", "backoffice", "back office"].includes(normalized)) return "backoffice";
+  if (["comptabilite", "compta"].includes(normalized)) return "compta";
+  if (["partenaire", "partner"].includes(normalized)) return "partner";
+
+  return roleName;
+}
+
+function getTenantRoleName(assignment: TenantRoleAssignmentAccountRow): string | null {
+  if (Array.isArray(assignment.tenant_roles)) {
+    return assignment.tenant_roles[0]?.name ?? null;
+  }
+
+  return assignment.tenant_roles?.name ?? null;
+}
 
 export default function CRMParametres() {
   const { t } = useTranslation();
@@ -354,14 +382,21 @@ export default function CRMParametres() {
       return;
     }
 
-    const [{ data: roles, error: rolesError }, { data: profiles, error: profilesError }] =
+    const [{ data: roleAssignments, error: rolesError }, { data: profiles, error: profilesError }] =
       await Promise.all([
         supabase
-          .from("user_roles")
-          .select("id, user_id, role, created_at")
+          .from("user_tenant_roles")
+          .select(`
+            id,
+            user_id,
+            assigned_at,
+            tenant_roles (
+              name
+            )
+          `)
+          .eq("tenant_id", tenantId)
           .in("user_id", allUserIds)
-          .neq("role", "client")
-          .order("created_at", { ascending: false }),
+          .order("assigned_at", { ascending: false }),
         supabase
           .from("profiles")
           .select("id, email, first_name, last_name")
@@ -381,27 +416,31 @@ export default function CRMParametres() {
       profileMap.set(profileItem.id, profileItem);
     });
 
-    // Group roles by user_id to avoid duplicate entries
+    // Group tenant roles by user_id to avoid duplicate entries
     const userMap = new Map<string, UserAccount>();
-    (roles as UserAccountRole[] | null)?.forEach((userRole) => {
-      if (!STAFF_ROLES.has(String(userRole.role))) return;
+    (roleAssignments as TenantRoleAssignmentAccountRow[] | null)?.forEach((assignment) => {
+      const roleName = getTenantRoleName(assignment);
+      if (!roleName) return;
 
-      const userId = userRole.user_id;
+      const roleKey = normalizeRoleName(roleName);
+      if (!STAFF_ROLES.has(roleKey) && roleKey === roleName) return;
+
+      const userId = assignment.user_id;
       if (!userMap.has(userId)) {
         userMap.set(userId, {
-          ...userRole,
-          role: String(userRole.role),
-          roles: [String(userRole.role)],
+          id: assignment.id,
+          user_id: userId,
+          role: roleKey,
+          created_at: assignment.assigned_at,
+          roles: [roleKey],
           profiles: profileMap.get(userId) || null,
           collaborateur: collabMap.get(userId) || null,
           isIncomplete: false,
         });
       } else {
-        // Add role to existing user
         const existing = userMap.get(userId);
-        const nextRole = String(userRole.role);
-        if (existing && !existing.roles.includes(nextRole)) {
-          existing.roles.push(nextRole);
+        if (existing && !existing.roles.includes(roleKey)) {
+          existing.roles.push(roleKey);
         }
       }
     });

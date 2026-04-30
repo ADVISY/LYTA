@@ -8,6 +8,7 @@ import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 export interface Collaborateur {
   id: string;
+  user_id: string | null;
   first_name: string | null;
   last_name: string | null;
   email: string | null;
@@ -93,7 +94,7 @@ export function useCollaborateurs() {
     buildQuery: (client) =>
       client
         .from('clients')
-        .select('id, first_name, last_name, email, mobile, status, profession, photo_url, created_at, commission_rate, commission_rate_lca, commission_rate_vie, fixed_salary, bonus_rate, contract_type, work_percentage, hire_date, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate')
+        .select('id, user_id, first_name, last_name, email, mobile, status, profession, photo_url, created_at, commission_rate, commission_rate_lca, commission_rate_vie, fixed_salary, bonus_rate, contract_type, work_percentage, hire_date, manager_id, manager_commission_rate_lca, manager_commission_rate_vie, reserve_rate')
         .eq('type_adresse', 'collaborateur')
         .eq('tenant_id', tenantId ?? '')
         .order('first_name', { ascending: true }),
@@ -184,12 +185,43 @@ export function useCollaborateurs() {
 
   const updateCollaborateur = async (id: string, data: Partial<CollaborateurFormData>) => {
     try {
+      const existingCollaborateur = collaborateursRaw.find((collaborateur) => collaborateur.id === id);
+
       const { error } = await supabase
         .from('clients')
         .update(data)
         .eq('id', id);
 
       if (error) throw error;
+
+      const nextRole = data.profession ? getAccountRoleFromProfession(data.profession) : null;
+      const previousRole = existingCollaborateur?.profession
+        ? getAccountRoleFromProfession(existingCollaborateur.profession)
+        : null;
+
+      if (tenantId && existingCollaborateur?.user_id && nextRole && nextRole !== previousRole) {
+        try {
+          await invokeSupabaseFunction('create-user-account', {
+            body: {
+              email: data.email || existingCollaborateur.email,
+              role: nextRole,
+              collaborateurId: id,
+              firstName: data.first_name || existingCollaborateur.first_name,
+              lastName: data.last_name || existingCollaborateur.last_name,
+              syncRoleOnly: true,
+              tenantId,
+            },
+          });
+        } catch (accountError) {
+          toast({
+            title: "Collaborateur modifié, rôle non synchronisé",
+            description: accountError instanceof Error
+              ? accountError.message
+              : "Impossible de synchroniser le rôle du compte utilisateur.",
+            variant: "destructive",
+          });
+        }
+      }
 
       toast({
         title: "Collaborateur modifié",

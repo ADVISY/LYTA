@@ -27,6 +27,7 @@ interface CreateUserAccountRequest {
   firstName?: string;
   lastName?: string;
   regeneratePassword?: boolean;
+  syncRoleOnly?: boolean;
   tenantId?: string;
 }
 
@@ -225,6 +226,12 @@ const TENANT_ROLE_CONFIGS: Record<string, TenantRoleConfig> = {
     ],
   },
 };
+
+const STAFF_ACCOUNT_ROLES = ["admin", "manager", "agent", "backoffice", "compta", "partner"];
+
+function getSystemTenantRoleNames(): string[] {
+  return Array.from(new Set(Object.values(TENANT_ROLE_CONFIGS).flatMap((config) => config.names)));
+}
 
 // Generate a human-readable password
 function generateReadablePassword(): string {
@@ -907,6 +914,24 @@ async function ensureUserRole(
   }
 }
 
+async function replaceUserStaffRole(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  role: string,
+): Promise<void> {
+  const { error: deleteError } = await supabaseAdmin
+    .from("user_roles")
+    .delete()
+    .eq("user_id", userId)
+    .in("role", STAFF_ACCOUNT_ROLES);
+
+  if (deleteError) {
+    throw new AuthError(`Erreur lors de la mise a jour du role: ${deleteError.message}`, 500);
+  }
+
+  await ensureUserRole(supabaseAdmin, userId, role);
+}
+
 async function ensureTenantRolePermissions(
   supabaseAdmin: ReturnType<typeof createClient>,
   roleId: string,
@@ -1003,6 +1028,40 @@ async function ensureTenantRoleAssignment(
   }
 }
 
+async function replaceTenantSystemRoleAssignment(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  tenantId: string,
+  role: string,
+  assignedBy: string,
+): Promise<void> {
+  const { data: systemRoles, error: rolesError } = await supabaseAdmin
+    .from("tenant_roles")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .in("name", getSystemTenantRoleNames());
+
+  if (rolesError) {
+    throw new AuthError(`Erreur lors de la recherche des roles tenant: ${rolesError.message}`, 500);
+  }
+
+  const roleIds = (systemRoles ?? []).map(({ id }) => id).filter(Boolean);
+  if (roleIds.length > 0) {
+    const { error: deleteError } = await supabaseAdmin
+      .from("user_tenant_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("tenant_id", tenantId)
+      .in("role_id", roleIds);
+
+    if (deleteError) {
+      throw new AuthError(`Erreur lors de la mise a jour du role tenant: ${deleteError.message}`, 500);
+    }
+  }
+
+  await ensureTenantRoleAssignment(supabaseAdmin, userId, tenantId, role, assignedBy);
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -1032,7 +1091,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, role, collaborateurId, clientId, firstName, lastName, regeneratePassword, tenantId: requestedTenantId } = requestBody;
+    const { email, role, collaborateurId, clientId, firstName, lastName, regeneratePassword, syncRoleOnly, tenantId: requestedTenantId } = requestBody;
     const targetId = collaborateurId || clientId;
     const isClientAccount = !!clientId;
 
@@ -1116,6 +1175,35 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: isClientAccount ? "Client non trouvé" : "Collaborateur non trouvé" }),
         { status: 404, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
+
+    if (syncRoleOnly) {
+      if (isClientAccount) {
+        return new Response(
+          JSON.stringify({ error: "La synchronisation de role ne concerne que les collaborateurs" }),
+          { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!targetRecord.user_id) {
+        return new Response(
+          JSON.stringify({ success: true, message: "Aucun compte utilisateur lie a synchroniser" }),
+          { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+        );
+      }
+
+      await ensureTenantAssignment(supabaseAdmin, targetRecord.user_id, tenantId, tenant as TenantRecord, role !== "client");
+      await replaceUserStaffRole(supabaseAdmin, targetRecord.user_id, role);
+      await replaceTenantSystemRoleAssignment(supabaseAdmin, targetRecord.user_id, tenantId, role, requestingUser.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          userId: targetRecord.user_id,
+          message: `Role synchronise avec ${role}`,
+        }),
+        { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
 
