@@ -134,7 +134,7 @@ export default function ClientForm() {
     if (data) {
       form.reset({
         type_adresse: (data.type_adresse as ClientFormData['type_adresse']) || "client",
-        assigned_agent_id: data.assigned_agent_id,
+        assigned_agent_id: data.assigned_agent?.id || data.assigned_agent_id,
         manager_id: (data as Record<string, unknown>).manager_id as string | null || null,
         first_name: data.first_name || "",
         last_name: data.last_name || "",

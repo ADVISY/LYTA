@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
-import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts";
+import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { getSenderAddress } from "../_shared/email-sender.ts";
 import { createLogger } from "../_shared/logger.ts";
 
@@ -700,7 +700,6 @@ async function resolveTenantId(
   requestedTenantId?: string,
 ): Promise<string> {
   if (requestedTenantId) {
-    await requireTenantAccess(userId, requestedTenantId);
     return requestedTenantId;
   }
 

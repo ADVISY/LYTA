@@ -9,8 +9,17 @@ import { translateError } from "@/lib/errorTranslations";
 const CLIENTS_PAGE_SIZE = 50;
 const CLIENTS_QUERY_TIMEOUT_MS = 12_000;
 
+type AssignedAgent = {
+  id: string;
+  user_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+};
+
 export type Client = {
   id: string;
+  tenant_id?: string | null;
   user_id?: string | null;
   assigned_agent_id?: string | null;
   first_name?: string | null;
@@ -53,12 +62,7 @@ export type Client = {
   manager_commission_rate_lca?: number | null;
   manager_commission_rate_vie?: number | null;
   reserve_rate?: number | null;
-  assigned_agent?: {
-    id: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    email: string;
-  } | null;
+  assigned_agent?: AssignedAgent | null;
 };
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -77,6 +81,101 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
         reject(error);
       });
   });
+}
+
+function addAssignedAgentsToMap(agentsByRef: Map<string, AssignedAgent>, agents: AssignedAgent[]) {
+  for (const agent of agents) {
+    agentsByRef.set(agent.id, agent);
+    if (agent.user_id) {
+      agentsByRef.set(agent.user_id, agent);
+    }
+  }
+}
+
+async function fetchCollaboratorAgentsBy(
+  column: "id" | "user_id",
+  ids: string[],
+  tenantId?: string | null
+): Promise<AssignedAgent[]> {
+  if (ids.length === 0) return [];
+
+  let query = supabase
+    .from("clients")
+    .select("id, user_id, first_name, last_name, email")
+    .eq("type_adresse", "collaborateur")
+    .in(column, ids);
+
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn("Unable to resolve assigned agents from collaborator addresses", error);
+    return [];
+  }
+
+  return (data ?? []) as AssignedAgent[];
+}
+
+async function fetchProfileAgents(ids: string[]): Promise<AssignedAgent[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, email")
+    .in("id", ids);
+
+  if (error) {
+    console.warn("Unable to resolve assigned agents from profiles", error);
+    return [];
+  }
+
+  return (data ?? []).map((profile) => ({
+    id: profile.id,
+    user_id: profile.id,
+    first_name: profile.first_name,
+    last_name: profile.last_name,
+    email: profile.email,
+  }));
+}
+
+async function withAssignedAgents(rows: Client[], tenantId?: string | null): Promise<Client[]> {
+  const assignedAgentIds = Array.from(
+    new Set(
+      rows
+        .map((client) => client.assigned_agent_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  if (assignedAgentIds.length === 0) {
+    return rows;
+  }
+
+  const agentsByRef = new Map<string, AssignedAgent>();
+
+  addAssignedAgentsToMap(
+    agentsByRef,
+    await fetchCollaboratorAgentsBy("id", assignedAgentIds, tenantId)
+  );
+
+  const missingCollaboratorIds = assignedAgentIds.filter((id) => !agentsByRef.has(id));
+  addAssignedAgentsToMap(
+    agentsByRef,
+    await fetchCollaboratorAgentsBy("user_id", missingCollaboratorIds, tenantId)
+  );
+
+  const missingProfileIds = assignedAgentIds.filter((id) => !agentsByRef.has(id));
+  addAssignedAgentsToMap(agentsByRef, await fetchProfileAgents(missingProfileIds));
+
+  return rows.map((client) => ({
+    ...client,
+    assigned_agent: client.assigned_agent_id
+      ? agentsByRef.get(client.assigned_agent_id) ?? null
+      : null,
+  }));
 }
 
 export function useClients(typeFilter?: string) {
@@ -122,8 +221,10 @@ export function useClients(typeFilter?: string) {
       throw result.error;
     }
 
+    const rows = await withAssignedAgents((result.data ?? []) as Client[], tenantId);
+
     return {
-      rows: (result.data ?? []) as Client[],
+      rows,
       count: result.count ?? 0,
     };
   }, [from, tenantId, to, typeFilter]);
@@ -276,7 +377,12 @@ export function useClients(typeFilter?: string) {
         throw clientError;
       }
 
-      return { data: client, error: null };
+      const [clientWithAssignedAgent] = await withAssignedAgents(
+        client ? [client as Client] : [],
+        (client as Client | null)?.tenant_id ?? tenantId
+      );
+
+      return { data: clientWithAssignedAgent ?? null, error: null };
     } catch (caughtError: any) {
       toast({
         title: "Erreur",
