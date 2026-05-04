@@ -39,6 +39,7 @@ const ResetPassword = () => {
   const processedUrlRef = useRef<string | null>(null);
   const completedRef = useRef(false);
   const requestedLoginSpaceRef = useRef<LoginSpace | null>(null);
+  const recoveryFlowActiveRef = useRef(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -46,13 +47,14 @@ const ResetPassword = () => {
 
       if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "PASSWORD_RECOVERY")) {
         console.log("[ResetPassword] Session ready");
+        recoveryFlowActiveRef.current = true;
         setSessionReady(true);
         setPendingRecoveryLink(null);
         setIsProcessingToken(false);
         setTokenError(null);
       }
 
-      if (event === "SIGNED_OUT" && !completedRef.current) {
+      if (event === "SIGNED_OUT" && !completedRef.current && !recoveryFlowActiveRef.current) {
         setTokenError("Votre session a expire. Veuillez demander un nouveau lien de reinitialisation.");
         setIsProcessingToken(false);
       }
@@ -91,6 +93,7 @@ const ResetPassword = () => {
           (tokenHash && tokenType === "recovery") ||
           code ||
           (accessToken && refreshToken);
+        recoveryFlowActiveRef.current = Boolean(hasRecoveryToken);
 
         console.log("[ResetPassword] Preparing token...", {
           hasAccessToken: !!accessToken,
@@ -157,6 +160,7 @@ const ResetPassword = () => {
     if (nextSession) {
       console.log("[ResetPassword] Session established successfully");
       window.history.replaceState({}, document.title, location.pathname);
+      recoveryFlowActiveRef.current = true;
       setSessionReady(true);
       setPendingRecoveryLink(null);
       setTokenError(null);

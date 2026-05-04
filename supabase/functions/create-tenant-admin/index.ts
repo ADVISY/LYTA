@@ -418,7 +418,7 @@ function generateAdminWelcomeEmail(
         </div>
         
         <div class="warning-box">
-          <p>⏰ Ce lien expire dans 24 heures. Si vous n'avez pas demandé la création de ce compte, contactez-nous immédiatement.</p>
+          <p>⏰ Ce lien expire dans 60 minutes. Si vous n'avez pas demandé la création de ce compte, contactez-nous immédiatement.</p>
         </div>
         
         <p class="text">En tant qu'administrateur, vous pourrez :</p>

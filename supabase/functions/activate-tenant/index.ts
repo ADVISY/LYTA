@@ -32,7 +32,14 @@ function buildRecoveryLink(redirectTo: string, resetData: any): string | null {
     return url.toString();
   }
 
-  return actionLink ?? null;
+  if (actionLink) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("confirmation_url", actionLink);
+    url.searchParams.set("type", "recovery");
+    return url.toString();
+  }
+
+  return null;
 }
 
 async function sendAccessEmail(email: string, tenantName: string, slug: string, resetLink: string) {
@@ -71,7 +78,7 @@ async function sendAccessEmail(email: string, tenantName: string, slug: string, 
             </a>
           </div>
           
-          <p style="color: #666; font-size: 14px;">Ce lien est valable 24 heures. Si vous n'avez pas demandé cet accès, ignorez cet email.</p>
+          <p style="color: #666; font-size: 14px;">Ce lien est valable 60 minutes. Si vous n'avez pas demandé cet accès, ignorez cet email.</p>
           
           <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
           

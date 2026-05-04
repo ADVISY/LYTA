@@ -1,7 +1,30 @@
 project_id = "shxbcszukoegvvejcpsn"
 
+[auth]
+enabled = true
+site_url = "https://app.lyta.ch"
+jwt_expiry = 3600
+additional_redirect_urls = ["https://lyta-xi.vercel.app/**", "https://app.lyta.ch/**", "https://*.lyta.ch/**"]
+
 [auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+max_frequency = "1m0s"
+otp_length = 8
 otp_expiry = 3600
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
 
 [functions.ai-chat]
 verify_jwt = false
