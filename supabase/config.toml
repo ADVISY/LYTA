@@ -1,5 +1,8 @@
 project_id = "shxbcszukoegvvejcpsn"
 
+[auth.email]
+otp_expiry = 3600
+
 [functions.ai-chat]
 verify_jwt = false
 
@@ -48,6 +51,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.delete-tenant]
+verify_jwt = false
+
+[functions.delete-user-account]
 verify_jwt = false
 
 [functions.export-tenant-data]

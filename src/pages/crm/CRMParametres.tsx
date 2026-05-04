@@ -15,7 +15,7 @@ import {
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
   Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
-  CreditCard, Briefcase, MapPin
+  CreditCard, Briefcase, MapPin, RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +87,13 @@ interface UserAccount {
   roles: string[];
   collaborateur: CollaboratorLink | null;
   isIncomplete: boolean;
+}
+
+interface UserAccessTarget {
+  userId: string;
+  name: string;
+  email: string | null;
+  collaborateurId?: string;
 }
 
 interface ClientAddress extends ClientAccountRow {
@@ -238,14 +245,15 @@ export default function CRMParametres() {
   const [accountSubTab, setAccountSubTab] = useState<"utilisateurs" | "collaborateurs" | "adresses">("utilisateurs");
   const [newAccount, setNewAccount] = useState({
     email: "",
-    password: "",
-    confirmPassword: "",
     role: "agent",
     collaborateurId: "",
   });
-  const [showNewPassword, setShowNewPassword] = useState(false);
   
   // État pour suppression/reset du compte client
+  const [deletingUserAccountId, setDeletingUserAccountId] = useState<string | null>(null);
+  const [resettingPasswordUserId, setResettingPasswordUserId] = useState<string | null>(null);
+  const [confirmDeleteUserDialog, setConfirmDeleteUserDialog] = useState(false);
+  const [userAccessToDelete, setUserAccessToDelete] = useState<UserAccessTarget | null>(null);
   const [deletingClientAccountId, setDeletingClientAccountId] = useState<string | null>(null);
   const [resettingPasswordClientId, setResettingPasswordClientId] = useState<string | null>(null);
   const [confirmDeleteClientDialog, setConfirmDeleteClientDialog] = useState(false);
@@ -710,14 +718,6 @@ export default function CRMParametres() {
       toast.error(t('settings.invalidEmail') || "Format d'email invalide");
       return;
     }
-    if (!newAccount.password || newAccount.password.length < 8) {
-      toast.error(t('settings.passwordTooShort'));
-      return;
-    }
-    if (newAccount.password !== newAccount.confirmPassword) {
-      toast.error(t('settings.passwordMismatch'));
-      return;
-    }
     if (!newAccount.collaborateurId) {
       toast.error(t('settings.selectCollaborator'));
       return;
@@ -731,7 +731,6 @@ export default function CRMParametres() {
       await invokeSupabaseFunction("create-user-account", {
         body: {
           email: newAccount.email,
-          password: newAccount.password,
           role: newAccount.role,
           collaborateurId: newAccount.collaborateurId,
           firstName: selectedCollab?.first_name,
@@ -744,8 +743,6 @@ export default function CRMParametres() {
       setIsAddingAccount(false);
       setNewAccount({
         email: "",
-        password: "",
-        confirmPassword: "",
         role: "agent",
         collaborateurId: "",
       });
@@ -760,17 +757,99 @@ export default function CRMParametres() {
     }
   };
 
+  const getUserAccountName = (account: UserAccount): string => {
+    const name = [
+      account.profiles?.first_name || account.collaborateur?.first_name,
+      account.profiles?.last_name || account.collaborateur?.last_name,
+    ].filter(Boolean).join(" ");
+
+    return name || account.profiles?.email || account.collaborateur?.email || "Utilisateur";
+  };
+
+  const getUserAccountEmail = (account: UserAccount): string | null => (
+    account.profiles?.email || account.collaborateur?.email || null
+  );
+
+  const getUserAccessTargetFromAccount = (account: UserAccount): UserAccessTarget => ({
+    userId: account.user_id,
+    name: getUserAccountName(account),
+    email: getUserAccountEmail(account),
+    collaborateurId: account.collaborateur?.id,
+  });
+
+  const getUserAccessTargetFromCollaborator = (collaborateur: CollaboratorAccountRow): UserAccessTarget | null => {
+    if (!collaborateur.user_id) return null;
+
+    return {
+      userId: collaborateur.user_id,
+      name: [collaborateur.first_name, collaborateur.last_name].filter(Boolean).join(" ") || collaborateur.email || "Collaborateur",
+      email: collaborateur.email,
+      collaborateurId: collaborateur.id,
+    };
+  };
+
+  const handleResendUserInvitation = async (target: UserAccessTarget) => {
+    if (!target.email) {
+      toast.error("Aucun email trouve pour cet utilisateur");
+      return;
+    }
+
+    setResettingPasswordUserId(target.userId);
+    try {
+      await invokeSupabaseFunction("send-password-reset", {
+        body: {
+          email: target.email,
+          redirectUrl: `${window.location.origin}/reset-password?space=team`,
+        },
+      });
+
+      toast.success("Lien d'invitation renvoye");
+    } catch (error: unknown) {
+      console.error("Error resending user invitation:", error);
+      toast.error(getErrorMessage(error, t('common.error')));
+    } finally {
+      setResettingPasswordUserId(null);
+    }
+  };
+
+  const handleDeleteUserAccount = async (target: UserAccessTarget) => {
+    setDeletingUserAccountId(target.userId);
+    try {
+      await invokeSupabaseFunction("delete-user-account", {
+        body: {
+          userId: target.userId,
+          collaborateurId: target.collaborateurId,
+          accountType: "collaborateur",
+          tenantId,
+        },
+      });
+
+      toast.success("Acces utilisateur supprime");
+      setConfirmDeleteUserDialog(false);
+      setUserAccessToDelete(null);
+      loadUserAccounts();
+      loadCollaborateurs();
+      tenantSeats.refresh();
+    } catch (error: unknown) {
+      console.error("Error deleting user account:", error);
+      toast.error(getErrorMessage(error, t('common.error')));
+    } finally {
+      setDeletingUserAccountId(null);
+    }
+  };
+
   // Supprimer le compte client (retirer user_id et supprimer l'utilisateur auth)
   const handleDeleteClientAccount = async (client: ClientAddress) => {
     setDeletingClientAccountId(client.id);
     try {
-      // Retirer le user_id du client
-      const { error: updateError } = await supabase
-        .from("clients")
-        .update({ user_id: null })
-        .eq("id", client.id);
-
-      if (updateError) throw updateError;
+      await invokeSupabaseFunction("delete-user-account", {
+        body: {
+          userId: client.user_id,
+          clientId: client.id,
+          accountType: "client",
+          tenantId,
+        },
+      });
 
       toast.success(t('settings.clientAccountDeleted'));
       setConfirmDeleteClientDialog(false);
@@ -794,19 +873,12 @@ export default function CRMParametres() {
 
     setResettingPasswordClientId(client.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Non authentifié");
 
-      // Appeler l'edge function pour recréer un mot de passe et l'envoyer
-      await invokeSupabaseFunction('create-user-account', {
+      // Appeler l'edge function pour renvoyer un lien de mot de passe
+      await invokeSupabaseFunction('send-password-reset', {
         body: {
           email: clientEmail,
-          role: 'client',
-          clientId: client.id,
-          firstName: client.first_name,
-          lastName: client.last_name,
-          regeneratePassword: true,
-          tenantId,
+          redirectUrl: `${window.location.origin}/reset-password?space=client`,
         },
       });
 
@@ -1153,6 +1225,7 @@ export default function CRMParametres() {
                         <TableHead>{t('collaborators.role')}</TableHead>
                         <TableHead>{t('settings.linkedCollaborator')}</TableHead>
                         <TableHead>{t('settings.createdAt')}</TableHead>
+                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1194,11 +1267,41 @@ export default function CRMParametres() {
                           <TableCell className="text-muted-foreground text-sm">
                             {new Date(account.created_at).toLocaleDateString("fr-CH")}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Renvoyer le lien"
+                                onClick={() => handleResendUserInvitation(getUserAccessTargetFromAccount(account))}
+                                disabled={resettingPasswordUserId === account.user_id}
+                              >
+                                {resettingPasswordUserId === account.user_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                title="Supprimer l'acces"
+                                onClick={() => {
+                                  setUserAccessToDelete(getUserAccessTargetFromAccount(account));
+                                  setConfirmDeleteUserDialog(true);
+                                }}
+                                disabled={account.user_id === user?.id}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {userAccounts.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                             Aucun utilisateur CRM dans ce cabinet
                           </TableCell>
                         </TableRow>
@@ -1258,36 +1361,6 @@ export default function CRMParametres() {
                         value={newAccount.email}
                         onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
                         placeholder="email@exemple.com"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Mot de passe *</Label>
-                      <div className="relative">
-                        <Input 
-                          type={showNewPassword ? "text" : "password"}
-                          value={newAccount.password}
-                          onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
-                          placeholder="Minimum 8 caractères"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                        >
-                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Confirmer le mot de passe *</Label>
-                      <Input 
-                        type={showNewPassword ? "text" : "password"}
-                        value={newAccount.confirmPassword}
-                        onChange={(e) => setNewAccount({ ...newAccount, confirmPassword: e.target.value })}
-                        placeholder="Confirmer le mot de passe"
                       />
                     </div>
 
@@ -1370,6 +1443,7 @@ export default function CRMParametres() {
                       <TableHead>{t('common.status')}</TableHead>
                       <TableHead>Acces CRM</TableHead>
                       <TableHead>{t('settings.createdAt')}</TableHead>
+                      <TableHead className="text-right">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1401,11 +1475,51 @@ export default function CRMParametres() {
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(collaborateur.created_at).toLocaleDateString("fr-CH")}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {collaborateur.user_id ? (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Renvoyer le lien"
+                                onClick={() => {
+                                  const target = getUserAccessTargetFromCollaborator(collaborateur);
+                                  if (target) handleResendUserInvitation(target);
+                                }}
+                                disabled={resettingPasswordUserId === collaborateur.user_id}
+                              >
+                                {resettingPasswordUserId === collaborateur.user_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                title="Supprimer l'acces"
+                                onClick={() => {
+                                  const target = getUserAccessTargetFromCollaborator(collaborateur);
+                                  if (target) {
+                                    setUserAccessToDelete(target);
+                                    setConfirmDeleteUserDialog(true);
+                                  }
+                                }}
+                                disabled={collaborateur.user_id === user?.id}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {collaboratorRows.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           Aucun collaborateur trouve
                         </TableCell>
                       </TableRow>
@@ -1522,6 +1636,42 @@ export default function CRMParametres() {
               </CardContent>
             </Card>
           )}
+
+          <Dialog open={confirmDeleteUserDialog} onOpenChange={setConfirmDeleteUserDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Supprimer cet acces utilisateur ?</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-muted-foreground">
+                  Voulez-vous vraiment supprimer l'acces CRM de {userAccessToDelete?.name} ?
+                  Le collaborateur ne pourra plus se connecter a ce cabinet.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setConfirmDeleteUserDialog(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => userAccessToDelete && handleDeleteUserAccount(userAccessToDelete)}
+                    disabled={deletingUserAccountId === userAccessToDelete?.userId}
+                  >
+                    {deletingUserAccountId === userAccessToDelete?.userId ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {t('common.deleting')}
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t('common.delete')}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Dialog de confirmation de suppression */}
           <Dialog open={confirmDeleteClientDialog} onOpenChange={setConfirmDeleteClientDialog}>

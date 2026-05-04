@@ -49,7 +49,14 @@ function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
     return url.toString();
   }
 
-  return actionLink ?? null;
+  if (actionLink) {
+    const url = new URL(redirectTo);
+    url.searchParams.set("confirmation_url", actionLink);
+    url.searchParams.set("type", "recovery");
+    return url.toString();
+  }
+
+  return null;
 }
 
 // Default roles configuration for new tenants

@@ -433,8 +433,11 @@ const handler = async (req: Request): Promise<Response> => {
       resetLink = url.toString();
       log.info("Reset link generated successfully (token_hash flow)");
     } else if (actionLink) {
-      resetLink = actionLink;
-      log.info("Reset link generated successfully (action_link flow)");
+      const url = new URL(resolvedRedirectUrl);
+      url.searchParams.set('confirmation_url', actionLink);
+      url.searchParams.set('type', 'recovery');
+      resetLink = url.toString();
+      log.info("Reset link generated successfully (deferred action_link flow)");
     }
 
     if (!resetLink) {
