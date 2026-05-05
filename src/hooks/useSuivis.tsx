@@ -55,7 +55,7 @@ export const suiviTypeLabels: Record<SuiviType, string> = {
   activation: "Activation",
   annulation: "Annulation",
   retour: "Retour",
-  resiliation: "RÃ©siliation",
+  resiliation: "Résiliation",
   sinistre: "Sinistre",
   autre: "Autre",
 };
@@ -63,7 +63,7 @@ export const suiviTypeLabels: Record<SuiviType, string> = {
 export const suiviStatusLabels: Record<SuiviStatus, string> = {
   ouvert: "Ouvert",
   en_cours: "En cours",
-  ferme: "FermÃ©",
+  ferme: "Fermé",
 };
 
 export const suiviStatusColors: Record<SuiviStatus, string> = {
@@ -123,7 +123,7 @@ export function useSuivis(clientId?: string) {
   const createSuivi = async (data: CreateSuiviData): Promise<{ data: Suivi | null; error: string | null }> => {
     try {
       if (!tenantId) {
-        throw new Error("Aucun cabinet assignÃ© Ã  cet utilisateur");
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
       const { data: newSuivi, error } = await supabase
@@ -165,8 +165,8 @@ export function useSuivis(clientId?: string) {
       });
 
       toast({
-        title: "SuccÃ¨s",
-        description: "Suivi crÃ©Ã© avec succÃ¨s",
+        title: "Succès",
+        description: "Suivi créé avec succès",
       });
 
       refetch();
@@ -223,8 +223,8 @@ export function useSuivis(clientId?: string) {
       });
 
       toast({
-        title: "SuccÃ¨s",
-        description: "Suivi mis Ã  jour avec succÃ¨s",
+        title: "Succès",
+        description: "Suivi mis à jour avec succès",
       });
 
       refetch();
@@ -282,8 +282,8 @@ export function useSuivis(clientId?: string) {
       });
 
       toast({
-        title: "SuccÃ¨s",
-        description: "Suivi supprimÃ© avec succÃ¨s",
+        title: "Succès",
+        description: "Suivi supprimé avec succès",
       });
 
       refetch();

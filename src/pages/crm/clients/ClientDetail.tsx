@@ -307,8 +307,8 @@ export default function ClientDetail() {
   const handleCreateClientAccount = async () => {
     if (!canManageClientPortal) {
       toast({
-        title: "Acces refuse",
-        description: "Vous n'avez pas les droits pour creer ce compte.",
+        title: "Accès refusé",
+        description: "Vous n'avez pas les droits pour créer ce compte.",
         variant: "destructive",
       });
       return;
@@ -359,7 +359,7 @@ export default function ClientDetail() {
   const handleResendInvitation = async () => {
     if (!canManageClientPortal) {
       toast({
-        title: "Acces refuse",
+        title: "Accès refusé",
         description: "Vous n'avez pas les droits pour renvoyer une invitation.",
         variant: "destructive",
       });

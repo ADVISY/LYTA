@@ -50,7 +50,7 @@ function getRecoveryErrorMessage(
 
   const normalized = `${errorCode ?? ""} ${errorDescription ?? ""}`.toLowerCase();
   if (normalized.includes("expired") || normalized.includes("invalid") || normalized.includes("otp")) {
-    return "Le lien de reinitialisation est invalide ou expire. Veuillez demander un nouveau lien.";
+    return "Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.";
   }
 
   return errorDescription || "Une erreur est survenue lors du traitement du lien.";
@@ -105,7 +105,7 @@ const ResetPassword = () => {
       }
 
       if (event === "SIGNED_OUT" && !completedRef.current && !recoveryFlowActiveRef.current) {
-        setTokenError("Votre session a expire. Veuillez demander un nouveau lien de reinitialisation.");
+        setTokenError("Votre session a expiré. Veuillez demander un nouveau lien de réinitialisation.");
         setIsProcessingToken(false);
       }
     });
@@ -191,7 +191,7 @@ const ResetPassword = () => {
           recoverySessionRef.current = session;
           setSessionReady(true);
         } else {
-          setTokenError("Aucun lien de reinitialisation valide trouve. Veuillez demander un nouveau lien depuis la page de connexion.");
+          setTokenError("Aucun lien de réinitialisation valide trouvé. Veuillez demander un nouveau lien depuis la page de connexion.");
         }
       } catch (err) {
         console.error("[ResetPassword] Error preparing recovery token:", err);
@@ -226,7 +226,7 @@ const ResetPassword = () => {
     }
 
     console.error("[ResetPassword] No session after recovery verification");
-    setTokenError("Le lien de reinitialisation est invalide ou expire.");
+    setTokenError("Le lien de réinitialisation est invalide ou expiré.");
   };
 
   const getActiveRecoverySession = async (): Promise<Session | null> => {
@@ -297,7 +297,7 @@ const ResetPassword = () => {
         const { data, error } = await supabase.auth.exchangeCodeForSession(pendingRecoveryLink.code);
         if (error) {
           console.error("[ResetPassword] Error exchanging code:", error);
-          setTokenError("Le lien de reinitialisation est invalide ou expire. Veuillez demander un nouveau lien.");
+          setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
           return;
         }
 
@@ -312,7 +312,7 @@ const ResetPassword = () => {
 
       if (error) {
         console.error("[ResetPassword] Error setting session:", error);
-        setTokenError("Le lien de reinitialisation est invalide ou expire. Veuillez demander un nouveau lien.");
+        setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
         return;
       }
 
@@ -340,7 +340,7 @@ const ResetPassword = () => {
     if (password.length < 6) {
       toast({
         title: "Erreur",
-        description: "Le mot de passe doit contenir au moins 6 caracteres.",
+        description: "Le mot de passe doit contenir au moins 6 caractères.",
         variant: "destructive",
       });
       return;
@@ -364,10 +364,10 @@ const ResetPassword = () => {
         console.error("[ResetPassword] No session found at submit time");
         toast({
           title: "Erreur",
-          description: "Votre session a expire. Veuillez demander un nouveau lien de reinitialisation.",
+          description: "Votre session a expiré. Veuillez demander un nouveau lien de réinitialisation.",
           variant: "destructive",
         });
-        setTokenError("Votre session a expire. Veuillez demander un nouveau lien de reinitialisation.");
+        setTokenError("Votre session a expiré. Veuillez demander un nouveau lien de réinitialisation.");
         return;
       }
 
@@ -385,8 +385,8 @@ const ResetPassword = () => {
       } else {
         console.log("[ResetPassword] Password updated successfully");
         toast({
-          title: "Mot de passe cree",
-          description: "Votre mot de passe a ete cree avec succes. Vous pouvez maintenant vous connecter.",
+          title: "Mot de passe créé",
+          description: "Votre mot de passe a été créé avec succès. Vous pouvez maintenant vous connecter.",
         });
 
         completedRef.current = true;
@@ -412,7 +412,7 @@ const ResetPassword = () => {
       <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Verification du lien...</p>
+          <p className="text-muted-foreground">Vérification du lien...</p>
         </div>
       </div>
     );
@@ -439,7 +439,7 @@ const ResetPassword = () => {
               {isVerifyingLink ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Verification...
+                  Vérification...
                 </>
               ) : (
                 "Continuer"
@@ -460,7 +460,7 @@ const ResetPassword = () => {
           </div>
 
           <div className="w-full max-w-md p-8 rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-xl text-center">
-            <h2 className="text-xl font-bold text-foreground mb-4">Lien expire</h2>
+            <h2 className="text-xl font-bold text-foreground mb-4">Lien expiré</h2>
             <p className="text-muted-foreground mb-6">{tokenError}</p>
             <Button
               onClick={() => {
@@ -469,7 +469,7 @@ const ResetPassword = () => {
               }}
               className="w-full"
             >
-              Retour a la connexion
+              Retour à la connexion
             </Button>
           </div>
         </main>
@@ -486,8 +486,8 @@ const ResetPassword = () => {
 
         <div className="w-full max-w-md p-8 rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-xl">
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-foreground">Creer votre mot de passe</h2>
-            <p className="text-sm text-muted-foreground">Definissez un mot de passe securise pour acceder a votre espace</p>
+            <h2 className="text-xl font-bold text-foreground">Créer votre mot de passe</h2>
+            <p className="text-sm text-muted-foreground">Définissez un mot de passe sécurisé pour accéder à votre espace</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -520,7 +520,7 @@ const ResetPassword = () => {
               disabled={loading}
               className="w-full mt-6"
             >
-              {loading ? "Creation en cours..." : "Creer mon mot de passe"}
+              {loading ? "Création en cours..." : "Créer mon mot de passe"}
             </Button>
           </form>
         </div>

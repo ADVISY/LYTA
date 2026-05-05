@@ -214,7 +214,7 @@ export function useClients(typeFilter?: string) {
     const result = await withTimeout(
       query.range(from, to),
       CLIENTS_QUERY_TIMEOUT_MS,
-      "Le chargement des adresses a expire."
+      "Le chargement des adresses a expiré."
     );
 
     if (result.error) {
@@ -279,7 +279,7 @@ export function useClients(typeFilter?: string) {
   const createClient = async (clientData: any) => {
     try {
       if (!tenantId) {
-        throw new Error("Aucun cabinet assigne a cet utilisateur");
+        throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
       const { data: createdClient, error: createError } = await supabase
@@ -293,8 +293,8 @@ export function useClients(typeFilter?: string) {
       }
 
       toast({
-        title: "Client cree",
-        description: "Le client a ete cree avec succes",
+        title: "Client créé",
+        description: "Le client a été créé avec succès",
       });
 
       await refreshClients();
@@ -321,8 +321,8 @@ export function useClients(typeFilter?: string) {
       }
 
       toast({
-        title: "Client mis a jour",
-        description: "Les modifications ont ete enregistrees",
+        title: "Client mis à jour",
+        description: "Les modifications ont été enregistrées",
       });
 
       await refreshClients();
@@ -349,8 +349,8 @@ export function useClients(typeFilter?: string) {
       }
 
       toast({
-        title: "Client supprime",
-        description: "Le client a ete supprime avec succes",
+        title: "Client supprimé",
+        description: "Le client a été supprimé avec succès",
       });
 
       await refreshClients();

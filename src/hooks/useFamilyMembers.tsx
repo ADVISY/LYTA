@@ -261,8 +261,8 @@ export function useFamilyMembers(clientId?: string) {
       });
 
       toast({
-        title: "Membre ajoutÃ©",
-        description: "Le membre de la famille a Ã©tÃ© ajoutÃ© avec succÃ¨s"
+        title: "Membre ajouté",
+        description: "Le membre de la famille a été ajouté avec succès"
       });
 
       await fetchFamilyMembers(memberData.client_id);
@@ -297,8 +297,8 @@ export function useFamilyMembers(clientId?: string) {
       });
 
       toast({
-        title: "Membre mis Ã  jour",
-        description: "Les modifications ont Ã©tÃ© enregistrÃ©es"
+        title: "Membre mis à jour",
+        description: "Les modifications ont été enregistrées"
       });
 
       await fetchFamilyMembers(clientId);
@@ -337,8 +337,8 @@ export function useFamilyMembers(clientId?: string) {
       });
 
       toast({
-        title: "Membre supprimÃ©",
-        description: "Le membre de la famille a Ã©tÃ© supprimÃ© avec succÃ¨s"
+        title: "Membre supprimé",
+        description: "Le membre de la famille a été supprimé avec succès"
       });
 
       await fetchFamilyMembers(clientId);

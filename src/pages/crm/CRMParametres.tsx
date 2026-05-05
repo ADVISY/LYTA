@@ -790,7 +790,7 @@ export default function CRMParametres() {
 
   const handleResendUserInvitation = async (target: UserAccessTarget) => {
     if (!target.email) {
-      toast.error("Aucun email trouve pour cet utilisateur");
+      toast.error("Aucun email trouvé pour cet utilisateur");
       return;
     }
 
@@ -803,7 +803,7 @@ export default function CRMParametres() {
         },
       });
 
-      toast.success("Lien d'invitation renvoye");
+      toast.success("Lien d'invitation renvoyé");
     } catch (error: unknown) {
       console.error("Error resending user invitation:", error);
       toast.error(getErrorMessage(error, t('common.error')));
@@ -824,7 +824,7 @@ export default function CRMParametres() {
         },
       });
 
-      toast.success("Acces utilisateur supprime");
+      toast.success("Accès utilisateur supprimé");
       setConfirmDeleteUserDialog(false);
       setUserAccessToDelete(null);
       loadUserAccounts();
@@ -1190,7 +1190,7 @@ export default function CRMParametres() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Les utilisateurs sont les collaborateurs qui disposent d'un acces CRM. Les comptes client des adresses restent gratuits et sont visibles dans l'onglet Adresses.
+                  Les utilisateurs sont les collaborateurs qui disposent d'un accès CRM. Les comptes client des adresses restent gratuits et sont visibles dans l'onglet Adresses.
                 </AlertDescription>
               </Alert>
 
@@ -1286,7 +1286,7 @@ export default function CRMParametres() {
                                 size="icon"
                                 variant="ghost"
                                 className="text-destructive hover:text-destructive"
-                                title="Supprimer l'acces"
+                                title="Supprimer l'accès"
                                 onClick={() => {
                                   setUserAccessToDelete(getUserAccessTargetFromAccount(account));
                                   setConfirmDeleteUserDialog(true);
@@ -1441,7 +1441,7 @@ export default function CRMParametres() {
                       <TableHead>{t('common.email')}</TableHead>
                       <TableHead>{t('collaborators.function')}</TableHead>
                       <TableHead>{t('common.status')}</TableHead>
-                      <TableHead>Acces CRM</TableHead>
+                      <TableHead>Accès CRM</TableHead>
                       <TableHead>{t('settings.createdAt')}</TableHead>
                       <TableHead className="text-right">{t('common.actions')}</TableHead>
                     </TableRow>
@@ -1469,7 +1469,7 @@ export default function CRMParametres() {
                           {collaborateur.user_id ? (
                             <Badge className="bg-emerald-600 text-white">Utilisateur lie</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-amber-300 text-amber-700">Sans acces</Badge>
+                            <Badge variant="outline" className="border-amber-300 text-amber-700">Sans accès</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
@@ -1498,7 +1498,7 @@ export default function CRMParametres() {
                                 size="icon"
                                 variant="ghost"
                                 className="text-destructive hover:text-destructive"
-                                title="Supprimer l'acces"
+                                title="Supprimer l'accès"
                                 onClick={() => {
                                   const target = getUserAccessTargetFromCollaborator(collaborateur);
                                   if (target) {
@@ -1520,7 +1520,7 @@ export default function CRMParametres() {
                     {collaboratorRows.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                          Aucun collaborateur trouve
+                          Aucun collaborateur trouvé
                         </TableCell>
                       </TableRow>
                     )}
@@ -1627,7 +1627,7 @@ export default function CRMParametres() {
                     {clientAddresses.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                          Aucune adresse trouvee
+                          Aucune adresse trouvée
                         </TableCell>
                       </TableRow>
                     )}
@@ -1640,12 +1640,12 @@ export default function CRMParametres() {
           <Dialog open={confirmDeleteUserDialog} onOpenChange={setConfirmDeleteUserDialog}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Supprimer cet acces utilisateur ?</DialogTitle>
+                <DialogTitle>Supprimer cet accès utilisateur ?</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Voulez-vous vraiment supprimer l'acces CRM de {userAccessToDelete?.name} ?
-                  Le collaborateur ne pourra plus se connecter a ce cabinet.
+                  Voulez-vous vraiment supprimer l'accès CRM de {userAccessToDelete?.name} ?
+                  Le collaborateur ne pourra plus se connecter à ce cabinet.
                 </p>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => setConfirmDeleteUserDialog(false)}>

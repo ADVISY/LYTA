@@ -99,7 +99,7 @@ export function usePolicies() {
 
   const createPolicy = async (policyData: any) => {
     if (!tenantId) {
-      throw new Error('Aucun cabinet assigne a cet utilisateur');
+      throw new Error('Aucun cabinet assigné à cet utilisateur');
     }
 
     const data = await savePolicy({
@@ -118,7 +118,7 @@ export function usePolicies() {
 
   const updatePolicy = async (id: string, updates: any) => {
     if (!tenantId) {
-      throw new Error('Aucun cabinet assigne a cet utilisateur');
+      throw new Error('Aucun cabinet assigné à cet utilisateur');
     }
 
     await savePolicy({
@@ -141,8 +141,8 @@ export function usePolicies() {
       if (error) throw error;
 
       toast({
-        title: 'Police supprimee',
-        description: "La police d'assurance a ete supprimee avec succes",
+        title: 'Police supprimée',
+        description: "La police d'assurance a été supprimée avec succès",
       });
 
       refetch();

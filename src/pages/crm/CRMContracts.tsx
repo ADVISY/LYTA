@@ -101,7 +101,7 @@ export default function CRMContracts() {
         console.error('Error loading clients for contract creation:', error);
         toast({
           title: t('common.error'),
-          description: "Impossible de charger les clients pour creer un contrat.",
+          description: "Impossible de charger les clients pour créer un contrat.",
           variant: 'destructive',
         });
         setClientOptions([]);
@@ -131,7 +131,7 @@ export default function CRMContracts() {
     if (!canCreateContract) {
       toast({
         title: t('common.error'),
-        description: "Vous n'avez pas les permissions pour creer un contrat.",
+        description: "Vous n'avez pas les permissions pour créer un contrat.",
         variant: 'destructive',
       });
       return;
@@ -334,7 +334,7 @@ export default function CRMContracts() {
                 </div>
               ) : (
                 <>
-                  <CommandEmpty>Aucun client trouve.</CommandEmpty>
+                  <CommandEmpty>Aucun client trouvé.</CommandEmpty>
                   <CommandGroup>
                     {clientOptions.map((client) => (
                       <CommandItem
@@ -370,7 +370,7 @@ export default function CRMContracts() {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Creer un client
+              Créer un client
             </Button>
           )}
         </DialogContent>

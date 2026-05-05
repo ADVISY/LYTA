@@ -555,7 +555,7 @@ export default function DeposerContrat() {
         {!selectedCompanyId ? (
           <p className="text-sm text-muted-foreground">Choisissez d'abord une compagnie.</p>
         ) : filteredProducts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun produit trouve pour cette compagnie.</p>
+          <p className="text-sm text-muted-foreground">Aucun produit trouvé pour cette compagnie.</p>
         ) : (
           <div className={`grid grid-cols-1 md:grid-cols-2 gap-2 ${formErrors.catalogProducts ? 'rounded-lg ring-2 ring-destructive p-2' : ''}`}>
             {filteredProducts.map(product => {

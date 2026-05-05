@@ -127,7 +127,7 @@ export default function KingSecurity() {
       setNewIp("");
       setNewIpLabel("");
       queryClient.invalidateQueries({ queryKey: ["king-ip-whitelist"] });
-      toast({ title: "IP ajoutÃ©e", description: `${newIp} a Ã©tÃ© ajoutÃ©e Ã  la whitelist.` });
+      toast({ title: "IP ajoutée", description: `${newIp} a été ajoutée à la whitelist.` });
     } catch (error: any) {
       console.error("Error adding IP:", error);
       toast({
@@ -150,7 +150,7 @@ export default function KingSecurity() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["king-ip-whitelist"] });
-      toast({ title: "IP supprimÃ©e", description: "L'adresse IP a Ã©tÃ© retirÃ©e de la whitelist." });
+      toast({ title: "IP supprimée", description: "L'adresse IP a été retirée de la whitelist." });
     } catch (error: any) {
       console.error("Error deleting IP:", error);
       toast({
@@ -190,8 +190,8 @@ export default function KingSecurity() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">SÃ©curitÃ© Plateforme</h1>
-        <p className="text-muted-foreground">ParamÃ¨tres de sÃ©curitÃ© globaux de LYTA</p>
+        <h1 className="text-3xl font-bold">Sécurité Plateforme</h1>
+        <p className="text-muted-foreground">Paramètres de sécurité globaux de LYTA</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -230,7 +230,7 @@ export default function KingSecurity() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Lock className="h-5 w-5 text-amber-500" />
-              AccÃ¨s
+              Accès
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -238,7 +238,7 @@ export default function KingSecurity() {
               <div>
                 <p className="font-medium">IP Whitelist</p>
                 <p className="text-sm text-muted-foreground">
-                  Limiter accÃ¨s par adresses IP
+                  Limiter accès par adresses IP
                 </p>
               </div>
               <Switch
@@ -331,7 +331,7 @@ export default function KingSecurity() {
               <div className="text-center py-8">
                 <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">
-                  Aucune entrÃ©e d'audit pour le moment
+                  Aucune entrée d'audit pour le moment
                 </p>
               </div>
             ) : (
@@ -369,7 +369,7 @@ export default function KingSecurity() {
           disabled={saving}
         >
           <Shield className="h-4 w-4 mr-2" />
-          {saving ? "Sauvegarde..." : "Sauvegarder la sÃ©curitÃ©"}
+          {saving ? "Sauvegarde..." : "Sauvegarder la sécurité"}
         </Button>
       </div>
     </div>
