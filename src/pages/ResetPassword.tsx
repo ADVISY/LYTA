@@ -19,16 +19,7 @@ type PendingRecoveryLink =
   | { kind: "session"; accessToken: string; refreshToken: string }
   | { kind: "confirmation_url"; url: string };
 
-const RECOVERY_URL_PARAMS = [
-  "token_hash",
-  "confirmation_url",
-  "code",
-  "access_token",
-  "refresh_token",
-  "error",
-  "error_code",
-  "error_description",
-];
+const RECOVERY_SESSION_STORAGE_KEY = "lyta_recovery_session";
 
 function getRequestedLoginSpace(search: string): LoginSpace | null {
   const params = new URLSearchParams(search);
@@ -56,20 +47,66 @@ function getRecoveryErrorMessage(
   return errorDescription || "Une erreur est survenue lors du traitement du lien.";
 }
 
-function buildSupabaseRecoveryActionUrl(tokenHash: string, currentHref: string): string {
-  const redirectUrl = new URL(currentHref);
+function getTokenHashFromConfirmationUrl(confirmationUrl: string): string | null {
+  try {
+    const url = new URL(confirmationUrl);
+    const supabaseOrigin = new URL(supabaseConfig.url).origin;
 
-  RECOVERY_URL_PARAMS.forEach((param) => redirectUrl.searchParams.delete(param));
-  redirectUrl.hash = "";
-  redirectUrl.searchParams.set("type", "recovery");
-  redirectUrl.searchParams.set("verify_fallback", "1");
+    if (url.origin !== supabaseOrigin) {
+      return null;
+    }
 
-  const verifyUrl = new URL("/auth/v1/verify", supabaseConfig.url);
-  verifyUrl.searchParams.set("token", tokenHash);
-  verifyUrl.searchParams.set("type", "recovery");
-  verifyUrl.searchParams.set("redirect_to", redirectUrl.toString());
+    const type = url.searchParams.get("type");
+    const token = url.searchParams.get("token_hash") ?? url.searchParams.get("token");
 
-  return verifyUrl.toString();
+    return token && (!type || type === "recovery") ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveRecoverySession(session: Session | null) {
+  if (!session) return;
+
+  try {
+    sessionStorage.setItem(RECOVERY_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Session persistence is best-effort; Supabase local storage remains the source of truth.
+  }
+}
+
+function readRecoverySession(): Session | null {
+  try {
+    const rawValue = sessionStorage.getItem(RECOVERY_SESSION_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const session = JSON.parse(rawValue) as Session;
+    return session?.access_token ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearRecoverySession() {
+  sessionStorage.removeItem(RECOVERY_SESSION_STORAGE_KEY);
+}
+
+async function restoreSupabaseSession(session: Session | null): Promise<Session | null> {
+  if (!session?.access_token || !session.refresh_token) {
+    return null;
+  }
+
+  const { data, error } = await supabase.auth.setSession({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  });
+
+  if (error) {
+    console.error("[ResetPassword] Error restoring Supabase session:", error);
+    return null;
+  }
+
+  return data.session;
 }
 
 const ResetPassword = () => {
@@ -98,6 +135,7 @@ const ResetPassword = () => {
         console.log("[ResetPassword] Session ready");
         recoveryFlowActiveRef.current = true;
         recoverySessionRef.current = session;
+        saveRecoverySession(session);
         setSessionReady(true);
         setPendingRecoveryLink(null);
         setIsProcessingToken(false);
@@ -134,6 +172,7 @@ const ResetPassword = () => {
 
         const recoveryErrorMessage = getRecoveryErrorMessage(queryParams, hashParams);
         if (recoveryErrorMessage) {
+          clearRecoverySession();
           setTokenError(recoveryErrorMessage);
           return;
         }
@@ -162,9 +201,16 @@ const ResetPassword = () => {
 
         if (hasRecoveryToken) {
           clearSessionEnforcerState();
+          clearRecoverySession();
         }
 
         if (confirmationUrl) {
+          const tokenFromConfirmationUrl = getTokenHashFromConfirmationUrl(confirmationUrl);
+          if (tokenFromConfirmationUrl) {
+            setPendingRecoveryLink({ kind: "token_hash", tokenHash: tokenFromConfirmationUrl });
+            return;
+          }
+
           setPendingRecoveryLink({ kind: "confirmation_url", url: confirmationUrl });
           return;
         }
@@ -189,6 +235,19 @@ const ResetPassword = () => {
         if (session) {
           console.log("[ResetPassword] Existing session found");
           recoverySessionRef.current = session;
+          saveRecoverySession(session);
+          recoveryFlowActiveRef.current = true;
+          setSessionReady(true);
+          return;
+        }
+
+        const savedRecoverySession = readRecoverySession();
+        const restoredSession = await restoreSupabaseSession(savedRecoverySession);
+        if (restoredSession) {
+          console.log("[ResetPassword] Recovery session restored");
+          recoverySessionRef.current = restoredSession;
+          saveRecoverySession(restoredSession);
+          recoveryFlowActiveRef.current = true;
           setSessionReady(true);
         } else {
           setTokenError("Aucun lien de réinitialisation valide trouvé. Veuillez demander un nouveau lien depuis la page de connexion.");
@@ -205,8 +264,15 @@ const ResetPassword = () => {
     return () => clearTimeout(timeout);
   }, [location.hash, location.search, location.pathname]);
 
-  const confirmSessionReady = async (sessionFromResponse?: unknown) => {
-    let nextSession = sessionFromResponse;
+  const confirmSessionReady = async (sessionFromResponse?: unknown): Promise<Session | null> => {
+    let nextSession = sessionFromResponse as Session | null | undefined;
+
+    if (nextSession?.access_token && nextSession.refresh_token) {
+      const restoredSession = await restoreSupabaseSession(nextSession);
+      if (restoredSession) {
+        nextSession = restoredSession;
+      }
+    }
 
     if (!nextSession) {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -215,44 +281,97 @@ const ResetPassword = () => {
     }
 
     if (nextSession) {
+      const recoverySession = nextSession as Session;
       console.log("[ResetPassword] Session established successfully");
       window.history.replaceState({}, document.title, location.pathname);
       recoveryFlowActiveRef.current = true;
-      recoverySessionRef.current = nextSession as Session;
+      recoverySessionRef.current = recoverySession;
+      saveRecoverySession(recoverySession);
       setSessionReady(true);
       setPendingRecoveryLink(null);
       setTokenError(null);
-      return;
+      return recoverySession;
     }
 
     console.error("[ResetPassword] No session after recovery verification");
     setTokenError("Le lien de réinitialisation est invalide ou expiré.");
+    return null;
   };
 
   const getActiveRecoverySession = async (): Promise<Session | null> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       recoverySessionRef.current = session;
+      saveRecoverySession(session);
       return session;
     }
 
-    const recoverySession = recoverySessionRef.current;
+    const recoverySession = recoverySessionRef.current ?? readRecoverySession();
     if (!recoverySession?.access_token || !recoverySession.refresh_token) {
       return null;
     }
 
-    const { data, error } = await supabase.auth.setSession({
-      access_token: recoverySession.access_token,
-      refresh_token: recoverySession.refresh_token,
-    });
+    const restoredSession = await restoreSupabaseSession(recoverySession);
+    if (!restoredSession) return null;
 
-    if (error) {
-      console.error("[ResetPassword] Error restoring recovery session:", error);
+    recoverySessionRef.current = restoredSession;
+    saveRecoverySession(restoredSession);
+    return restoredSession;
+  };
+
+  const verifyRecoveryLinkForSession = async (recoveryLink: PendingRecoveryLink): Promise<Session | null> => {
+    if (recoveryLink.kind === "confirmation_url") {
+      const tokenFromConfirmationUrl = getTokenHashFromConfirmationUrl(recoveryLink.url);
+      if (tokenFromConfirmationUrl) {
+        return verifyRecoveryLinkForSession({ kind: "token_hash", tokenHash: tokenFromConfirmationUrl });
+      }
+
+      const confirmationUrl = new URL(recoveryLink.url);
+      const supabaseOrigin = new URL(supabaseConfig.url).origin;
+
+      if (confirmationUrl.origin !== supabaseOrigin) {
+        throw new Error("Lien de confirmation invalide.");
+      }
+
+      window.location.href = confirmationUrl.toString();
       return null;
     }
 
-    recoverySessionRef.current = data.session;
-    return data.session;
+    if (recoveryLink.kind === "token_hash") {
+      const { data, error } = await supabase.auth.verifyOtp({
+        type: "recovery",
+        token_hash: recoveryLink.tokenHash,
+      });
+
+      if (error) {
+        console.error("[ResetPassword] Error verifying OTP:", error);
+        throw new Error("Le lien de r?initialisation est invalide ou expir?. Veuillez demander un nouveau lien.");
+      }
+
+      return confirmSessionReady(data.session);
+    }
+
+    if (recoveryLink.kind === "code") {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(recoveryLink.code);
+      if (error) {
+        console.error("[ResetPassword] Error exchanging code:", error);
+        throw new Error("Le lien de r?initialisation est invalide ou expir?. Veuillez demander un nouveau lien.");
+      }
+
+      return confirmSessionReady(data.session);
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: recoveryLink.accessToken,
+      refresh_token: recoveryLink.refreshToken,
+    });
+
+    if (error) {
+      console.error("[ResetPassword] Error setting session:", error);
+      throw new Error("Le lien de r?initialisation est invalide ou expir?. Veuillez demander un nouveau lien.");
+    }
+
+    return confirmSessionReady(data.session);
   };
 
   const handleVerifyRecoveryLink = async () => {
@@ -262,61 +381,8 @@ const ResetPassword = () => {
     setTokenError(null);
 
     try {
-      if (pendingRecoveryLink.kind === "confirmation_url") {
-        const confirmationUrl = new URL(pendingRecoveryLink.url);
-        const supabaseOrigin = new URL(supabaseConfig.url).origin;
-
-        if (confirmationUrl.origin !== supabaseOrigin) {
-          throw new Error("Lien de confirmation invalide.");
-        }
-
-        window.location.href = confirmationUrl.toString();
-        return;
-      }
-
-      if (pendingRecoveryLink.kind === "token_hash") {
-        const { data, error } = await supabase.auth.verifyOtp({
-          type: "recovery",
-          token_hash: pendingRecoveryLink.tokenHash,
-        });
-
-        if (error) {
-          console.error("[ResetPassword] Error verifying OTP:", error);
-          window.location.href = buildSupabaseRecoveryActionUrl(
-            pendingRecoveryLink.tokenHash,
-            window.location.href,
-          );
-          return;
-        }
-
-        await confirmSessionReady(data.session);
-        return;
-      }
-
-      if (pendingRecoveryLink.kind === "code") {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(pendingRecoveryLink.code);
-        if (error) {
-          console.error("[ResetPassword] Error exchanging code:", error);
-          setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
-          return;
-        }
-
-        await confirmSessionReady(data.session);
-        return;
-      }
-
-      const { data, error } = await supabase.auth.setSession({
-        access_token: pendingRecoveryLink.accessToken,
-        refresh_token: pendingRecoveryLink.refreshToken,
-      });
-
-      if (error) {
-        console.error("[ResetPassword] Error setting session:", error);
-        setTokenError("Le lien de réinitialisation est invalide ou expiré. Veuillez demander un nouveau lien.");
-        return;
-      }
-
-      await confirmSessionReady(data.session);
+      await verifyRecoveryLinkForSession(pendingRecoveryLink);
+      return;
     } catch (error) {
       console.error("[ResetPassword] Error confirming recovery link:", error);
       setTokenError(error instanceof Error ? error.message : "Une erreur est survenue lors du traitement du lien.");
@@ -358,7 +424,10 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const session = await getActiveRecoverySession();
+      let session = await getActiveRecoverySession();
+      if (!session && pendingRecoveryLink) {
+        session = await verifyRecoveryLinkForSession(pendingRecoveryLink);
+      }
 
       if (!session) {
         console.error("[ResetPassword] No session found at submit time");
@@ -390,6 +459,7 @@ const ResetPassword = () => {
         });
 
         completedRef.current = true;
+        clearRecoverySession();
         await supabase.auth.signOut();
         const loginSpace = requestedLoginSpaceRef.current;
         navigate(loginSpace ? `/connexion?space=${loginSpace}` : "/connexion", { replace: true });
@@ -418,7 +488,7 @@ const ResetPassword = () => {
     );
   }
 
-  if (pendingRecoveryLink && !sessionReady && !tokenError) {
+  if (pendingRecoveryLink?.kind === "confirmation_url" && !sessionReady && !tokenError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background">
         <main className="min-h-screen flex flex-col items-center justify-center px-4 py-20">

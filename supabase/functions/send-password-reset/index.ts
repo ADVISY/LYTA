@@ -414,8 +414,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to generate password reset link");
     }
 
-    // Keep the Supabase action link behind the app confirmation screen so email
-    // scanners do not consume the recovery token before the user clicks.
+    // Prefer token_hash so mail security scanners cannot pre-open the one-time action link.
     const actionLink = resetData?.properties?.action_link;
     let hashedToken = resetData?.properties?.hashed_token;
 
@@ -428,18 +427,18 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     let resetLink: string | null = null;
-    if (actionLink) {
-      const url = new URL(resolvedRedirectUrl);
-      url.searchParams.set('confirmation_url', actionLink);
-      url.searchParams.set('type', 'recovery');
-      resetLink = url.toString();
-      log.info("Reset link generated successfully (deferred action_link flow)");
-    } else if (hashedToken) {
+    if (hashedToken) {
       const url = new URL(resolvedRedirectUrl);
       url.searchParams.set('token_hash', hashedToken);
       url.searchParams.set('type', 'recovery');
       resetLink = url.toString();
-      log.info("Reset link generated successfully (token_hash fallback flow)");
+      log.info("Reset link generated successfully (token_hash flow)");
+    } else if (actionLink) {
+      const url = new URL(resolvedRedirectUrl);
+      url.searchParams.set('confirmation_url', actionLink);
+      url.searchParams.set('type', 'recovery');
+      resetLink = url.toString();
+      log.info("Reset link generated successfully (deferred action_link fallback flow)");
     }
 
     if (!resetLink) {
