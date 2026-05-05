@@ -18,10 +18,57 @@ type PendingRecoveryLink =
   | { kind: "session"; accessToken: string; refreshToken: string }
   | { kind: "confirmation_url"; url: string };
 
+const RECOVERY_URL_PARAMS = [
+  "token_hash",
+  "confirmation_url",
+  "code",
+  "access_token",
+  "refresh_token",
+  "error",
+  "error_code",
+  "error_description",
+];
+
 function getRequestedLoginSpace(search: string): LoginSpace | null {
   const params = new URLSearchParams(search);
   const value = params.get("space") || params.get("login");
   return value === "client" || value === "team" || value === "king" ? value : null;
+}
+
+function getRecoveryErrorMessage(
+  queryParams: URLSearchParams,
+  hashParams: URLSearchParams,
+): string | null {
+  const error = queryParams.get("error") ?? hashParams.get("error");
+  const errorCode = queryParams.get("error_code") ?? hashParams.get("error_code");
+  const errorDescription = queryParams.get("error_description") ?? hashParams.get("error_description");
+
+  if (!error && !errorCode && !errorDescription) {
+    return null;
+  }
+
+  const normalized = `${errorCode ?? ""} ${errorDescription ?? ""}`.toLowerCase();
+  if (normalized.includes("expired") || normalized.includes("invalid") || normalized.includes("otp")) {
+    return "Le lien de reinitialisation est invalide ou expire. Veuillez demander un nouveau lien.";
+  }
+
+  return errorDescription || "Une erreur est survenue lors du traitement du lien.";
+}
+
+function buildSupabaseRecoveryActionUrl(tokenHash: string, currentHref: string): string {
+  const redirectUrl = new URL(currentHref);
+
+  RECOVERY_URL_PARAMS.forEach((param) => redirectUrl.searchParams.delete(param));
+  redirectUrl.hash = "";
+  redirectUrl.searchParams.set("type", "recovery");
+  redirectUrl.searchParams.set("verify_fallback", "1");
+
+  const verifyUrl = new URL("/auth/v1/verify", supabaseConfig.url);
+  verifyUrl.searchParams.set("token", tokenHash);
+  verifyUrl.searchParams.set("type", "recovery");
+  verifyUrl.searchParams.set("redirect_to", redirectUrl.toString());
+
+  return verifyUrl.toString();
 }
 
 const ResetPassword = () => {
@@ -80,6 +127,12 @@ const ResetPassword = () => {
         const requestedLoginSpace = getRequestedLoginSpace(location.search);
         if (requestedLoginSpace) {
           requestedLoginSpaceRef.current = requestedLoginSpace;
+        }
+
+        const recoveryErrorMessage = getRecoveryErrorMessage(queryParams, hashParams);
+        if (recoveryErrorMessage) {
+          setTokenError(recoveryErrorMessage);
+          return;
         }
 
         const code = queryParams.get("code");
@@ -198,7 +251,10 @@ const ResetPassword = () => {
 
         if (error) {
           console.error("[ResetPassword] Error verifying OTP:", error);
-          setTokenError("Le lien de reinitialisation est invalide ou expire. Veuillez demander un nouveau lien.");
+          window.location.href = buildSupabaseRecoveryActionUrl(
+            pendingRecoveryLink.tokenHash,
+            window.location.href,
+          );
           return;
         }
 
@@ -307,11 +363,12 @@ const ResetPassword = () => {
         const loginSpace = requestedLoginSpaceRef.current;
         navigate(loginSpace ? `/connexion?space=${loginSpace}` : "/connexion", { replace: true });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[ResetPassword] Unexpected error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue.";
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

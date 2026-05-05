@@ -9,11 +9,18 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
 const log = createLogger("activate-tenant");
 
+interface RecoveryLinkData {
+  properties?: {
+    action_link?: string | null;
+    hashed_token?: string | null;
+  } | null;
+}
+
 function getTenantResetRedirectUrl(slug: string | null): string {
   return slug ? `https://${slug}.lyta.ch/reset-password?space=team` : "https://app.lyta.ch/reset-password?space=team";
 }
 
-function buildRecoveryLink(redirectTo: string, resetData: any): string | null {
+function buildRecoveryLink(redirectTo: string, resetData: RecoveryLinkData | null | undefined): string | null {
   const actionLink = resetData?.properties?.action_link;
   let hashedToken = resetData?.properties?.hashed_token;
 
@@ -25,16 +32,16 @@ function buildRecoveryLink(redirectTo: string, resetData: any): string | null {
     }
   }
 
-  if (hashedToken) {
+  if (actionLink) {
     const url = new URL(redirectTo);
-    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("confirmation_url", actionLink);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }
 
-  if (actionLink) {
+  if (hashedToken) {
     const url = new URL(redirectTo);
-    url.searchParams.set("confirmation_url", actionLink);
+    url.searchParams.set("token_hash", hashedToken);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }

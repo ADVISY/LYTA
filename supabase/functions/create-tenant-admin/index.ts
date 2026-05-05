@@ -26,11 +26,18 @@ interface TenantBranding {
   email_sender_address: string | null;
 }
 
+interface RecoveryLinkData {
+  properties?: {
+    action_link?: string | null;
+    hashed_token?: string | null;
+  } | null;
+}
+
 function getTenantResetRedirectUrl(slug: string | null): string {
   return slug ? `https://${slug}.lyta.ch/reset-password?space=team` : "https://app.lyta.ch/reset-password?space=team";
 }
 
-function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
+function buildRecoveryLink(redirectTo: string, linkData: RecoveryLinkData | null | undefined): string | null {
   const actionLink = linkData?.properties?.action_link;
   let hashedToken = linkData?.properties?.hashed_token;
 
@@ -42,16 +49,16 @@ function buildRecoveryLink(redirectTo: string, linkData: any): string | null {
     }
   }
 
-  if (hashedToken) {
+  if (actionLink) {
     const url = new URL(redirectTo);
-    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("confirmation_url", actionLink);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }
 
-  if (actionLink) {
+  if (hashedToken) {
     const url = new URL(redirectTo);
-    url.searchParams.set("confirmation_url", actionLink);
+    url.searchParams.set("token_hash", hashedToken);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }
@@ -846,7 +853,7 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthError) {
       return new Response(
         JSON.stringify({ success: false, error: error.message }),
@@ -859,11 +866,12 @@ serve(async (req) => {
         { status: 403, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
       );
     }
-    log.error("Error in create-tenant-admin", { error: error.message });
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+    log.error("Error in create-tenant-admin", { error: errorMessage });
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: errorMessage
       }),
       {
         status: 400,

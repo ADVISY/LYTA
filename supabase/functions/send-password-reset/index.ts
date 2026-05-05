@@ -375,7 +375,8 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (tenant) {
         tenantName = tenant.name || "Lyta";
-        const tb = (tenant.tenant_branding as any)?.[0];
+        const tenantBranding = tenant.tenant_branding as TenantBranding[] | TenantBranding | null | undefined;
+        const tb = Array.isArray(tenantBranding) ? tenantBranding[0] : tenantBranding;
         if (tb) {
           branding = {
             display_name: tb.display_name,
@@ -413,7 +414,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to generate password reset link");
     }
 
-    // Prefer sending a direct app link with token_hash (more reliable than the /verify redirect flow)
+    // Keep the Supabase action link behind the app confirmation screen so email
+    // scanners do not consume the recovery token before the user clicks.
     const actionLink = resetData?.properties?.action_link;
     let hashedToken = resetData?.properties?.hashed_token;
 
@@ -426,18 +428,18 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     let resetLink: string | null = null;
-    if (hashedToken) {
-      const url = new URL(resolvedRedirectUrl);
-      url.searchParams.set('token_hash', hashedToken);
-      url.searchParams.set('type', 'recovery');
-      resetLink = url.toString();
-      log.info("Reset link generated successfully (token_hash flow)");
-    } else if (actionLink) {
+    if (actionLink) {
       const url = new URL(resolvedRedirectUrl);
       url.searchParams.set('confirmation_url', actionLink);
       url.searchParams.set('type', 'recovery');
       resetLink = url.toString();
       log.info("Reset link generated successfully (deferred action_link flow)");
+    } else if (hashedToken) {
+      const url = new URL(resolvedRedirectUrl);
+      url.searchParams.set('token_hash', hashedToken);
+      url.searchParams.set('type', 'recovery');
+      resetLink = url.toString();
+      log.info("Reset link generated successfully (token_hash fallback flow)");
     }
 
     if (!resetLink) {
@@ -545,7 +547,7 @@ const handler = async (req: Request): Promise<Response> => {
       { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
     );
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof RateLimitError) {
       return new Response(
         JSON.stringify({ error: "Trop de requêtes, réessayez plus tard" }),
@@ -559,9 +561,10 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
-    log.error("Error in send-password-reset function", { error: error.message });
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+    log.error("Error in send-password-reset function", { error: errorMessage });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } }
     );
   }

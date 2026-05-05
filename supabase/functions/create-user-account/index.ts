@@ -286,16 +286,16 @@ function buildRecoveryLink(redirectTo: string, linkData: RecoveryLinkData | null
     }
   }
 
-  if (hashedToken) {
+  if (actionLink) {
     const url = new URL(redirectTo);
-    url.searchParams.set("token_hash", hashedToken);
+    url.searchParams.set("confirmation_url", actionLink);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }
 
-  if (actionLink) {
+  if (hashedToken) {
     const url = new URL(redirectTo);
-    url.searchParams.set("confirmation_url", actionLink);
+    url.searchParams.set("token_hash", hashedToken);
     url.searchParams.set("type", "recovery");
     return url.toString();
   }
