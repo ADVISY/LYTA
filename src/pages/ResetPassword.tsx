@@ -10,6 +10,7 @@ import { supabaseConfig } from "@/integrations/supabase/config";
 import { Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { clearSessionEnforcerState } from "@/lib/sessionEnforcerStorage";
+import type { Session } from "@supabase/supabase-js";
 
 type LoginSpace = "client" | "team" | "king";
 type PendingRecoveryLink =
@@ -87,6 +88,7 @@ const ResetPassword = () => {
   const completedRef = useRef(false);
   const requestedLoginSpaceRef = useRef<LoginSpace | null>(null);
   const recoveryFlowActiveRef = useRef(false);
+  const recoverySessionRef = useRef<Session | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -95,6 +97,7 @@ const ResetPassword = () => {
       if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "PASSWORD_RECOVERY")) {
         console.log("[ResetPassword] Session ready");
         recoveryFlowActiveRef.current = true;
+        recoverySessionRef.current = session;
         setSessionReady(true);
         setPendingRecoveryLink(null);
         setIsProcessingToken(false);
@@ -185,6 +188,7 @@ const ResetPassword = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           console.log("[ResetPassword] Existing session found");
+          recoverySessionRef.current = session;
           setSessionReady(true);
         } else {
           setTokenError("Aucun lien de reinitialisation valide trouve. Veuillez demander un nouveau lien depuis la page de connexion.");
@@ -214,6 +218,7 @@ const ResetPassword = () => {
       console.log("[ResetPassword] Session established successfully");
       window.history.replaceState({}, document.title, location.pathname);
       recoveryFlowActiveRef.current = true;
+      recoverySessionRef.current = nextSession as Session;
       setSessionReady(true);
       setPendingRecoveryLink(null);
       setTokenError(null);
@@ -222,6 +227,32 @@ const ResetPassword = () => {
 
     console.error("[ResetPassword] No session after recovery verification");
     setTokenError("Le lien de reinitialisation est invalide ou expire.");
+  };
+
+  const getActiveRecoverySession = async (): Promise<Session | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      recoverySessionRef.current = session;
+      return session;
+    }
+
+    const recoverySession = recoverySessionRef.current;
+    if (!recoverySession?.access_token || !recoverySession.refresh_token) {
+      return null;
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: recoverySession.access_token,
+      refresh_token: recoverySession.refresh_token,
+    });
+
+    if (error) {
+      console.error("[ResetPassword] Error restoring recovery session:", error);
+      return null;
+    }
+
+    recoverySessionRef.current = data.session;
+    return data.session;
   };
 
   const handleVerifyRecoveryLink = async () => {
@@ -327,7 +358,7 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getActiveRecoverySession();
 
       if (!session) {
         console.error("[ResetPassword] No session found at submit time");
