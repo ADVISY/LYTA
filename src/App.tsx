@@ -36,6 +36,7 @@ const CRMCompta = lazy(() => import("./pages/crm/CRMCompta"));
 const CRMPublicite = lazy(() => import("./pages/crm/CRMPublicite"));
 const CRMAbonnement = lazy(() => import("./pages/crm/CRMAbonnement"));
 const CRMLytaTools = lazy(() => import("./pages/crm/CRMLytaTools"));
+const CRMSignatures = lazy(() => import("./pages/crm/CRMSignatures"));
 
 // Client Portal (lazy loaded)
 const ClientLayout = lazy(() => import("./pages/client/ClientLayout"));
@@ -121,6 +122,7 @@ const App = () => (
                 <Route path="publicite" element={<CRMPublicite />} />
                 <Route path="abonnement" element={<CRMAbonnement />} />
                 <Route path="tools" element={<CRMLytaTools />} />
+                <Route path="signatures" element={<CRMSignatures />} />
               </Route>
               
               {/* KING Platform Routes */}

@@ -25,7 +25,7 @@ BEGIN
   v_norm := lower(trim(p_name));
 
   -- Remove punctuation that does not carry meaning
-  v_norm := regexp_replace(v_norm, '[\.\,\;\:\(\)\[\]\"\''']', '', 'g');
+  v_norm := regexp_replace(v_norm, E'[.,;:()\\[\\]"\']', '', 'g');
 
   -- Strip common legal suffixes (order matters - longest first)
   v_norm := regexp_replace(v_norm, '\s+(s\s*\.?\s*a\s*\.?\s*r\s*\.?\s*l\.?|sarl|sàrl|s\.a\.r\.l\.)$', '', 'i');
@@ -61,7 +61,7 @@ BEGIN
 
   v_norm := lower(trim(p_name));
   -- Remove most punctuation
-  v_norm := regexp_replace(v_norm, '[\.\,\;\:\(\)\[\]\"\''']', '', 'g');
+  v_norm := regexp_replace(v_norm, E'[.,;:()\\[\\]"\']', '', 'g');
   -- Collapse whitespace
   v_norm := regexp_replace(v_norm, '\s+', ' ', 'g');
   v_norm := trim(v_norm);

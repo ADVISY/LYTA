@@ -44,7 +44,9 @@ const STATUS_BADGE: Record<SignatureRequestRow["status"], { label: string; class
 };
 
 interface PendingSignaturesPanelProps {
-  clientId: string;
+  /** When provided, only show signatures for this client. Otherwise list all
+   *  signatures of the current tenant (RLS handles tenant isolation). */
+  clientId?: string;
   refreshTick?: number;
 }
 
@@ -57,11 +59,16 @@ export default function PendingSignaturesPanel({ clientId, refreshTick }: Pendin
 
   const fetch = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("signature_requests")
       .select("id, document_kind, status, access_token, expires_at, invited_at, signed_at, refused_at, refusal_reason, client_full_name, signed_document_id")
-      .eq("client_id", clientId)
       .order("invited_at", { ascending: false });
+
+    if (clientId) {
+      query = query.eq("client_id", clientId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
