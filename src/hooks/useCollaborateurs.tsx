@@ -58,6 +58,9 @@ export type CollaborateurFormData = {
   manager_commission_rate_vie?: number;
   // Reserve account
   reserve_rate?: number;
+  // Optional: associated company (the collaborator stays a physical person,
+  // but is linked to a company entity — used for "apporteur d'affaires" etc.)
+  company_name?: string;
 };
 
 function getAccountRoleFromProfession(profession?: string): string {

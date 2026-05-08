@@ -10,6 +10,7 @@ import { useCrmEmails } from "@/hooks/useCrmEmails";
 import { useCelebration } from "@/hooks/useCelebration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
@@ -45,7 +46,7 @@ const clientSchema = z.object({
   phone: z.string().max(50).optional().nullable(),
   status: z.enum(["prospect", "actif", "résilié", "dormant"]),
   tags: z.array(z.string()).optional().nullable(),
-  civil_status: z.enum(["célibataire", "marié", "divorcé", "séparé", "veuf"]).optional().nullable(),
+  civil_status: z.enum(["célibataire", "marié", "pacsé", "divorcé", "séparé", "veuf"]).optional().nullable(),
   permit_type: z.enum(["B", "C", "G", "L", "Autre"]).optional().nullable(),
   nationality: z.string().max(100).optional().nullable(),
   profession: z.string().max(200).optional().nullable(),
@@ -301,6 +302,7 @@ export default function ClientForm() {
                             <SelectItem value="none">{t('clientForm.notSpecified')}</SelectItem>
                             <SelectItem value="célibataire">{t('clientForm.single')}</SelectItem>
                             <SelectItem value="marié">{t('clientForm.married')}</SelectItem>
+                            <SelectItem value="pacsé">{t('clientForm.civilUnion', 'Pacsé(e)')}</SelectItem>
                             <SelectItem value="divorcé">{t('clientForm.divorced')}</SelectItem>
                             <SelectItem value="séparé">{t('clientForm.separated')}</SelectItem>
                             <SelectItem value="veuf">{t('clientForm.widowed')}</SelectItem>
@@ -584,7 +586,11 @@ export default function ClientForm() {
                       <FormItem>
                         <FormLabel>{t('clientForm.mobile')}</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} />
+                          <PhoneInput
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="79 123 45 67"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -598,7 +604,11 @@ export default function ClientForm() {
                       <FormItem>
                         <FormLabel>{t('clientForm.phone')}</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} />
+                          <PhoneInput
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="22 123 45 67"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

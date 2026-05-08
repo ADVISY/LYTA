@@ -48,6 +48,7 @@ const getContractTypeOptions = (t: (key: string) => string) => [
   { value: "cdd", label: t("forms.contractTypes.cdd") },
   { value: "freelance", label: t("forms.contractTypes.freelance") },
   { value: "stagiaire", label: t("forms.contractTypes.stagiaire") },
+  { value: "apporteur_affaires", label: t("forms.contractTypes.apporteurAffaires", "Apporteur d'affaires") },
 ];
 
 export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit }: CollaborateurFormProps) {
@@ -76,7 +77,8 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
     manager_commission_rate_lca: 0,
     manager_commission_rate_vie: 0,
     reserve_rate: 0,
-  });
+    company_name: "",
+  } as CollaborateurFormData);
 
   // Filter managers (collaborateurs with profession "manager" or "direction") - case insensitive
   const availableManagers = collaborateurs.filter(c => {
@@ -106,7 +108,8 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
         manager_commission_rate_lca: collaborateur.manager_commission_rate_lca || 0,
         manager_commission_rate_vie: collaborateur.manager_commission_rate_vie || 0,
         reserve_rate: collaborateur.reserve_rate || 0,
-      });
+        company_name: collaborateur.company_name || "",
+      } as CollaborateurFormData);
     } else {
       setFormData({
         first_name: "",
@@ -127,7 +130,8 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
         manager_commission_rate_lca: 0,
         manager_commission_rate_vie: 0,
         reserve_rate: 0,
-      });
+        company_name: "",
+      } as CollaborateurFormData);
     }
   }, [collaborateur, open]);
 
@@ -252,6 +256,21 @@ export function CollaborateurForm({ open, onOpenChange, collaborateur, onSubmit 
                   type="tel"
                   value={formData.mobile}
                   onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="company_name">
+                  {t("forms.collaborateur.companyName", "Société associée")}
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                    {t("common.optional", "(optionnel)")}
+                  </span>
+                </Label>
+                <Input
+                  id="company_name"
+                  value={(formData as CollaborateurFormData & { company_name?: string }).company_name || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, company_name: e.target.value } as CollaborateurFormData))}
+                  placeholder={t("forms.collaborateur.companyNamePlaceholder", "Ex : Cabinet Dupont SA")}
                 />
               </div>
 

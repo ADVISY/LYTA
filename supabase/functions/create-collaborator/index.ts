@@ -30,6 +30,7 @@ interface CreateCollaboratorRequest {
   manager_commission_rate_lca?: number;
   manager_commission_rate_vie?: number;
   reserve_rate?: number;
+  company_name?: string;
 }
 
 function json(req: Request, body: unknown, status = 200): Response {
@@ -208,6 +209,7 @@ Deno.serve(async (req) => {
       manager_commission_rate_lca: normalizeOptionalNumber(requestBody.manager_commission_rate_lca),
       manager_commission_rate_vie: normalizeOptionalNumber(requestBody.manager_commission_rate_vie),
       reserve_rate: normalizeOptionalNumber(requestBody.reserve_rate),
+      company_name: normalizeOptionalString(requestBody.company_name),
     };
 
     const { data: collaborator, error: insertError } = await supabaseAdmin
