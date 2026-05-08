@@ -47,6 +47,14 @@ export interface QRInvoice {
   };
 }
 
+export interface InvoiceItemInput {
+  service_id?: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  sort_order?: number;
+}
+
 export interface CreateInvoiceData {
   client_id?: string | null;
   client_name: string;
@@ -67,6 +75,9 @@ export interface CreateInvoiceData {
   location?: string;
   object?: string;
   notes?: string;
+  /** Multi-line items. If omitted, the invoice is treated as single-line
+   *  with service_type/service_description/amount_ht for backwards compat. */
+  items?: InvoiceItemInput[];
 }
 
 export function useQRInvoices() {
@@ -122,10 +133,13 @@ export function useQRInvoices() {
 
   const createInvoice = useCallback(async (invoiceData: CreateInvoiceData): Promise<QRInvoice | null> => {
     if (!user || !tenantId) return null;
-    
+
     try {
       const invoiceNumber = await getNextInvoiceNumber();
       if (!invoiceNumber) throw new Error('Could not generate invoice number');
+
+      // Strip the items array before insert — items go to a separate table
+      const { items, ...invoiceFields } = invoiceData;
 
       const { data, error } = await supabase
         .from('qr_invoices')
@@ -133,19 +147,57 @@ export function useQRInvoices() {
           tenant_id: tenantId,
           invoice_number: invoiceNumber,
           created_by: user.id,
-          ...invoiceData
+          ...invoiceFields
         })
         .select()
         .single();
 
       if (error) throw error;
 
+      // Insert invoice items (multi-line). If no items provided, fall back to
+      // a single line built from the legacy fields (backwards compat).
+      const itemsToInsert =
+        items && items.length > 0
+          ? items.map((it, idx) => ({
+              invoice_id: data.id,
+              service_id: it.service_id ?? null,
+              description: it.description,
+              quantity: it.quantity,
+              unit_price: it.unit_price,
+              sort_order: it.sort_order ?? idx,
+            }))
+          : [
+              {
+                invoice_id: data.id,
+                service_id: null,
+                description: invoiceData.service_description || invoiceData.service_type || 'Prestation',
+                quantity: 1,
+                unit_price: invoiceData.amount_ht,
+                sort_order: 0,
+              },
+            ];
+
+      const { error: itemsErr } = await (supabase as any)
+        .from('invoice_items')
+        .insert(itemsToInsert);
+
+      if (itemsErr) {
+        // Items insert failed — keep the invoice but warn (we don't roll back
+        // the qr_invoices row since the legacy fields still hold the totals).
+        console.error('Error inserting invoice_items', itemsErr);
+        toast({
+          variant: "destructive",
+          title: "Lignes de facturation",
+          description: "Facture créée mais les lignes détaillées n'ont pas été sauvegardées : " + itemsErr.message,
+        });
+      }
+
       // Log the action
       await supabase.from('qr_invoice_logs').insert({
         invoice_id: data.id,
         action: 'created',
         performed_by: user.id,
-        details: { invoice_number: invoiceNumber }
+        details: { invoice_number: invoiceNumber, line_count: itemsToInsert.length }
       });
 
       // Notifier le client si une facture est liée à un client

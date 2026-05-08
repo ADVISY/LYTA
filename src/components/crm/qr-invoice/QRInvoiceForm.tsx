@@ -38,14 +38,7 @@ import { useClients, Client } from "@/hooks/useClients";
 import { useTenant } from "@/contexts/TenantContext";
 import { CreateInvoiceData } from "@/hooks/useQRInvoices";
 import { cn } from "@/lib/utils";
-
-const SERVICE_TYPES = [
-  { value: 'declaration_impot', label: 'Déclaration d\'impôt' },
-  { value: 'demande_subside', label: 'Demande de subside' },
-  { value: 'conseil_financier', label: 'Conseil financier' },
-  { value: 'domiciliation', label: 'Domiciliation' },
-  { value: 'autre', label: 'Autre' },
-];
+import { InvoiceItemsEditor, InvoiceItemDraft, sumItemsHT } from "@/components/crm/qr-invoice/InvoiceItemsEditor";
 
 const invoiceSchema = z.object({
   client_id: z.string().optional(),
@@ -55,9 +48,6 @@ const invoiceSchema = z.object({
   client_city: z.string().optional(),
   client_country: z.string().default('CH'),
   client_email: z.string().email().optional().or(z.literal('')),
-  service_type: z.string().min(1, "Prestation requise"),
-  service_description: z.string().optional(),
-  amount: z.number().min(0.01, "Montant requis"),
   vat_rate: z.number().default(7.7),
   is_vat_included: z.boolean().default(false),
   invoice_date: z.string(),
@@ -83,7 +73,7 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
   const [submitting, setSubmitting] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
-  const [isCustomService, setIsCustomService] = useState(false);
+  const [items, setItems] = useState<InvoiceItemDraft[]>([]);
 
   const defaultLocation = tenant?.branding?.company_address?.split(',')[0] || '';
 
@@ -91,8 +81,6 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       client_country: 'CH',
-      service_type: '',
-      amount: 0,
       vat_rate: 7.7,
       is_vat_included: false,
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
@@ -102,26 +90,25 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
     },
   });
 
-  const watchAmount = form.watch('amount');
   const watchVatRate = form.watch('vat_rate');
   const watchIsVatIncluded = form.watch('is_vat_included');
-  const watchServiceType = form.watch('service_type');
 
-  // Calculate VAT amounts
+  // Calculate VAT amounts from the sum of all invoice items
   const vatCalculation = useMemo(() => {
-    const amount = watchAmount || 0;
+    const subtotal = sumItemsHT(items);
     const rate = watchVatRate || 0;
-    
+
     if (watchIsVatIncluded) {
-      const ht = amount / (1 + rate / 100);
-      const vat = amount - ht;
-      return { ht: Math.round(ht * 100) / 100, vat: Math.round(vat * 100) / 100, ttc: amount };
+      // The subtotal of items already includes VAT
+      const ht = subtotal / (1 + rate / 100);
+      const vat = subtotal - ht;
+      return { ht: Math.round(ht * 100) / 100, vat: Math.round(vat * 100) / 100, ttc: Math.round(subtotal * 100) / 100 };
     } else {
-      const vat = amount * rate / 100;
-      const ttc = amount + vat;
-      return { ht: amount, vat: Math.round(vat * 100) / 100, ttc: Math.round(ttc * 100) / 100 };
+      const vat = subtotal * rate / 100;
+      const ttc = subtotal + vat;
+      return { ht: Math.round(subtotal * 100) / 100, vat: Math.round(vat * 100) / 100, ttc: Math.round(ttc * 100) / 100 };
     }
-  }, [watchAmount, watchVatRate, watchIsVatIncluded]);
+  }, [items, watchVatRate, watchIsVatIncluded]);
 
   // Filter clients
   const filteredClients = useMemo(() => {
@@ -135,15 +122,14 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
     ).slice(0, 50);
   }, [clients, clientSearch]);
 
-  // Update object when service type changes
+  // Auto-fill the "object" field with the first item's description (gives a
+  // sensible default that the user can still override).
   useEffect(() => {
-    if (watchServiceType && watchServiceType !== 'autre') {
-      const service = SERVICE_TYPES.find(s => s.value === watchServiceType);
-      if (service) {
-        form.setValue('object', service.label);
-      }
+    const firstDesc = items.find((it) => it.description.trim())?.description.trim();
+    if (firstDesc && !form.getValues("object")) {
+      form.setValue("object", firstDesc);
     }
-  }, [watchServiceType, form]);
+  }, [items, form]);
 
   const handleClientSelect = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -161,8 +147,16 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
   };
 
   const handleSubmit = async (data: InvoiceFormData) => {
+    // Validate items
+    const validItems = items.filter((it) => it.description.trim() && it.quantity > 0 && it.unit_price >= 0);
+    if (validItems.length === 0) {
+      form.setError("root", { message: "Ajoute au moins une ligne de facturation valide." });
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const firstItem = validItems[0];
       const invoiceData: CreateInvoiceData = {
         client_id: data.client_id || null,
         client_name: data.client_name,
@@ -171,8 +165,11 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
         client_city: data.client_city,
         client_country: data.client_country,
         client_email: data.client_email || undefined,
-        service_type: isCustomService ? data.service_description || data.service_type : data.service_type,
-        service_description: data.service_description,
+        // For backwards compatibility with existing reports/PDFs, we keep
+        // service_type/description filled from the first line. The full breakdown
+        // lives in the new invoice_items table.
+        service_type: validItems.length === 1 ? "autre" : "multi_lignes",
+        service_description: firstItem.description,
         amount_ht: vatCalculation.ht,
         vat_rate: data.vat_rate,
         vat_amount: vatCalculation.vat,
@@ -183,10 +180,18 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
         location: data.location,
         object: data.object,
         notes: data.notes,
+        items: validItems.map((it, idx) => ({
+          service_id: it.service_id,
+          description: it.description.trim(),
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          sort_order: idx,
+        })),
       };
-      
+
       await onSubmit(invoiceData);
       form.reset();
+      setItems([]);
       onClose();
     } finally {
       setSubmitting(false);
@@ -354,87 +359,18 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
 
             <Separator />
 
-            {/* Service Section */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                {t('qrInvoice.serviceSection')}
-              </h3>
-
-              <FormField
-                control={form.control}
-                name="service_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('qrInvoice.serviceType')} *</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        setIsCustomService(value === 'autre');
-                      }} 
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('qrInvoice.selectService')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SERVICE_TYPES.map((service) => (
-                          <SelectItem key={service.value} value={service.value}>
-                            {service.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {isCustomService && (
-                <FormField
-                  control={form.control}
-                  name="service_description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('qrInvoice.serviceDescription')}</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder={t('qrInvoice.describeService')} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
+            {/* Lignes de facturation (multi-items) */}
+            <InvoiceItemsEditor items={items} onChange={setItems} />
 
             <Separator />
 
-            {/* Amount Section */}
+            {/* TVA Section */}
             <div className="space-y-4">
               <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                {t('qrInvoice.amountSection')}
+                TVA et total
               </h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('qrInvoice.amount')} (CHF) *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.05"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="vat_rate"
@@ -442,8 +378,8 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
                     <FormItem>
                       <FormLabel>{t('qrInvoice.vatRate')} (%)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           step="0.1"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -452,34 +388,40 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="vat-included"
-                  checked={form.watch('is_vat_included')}
-                  onCheckedChange={(checked) => form.setValue('is_vat_included', checked)}
-                />
-                <Label htmlFor="vat-included">{t('qrInvoice.vatIncluded')}</Label>
+                <div className="flex items-end pb-2 space-x-2">
+                  <Switch
+                    id="vat-included"
+                    checked={form.watch('is_vat_included')}
+                    onCheckedChange={(checked) => form.setValue('is_vat_included', checked)}
+                  />
+                  <Label htmlFor="vat-included">{t('qrInvoice.vatIncluded')}</Label>
+                </div>
               </div>
 
               <Card className="bg-muted/50">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>{t('qrInvoice.amountHT')}</span>
-                    <span className="font-medium">{vatCalculation.ht.toFixed(2)} CHF</span>
+                    <span className="font-medium tabular-nums">{vatCalculation.ht.toFixed(2)} CHF</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>{t('qrInvoice.vatAmount')} ({watchVatRate}%)</span>
-                    <span className="font-medium">{vatCalculation.vat.toFixed(2)} CHF</span>
+                    <span className="font-medium tabular-nums">{vatCalculation.vat.toFixed(2)} CHF</span>
                   </div>
                   <Separator />
-                  <div className="flex justify-between font-medium">
+                  <div className="flex justify-between font-bold text-base">
                     <span>{t('qrInvoice.amountTTC')}</span>
-                    <span>{vatCalculation.ttc.toFixed(2)} CHF</span>
+                    <span className="tabular-nums">{vatCalculation.ttc.toFixed(2)} CHF</span>
                   </div>
                 </CardContent>
               </Card>
+
+              {form.formState.errors.root && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.root.message}
+                </p>
+              )}
             </div>
 
             <Separator />
