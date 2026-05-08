@@ -11,6 +11,8 @@ import { useCelebration } from "@/hooks/useCelebration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Building2, User as UserIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
@@ -33,6 +35,7 @@ const clientSchema = z.object({
   type_adresse: z.enum(["client", "collaborateur", "partenaire"]),
   assigned_agent_id: z.string().optional().nullable(),
   manager_id: z.string().optional().nullable(),
+  is_company: z.boolean().optional().default(false),
   first_name: z.string().min(1, "Prénom requis").max(100),
   last_name: z.string().min(1, "Nom requis").max(100),
   company_name: z.string().max(200).optional().nullable(),
@@ -54,7 +57,14 @@ const clientSchema = z.object({
   iban: z.string().max(34).optional().nullable(),
   bank_name: z.string().max(200).optional().nullable(),
   gender: z.enum(["homme", "femme", "enfant"]).optional().nullable(),
-});
+}).refine(
+  (data) =>
+    !data.is_company || (data.company_name != null && data.company_name.trim().length > 0),
+  {
+    message: "La raison sociale est requise pour un client professionnel",
+    path: ["company_name"],
+  }
+);
 
 type ClientFormData = z.infer<typeof clientSchema>;
 
@@ -76,6 +86,7 @@ export default function ClientForm() {
       type_adresse: "client",
       assigned_agent_id: null,
       manager_id: null,
+      is_company: false,
       first_name: "",
       last_name: "",
       company_name: null,
@@ -137,6 +148,7 @@ export default function ClientForm() {
         type_adresse: (data.type_adresse as ClientFormData['type_adresse']) || "client",
         assigned_agent_id: data.assigned_agent?.id || data.assigned_agent_id,
         manager_id: (data as Record<string, unknown>).manager_id as string | null || null,
+        is_company: Boolean((data as Record<string, unknown>).is_company),
         first_name: data.first_name || "",
         last_name: data.last_name || "",
         company_name: data.company_name,
@@ -279,6 +291,88 @@ export default function ClientForm() {
                     </FormItem>
                   )}
                 />
+
+                {/* Privé / Professionnel — visible uniquement pour le type "client" */}
+                {form.watch("type_adresse") === "client" && (
+                  <FormField
+                    control={form.control}
+                    name="is_company"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type de client *</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            value={field.value ? "pro" : "prive"}
+                            onValueChange={(v) => field.onChange(v === "pro")}
+                            className="grid grid-cols-2 gap-3"
+                          >
+                            <label
+                              htmlFor="client-type-prive"
+                              className={`flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                                !field.value
+                                  ? "border-primary bg-primary/5"
+                                  : "border-muted hover:border-primary/40"
+                              }`}
+                            >
+                              <RadioGroupItem id="client-type-prive" value="prive" />
+                              <UserIcon className="h-5 w-5 text-primary" />
+                              <div className="flex flex-col">
+                                <span className="font-medium">Privé</span>
+                                <span className="text-xs text-muted-foreground">Personne physique</span>
+                              </div>
+                            </label>
+                            <label
+                              htmlFor="client-type-pro"
+                              className={`flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                                field.value
+                                  ? "border-primary bg-primary/5"
+                                  : "border-muted hover:border-primary/40"
+                              }`}
+                            >
+                              <RadioGroupItem id="client-type-pro" value="pro" />
+                              <Building2 className="h-5 w-5 text-primary" />
+                              <div className="flex flex-col">
+                                <span className="font-medium">Professionnel</span>
+                                <span className="text-xs text-muted-foreground">Entreprise / société</span>
+                              </div>
+                            </label>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Raison sociale — visible uniquement si client professionnel */}
+                {form.watch("type_adresse") === "client" && form.watch("is_company") && (
+                  <FormField
+                    control={form.control}
+                    name="company_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-primary" />
+                          Raison sociale *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Ex : Cabinet Dupont SA"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {form.watch("type_adresse") === "client" && form.watch("is_company") && (
+                  <p className="text-sm text-muted-foreground -mt-2">
+                    Renseignez ci-dessous la <strong>personne associée</strong> (contact principal de l'entreprise) :
+                  </p>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
