@@ -105,7 +105,19 @@ export default function ImportDocumentForSignatureDialog({
       onOpenChange(false);
       onSent?.();
     } catch (e) {
-      toast({ title: "Erreur", description: e instanceof Error ? e.message : "—", variant: "destructive" });
+      // Log full error to the browser console so we can debug from F12 Console
+      console.error("[ImportDocumentForSignatureDialog] handleSubmit failed", e);
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message: unknown }).message)
+          : JSON.stringify(e);
+      toast({
+        title: "Erreur lors de l'envoi",
+        description: message || "Erreur inconnue — voir la console (F12) pour le détail.",
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
