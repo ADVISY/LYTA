@@ -110,31 +110,41 @@ export function CabinetInfoSettings() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Upsert: si la ligne tenant_branding existe -> UPDATE, sinon -> INSERT.
+      // Avant, un simple UPDATE échouait silencieusement quand le tenant n'avait
+      // pas encore de ligne branding (toast "Enregistré" mais 0 ligne modifiée).
+      const { data, error } = await supabase
         .from("tenant_branding")
-        .update({
-          display_name: cabinetInfo.display_name,
-          company_address: cabinetInfo.company_address,
-          company_phone: cabinetInfo.company_phone,
-          company_email: cabinetInfo.company_email,
-          company_website: cabinetInfo.company_website,
-          email_sender_address: cabinetInfo.email_sender_address,
-          claims_notification_email: cabinetInfo.claims_notification_email,
-          iban: cabinetInfo.iban,
-          qr_iban: cabinetInfo.qr_iban,
-          vat_number: cabinetInfo.vat_number,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("tenant_id", tenantId);
+        .upsert(
+          {
+            tenant_id: tenantId,
+            display_name: cabinetInfo.display_name,
+            company_address: cabinetInfo.company_address,
+            company_phone: cabinetInfo.company_phone,
+            company_email: cabinetInfo.company_email,
+            company_website: cabinetInfo.company_website,
+            email_sender_address: cabinetInfo.email_sender_address,
+            claims_notification_email: cabinetInfo.claims_notification_email,
+            iban: cabinetInfo.iban,
+            qr_iban: cabinetInfo.qr_iban,
+            vat_number: cabinetInfo.vat_number,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id" }
+        )
+        .select()
+        .single();
 
       if (error) throw error;
+      if (!data) throw new Error("Aucune donnée retournée après l'enregistrement.");
 
       setOriginalInfo(cabinetInfo);
       setHasChanges(false);
       toast.success(t("settings.saved"));
     } catch (error) {
       console.error("Error saving cabinet info:", error);
-      toast.error(t("common.error"));
+      const message = error instanceof Error ? error.message : t("common.error");
+      toast.error(message);
     } finally {
       setSaving(false);
     }
