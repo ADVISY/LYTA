@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter } from "lucide-react";
+import { useTenantDocumentTypes } from "@/hooks/useTenantLookups";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -138,6 +146,13 @@ export default function ClientDetail() {
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
   const [importSignatureOpen, setImportSignatureOpen] = useState(false);
   const [signatureRefreshTick, setSignatureRefreshTick] = useState(0);
+  // Documents tab filters + change-type dialog
+  const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
+  const [docDateFrom, setDocDateFrom] = useState<string>("");
+  const [docDateTo, setDocDateTo] = useState<string>("");
+  const [editTypeDocId, setEditTypeDocId] = useState<string | null>(null);
+  const [editTypeDocKind, setEditTypeDocKind] = useState<string>("autre");
+  const { rows: dynamicDocTypes } = useTenantDocumentTypes();
   const [suiviFormOpen, setSuiviFormOpen] = useState(false);
   const [editSuiviOpen, setEditSuiviOpen] = useState(false);
   const [editSuivi, setEditSuivi] = useState<Suivi | null>(null);
@@ -1143,6 +1158,63 @@ export default function ClientDetail() {
                     />
                   </div>
 
+                  {/* Filters */}
+                  {clientDocuments.length > 0 && (
+                    <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/20 rounded-lg border">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Filter className="h-4 w-4" />
+                        Filtrer
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Type</label>
+                        <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
+                          <SelectTrigger className="h-8 w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tous les types</SelectItem>
+                            {(dynamicDocTypes.length > 0 ? dynamicDocTypes.map(r => ({ value: r.code, label: r.label })) : docKindOptions).map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Du</label>
+                        <Input
+                          type="date"
+                          value={docDateFrom}
+                          onChange={(e) => setDocDateFrom(e.target.value)}
+                          className="h-8 w-[150px]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Au</label>
+                        <Input
+                          type="date"
+                          value={docDateTo}
+                          onChange={(e) => setDocDateTo(e.target.value)}
+                          className="h-8 w-[150px]"
+                        />
+                      </div>
+                      {(docTypeFilter !== "all" || docDateFrom || docDateTo) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDocTypeFilter("all");
+                            setDocDateFrom("");
+                            setDocDateTo("");
+                          }}
+                          className="h-8"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Réinitialiser
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Documents List */}
                   {documentsLoading ? (
                     <p className="text-muted-foreground text-center py-8">Chargement...</p>
@@ -1151,55 +1223,131 @@ export default function ClientDetail() {
                       <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
                       <p className="text-muted-foreground">Aucun document pour ce client</p>
                     </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nom du fichier</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Date d'ajout</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {clientDocuments.map((doc) => (
-                          <TableRow key={doc.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-primary" />
-                                {doc.file_name}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{getDocKindLabel(doc.doc_kind || 'autre')}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(doc.created_at), "dd.MM.yyyy HH:mm")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDocumentView(doc.file_key)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => handleDocumentDelete(doc.id, doc.file_key)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
+                  ) : (() => {
+                    const filtered = clientDocuments.filter((doc) => {
+                      if (docTypeFilter !== "all" && (doc.doc_kind || "autre") !== docTypeFilter) return false;
+                      if (docDateFrom && new Date(doc.created_at) < new Date(docDateFrom)) return false;
+                      if (docDateTo) {
+                        const end = new Date(docDateTo);
+                        end.setHours(23, 59, 59, 999);
+                        if (new Date(doc.created_at) > end) return false;
+                      }
+                      return true;
+                    });
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <Filter className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                          <p className="text-muted-foreground text-sm">Aucun document ne correspond aux filtres</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom du fichier</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Date d'ajout</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map((doc) => (
+                            <TableRow key={doc.id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-primary" />
+                                  {doc.file_name}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{getDocKindLabel(doc.doc_kind || 'autre')}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(doc.created_at), "dd.MM.yyyy HH:mm")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Modifier le type"
+                                    onClick={() => {
+                                      setEditTypeDocId(doc.id);
+                                      setEditTypeDocKind(doc.doc_kind || "autre");
+                                    }}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDocumentView(doc.file_key)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDocumentDelete(doc.id, doc.file_key)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+                  })()}
+
+                  {/* Dialog : modifier le type d'un document */}
+                  <Dialog open={!!editTypeDocId} onOpenChange={(open) => { if (!open) setEditTypeDocId(null); }}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Modifier le type du document</DialogTitle>
+                        <DialogDescription>
+                          Choisis le nouveau type pour ce document. Le fichier reste inchangé.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-2">
+                        <Select value={editTypeDocKind} onValueChange={setEditTypeDocKind}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(dynamicDocTypes.length > 0 ? dynamicDocTypes.map(r => ({ value: r.code, label: r.label })) : docKindOptions).map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditTypeDocId(null)}>Annuler</Button>
+                        <Button
+                          onClick={async () => {
+                            if (!editTypeDocId) return;
+                            const { error } = await supabase
+                              .from("documents")
+                              .update({ doc_kind: editTypeDocKind })
+                              .eq("id", editTypeDocId);
+                            if (error) {
+                              toast({ title: "Erreur", description: error.message, variant: "destructive" });
+                              return;
+                            }
+                            toast({ title: "Type mis à jour" });
+                            setEditTypeDocId(null);
+                            await loadDocuments();
+                          }}
+                        >
+                          Enregistrer
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </TabsContent>
