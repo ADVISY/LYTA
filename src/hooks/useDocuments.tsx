@@ -76,6 +76,31 @@ export function useDocuments() {
     }
   };
 
+  const updateDocument = async (id: string, updates: Partial<Pick<Document, 'doc_kind' | 'file_name'>>) => {
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Document mis à jour",
+        description: "Les modifications ont été enregistrées"
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: translateError(error.message),
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const deleteDocument = async (id: string) => {
     try {
       const { error } = await supabase
@@ -112,6 +137,7 @@ export function useDocuments() {
     prevPage,
     fetchDocuments: refetch,
     createDocument,
+    updateDocument,
     deleteDocument
   };
 }

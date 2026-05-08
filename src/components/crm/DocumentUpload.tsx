@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, FileText, Loader2 } from "lucide-react";
+import { useTenantDocumentTypes } from "@/hooks/useTenantLookups";
 
 interface DocumentUploadProps {
   onUpload: (doc: { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number }) => void;
@@ -20,7 +20,10 @@ interface DocumentUploadProps {
   showList?: boolean;
 }
 
-const docKindOptions = [
+// Fallback hardcoded list (used only if the hook hasn't loaded yet, to avoid a
+// flash of empty Select). Once the hook returns rows, we use those instead so
+// tenants see their custom document types too.
+const FALLBACK_DOC_KINDS = [
   { value: "police_assurance", label: "Police d'assurance" },
   { value: "piece_identite", label: "Pièce d'identité" },
   { value: "resiliation", label: "Résiliation" },
@@ -36,63 +39,91 @@ export default function DocumentUpload({ onUpload, onRemove, documents = [], sho
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedKind, setSelectedKind] = useState("police_assurance");
+  const { rows: dynamicTypes } = useTenantDocumentTypes();
+
+  // Use dynamic types from the catalog if loaded, otherwise the hardcoded fallback
+  const docKindOptions = useMemo(() => {
+    if (dynamicTypes.length > 0) {
+      return dynamicTypes.map((r) => ({ value: r.code, label: r.label }));
+    }
+    return FALLBACK_DOC_KINDS;
+  }, [dynamicTypes]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validate file size (10MB max per file)
+    const oversize = files.find((f) => f.size > 10 * 1024 * 1024);
+    if (oversize) {
       toast({
         title: "Fichier trop volumineux",
-        description: "La taille maximale est de 10MB",
+        description: `${oversize.name} dépasse 10 Mo. Aucun fichier n'a été uploadé.`,
         variant: "destructive",
       });
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
     setUploading(true);
 
-    try {
-      // Generate unique file path - use public-deposits folder for public access
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `public-deposits/${fileName}`;
+    let okCount = 0;
+    const errors: string[] = [];
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file);
+    for (const file of files) {
+      try {
+        // Generate unique file path - use public-deposits folder for public access
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `public-deposits/${fileName}`;
 
-      if (uploadError) throw uploadError;
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(filePath, file);
 
-      // Call onUpload with document info
-      onUpload({
-        file_key: filePath,
-        file_name: file.name,
-        doc_kind: selectedKind,
-        mime_type: file.type,
-        size_bytes: file.size,
-      });
+        if (uploadError) throw uploadError;
 
-      toast({
-        title: "Document uploadé",
-        description: file.name,
-      });
+        // Call onUpload with document info — once per file
+        onUpload({
+          file_key: filePath,
+          file_name: file.name,
+          doc_kind: selectedKind,
+          mime_type: file.type,
+          size_bytes: file.size,
+        });
 
-      // Reset input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        okCount += 1;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`${file.name}: ${message}`);
       }
-    } catch (error: any) {
+    }
+
+    if (okCount > 0) {
       toast({
-        title: "Erreur d'upload",
-        description: error.message,
+        title: okCount === 1 ? "Document uploadé" : `${okCount} documents uploadés`,
+        description:
+          errors.length > 0
+            ? `${errors.length} fichier(s) ont échoué — voir détails ci-dessous.`
+            : files.length === 1
+            ? files[0].name
+            : `${okCount} fichier(s) ajoutés avec le type « ${getDocKindLabel(selectedKind)} »`,
+      });
+    }
+    if (errors.length > 0) {
+      toast({
+        title: "Erreur sur certains fichiers",
+        description: errors.slice(0, 3).join("\n") + (errors.length > 3 ? `\n…et ${errors.length - 3} autres` : ""),
         variant: "destructive",
       });
-    } finally {
-      setUploading(false);
     }
+
+    // Reset input so re-uploading the same file triggers onChange again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setUploading(false);
   };
 
   const getDocKindLabel = (kind: string) => {
@@ -118,6 +149,7 @@ export default function DocumentUpload({ onUpload, onRemove, documents = [], sho
           ref={fileInputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
           id="file-upload"
@@ -169,4 +201,4 @@ export default function DocumentUpload({ onUpload, onRemove, documents = [], sho
   );
 }
 
-export { docKindOptions };
+export const docKindOptions = FALLBACK_DOC_KINDS;

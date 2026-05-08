@@ -15,7 +15,7 @@ import {
   Settings, User, Building2, Package, Percent, Moon, Sun, 
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
   Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
-  CreditCard, Briefcase, MapPin, RefreshCw
+  CreditCard, Briefcase, MapPin, RefreshCw, FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,7 @@ import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
 import { CabinetInfoSettings } from "@/components/crm/settings/CabinetInfoSettings";
+import { TenantCatalogsTab } from "@/components/crm/settings/TenantCatalogsTab";
 import CRMAbonnement from "@/pages/crm/CRMAbonnement";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -943,17 +944,9 @@ export default function CRMParametres() {
                   <KeyRound className="h-4 w-4" />
                   <span className="hidden sm:inline">{t('collaborators.permissions')}</span>
                 </TabsTrigger>
-                <TabsTrigger value="compagnies" className="gap-2 whitespace-nowrap">
-                  <Building2 className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t('settings.companies')}</span>
-                </TabsTrigger>
-                <TabsTrigger value="produits" className="gap-2 whitespace-nowrap">
-                  <Package className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t('settings.products')}</span>
-                </TabsTrigger>
-                <TabsTrigger value="commissions" className="gap-2 whitespace-nowrap">
-                  <Percent className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t('nav.commissions')}</span>
+                <TabsTrigger value="catalogues" className="gap-2 whitespace-nowrap">
+                  <FolderOpen className="h-4 w-4" />
+                  <span className="hidden sm:inline">Catalogues</span>
                 </TabsTrigger>
                 <TabsTrigger value="apparence" className="gap-2 whitespace-nowrap">
                   <Palette className="h-4 w-4" />
@@ -2084,6 +2077,13 @@ export default function CRMParametres() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
+
+        {/* CATALOGUES (types de documents + services facturables) */}
+        {canManageAdminSettings && (
+          <TabsContent value="catalogues" className="space-y-6 mt-6">
+            <TenantCatalogsTab />
+          </TabsContent>
         )}
 
         {/* APPARENCE */}
