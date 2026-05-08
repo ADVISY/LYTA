@@ -1112,11 +1112,14 @@ serve(async (req) => {
 
     const productMatchResults = await mapWithConcurrency(productsToMatch, getProductMatchConcurrency(), async (product) => {
       try {
-        // Try to find a matching product using fuzzy matching
+        // Try to find a matching product using fuzzy matching.
+        // p_include_candidates=true so we also reuse pending/merged products from prior scans
+        // instead of creating a new candidate every time.
         const { data: matches, error: matchError } = await supabase.rpc('find_product_by_alias', {
           search_term: product.product_name,
           company_name: product.company || null,
-          category_hint: product.product_category || null
+          category_hint: product.product_category || null,
+          p_include_candidates: true
         });
 
         if (matchError) {

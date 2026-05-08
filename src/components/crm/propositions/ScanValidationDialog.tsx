@@ -954,12 +954,19 @@ export default function ScanValidationDialog({
           // Build products_data array EXACTLY like ContractForm (same structure)
           const productsData = await Promise.all(products.map(async (p) => {
             const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
+            // The IA classifies each product with product_category: "LAMal" | "LCA" | "VIE" | "NON-VIE" | "LAA" | "LPP"
+            // (see scan-document/index.ts:47). We must preserve LAMal as a subtype so the edit form
+            // routes it to the LAMal block instead of LCA — even when the commercial name doesn't
+            // contain "LAMal" (e.g. Swica FAVORIT MEDPHARM, Helsana PRIMEO).
+            const rawCategory = (p.product_category || '').toUpperCase();
+            const isLamalSubtype = rawCategory === 'LAMAL' || rawCategory === 'LAMAL'.normalize() || rawCategory.includes('LAMAL');
             try {
               const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
                 productId: result.productId,  // camelCase like ContractForm
                 name: p.product_name || 'Produit',
                 category: result.category,  // Use catalog category for proper display (health, life, auto, etc.)
+                subtype: isLamalSubtype ? 'LAMAL' : null,
                 premium: p.premium_monthly || 0,  // monthly premium like ContractForm
                 deductible: p.franchise || null,
                 durationYears: null,  // For life insurance compatibility with ContractForm
@@ -970,6 +977,7 @@ export default function ScanValidationDialog({
                 productId: '',
                 name: p.product_name || 'Produit',
                 category: 'health',  // Default to health on error
+                subtype: isLamalSubtype ? 'LAMAL' : null,
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
                 durationYears: null,
@@ -979,7 +987,7 @@ export default function ScanValidationDialog({
 
           // Use the first resolved product's ID as the main policy product_id
           const mainProductId = productsData.find(p => p.productId)?.productId;
-          
+
           if (!mainProductId) {
             console.warn(`[ScanValidation] No valid product ID found for old policy group: ${companyKey}`);
             continue;
@@ -1089,25 +1097,30 @@ export default function ScanValidationDialog({
           const { clientId, personLabel, products } = group;
           const firstProduct = products[0];
           
-          // Build products_data array EXACTLY like ContractForm (same structure)
+          // Build products_data array EXACTLY like ContractForm (same structure).
+          // See comment on the old-products branch above: we preserve LAMal as a subtype.
           const productsDataNew = await Promise.all(products.map(async (p) => {
             const productNameToSearch = p.product_name || `Produit ${p.product_category || 'Assurance'}`;
+            const rawCategory = (p.product_category || '').toUpperCase();
+            const isLamalSubtype = rawCategory === 'LAMAL' || rawCategory.includes('LAMAL');
             try {
               const result = await resolveOrCreateProduct(productNameToSearch, firstProduct.company, p.product_category);
               return {
-                productId: result.productId,  // camelCase like ContractForm
+                productId: result.productId,
                 name: p.product_name || 'Produit',
-                category: result.category,  // Use catalog category for proper display (health, life, auto, etc.)
-                premium: p.premium_monthly || 0,  // monthly premium like ContractForm
+                category: result.category,
+                subtype: isLamalSubtype ? 'LAMAL' : null,
+                premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
-                durationYears: null,  // For life insurance compatibility with ContractForm
+                durationYears: null,
               };
             } catch (e) {
               console.warn(`Could not resolve product ${productNameToSearch}:`, e);
               return {
                 productId: '',
                 name: p.product_name || 'Produit',
-                category: 'health',  // Default to health on error
+                category: 'health',
+                subtype: isLamalSubtype ? 'LAMAL' : null,
                 premium: p.premium_monthly || 0,
                 deductible: p.franchise || null,
                 durationYears: null,

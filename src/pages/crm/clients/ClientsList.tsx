@@ -31,11 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import { useTranslation } from "react-i18next";
+import { ProspectImportDialog } from "@/components/crm/clients/ProspectImportDialog";
 
 
 export default function ClientsList() {
@@ -58,6 +59,7 @@ export default function ClientsList() {
   } = useClients(typeFilter);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
     prospect: { label: t('clients.prospect'), color: "text-blue-700", bgColor: "bg-blue-100" },
@@ -157,13 +159,25 @@ export default function ClientsList() {
             </p>
           </div>
         </div>
-        <Button 
-          onClick={() => navigate("/crm/clients/nouveau")}
-          className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20"
-        >
-          <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
-          {t('clients.newAddress')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {typeFilter === "client" && (
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+              className="border-primary/30 hover:bg-primary/5 hover:border-primary/50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Importer
+            </Button>
+          )}
+          <Button
+            onClick={() => navigate("/crm/clients/nouveau")}
+            className="group bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20"
+          >
+            <Plus className="h-4 w-4 mr-2 transition-transform group-hover:rotate-90" />
+            {t('clients.newAddress')}
+          </Button>
+        </div>
       </div>
 
       {/* Type Filter Tabs */}
@@ -338,6 +352,12 @@ export default function ClientsList() {
         totalPages={totalPages}
         totalCount={totalCount}
         onPageChange={goToPage}
+      />
+
+      <ProspectImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => fetchClients()}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

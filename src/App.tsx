@@ -11,6 +11,7 @@ import { CelebrationProvider } from "./hooks/useCelebration";
 import Connexion from "./pages/Connexion";
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const DeposerContrat = lazy(() => import("./pages/DeposerContrat"));
+const Signer = lazy(() => import("./pages/Signer"));
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -43,6 +44,7 @@ const ClientContracts = lazy(() => import("./pages/client/ClientContracts"));
 const ClientDocuments = lazy(() => import("./pages/client/ClientDocuments"));
 const ClientMessages = lazy(() => import("./pages/client/ClientMessages"));
 const ClientNotifications = lazy(() => import("./pages/client/ClientNotifications"));
+const ClientReferrals = lazy(() => import("./pages/client/ClientReferrals"));
 const ClientProfile = lazy(() => import("./pages/client/ClientProfile"));
 const ClientClaims = lazy(() => import("./pages/client/ClientClaims"));
 
@@ -97,6 +99,7 @@ const App = () => (
               <Route path="/connexion" element={<Connexion />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/deposer-contrat" element={<DeposerContrat />} />
+              <Route path="/signer/:token" element={<Signer />} />
               <Route path="/font-preview" element={<FontPreview />} />
               
               {/* CRM Routes */}
@@ -147,6 +150,7 @@ const App = () => (
                 <Route path="sinistres" element={<ClientClaims />} />
                 <Route path="messages" element={<ClientMessages />} />
                 <Route path="notifications" element={<ClientNotifications />} />
+                <Route path="recommandations" element={<ClientReferrals />} />
                 <Route path="profil" element={<ClientProfile />} />
               </Route>
               

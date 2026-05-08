@@ -49,6 +49,10 @@ type SelectedProduct = {
   premium: string; // Individual premium for this product
   deductible: string;
   durationYears: string; // For life insurance
+  // Sous-type pour les produits santé : 'LAMAL' (assurance de base obligatoire) vs LCA (complémentaire).
+  // Source de vérité prioritaire à la détection par nom : permet de classer correctement les produits
+  // dont le nom commercial ne contient pas "LAMal" (ex: Swica FAVORIT MEDPHARM, Helsana PRIMEO).
+  subtype?: 'LAMAL' | null;
 };
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
@@ -101,11 +105,21 @@ const categoryColors: Record<string, string> = {
   other: "bg-gray-50 text-gray-800 border-gray-200",
 };
 
-// Helper to detect if a health product is LAMal or LCA
+// Helper to detect if a health product is LAMal (assurance de base obligatoire) — name-based fallback.
+// Used when only the product name is available (legacy code paths).
 const isLamalProduct = (productName: string | null | undefined): boolean => {
   if (!productName) return false;
   const name = productName.toLowerCase();
   return name.includes('lamal') || name.includes('base') || name.includes('obligatoire');
+};
+
+// Preferred LAMal detector: trusts the explicit `subtype` flag carried in products_data
+// (set by the IA scan when it detects a LAMal product, regardless of commercial name).
+// Falls back to name heuristic for legacy data without subtype.
+const isLamal = (product: { subtype?: 'LAMAL' | null; name?: string | null } | null | undefined): boolean => {
+  if (!product) return false;
+  if (product.subtype === 'LAMAL') return true;
+  return isLamalProduct(product.name);
 };
 
 // Helper to normalize category from database (handles legacy IA Scan values like 'LAMal', 'LCA')
@@ -244,14 +258,15 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         const loadedProducts: SelectedProduct[] = await Promise.all(productsData.map(async (prod) => {
           // Normalize category to handle legacy IA Scan values (LAMal, LCA -> health)
           const normalizedCategory = normalizeCategoryFromDB(prod.category);
-          const isLamal = normalizedCategory === 'health' && isLamalProduct(prod.name);
-          
+          // Trust the explicit subtype if persisted (preferred), else fall back to name heuristic.
+          const productIsLamal = normalizedCategory === 'health' && isLamal({ subtype: prod.subtype, name: prod.name });
+
           // Set LAMal fields if applicable
-          if (isLamal && prod.premium) {
+          if (productIsLamal && prod.premium) {
             setLamalPremium(String(prod.premium));
             if (prod.deductible) setLamalFranchise(String(prod.deductible));
           }
-          
+
           // If productId is missing, try to find it by name
           let resolvedProductId = prod.productId || '';
           if (!resolvedProductId && prod.name) {
@@ -265,7 +280,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               resolvedProductId = matchedProduct.id;
             }
           }
-          
+
           return {
             id: generateId(),
             productId: resolvedProductId,
@@ -274,6 +289,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             premium: String(prod.premium || ''),
             deductible: String(prod.deductible || ''),
             durationYears: String(prod.durationYears || ''),
+            // Persist the LAMal flag derived from data (or implied by name) so subsequent saves keep it
+            subtype: productIsLamal ? 'LAMAL' : null,
           };
         }));
         
@@ -281,9 +298,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       } else if (existingPolicy.product) {
         // Fallback: single product from product relation
         const category = normalizeCategoryFromDB(existingPolicy.product.category);
-        const isLamal = category === 'health' && isLamalProduct(existingPolicy.product.name);
-        
-        if (isLamal) {
+        const productIsLamal = category === 'health' && isLamalProduct(existingPolicy.product.name);
+
+        if (productIsLamal) {
           setLamalPremium(String(existingPolicy.premium_monthly || ''));
           setLamalFranchise(String(existingPolicy.deductible || ''));
         }
@@ -296,6 +313,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium: String(existingPolicy.premium_monthly || ''),
           deductible: String(existingPolicy.deductible || ''),
           durationYears: '',
+          subtype: productIsLamal ? 'LAMAL' : null,
         }]);
       }
     }
@@ -361,7 +379,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // Remove product
         return currentList.filter((_, index) => index !== existingIndex);
       } else {
-        // Add product
+        // Add product. For health products, derive the LAMal flag from the name so the UI
+        // routes it to the correct block immediately (LAMal vs LCA).
         const newProduct: SelectedProduct = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           productId: productId,
@@ -370,6 +389,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium: "",
           deductible: "",
           durationYears: "",
+          subtype: productCategory === 'health' && isLamalProduct(productName) ? 'LAMAL' : null,
         };
         return [...currentList, newProduct];
       }
@@ -409,8 +429,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     const life = safeProducts.filter(p => p.category === 'life');
     const other = safeProducts.filter(p => p.category !== 'health' && p.category !== 'life');
     
-    const healthLamal = health.filter(p => p.name && isLamalProduct(p.name));
-    const healthLca = health.filter(p => !isLamalProduct(p.name || ''));
+    const healthLamal = health.filter(p => isLamal(p));
+    const healthLca = health.filter(p => !isLamal(p));
     
     return { healthLamal, healthLca, life, other, health };
   }, [selectedProducts]);
@@ -479,9 +499,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const productsData = selectedProducts.map(product => {
         let premium = 0;
         let deductible: number | null = null;
-        
+        const productIsLamal = product.category === 'health' && isLamal(product);
+
         if (product.category === 'health') {
-          if (isLamalProduct(product.name)) {
+          if (productIsLamal) {
             premium = parseFloat(lamalPremium) || 0;
             deductible = parseFloat(lamalFranchise) || null;
           } else {
@@ -493,7 +514,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium = parseFloat(product.premium) || 0;
           deductible = parseFloat(product.deductible) || null;
         }
-        
+
         return {
           productId: product.productId,
           name: product.name,
@@ -501,6 +522,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium,
           deductible,
           durationYears: product.durationYears ? parseInt(product.durationYears) : null,
+          // Persist the LAMal flag so the next edit can re-route the product into the LAMal block
+          // even if its commercial name doesn't contain "LAMal" (e.g. Swica FAVORIT MEDPHARM).
+          subtype: productIsLamal ? 'LAMAL' : null,
         };
       });
 

@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileDown, Printer, FileCheck, Save, Loader2 } from "lucide-react";
+import { FileDown, Printer, FileCheck, Save, Loader2, Send } from "lucide-react";
 import { format } from "date-fns";
 import { fr, de, it, enUS } from "date-fns/locale";
 import { Client } from "@/hooks/useClients";
 import html2pdf from "html2pdf.js";
 import SignaturePad from "./SignaturePad";
+import { MandatTemplate, MandatTemplateData } from "@/components/signatures/MandatTemplate";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -75,6 +76,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
   const [signatureAdvisy, setSignatureAdvisy] = useState<string | null>(null);
   const [signatureClient, setSignatureClient] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
   const mandatRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -299,6 +301,100 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Send the mandat for remote signature: broker has signed (signatureAdvisy required),
+  // client signature will be captured later via the public /signer/:token page.
+  const handleSendForRemoteSignature = async () => {
+    if (!signatureAdvisy) {
+      toast({
+        title: t('mandatForm.advisorSignatureRequired') || "Signature courtier requise",
+        description: t('mandatForm.advisorSignatureRequiredDesc') || "Veuillez signer en bas du mandat avant de l'envoyer pour signature à distance.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!client.email && !client.mobile && !client.phone) {
+      toast({
+        title: t('mandatForm.noContactInfo') || "Coordonnées client manquantes",
+        description: t('mandatForm.noContactInfoDesc') || "Le client n'a ni email ni téléphone. Ajoutez au moins un moyen de contact.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user?.id || !tenantId) {
+      toast({
+        title: t('mandatForm.error'),
+        description: "Session expirée. Veuillez vous reconnecter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingInvite(true);
+
+    try {
+      const payload: MandatTemplateData = {
+        companyName,
+        companyLogo,
+        companyAddress,
+        companyPhone,
+        companyEmail,
+        companyWebsite,
+        primaryColor: tenant?.branding?.primary_color || '#1800AD',
+        clientName: getClientName(),
+        clientFullAddress: getFullAddress(),
+        clientLocality: getLocality(),
+        clientBirthdate: getBirthdate(),
+        clientEmail: client.email,
+        clientPhone: client.mobile || client.phone,
+        clientNationality: client.nationality,
+        clientPermitType: client.permit_type,
+        insurances,
+        autreCompany,
+        lieu,
+        signatureDate: new Date().toISOString(),
+        signatureAdvisy,
+        signatureClient: null,
+      };
+
+      const { data: sr, error: insertError } = await supabase
+        .from('signature_requests')
+        .insert({
+          tenant_id: tenantId,
+          client_id: client.id,
+          created_by: user.id,
+          document_kind: 'mandat_gestion',
+          payload: payload as unknown as Record<string, unknown>,
+        })
+        .select('id, access_token')
+        .single();
+
+      if (insertError || !sr) throw insertError || new Error("Création de la demande de signature échouée");
+
+      await invokeSupabaseFunction("send-signature-invite", {
+        body: {
+          signatureRequestId: sr.id,
+          appOrigin: window.location.origin,
+        },
+      });
+
+      toast({
+        title: t('mandatForm.inviteSent') || "Invitation envoyée",
+        description: t('mandatForm.inviteSentDesc') || "Le client a reçu un lien pour signer le mandat à distance.",
+      });
+
+      onSaved?.();
+    } catch (error: unknown) {
+      console.error("Erreur envoi signature à distance:", error);
+      toast({
+        title: t('mandatForm.error'),
+        description: error instanceof Error ? error.message : "Erreur inconnue",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingInvite(false);
     }
   };
 
@@ -534,8 +630,8 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
               <Printer className="h-4 w-4" />
               {t('mandatForm.print')}
             </Button>
-            <Button 
-              onClick={handleSaveMandat} 
+            <Button
+              onClick={handleSaveMandat}
               disabled={isSaving || !signatureAdvisy || !signatureClient}
               className="gap-2 bg-green-600 hover:bg-green-700"
             >
@@ -546,265 +642,69 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
               )}
               {isSaving ? t('common.saving') : t('mandatForm.saveMandat')}
             </Button>
+            <Button
+              onClick={handleSendForRemoteSignature}
+              disabled={isSendingInvite || !signatureAdvisy}
+              variant="default"
+              className="gap-2 bg-blue-600 hover:bg-blue-700"
+            >
+              {isSendingInvite ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {isSendingInvite
+                ? (t('mandatForm.sendingInvite') || 'Envoi en cours…')
+                : (t('mandatForm.sendForRemoteSignature') || 'Envoyer pour signature à distance')}
+            </Button>
           </div>
-          {(!signatureAdvisy || !signatureClient) && (
-            <p className="text-sm text-muted-foreground">
-              {t('mandatForm.signaturesRequiredDesc')}
-            </p>
-          )}
+          <div className="space-y-1">
+            {(!signatureAdvisy || !signatureClient) && (
+              <p className="text-sm text-muted-foreground">
+                {t('mandatForm.signaturesRequiredDesc')}
+              </p>
+            )}
+            {!signatureAdvisy && (
+              <p className="text-xs text-amber-700">
+                {t('mandatForm.advisorSignatureRequiredHint') || "La signature courtier est requise avant l'envoi à distance."}
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Aperçu du mandat */}
-      {showPreview && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('mandatForm.showPreview')}</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div 
-              ref={mandatRef} 
-              className="bg-white text-black mx-auto"
-              style={{ 
-                fontFamily: 'Arial, Helvetica, sans-serif', 
-                lineHeight: 1.4,
-                width: '190mm',
-                fontSize: '11px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-              }}
-            >
-              {/* ========== PAGE 1 ========== */}
-              <div style={{ padding: '30px 35px', boxSizing: 'border-box', position: 'relative', overflow: 'hidden' }}>
-                {/* Filigrane logo en fond */}
-                {companyLogo && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    top: '50%', 
-                    left: '50%', 
-                    transform: 'translate(-50%, -50%) rotate(-30deg)', 
-                    opacity: 0.06, 
-                    pointerEvents: 'none',
-                    zIndex: 0
-                  }}>
-                    <img src={companyLogo} alt="" style={{ width: '400px', height: 'auto' }} />
-                  </div>
-                )}
-
-                {/* Contenu page 1 */}
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  {/* En-tête avec logo */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', paddingBottom: '15px', borderBottom: '3px solid #1800AD' }}>
-                    <div>
-                      {companyLogo && (
-                        <img src={companyLogo} alt={companyName} style={{ height: '50px', width: 'auto', marginBottom: '8px' }} />
-                      )}
-                      <div style={{ fontSize: '9px', color: '#666' }}>
-                        {companyAddress && <>{companyAddress}<br/></>}
-                        {companyEmail}{companyWebsite ? ` • ${companyWebsite}` : ''}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '10px', backgroundColor: '#1800AD', color: 'white', padding: '4px 12px', borderRadius: '12px', display: 'inline-block' }}>
-                        Inscrit FINMA
-                      </div>
-                      <div style={{ fontSize: '9px', color: '#666', marginTop: '5px' }}>
-                        {format(new Date(), "dd.MM.yyyy")}
-                      </div>
-                    </div>
-                  </div>
-
-                {/* Titre principal */}
-                <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-                  <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1800AD', letterSpacing: '3px', margin: 0 }}>
-                    MANDAT DE GESTION
-                  </h1>
-                  <div style={{ width: '80px', height: '3px', backgroundColor: '#1800AD', margin: '10px auto 0' }} />
-                </div>
-
-                {/* Mandant */}
-                <div style={{ backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e9ecef', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#666', marginBottom: '8px', letterSpacing: '2px', fontWeight: 'bold' }}>Le Mandant</div>
-                  <div style={{ fontWeight: 'bold', color: '#1800AD', fontSize: '16px', marginBottom: '5px' }}>{getClientName()}</div>
-                  <div style={{ fontSize: '12px', color: '#333', marginBottom: '3px' }}>{getFullAddress()}</div>
-                  <div style={{ fontSize: '12px', color: '#333', marginBottom: '3px' }}>{getLocality()}</div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>Né(e) le {getBirthdate()}</div>
-                  {client.email && <div style={{ fontSize: '11px', color: '#666' }}>{client.email}</div>}
-                  {(client.mobile || client.phone) && <div style={{ fontSize: '11px', color: '#666' }}>{client.mobile || client.phone}</div>}
-                  <div style={{ fontSize: '11px', color: '#666' }}>Nationalité: {client.nationality || "—"} • Permis: {client.permit_type || "—"}</div>
-                </div>
-
-                {/* Mandataire */}
-                <div style={{ backgroundColor: '#1800AD', color: 'white', padding: '15px 20px', borderRadius: '8px', marginBottom: '25px' }}>
-                  <div style={{ fontSize: '10px', textTransform: 'uppercase', opacity: 0.7, marginBottom: '8px', letterSpacing: '2px', fontWeight: 'bold' }}>Le Mandataire</div>
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '5px' }}>{companyName}</div>
-                  {companyAddress && <div style={{ fontSize: '12px' }}>{companyAddress}</div>}
-                  <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '5px' }}>
-                    {companyEmail}{companyPhone ? ` • ${companyPhone}` : ''}
-                  </div>
-                </div>
-
-                {/* Portefeuille d'assurances */}
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '10px', paddingBottom: '5px', borderBottom: '2px solid #1800AD', letterSpacing: '1px' }}>
-                    PORTEFEUILLE D'ASSURANCES ACTUEL
-                  </div>
-                  {getInsurancesList().length > 0 ? (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#1800AD', color: 'white' }}>
-                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold' }}>Type d'assurance</th>
-                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 'bold' }}>Compagnie actuelle</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getInsurancesList().map((ins, idx) => (
-                          <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white' }}>
-                            <td style={{ padding: '8px 12px', borderBottom: '1px solid #e9ecef' }}>{ins.type}</td>
-                            <td style={{ padding: '8px 12px', borderBottom: '1px solid #e9ecef', fontWeight: 600, color: '#1800AD' }}>{ins.company}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px', textAlign: 'center', color: '#666', fontSize: '11px' }}>
-                      Aucune assurance existante renseignée
-                    </div>
-                  )}
-                </div>
-
-                {/* Pied de page 1 */}
-                <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', borderTop: '1px solid #e9ecef', paddingTop: '10px', marginTop: 'auto' }}>
-                  Page 1/2 • Mandat de Gestion • {getClientName()}
-                </div>
-                </div>{/* Fin contenu page 1 */}
-              </div>
-
-              {/* ========== PAGE 2 ========== */}
-              <div style={{ padding: '30px 35px', boxSizing: 'border-box', pageBreakBefore: 'always', position: 'relative', overflow: 'hidden' }}>
-                {/* Filigrane logo en fond page 2 */}
-                {companyLogo && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    top: '50%', 
-                    left: '50%', 
-                    transform: 'translate(-50%, -50%) rotate(-30deg)', 
-                    opacity: 0.06, 
-                    pointerEvents: 'none',
-                    zIndex: 0
-                  }}>
-                    <img src={companyLogo} alt="" style={{ width: '400px', height: 'auto' }} />
-                  </div>
-                )}
-
-                {/* Contenu page 2 */}
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  {/* En-tête page 2 avec logo */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '10px', borderBottom: '2px solid #1800AD' }}>
-                    {companyLogo ? (
-                      <img src={companyLogo} alt={companyName} style={{ height: '35px', width: 'auto' }} />
-                    ) : (
-                      <div style={{ fontWeight: 'bold', color: '#1800AD' }}>{companyName}</div>
-                    )}
-                    <div style={{ fontSize: '10px', color: '#666' }}>Mandat de Gestion • {getClientName()}</div>
-                  </div>
-
-                {/* Conditions du mandat */}
-                <div style={{ marginBottom: '25px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1800AD', marginBottom: '15px', paddingBottom: '8px', borderBottom: '3px solid #1800AD', letterSpacing: '2px' }}>
-                    CONDITIONS DU MANDAT
-                  </div>
-
-                  <div style={{ display: 'grid', gap: '12px' }}>
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>1. Objet du contrat</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Le présent contrat est un mandat de gestion dans le domaine des assurances de tous types.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>2. Prestations</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>{companyName} négocie les meilleurs contrats d'assurance en fonction des besoins du Mandant. Celui-ci donne procuration au courtier pour entreprendre toutes les démarches nécessaires.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>3. Statut FINMA</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>{companyName}, inscrit auprès de la FINMA en tant que courtier indépendant, collabore de manière neutre avec les principaux assureurs autorisés en Suisse.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>4. Responsabilité</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>{companyName} répond des négligences ou fautes en relation avec l'activité de conseil. Ces risques sont couverts par une assurance RC professionnelle.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>5. Rémunération</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>{companyName} est uniquement rémunéré par les commissions versées par les assureurs. Aucun frais n'est facturé au Mandant.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>6. Procuration</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Le Mandant autorise {companyName} à obtenir tous renseignements auprès des assureurs, modifier les données personnelles et couvertures, et résilier les contrats.</div>
-                    </div>
-                    
-                    <div style={{ backgroundColor: '#f8f9fa', padding: '12px 15px', borderRadius: '6px', borderLeft: '4px solid #1800AD' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1800AD', marginBottom: '4px' }}>7. Durée et for juridique</div>
-                      <div style={{ fontSize: '11px', lineHeight: 1.5, color: '#333' }}>Valable dès signature jusqu'à révocation écrite. Droit suisse applicable.</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Déclaration */}
-                <div style={{ padding: '12px 15px', marginBottom: '20px', fontSize: '10px', fontStyle: 'italic', backgroundColor: '#f8f9fa', borderLeft: '4px solid #1800AD', borderRadius: '4px' }}>
-                  Par sa signature, le Mandant confirme avoir reçu, lu et compris le présent document, met fin à tout mandat de gestion antérieur, et autorise {companyName} à agir en son nom auprès des compagnies d'assurances.
-                </div>
-
-                {/* Date et lieu */}
-                <div style={{ textAlign: 'center', marginBottom: '25px', fontSize: '12px' }}>
-                  Fait à <strong>{lieu || "_______________"}</strong>, le <strong>{format(new Date(), "dd MMMM yyyy", { locale: fr })}</strong>
-                </div>
-
-                {/* Signatures */}
-                <div style={{ display: 'flex', gap: '30px', marginBottom: '30px' }}>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ height: '90px', backgroundColor: '#fafafa', border: '2px dashed #1800AD', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                      {signatureAdvisy ? (
-                        <img src={signatureAdvisy} alt={`Signature ${companyName}`} style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <span style={{ color: '#999', fontSize: '10px' }}>Signature {companyName}</span>
-                      )}
-                    </div>
-                    <div style={{ borderTop: '2px solid #1800AD', paddingTop: '8px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#1800AD' }}>{companyName}</div>
-                      <div style={{ fontSize: '10px', color: '#666' }}>Le Mandataire</div>
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ height: '90px', backgroundColor: '#fafafa', border: '2px dashed #1800AD', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                      {signatureClient ? (
-                        <img src={signatureClient} alt="Signature Mandant" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <span style={{ color: '#999', fontSize: '10px' }}>Signature du Mandant</span>
-                      )}
-                    </div>
-                    <div style={{ borderTop: '2px solid #1800AD', paddingTop: '8px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#1800AD' }}>{getClientName()}</div>
-                      <div style={{ fontSize: '10px', color: '#666' }}>Le Mandant</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pied de page final */}
-                <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '15px', textAlign: 'center', fontSize: '9px', color: '#999' }}>
-                  <div style={{ fontWeight: 'bold', color: '#1800AD', fontSize: '11px' }}>{companyName}</div>
-                  {companyAddress && <div>{companyAddress}</div>}
-                  <div>{companyEmail}{companyWebsite ? ` • ${companyWebsite}` : ''}</div>
-                  <div style={{ marginTop: '8px' }}>Document généré le {format(new Date(), "dd.MM.yyyy 'à' HH:mm")} • Page 2/2</div>
-                </div>
-                </div>{/* Fin contenu page 2 */}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Aperçu du mandat — toujours rendu (caché si !showPreview) pour pouvoir générer le PDF même sans afficher l'aperçu */}
+      <Card style={showPreview ? undefined : { position: 'fixed', top: 0, left: '-99999px', width: '210mm', visibility: 'hidden', pointerEvents: 'none' }}>
+        <CardHeader>
+          <CardTitle>{t('mandatForm.showPreview')}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <MandatTemplate
+            ref={mandatRef}
+            companyName={companyName}
+            companyLogo={companyLogo}
+            companyAddress={companyAddress}
+            companyPhone={companyPhone}
+            companyEmail={companyEmail}
+            companyWebsite={companyWebsite}
+            primaryColor={tenant?.branding?.primary_color || '#1800AD'}
+            clientName={getClientName()}
+            clientFullAddress={getFullAddress()}
+            clientLocality={getLocality()}
+            clientBirthdate={getBirthdate()}
+            clientEmail={client.email}
+            clientPhone={client.mobile || client.phone}
+            clientNationality={client.nationality}
+            clientPermitType={client.permit_type}
+            insurances={insurances}
+            autreCompany={autreCompany}
+            lieu={lieu}
+            signatureAdvisy={signatureAdvisy}
+            signatureClient={signatureClient}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
