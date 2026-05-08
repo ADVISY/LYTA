@@ -4,7 +4,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserTenant } from '@/hooks/useUserTenant';
 
 // CRM/Team notification kinds (NOT client notifications)
-const CRM_NOTIFICATION_KINDS = ['new_contract', 'team_alert', 'task', 'reminder', 'system'];
+const CRM_NOTIFICATION_KINDS = [
+  'new_contract', 'team_alert', 'task', 'reminder', 'system',
+  'success', 'info', 'warning', 'error',
+];
 
 export interface Notification {
   id: string;
@@ -44,8 +47,18 @@ export const useNotifications = () => {
 
       const { data, error } = await query;
 
+      if (import.meta.env.DEV) {
+        console.log('[useNotifications CRM] fetch', {
+          userId: user.id,
+          tenantId,
+          rowsReturned: data?.length ?? 0,
+          kinds: (data ?? []).map(n => n.kind),
+          error: error?.message,
+        });
+      }
+
       if (error) throw error;
-      
+
       setNotifications(data || []);
       setUnreadCount((data || []).filter(n => !n.read_at).length);
     } catch (error) {

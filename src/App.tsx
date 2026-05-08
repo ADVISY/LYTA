@@ -11,6 +11,7 @@ import { CelebrationProvider } from "./hooks/useCelebration";
 import Connexion from "./pages/Connexion";
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const DeposerContrat = lazy(() => import("./pages/DeposerContrat"));
+const Signer = lazy(() => import("./pages/Signer"));
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -35,6 +36,7 @@ const CRMCompta = lazy(() => import("./pages/crm/CRMCompta"));
 const CRMPublicite = lazy(() => import("./pages/crm/CRMPublicite"));
 const CRMAbonnement = lazy(() => import("./pages/crm/CRMAbonnement"));
 const CRMLytaTools = lazy(() => import("./pages/crm/CRMLytaTools"));
+const CRMSignatures = lazy(() => import("./pages/crm/CRMSignatures"));
 
 // Client Portal (lazy loaded)
 const ClientLayout = lazy(() => import("./pages/client/ClientLayout"));
@@ -43,6 +45,7 @@ const ClientContracts = lazy(() => import("./pages/client/ClientContracts"));
 const ClientDocuments = lazy(() => import("./pages/client/ClientDocuments"));
 const ClientMessages = lazy(() => import("./pages/client/ClientMessages"));
 const ClientNotifications = lazy(() => import("./pages/client/ClientNotifications"));
+const ClientReferrals = lazy(() => import("./pages/client/ClientReferrals"));
 const ClientProfile = lazy(() => import("./pages/client/ClientProfile"));
 const ClientClaims = lazy(() => import("./pages/client/ClientClaims"));
 
@@ -97,6 +100,7 @@ const App = () => (
               <Route path="/connexion" element={<Connexion />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/deposer-contrat" element={<DeposerContrat />} />
+              <Route path="/signer/:token" element={<Signer />} />
               <Route path="/font-preview" element={<FontPreview />} />
               
               {/* CRM Routes */}
@@ -118,6 +122,7 @@ const App = () => (
                 <Route path="publicite" element={<CRMPublicite />} />
                 <Route path="abonnement" element={<CRMAbonnement />} />
                 <Route path="tools" element={<CRMLytaTools />} />
+                <Route path="signatures" element={<CRMSignatures />} />
               </Route>
               
               {/* KING Platform Routes */}
@@ -147,6 +152,7 @@ const App = () => (
                 <Route path="sinistres" element={<ClientClaims />} />
                 <Route path="messages" element={<ClientMessages />} />
                 <Route path="notifications" element={<ClientNotifications />} />
+                <Route path="recommandations" element={<ClientReferrals />} />
                 <Route path="profil" element={<ClientProfile />} />
               </Route>
               

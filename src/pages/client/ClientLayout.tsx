@@ -11,19 +11,20 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import MobileBottomNav from "@/components/client/MobileBottomNav";
 import { ClientNotificationBell } from "@/components/client/ClientNotificationBell";
 
-import { 
-  Home, 
-  FileText, 
-  FolderOpen, 
-  MessageCircle, 
-  User, 
+import {
+  Home,
+  FileText,
+  FolderOpen,
+  MessageCircle,
+  User,
   Bell,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  Building2
+  Building2,
+  Gift
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTenant } from "@/contexts/TenantContext";
@@ -35,6 +36,7 @@ const getMenuItems = (t: (key: string) => string) => [
   { to: "/espace-client/sinistres", icon: AlertTriangle, label: t('clientSpace.claims') },
   { to: "/espace-client/messages", icon: MessageCircle, label: t('clientSpace.messages') },
   { to: "/espace-client/notifications", icon: Bell, label: t('clientSpace.notifications') },
+  { to: "/espace-client/recommandations", icon: Gift, label: "Recommander" },
   { to: "/espace-client/profil", icon: User, label: t('clientSpace.myProfile') },
 ];
 

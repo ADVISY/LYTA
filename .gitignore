@@ -22,8 +22,6 @@ dist-ssr
 *.sw?
 .claude/
 .claude*
-CLAUDE.md
-claude.md
 .cursorrules
 .cursorignore
 .cursor/
@@ -38,6 +36,7 @@ claude.md
 docs/
 *.md
 !README.md
+!CLAUDE.md
 audit-details/
 
 .vercel
