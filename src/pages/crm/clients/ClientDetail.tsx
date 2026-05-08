@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +39,8 @@ import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import MandatGestionForm from "@/components/crm/MandatGestionForm";
+import PendingSignaturesPanel from "@/components/signatures/PendingSignaturesPanel";
+import ImportDocumentForSignatureDialog from "@/components/signatures/ImportDocumentForSignatureDialog";
 import SendEmailDialog from "@/components/crm/SendEmailDialog";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import {
@@ -134,6 +136,8 @@ export default function ClientDetail() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
+  const [importSignatureOpen, setImportSignatureOpen] = useState(false);
+  const [signatureRefreshTick, setSignatureRefreshTick] = useState(0);
   const [suiviFormOpen, setSuiviFormOpen] = useState(false);
   const [editSuiviOpen, setEditSuiviOpen] = useState(false);
   const [editSuivi, setEditSuivi] = useState<Suivi | null>(null);
@@ -610,6 +614,10 @@ export default function ClientDetail() {
                   {t('clientDetail.mandate')}
                 </TabsTrigger>
               )}
+              <TabsTrigger value="signatures">
+                <Send className="h-4 w-4 mr-2" />
+                Signatures
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="info">
@@ -1650,6 +1658,29 @@ export default function ClientDetail() {
                 <MandatGestionForm client={client} onSaved={loadDocuments} />
               </TabsContent>
             )}
+
+            <TabsContent value="signatures" className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setImportSignatureOpen(true)}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importer un document à signer
+                </Button>
+              </div>
+              <PendingSignaturesPanel clientId={id!} refreshTick={signatureRefreshTick} />
+              <ImportDocumentForSignatureDialog
+                open={importSignatureOpen}
+                onOpenChange={setImportSignatureOpen}
+                clientId={id!}
+                clientLabel={`${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() || client.company_name || 'Client'}
+                onSent={() => {
+                  setImportSignatureOpen(false);
+                  setSignatureRefreshTick((t) => t + 1);
+                }}
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </div>
