@@ -385,9 +385,9 @@ export function QRInvoicePreview({
           }} />
 
           {/* Main Content Area */}
-          <div style={{ padding: '12mm 15mm 10mm 15mm' }}>
+          <div style={{ padding: '8mm 15mm 6mm 15mm' }}>
             {/* Header with Logo and Invoice Info */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15mm' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8mm' }}>
             {/* Company Info Left */}
               <div style={{ flex: 1 }}>
                 {/* Show logo if available, otherwise show company name as text */}
@@ -455,9 +455,9 @@ export function QRInvoicePreview({
             </div>
 
             {/* Client Information */}
-            <div style={{ 
-              marginBottom: '12mm',
-              padding: '5mm 6mm',
+            <div style={{
+              marginBottom: '6mm',
+              padding: '4mm 6mm',
               backgroundColor: '#f8fafc',
               borderRadius: '3mm',
               borderLeft: `4px solid ${primaryColor}`
@@ -483,7 +483,7 @@ export function QRInvoicePreview({
             </div>
 
             {/* Object */}
-            <div style={{ marginBottom: '8mm' }}>
+            <div style={{ marginBottom: '4mm' }}>
               <span style={{ 
                 fontSize: '9pt', 
                 fontWeight: '600', 
@@ -497,10 +497,10 @@ export function QRInvoicePreview({
             </div>
 
             {/* Invoice Table */}
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse', 
-              marginBottom: '8mm',
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              marginBottom: '5mm',
               fontSize: '9pt'
             }}>
               <thead>
@@ -580,22 +580,22 @@ export function QRInvoicePreview({
             </table>
 
             {/* Totals */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10mm' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '5mm' }}>
               <div style={{ width: '75mm' }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  padding: '2.5mm 0',
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '1.5mm 0',
                   fontSize: '9pt',
                   color: '#64748b'
                 }}>
                   <span>Sous-total HT</span>
                   <span>CHF {invoice.amount_ht.toFixed(2)}</span>
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  padding: '2.5mm 0',
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '1.5mm 0',
                   fontSize: '9pt',
                   color: '#64748b',
                   borderBottom: '1px solid #e2e8f0'
@@ -603,11 +603,11 @@ export function QRInvoicePreview({
                   <span>TVA ({invoice.vat_rate}%)</span>
                   <span>CHF {invoice.vat_amount.toFixed(2)}</span>
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  padding: '4mm 5mm',
-                  marginTop: '2mm',
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '3mm 5mm',
+                  marginTop: '1.5mm',
                   backgroundColor: primaryColor,
                   color: '#ffffff',
                   borderRadius: '2mm',

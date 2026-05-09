@@ -20,6 +20,7 @@ import { Loader2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabaseConfig } from "@/integrations/supabase/config";
 
 export interface SwissPostalCodeFieldsProps {
   postalCode: string;
@@ -161,12 +162,25 @@ export function SwissPostalCodeFields({
 
     const timer = window.setTimeout(async () => {
       try {
-        const url = `https://openplz.org/api/ch/Localities?postalCode=${encodeURIComponent(trimmed)}`;
+        // Call our Supabase Edge Function proxy instead of openplz.org
+        // directly. Reasons:
+        //   - Some tenant networks fail to resolve openplz.org (DNS),
+        //     and the request never even gets a CSP / CORS check
+        //   - Our CSP already whitelists *.supabase.co, no extra config
+        //   - Edge Function caches & swallows upstream failures so the
+        //     UI never sees a hard error
+        const url = `${supabaseConfig.url}/functions/v1/swiss-postal-code-lookup?postalCode=${encodeURIComponent(trimmed)}`;
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
           console.log("[SwissPostalCodeFields] fetching", url);
         }
-        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            apikey: supabaseConfig.publishableKey,
+            Authorization: `Bearer ${supabaseConfig.publishableKey}`,
+          },
+        });
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
           console.log("[SwissPostalCodeFields] response", res.status, res.statusText);
