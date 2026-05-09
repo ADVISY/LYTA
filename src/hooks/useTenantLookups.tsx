@@ -52,13 +52,30 @@ function useTenantLookup({ table }: UseTenantLookupOptions): UseTenantLookupRetu
         .order("label", { ascending: true });
       if (error) throw error;
       setRows((data ?? []) as LookupRow[]);
-    } catch (e) {
-      console.error(`[useTenantLookup:${table}] fetch error`, e);
+    } catch (e: any) {
+      // Surface the full Supabase error (code/message/details/hint) so a
+      // 400 / 403 stops being a silent "Erreur" toast and we can debug
+      // RLS or schema issues from F12 console.
+      console.error(`[useTenantLookup:${table}] fetch error`, {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+        raw: e,
+      });
+      toast({
+        title: `Erreur de chargement (${table})`,
+        description:
+          e?.message ||
+          e?.details ||
+          "Impossible de charger la liste — voir la console (F12) pour le détail.",
+        variant: "destructive",
+      });
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [table]);
+  }, [table, toast]);
 
   useEffect(() => {
     if (!tenantLoading) {
@@ -86,10 +103,25 @@ function useTenantLookup({ table }: UseTenantLookupOptions): UseTenantLookupRetu
       toast({ title: "Ajouté" });
       await fetchRows();
       return data as LookupRow;
-    } catch (e) {
-      console.error(`[useTenantLookup:${table}] create error`, e);
-      const msg = e instanceof Error ? e.message : "Erreur";
-      toast({ title: "Erreur", description: msg, variant: "destructive" });
+    } catch (e: any) {
+      console.error(`[useTenantLookup:${table}] create error`, {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+        raw: e,
+      });
+      const description =
+        e?.message ||
+        e?.details ||
+        e?.hint ||
+        (typeof e === "string" ? e : null) ||
+        "Erreur inconnue — voir la console (F12) pour le détail.";
+      toast({
+        title: "Erreur lors de l'ajout",
+        description,
+        variant: "destructive",
+      });
       return null;
     }
   };

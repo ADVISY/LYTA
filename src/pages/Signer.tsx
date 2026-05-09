@@ -363,7 +363,14 @@ export default function Signer() {
     try {
       // Wait one frame so the rendered MandatTemplate picks up the latest signatureClient
       await new Promise((r) => requestAnimationFrame(() => r(null)));
+      // eslint-disable-next-line no-console
+      console.log("[Signer] generating signed PDF…");
       const signedPdfBase64 = await generateSignedPdfBase64();
+      // eslint-disable-next-line no-console
+      console.log("[Signer] signed PDF generated", {
+        base64Length: signedPdfBase64.length,
+        approxBytes: Math.round((signedPdfBase64.length * 3) / 4),
+      });
 
       await callCompleteSignature({
         token,
@@ -374,6 +381,8 @@ export default function Signer() {
 
       setScreen({ kind: "success" });
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[Signer] handleSubmit failed", err);
       const message = err instanceof Error ? err.message : "Erreur inconnue";
       setScreen({ kind: "error", message });
     }
