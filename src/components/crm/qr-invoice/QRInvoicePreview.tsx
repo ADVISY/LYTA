@@ -532,31 +532,44 @@ export function QRInvoicePreview({
                 </tr>
               </thead>
               <tbody>
+                {/*
+                  Compact row sizing — the QR-bill section is absolutely
+                  pinned to the bottom 105 mm of the page, so the table
+                  realistically has ~95 mm of vertical room. Tight padding
+                  + slightly smaller body font lets us fit ~12-14 lines
+                  before any overflow risk (vs ~7-8 with the previous
+                  5 mm padding).
+                */}
                 {items.map((it, idx) => (
                   <tr key={it.id}>
                     <td
                       style={{
-                        padding: '5mm',
+                        padding: '2.5mm 5mm',
                         borderBottom: '1px solid #e2e8f0',
                         backgroundColor: idx % 2 === 0 ? '#fafbfc' : '#ffffff',
+                        fontSize: '8.5pt',
+                        verticalAlign: 'top',
                       }}
                     >
-                      <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                      <div style={{ fontWeight: '500', color: '#1e293b', lineHeight: 1.35 }}>
                         {it.description}
                       </div>
                       {it.quantity !== 1 && (
-                        <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '1.5mm' }}>
+                        <div style={{ fontSize: '7.5pt', color: '#64748b', marginTop: '0.5mm' }}>
                           {it.quantity} × CHF {it.unit_price.toFixed(2)}
                         </div>
                       )}
                     </td>
                     <td
                       style={{
-                        padding: '5mm',
+                        padding: '2.5mm 5mm',
                         textAlign: 'right',
                         borderBottom: '1px solid #e2e8f0',
                         backgroundColor: idx % 2 === 0 ? '#fafbfc' : '#ffffff',
                         fontWeight: '500',
+                        fontSize: '8.5pt',
+                        verticalAlign: 'top',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       CHF {it.line_total.toFixed(2)}
