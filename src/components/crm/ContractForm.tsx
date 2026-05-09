@@ -184,10 +184,21 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       .filter(Boolean);
   }, [clientExistingPolicies, policyId]);
 
+  // Categories where duplicates with the same company are LEGITIMATELY
+  // allowed and must never be flagged.
+  //
+  // 'life' (3e pilier / prévoyance) — Swiss brokerage practice: split the
+  //   target premium across two identical contracts with the same company.
+  //   If the client can no longer pay, the broker cancels only ONE of the
+  //   two, halving the decommission (clawback) instead of losing the full
+  //   commission.
+  const DUPLICATES_ALLOWED_CATEGORIES = new Set(['life']);
+
   // Set of "<company-lowercased>|<normalized-category>" keys covering every
   // (company, product category) pair the client already holds a live policy
   // for. Looks into products_data first (multi-product contracts) and falls
-  // back to the legacy product_type column.
+  // back to the legacy product_type column. Categories in
+  // DUPLICATES_ALLOWED_CATEGORIES are intentionally excluded.
   const existingDuplicateKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const p of clientExistingPolicies) {
@@ -197,15 +208,18 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const company = (p.company_name || '').trim().toLowerCase();
       if (!company) continue;
 
+      const addIfBlocking = (rawCategory: string | null | undefined) => {
+        const cat = normalizeCategoryFromDB(rawCategory);
+        if (!cat || cat === 'other') return;
+        if (DUPLICATES_ALLOWED_CATEGORIES.has(cat)) return;
+        keys.add(`${company}|${cat}`);
+      };
+
       const productsData = p.products_data as Array<{ category?: string | null }> | null;
       if (productsData && productsData.length > 0) {
-        for (const prod of productsData) {
-          const cat = normalizeCategoryFromDB(prod?.category);
-          if (cat && cat !== 'other') keys.add(`${company}|${cat}`);
-        }
+        for (const prod of productsData) addIfBlocking(prod?.category);
       } else if (p.product_type) {
-        const cat = normalizeCategoryFromDB(p.product_type);
-        if (cat && cat !== 'other') keys.add(`${company}|${cat}`);
+        addIfBlocking(p.product_type);
       }
     }
     return keys;
