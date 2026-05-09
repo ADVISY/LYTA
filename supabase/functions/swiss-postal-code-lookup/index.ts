@@ -91,14 +91,13 @@ serve(async (req) => {
       }
     }
 
-    // ─── Source 2: zippopotam.us (fallback, no canton) ──────────────
+    // ─── Source 2: zippopotam.us (CDN-fast, partial CH coverage) ───
     if (upstreamData.length === 0) {
       const raw: any = await tryFetch(
         `https://api.zippopotam.us/ch/${encodeURIComponent(postalCode)}`,
         4_000,
       );
       if (raw && Array.isArray(raw.places)) {
-        // Re-shape zippopotam payload to match OpenPLZ's frontend expectation
         upstreamData = raw.places.map((p: any) => ({
           postalCode: raw["post code"] ?? postalCode,
           name: p["place name"],
@@ -106,6 +105,40 @@ serve(async (req) => {
             ? { name: p.state, key: p["state abbreviation"], shortName: p["state abbreviation"] }
             : undefined,
         }));
+      }
+    }
+
+    // ─── Source 3: api3.geo.admin.ch (OFFICIAL Swiss Confederation) ──
+    // Maintained by swisstopo. Has ALL ~4500 active Swiss PLZ. Slowest of
+    // the three but exhaustive — used as last resort so we never miss a
+    // village that the other two skip.
+    if (upstreamData.length === 0) {
+      const raw: any = await tryFetch(
+        `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&origins=zipcode&searchText=${encodeURIComponent(postalCode)}`,
+        5_000,
+      );
+      if (raw && Array.isArray(raw.results)) {
+        // Each result has attrs.label like "1003 Lausanne". Parse it.
+        const labelRegex = /^(\d{4})\s+(.+)$/;
+        const seen = new Set<string>();
+        for (const r of raw.results) {
+          const label = r?.attrs?.label as string | undefined;
+          if (!label) continue;
+          const match = label.match(labelRegex);
+          if (!match) continue;
+          const [, plz, cityRaw] = match;
+          if (plz !== postalCode) continue;
+          const city = cityRaw.trim();
+          if (!city || seen.has(city.toLowerCase())) continue;
+          seen.add(city.toLowerCase());
+          upstreamData.push({
+            postalCode: plz,
+            name: city,
+            // swisstopo doesn't return canton on the basic search but the
+            // frontend gracefully handles a missing canton
+            canton: undefined,
+          });
+        }
       }
     }
 
