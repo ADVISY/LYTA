@@ -11,6 +11,7 @@ import { useCelebration } from "@/hooks/useCelebration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { SwissPostalCodeFields } from "@/components/ui/swiss-postal-code-fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Building2, User as UserIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -615,32 +616,23 @@ export default function ClientForm() {
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="zip_code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('clientForm.postalCode')}</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('clientForm.city')}</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  {/*
+                    Swiss postal code + city auto-completion via OpenPLZ API.
+                    The component drives both `zip_code` and `city` through
+                    react-hook-form's setValue, with debounced lookup.
+                  */}
+                  <SwissPostalCodeFields
+                    postalCode={form.watch("zip_code") || ""}
+                    city={form.watch("city") || ""}
+                    country={form.watch("country") || ""}
+                    onPostalCodeChange={(v) =>
+                      form.setValue("zip_code", v, { shouldDirty: true, shouldTouch: true })
+                    }
+                    onCityChange={(v) =>
+                      form.setValue("city", v, { shouldDirty: true, shouldTouch: true })
+                    }
+                    postalCodeLabel={t("clientForm.postalCode")}
+                    cityLabel={t("clientForm.city")}
                   />
 
                   <FormField

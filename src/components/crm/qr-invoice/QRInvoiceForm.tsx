@@ -20,6 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { SwissPostalCodeFields } from "@/components/ui/swiss-postal-code-fields";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -297,29 +298,28 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="client_postal_code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('qrInvoice.postalCode')}</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="client_city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('qrInvoice.city')}</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
+                  {/*
+                    Swiss postal code + city auto-completion via OpenPLZ.
+                    Form's `client_country` defaults to "CH" (schema).
+                  */}
+                  <SwissPostalCodeFields
+                    postalCode={form.watch("client_postal_code") || ""}
+                    city={form.watch("client_city") || ""}
+                    country={form.watch("client_country") || "CH"}
+                    onPostalCodeChange={(v) =>
+                      form.setValue("client_postal_code", v, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      })
+                    }
+                    onCityChange={(v) =>
+                      form.setValue("client_city", v, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      })
+                    }
+                    postalCodeLabel={t("qrInvoice.postalCode")}
+                    cityLabel={t("qrInvoice.city")}
                   />
                   <FormField
                     control={form.control}
