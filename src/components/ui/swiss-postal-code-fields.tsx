@@ -99,6 +99,13 @@ export function SwissPostalCodeFields({
   const [suggestions, setSuggestions] = useState<OpenPLZLocality[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Visible status badge so we don't rely on F12 console for diagnosis.
+  // Shows on the page itself: idle / "Recherche…" / "Trouvé X" / "Non trouvé"
+  // / "Erreur".
+  const [statusBadge, setStatusBadge] = useState<{
+    kind: "idle" | "loading" | "found" | "none" | "error";
+    text: string;
+  }>({ kind: "idle", text: "" });
   // Track the PLZ we last auto-filled for, so we don't re-overwrite a city
   // the user has manually edited.
   const lastAutoFilledPLZ = useRef<string | null>(null);
@@ -136,7 +143,7 @@ export function SwissPostalCodeFields({
   useEffect(() => {
     if (typeof console !== "undefined") {
       // eslint-disable-next-line no-console
-      console.log("[SwissPostalCodeFields] effect tick", {
+      console.log("[SwissPostalCodeFields v3] effect tick", {
         postalCode,
         country,
         lookupEnabled,
@@ -146,6 +153,7 @@ export function SwissPostalCodeFields({
       setSuggestions([]);
       setShowSuggestions(false);
       setLoading(false);
+      setStatusBadge({ kind: "idle", text: "" });
       return;
     }
 
@@ -154,11 +162,17 @@ export function SwissPostalCodeFields({
       setSuggestions([]);
       setShowSuggestions(false);
       setLoading(false);
+      if (trimmed.length > 0 && trimmed.length < 4) {
+        setStatusBadge({ kind: "idle", text: `Tape les ${4 - trimmed.length} chiffres restants…` });
+      } else {
+        setStatusBadge({ kind: "idle", text: "" });
+      }
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setStatusBadge({ kind: "loading", text: `Recherche du PLZ ${trimmed}…` });
 
     const timer = window.setTimeout(async () => {
       try {
@@ -199,6 +213,7 @@ export function SwissPostalCodeFields({
         if (data.length === 0) {
           setSuggestions([]);
           setShowSuggestions(false);
+          setStatusBadge({ kind: "none", text: `Aucune ville trouvée pour ${trimmed}` });
           return;
         }
 
@@ -208,6 +223,7 @@ export function SwissPostalCodeFields({
           // Single canonical match → auto-fill silently if the city is empty
           // or doesn't match what the API returned.
           const only = data[0];
+          setStatusBadge({ kind: "found", text: `✅ ${only.name}` });
           if (!currentCity || currentCity.trim().toLowerCase() !== only.name.toLowerCase()) {
             handlePick(only);
           } else {
@@ -233,20 +249,26 @@ export function SwissPostalCodeFields({
         if (cityMatchesACandidate) {
           setSuggestions([]);
           setShowSuggestions(false);
+          setStatusBadge({ kind: "found", text: `✅ ${currentCity}` });
         } else {
           setSuggestions(data);
           setShowSuggestions(true);
+          setStatusBadge({ kind: "found", text: `${data.length} villes possibles — choisis dans la liste` });
         }
       } catch (err) {
         // Network blocked, offline, ad-blocker, CORS, etc. The fields
         // still work as plain inputs — log a warn for diagnosability.
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
-          console.warn("[SwissPostalCodeFields] OpenPLZ lookup failed", err);
+          console.warn("[SwissPostalCodeFields v3] lookup failed", err);
         }
         if (!cancelled) {
           setSuggestions([]);
           setShowSuggestions(false);
+          setStatusBadge({
+            kind: "error",
+            text: `Erreur réseau (${err instanceof Error ? err.message : "inconnue"}) — tu peux taper la ville à la main`,
+          });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -263,8 +285,16 @@ export function SwissPostalCodeFields({
     // - handlePick: stable (empty deps), included for the linter
   }, [postalCode, lookupEnabled, handlePick]);
 
+  const badgeColorClass: Record<typeof statusBadge.kind, string> = {
+    idle: "text-muted-foreground",
+    loading: "text-blue-600",
+    found: "text-emerald-700",
+    none: "text-amber-700",
+    error: "text-red-700",
+  };
+
   const postalCodeInput = (
-    <div className="relative">
+    <div className="relative space-y-1">
       <Input
         id={postalCodeId}
         name={postalCodeName}
@@ -286,7 +316,17 @@ export function SwissPostalCodeFields({
         autoComplete="postal-code"
       />
       {loading && (
-        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        <Loader2 className="absolute right-2 top-[26px] -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+      )}
+      {/*
+        Always-visible status text under the postal code field. Lets us
+        diagnose the autocomplete from the page itself instead of having
+        to crack open F12 console. Disappears when idle + no input.
+      */}
+      {statusBadge.text && lookupEnabled && (
+        <div className={`text-[11px] ${badgeColorClass[statusBadge.kind]} leading-tight`}>
+          {statusBadge.text}
+        </div>
       )}
     </div>
   );
