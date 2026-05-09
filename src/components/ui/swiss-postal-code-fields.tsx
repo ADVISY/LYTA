@@ -104,19 +104,33 @@ export function SwissPostalCodeFields({
 
   const lookupEnabled = isSwissCountry(country);
 
-  const handlePick = useCallback(
-    (loc: OpenPLZLocality) => {
-      onCityChange(loc.name);
-      lastAutoFilledPLZ.current = loc.postalCode;
-      onLocalityResolved?.({
-        city: loc.name,
-        canton: loc.canton?.shortName ?? loc.canton?.key ?? loc.canton?.name,
-      });
-      setSuggestions([]);
-      setShowSuggestions(false);
-    },
-    [onCityChange, onLocalityResolved],
-  );
+  // Callback refs — kept up-to-date on every render but never appear in
+  // useEffect deps. This is the fix for the "PLZ never resolves" bug:
+  // parent forms typically pass inline arrow functions for onCityChange /
+  // onLocalityResolved, which are recreated on every keystroke. If those
+  // callbacks (or anything that closes over them) sit in the lookup
+  // effect's dep array, the effect cleans up after every keystroke, the
+  // 300ms debounce timer is cancelled before it fires, and we never call
+  // OpenPLZ. Refs decouple this.
+  const onCityChangeRef = useRef(onCityChange);
+  const onLocalityResolvedRef = useRef(onLocalityResolved);
+  const cityRef = useRef(city);
+  useEffect(() => {
+    onCityChangeRef.current = onCityChange;
+    onLocalityResolvedRef.current = onLocalityResolved;
+    cityRef.current = city;
+  });
+
+  const handlePick = useCallback((loc: OpenPLZLocality) => {
+    onCityChangeRef.current(loc.name);
+    lastAutoFilledPLZ.current = loc.postalCode;
+    onLocalityResolvedRef.current?.({
+      city: loc.name,
+      canton: loc.canton?.shortName ?? loc.canton?.key ?? loc.canton?.name,
+    });
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }, []);
 
   useEffect(() => {
     if (!lookupEnabled) {
@@ -134,9 +148,6 @@ export function SwissPostalCodeFields({
       return;
     }
 
-    // If the user already has a city for this PLZ (either we auto-filled it,
-    // or they typed it), don't pop a dropdown — but we still want to allow
-    // the user to clear the city and get the suggestion back.
     let cancelled = false;
     setLoading(true);
 
@@ -161,16 +172,18 @@ export function SwissPostalCodeFields({
           return;
         }
 
+        const currentCity = cityRef.current; // latest, not closure-stale
+
         if (data.length === 1) {
           // Single canonical match → auto-fill silently if the city is empty
           // or doesn't match what the API returned.
           const only = data[0];
-          if (!city || city.trim().toLowerCase() !== only.name.toLowerCase()) {
+          if (!currentCity || currentCity.trim().toLowerCase() !== only.name.toLowerCase()) {
             handlePick(only);
           } else {
-            // City already correct — just stash so onLocalityResolved fires once
+            // City already correct — record we've seen this PLZ
             lastAutoFilledPLZ.current = only.postalCode;
-            onLocalityResolved?.({
+            onLocalityResolvedRef.current?.({
               city: only.name,
               canton:
                 only.canton?.shortName ?? only.canton?.key ?? only.canton?.name,
@@ -183,7 +196,7 @@ export function SwissPostalCodeFields({
 
         // Multiple matches (e.g. PLZ 1009 → Pully + Paudex). Show dropdown
         // unless the user already has one of the candidates typed in.
-        const cityLower = city.trim().toLowerCase();
+        const cityLower = currentCity.trim().toLowerCase();
         const cityMatchesACandidate =
           cityLower !== "" &&
           data.some((d) => d.name.toLowerCase() === cityLower);
@@ -194,9 +207,13 @@ export function SwissPostalCodeFields({
           setSuggestions(data);
           setShowSuggestions(true);
         }
-      } catch {
-        // Silent — network blocked, offline, ad-blocker, etc. The fields
-        // still work as plain inputs.
+      } catch (err) {
+        // Network blocked, offline, ad-blocker, CORS, etc. The fields
+        // still work as plain inputs — log a warn for diagnosability.
+        if (typeof console !== "undefined") {
+          // eslint-disable-next-line no-console
+          console.warn("[SwissPostalCodeFields] OpenPLZ lookup failed", err);
+        }
         if (!cancelled) {
           setSuggestions([]);
           setShowSuggestions(false);
@@ -210,10 +227,11 @@ export function SwissPostalCodeFields({
       cancelled = true;
       window.clearTimeout(timer);
     };
-    // We deliberately exclude `city` from deps: the suggestion list should
-    // refresh on PLZ change, not on every keystroke in the city input.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postalCode, lookupEnabled, handlePick, onLocalityResolved]);
+    // Deps: only the values that should re-fire the lookup.
+    // - postalCode: the actual trigger
+    // - lookupEnabled: country switched between Swiss and non-Swiss
+    // - handlePick: stable (empty deps), included for the linter
+  }, [postalCode, lookupEnabled, handlePick]);
 
   const postalCodeInput = (
     <div className="relative">
