@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserTenant } from "@/hooks/useUserTenant";
 
-export type ContactType = 
+export type ContactType =
   | 'BACK_OFFICE'
-  | 'KEY_MANAGER' 
+  | 'KEY_MANAGER'
   | 'SINISTRES'
   | 'RECLAMATIONS'
   | 'RESILIATION'
@@ -16,6 +17,13 @@ export type ContactChannel = 'EMAIL' | 'TELEPHONE' | 'FORMULAIRE' | 'POSTAL';
 
 export interface CompanyContact {
   id: string;
+  /**
+   * Owning tenant. Each tenant maintains its own list of company contacts —
+   * cabinets often have different account managers / regional broker
+   * service inboxes for the same insurer, so a global table would let one
+   * tenant overwrite another. RLS enforces this scope on the server.
+   */
+  tenant_id: string;
   company_id: string;
   contact_type: ContactType;
   channel: ContactChannel;
@@ -50,9 +58,10 @@ export function useCompanyContacts(companyId?: string) {
   const [contacts, setContacts] = useState<CompanyContact[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenantId } = useUserTenant();
 
   const fetchContacts = useCallback(async () => {
-    if (!companyId) {
+    if (!companyId || !tenantId) {
       setContacts([]);
       setLoading(false);
       return;
@@ -60,10 +69,14 @@ export function useCompanyContacts(companyId?: string) {
 
     try {
       setLoading(true);
+      // RLS already filters by tenant, but we add the explicit tenant_id
+      // filter to be tolerant of the brief window where RLS hasn't been
+      // re-applied yet on a freshly migrated environment.
       const { data, error } = await supabase
         .from('company_contacts')
         .select('*')
         .eq('company_id', companyId)
+        .eq('tenant_id', tenantId)
         .order('contact_type', { ascending: true })
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true });
@@ -80,17 +93,29 @@ export function useCompanyContacts(companyId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, tenantId, toast]);
 
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
 
-  const addContact = async (contact: Omit<CompanyContact, 'id' | 'created_at' | 'updated_at'>) => {
+  const addContact = async (
+    contact: Omit<CompanyContact, 'id' | 'created_at' | 'updated_at' | 'tenant_id'>,
+  ) => {
+    if (!tenantId) {
+      toast({
+        title: "Erreur",
+        description: "Aucun cabinet actif — impossible d'ajouter le contact",
+        variant: "destructive",
+      });
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('company_contacts')
-        .insert(contact)
+        // tenant_id auto-injected so callers don't have to remember it
+        // and RLS WITH CHECK accepts the row.
+        .insert({ ...contact, tenant_id: tenantId })
         .select()
         .single();
 

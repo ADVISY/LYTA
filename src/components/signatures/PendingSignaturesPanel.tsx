@@ -11,6 +11,7 @@ import { Loader2, Copy, Send, Ban, FileSignature, RefreshCw, Check } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+import { MandatDispatchPanel } from "@/components/signatures/MandatDispatchPanel";
 
 interface SignatureRequestRow {
   id: string;
@@ -152,46 +153,56 @@ export default function PendingSignaturesPanel({ clientId, refreshTick }: Pendin
               const badge = STATUS_BADGE[r.status];
               const documentLabel = DOCUMENT_KIND_LABELS[r.document_kind] || "Document";
               const fmt = (d: string) => format(new Date(d), "dd MMM yyyy 'à' HH:mm", { locale: fr });
+              const isSignedMandat =
+                r.status === "signed" && r.document_kind === "mandat_gestion";
               return (
-                <div key={r.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{documentLabel}</span>
-                      <Badge className={badge.className}>{badge.label}</Badge>
+                <div key={r.id} className="border rounded-lg p-4 flex flex-col gap-3">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{documentLabel}</span>
+                        <Badge className={badge.className}>{badge.label}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-x-2">
+                        <span>Envoyé le {fmt(r.invited_at)}</span>
+                        {r.status === "signed" && r.signed_at && <span>• Signé le {fmt(r.signed_at)}</span>}
+                        {r.status === "refused" && r.refused_at && <span>• Refusé le {fmt(r.refused_at)}</span>}
+                        {isOpen && <span>• Expire le {format(new Date(r.expires_at), "dd MMM yyyy", { locale: fr })}</span>}
+                      </div>
+                      {r.client_full_name && <div className="text-xs text-muted-foreground">Signé par : {r.client_full_name}</div>}
+                      {r.refusal_reason && <div className="text-xs text-red-700">Motif : {r.refusal_reason}</div>}
                     </div>
-                    <div className="text-xs text-muted-foreground space-x-2">
-                      <span>Envoyé le {fmt(r.invited_at)}</span>
-                      {r.status === "signed" && r.signed_at && <span>• Signé le {fmt(r.signed_at)}</span>}
-                      {r.status === "refused" && r.refused_at && <span>• Refusé le {fmt(r.refused_at)}</span>}
-                      {isOpen && <span>• Expire le {format(new Date(r.expires_at), "dd MMM yyyy", { locale: fr })}</span>}
+                    <div className="flex flex-wrap gap-2">
+                      {isOpen && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleCopy(r.access_token)} className="gap-1">
+                            <Copy className="h-3.5 w-3.5" />
+                            {t("signatures.copyLink") || "Copier le lien"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleResend(r.id)} disabled={busyId === r.id} className="gap-1">
+                            {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            {t("signatures.resendInvite") || "Renvoyer"}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleCancel(r.id)} disabled={busyId === r.id} className="gap-1 text-red-700">
+                            <Ban className="h-3.5 w-3.5" />
+                            {t("signatures.cancelRequest") || "Annuler"}
+                          </Button>
+                        </>
+                      )}
+                      {r.status === "signed" && !isSignedMandat && (
+                        <Badge variant="outline" className="gap-1">
+                          <Check className="h-3 w-3" />
+                          Document archivé
+                        </Badge>
+                      )}
                     </div>
-                    {r.client_full_name && <div className="text-xs text-muted-foreground">Signé par : {r.client_full_name}</div>}
-                    {r.refusal_reason && <div className="text-xs text-red-700">Motif : {r.refusal_reason}</div>}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {isOpen && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => handleCopy(r.access_token)} className="gap-1">
-                          <Copy className="h-3.5 w-3.5" />
-                          {t("signatures.copyLink") || "Copier le lien"}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleResend(r.id)} disabled={busyId === r.id} className="gap-1">
-                          {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                          {t("signatures.resendInvite") || "Renvoyer"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleCancel(r.id)} disabled={busyId === r.id} className="gap-1 text-red-700">
-                          <Ban className="h-3.5 w-3.5" />
-                          {t("signatures.cancelRequest") || "Annuler"}
-                        </Button>
-                      </>
-                    )}
-                    {r.status === "signed" && (
-                      <Badge variant="outline" className="gap-1">
-                        <Check className="h-3 w-3" />
-                        Document archivé
-                      </Badge>
-                    )}
-                  </div>
+                  {/*
+                    Signed Mandat de gestion → broker can dispatch the
+                    signed PDF to each insurance company listed in the
+                    mandat. Manual trigger (button) by product design.
+                  */}
+                  {isSignedMandat && <MandatDispatchPanel signatureRequestId={r.id} />}
                 </div>
               );
             })}
