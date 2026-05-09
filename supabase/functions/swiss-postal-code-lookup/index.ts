@@ -54,30 +54,59 @@ serve(async (req) => {
       });
     }
 
-    const upstream = `https://openplz.org/api/ch/Localities?postalCode=${encodeURIComponent(postalCode)}`;
-
-    // 5-second timeout so a slow OpenPLZ doesn't hang the broker's UI.
-    const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 5_000);
-
+    // Try OpenPLZ first (richer canton metadata), then fall back to
+    // zippopotam.us (extremely reliable, but no canton info). If BOTH
+    // fail we return [] silently and the broker types the city manually.
     let upstreamData: any[] = [];
-    try {
-      const res = await fetch(upstream, {
-        headers: { Accept: "application/json" },
-        signal: ctrl.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const raw = await res.json();
-        if (Array.isArray(raw)) upstreamData = raw;
-      } else {
-        console.warn(`[swiss-postal-code-lookup] upstream ${res.status}`);
+
+    const tryFetch = async (url: string, timeout: number): Promise<any | null> => {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), timeout);
+      try {
+        const res = await fetch(url, {
+          headers: { Accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          console.warn(`[swiss-postal-code-lookup] ${url} → ${res.status}`);
+          return null;
+        }
+        return await res.json();
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.warn(`[swiss-postal-code-lookup] ${url} failed`, err);
+        return null;
       }
-    } catch (err) {
-      clearTimeout(timeoutId);
-      console.warn("[swiss-postal-code-lookup] upstream failed", err);
-      // Fall through with empty array — frontend treats it as "no match"
-      // and lets the user type the city manually. Better than 500.
+    };
+
+    // ─── Source 1: OpenPLZ (richer schema with canton) ──────────────
+    {
+      const raw = await tryFetch(
+        `https://openplz.org/api/ch/Localities?postalCode=${encodeURIComponent(postalCode)}`,
+        4_000,
+      );
+      if (Array.isArray(raw) && raw.length > 0) {
+        upstreamData = raw;
+      }
+    }
+
+    // ─── Source 2: zippopotam.us (fallback, no canton) ──────────────
+    if (upstreamData.length === 0) {
+      const raw: any = await tryFetch(
+        `https://api.zippopotam.us/ch/${encodeURIComponent(postalCode)}`,
+        4_000,
+      );
+      if (raw && Array.isArray(raw.places)) {
+        // Re-shape zippopotam payload to match OpenPLZ's frontend expectation
+        upstreamData = raw.places.map((p: any) => ({
+          postalCode: raw["post code"] ?? postalCode,
+          name: p["place name"],
+          canton: p.state
+            ? { name: p.state, key: p["state abbreviation"], shortName: p["state abbreviation"] }
+            : undefined,
+        }));
+      }
     }
 
     return new Response(JSON.stringify(upstreamData), {
