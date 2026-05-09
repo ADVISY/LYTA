@@ -142,13 +142,24 @@ serve(async (req) => {
       }
     }
 
+    // CACHE STRATEGY:
+    //   - Successful lookup (≥1 hit) → cache 1h, PLZ data is stable.
+    //   - Empty result               → DO NOT CACHE. Otherwise the
+    //     browser stores "no city for 1003" and serves it for an hour
+    //     even after we improve the upstream cascade. This was Habib's
+    //     bug — adding fallback APIs didn't help because his browser
+    //     still served the previous empty response.
+    const cacheControl =
+      upstreamData.length > 0
+        ? "public, max-age=3600, s-maxage=3600"
+        : "no-store, no-cache, must-revalidate";
+
     return new Response(JSON.stringify(upstreamData), {
       status: 200,
       headers: {
         ...CORS_HEADERS,
         "Content-Type": "application/json",
-        // Browsers + Supabase edge cache for 1h. PLZ data barely changes.
-        "Cache-Control": "public, max-age=3600, s-maxage=3600",
+        "Cache-Control": cacheControl,
       },
     });
   } catch (e) {

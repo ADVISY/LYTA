@@ -183,7 +183,11 @@ export function SwissPostalCodeFields({
         //   - Our CSP already whitelists *.supabase.co, no extra config
         //   - Edge Function caches & swallows upstream failures so the
         //     UI never sees a hard error
-        const url = `${supabaseConfig.url}/functions/v1/swiss-postal-code-lookup?postalCode=${encodeURIComponent(trimmed)}`;
+        // Bump the `v` param when the upstream cascade changes so the
+        // browser doesn't keep serving stale empty results from previous
+        // versions. Empty results are also no-cached server-side, so
+        // future negatives won't stick anyway.
+        const url = `${supabaseConfig.url}/functions/v1/swiss-postal-code-lookup?postalCode=${encodeURIComponent(trimmed)}&v=4`;
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
           console.log("[SwissPostalCodeFields] fetching", url);
