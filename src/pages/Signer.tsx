@@ -558,11 +558,53 @@ export default function Signer() {
               {importedPdfLoading && !importedPdfUrl ? (
                 <div className="py-8 text-center"><Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" /></div>
               ) : importedPdfUrl ? (
-                <iframe
-                  src={importedPdfUrl}
-                  title="Document à signer"
-                  className="w-full h-[700px] rounded border bg-slate-100"
-                />
+                <div className="space-y-3">
+                  {/*
+                    Use <object> rather than <iframe>: browsers (especially
+                    Chrome) frequently render a blank frame for PDFs served
+                    from cross-origin signed URLs because of X-Frame-Options
+                    or PDF-viewer policies. <object> falls back gracefully
+                    to its inner content (the "open in new tab" link below)
+                    when the inline render fails.
+                  */}
+                  <object
+                    data={importedPdfUrl}
+                    type="application/pdf"
+                    className="w-full h-[700px] rounded border bg-slate-100"
+                    aria-label="Document à signer"
+                  >
+                    <div className="p-6 bg-amber-50 border border-amber-200 rounded text-sm space-y-3">
+                      <p className="font-semibold text-amber-900">
+                        L'aperçu PDF n'a pas pu s'afficher dans cette fenêtre.
+                      </p>
+                      <p className="text-amber-800">
+                        Cliquez sur le bouton ci-dessous pour ouvrir le document
+                        dans un nouvel onglet, lisez-le attentivement, puis
+                        revenez ici pour signer.
+                      </p>
+                      <a
+                        href={importedPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-amber-600 text-white text-sm font-medium hover:bg-amber-700"
+                      >
+                        Ouvrir le document dans un nouvel onglet
+                      </a>
+                    </div>
+                  </object>
+                  {/* Always-visible secondary link in case <object> renders but
+                      the user wants the document larger / printable. */}
+                  <div className="text-xs text-muted-foreground text-right">
+                    <a
+                      href={importedPdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-foreground"
+                    >
+                      Ouvrir dans un nouvel onglet ↗
+                    </a>
+                  </div>
+                </div>
               ) : (
                 <Alert variant="destructive">
                   <AlertTitle>Document indisponible</AlertTitle>
