@@ -202,6 +202,35 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/** Lowercased + trimmed email for case-insensitive duplicate detection. */
+function normalizeEmail(value: string | null | undefined): string {
+  if (!value) return "";
+  return String(value).toLowerCase().trim();
+}
+
+/** Strip all non-digit characters except a leading + so different formats
+ *  like "+41 79 123 45 67", "0041791234567", "079 123 45 67" can match. */
+function normalizePhone(value: string | null | undefined): string {
+  if (!value) return "";
+  let p = String(value).trim();
+  // Remove anything that is not digit or leading +
+  p = p.replace(/[^\d+]/g, "");
+  // Convert leading 00 to +
+  if (p.startsWith("00")) p = "+" + p.slice(2);
+  // Remove leading + only at this point so internal + (very unlikely) stays consistent
+  // Actually keep the +, just remove spaces and separators (already done above).
+  // For Swiss numbers: "079..." (8 digits) and "+4179..." (11 digits with +) should match.
+  // We strip the country code if present:
+  if (p.startsWith("+41")) p = "0" + p.slice(3);
+  if (p.startsWith("+33")) p = "0" + p.slice(3);
+  // Keep only the last 9-10 digits as a stable key (handles country code variants)
+  const digits = p.replace(/\D/g, "");
+  if (digits.length >= 9) {
+    return digits.slice(-9);
+  }
+  return digits;
+}
+
 async function readFile(file: File): Promise<{ headers: string[]; rows: string[][] }> {
   const ext = file.name.split(".").pop()?.toLowerCase();
   const buffer = await file.arrayBuffer();
@@ -436,37 +465,74 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
     setProgress(0);
 
     const headerToField = mapping;
-    const emails: string[] = [];
-    const phones: string[] = [];
-    rows.forEach((row) => {
+
+    // Fetch all existing clients of this tenant (only the fields we need to
+    // detect duplicates). This is more reliable than `.in("email", [...])`
+    // because we want case-insensitive email match AND phone match, neither
+    // of which work cleanly via Supabase filters on possibly-mixed-case data.
+    const { data: existing, error: existErr } = await supabase
+      .from("clients")
+      .select("id, email, mobile, phone")
+      .eq("tenant_id", tenantId);
+
+    if (existErr) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de vérifier les doublons : " + existErr.message,
+        variant: "destructive",
+      });
+      setImporting(false);
+      return;
+    }
+
+    const byEmail = new Map<string, string>();
+    const byPhone = new Map<string, string>();
+    for (const c of existing ?? []) {
+      if (c.email) {
+        const e = normalizeEmail(c.email);
+        if (e) byEmail.set(e, c.id);
+      }
+      if (c.mobile) {
+        const p = normalizePhone(c.mobile);
+        if (p) byPhone.set(p, c.id);
+      }
+      if (c.phone) {
+        const p = normalizePhone(c.phone);
+        if (p) byPhone.set(p, c.id);
+      }
+    }
+
+    const dups = new Map<number, { existingId: string; matchOn: "email" | "phone" }>();
+    rows.forEach((row, i) => {
       let email = "";
+      let mobile = "";
       let phone = "";
       headers.forEach((h, idx) => {
         const field = headerToField[h];
-        if (field === "email") email = row[idx]?.toLowerCase().trim() ?? "";
-        if (field === "phone" || field === "mobile") phone = phone || (row[idx]?.trim() ?? "");
+        const cell = row[idx]?.trim() ?? "";
+        if (field === "email") email = cell;
+        if (field === "mobile") mobile = cell;
+        if (field === "phone") phone = cell;
       });
-      if (email && isValidEmail(email)) emails.push(email);
-      if (phone) phones.push(phone);
-    });
 
-    const dups = new Map<number, { existingId: string; matchOn: "email" | "phone" }>();
-    if (emails.length > 0) {
-      const { data } = await supabase
-        .from("clients")
-        .select("id, email")
-        .eq("tenant_id", tenantId)
-        .in("email", emails);
-      const byEmail = new Map((data ?? []).map((c: any) => [String(c.email).toLowerCase(), c.id]));
-      rows.forEach((row, i) => {
-        const emailIdx = headers.findIndex((h) => headerToField[h] === "email");
-        if (emailIdx === -1) return;
-        const email = row[emailIdx]?.toLowerCase().trim();
-        if (email && byEmail.has(email)) {
-          dups.set(i, { existingId: byEmail.get(email)!, matchOn: "email" });
+      // Priority 1: email match (case-insensitive)
+      if (email) {
+        const e = normalizeEmail(email);
+        if (e && byEmail.has(e)) {
+          dups.set(i, { existingId: byEmail.get(e)!, matchOn: "email" });
+          return;
         }
-      });
-    }
+      }
+      // Priority 2: phone match (normalized: digits + leading + only)
+      for (const candidate of [mobile, phone]) {
+        if (!candidate) continue;
+        const p = normalizePhone(candidate);
+        if (p && byPhone.has(p)) {
+          dups.set(i, { existingId: byPhone.get(p)!, matchOn: "phone" });
+          return;
+        }
+      }
+    });
 
     setDuplicates(dups);
     setImporting(false);

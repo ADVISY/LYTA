@@ -14,7 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Download, Printer, Send, CheckCircle, Loader2 } from "lucide-react";
 import { QRInvoice } from "@/hooks/useQRInvoices";
 import { useTenant } from "@/contexts/TenantContext";
+import { supabase } from "@/integrations/supabase/client";
 import html2pdf from "html2pdf.js";
+
+interface InvoiceItemRow {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  sort_order: number;
+}
 import { 
   validateIBAN, 
   getIBANForQR, 
@@ -116,6 +126,44 @@ export function QRInvoicePreview({
   const [sending, setSending] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [logoBase64, setLogoBase64] = useState<string>('');
+  const [items, setItems] = useState<InvoiceItemRow[]>([]);
+
+  // Fetch invoice items (multi-line breakdown). Falls back to a single-line
+  // synthesized from the legacy fields if no rows exist.
+  useEffect(() => {
+    if (!invoice?.id) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("invoice_items")
+        .select("id, description, quantity, unit_price, line_total, sort_order")
+        .eq("invoice_id", invoice.id)
+        .order("sort_order", { ascending: true });
+      if (cancelled) return;
+      const fetched = (data ?? []) as InvoiceItemRow[];
+      if (fetched.length > 0) {
+        setItems(fetched);
+      } else {
+        // Backwards compat for invoices created before invoice_items existed
+        setItems([
+          {
+            id: "legacy",
+            description: invoice.service_description || formatServiceType(invoice.service_type) || "Prestation",
+            quantity: 1,
+            unit_price: invoice.amount_ht,
+            line_total: invoice.amount_ht,
+            sort_order: 0,
+          },
+        ]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoice?.id, invoice?.amount_ht, invoice?.service_description, invoice?.service_type]);
 
   const tenantBranding = tenant?.branding;
   const tenantName = tenantBranding?.display_name || tenant?.name || 'Cabinet';
@@ -484,31 +532,37 @@ export function QRInvoicePreview({
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={{ 
-                    padding: '5mm', 
-                    borderBottom: '1px solid #e2e8f0',
-                    backgroundColor: '#fafbfc'
-                  }}>
-                    <div style={{ fontWeight: '500', color: '#1e293b' }}>
-                      {formattedServiceType}
-                    </div>
-                    {invoice.service_description && (
-                      <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '1.5mm' }}>
-                        {invoice.service_description}
+                {items.map((it, idx) => (
+                  <tr key={it.id}>
+                    <td
+                      style={{
+                        padding: '5mm',
+                        borderBottom: '1px solid #e2e8f0',
+                        backgroundColor: idx % 2 === 0 ? '#fafbfc' : '#ffffff',
+                      }}
+                    >
+                      <div style={{ fontWeight: '500', color: '#1e293b' }}>
+                        {it.description}
                       </div>
-                    )}
-                  </td>
-                  <td style={{ 
-                    padding: '5mm', 
-                    textAlign: 'right', 
-                    borderBottom: '1px solid #e2e8f0',
-                    backgroundColor: '#fafbfc',
-                    fontWeight: '500'
-                  }}>
-                    CHF {invoice.amount_ht.toFixed(2)}
-                  </td>
-                </tr>
+                      {it.quantity !== 1 && (
+                        <div style={{ fontSize: '8pt', color: '#64748b', marginTop: '1.5mm' }}>
+                          {it.quantity} × CHF {it.unit_price.toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: '5mm',
+                        textAlign: 'right',
+                        borderBottom: '1px solid #e2e8f0',
+                        backgroundColor: idx % 2 === 0 ? '#fafbfc' : '#ffffff',
+                        fontWeight: '500',
+                      }}
+                    >
+                      CHF {it.line_total.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
