@@ -89,14 +89,29 @@ function useTenantLookup({ table }: UseTenantLookupOptions): UseTenantLookupRetu
       return null;
     }
     try {
-      const payload = {
-        ...input,
+      // tenant_document_types and tenant_billable_services share the
+      // (id, tenant_id, code, label, is_system, sort_order) shape, but
+      // only `tenant_billable_services` has the service-specific columns
+      // (description, default_amount, default_unit). Sending those keys
+      // to tenant_document_types triggers a PostgREST 400
+      // "Could not find the 'X' column in the schema cache". Strip
+      // them out for document types.
+      const isServiceTable = table === "tenant_billable_services";
+      const basePayload: Record<string, unknown> = {
+        code: input.code,
+        label: input.label,
+        sort_order: input.sort_order,
         tenant_id: tenantId,
         is_system: false,
       };
+      if (isServiceTable) {
+        basePayload.description = input.description ?? null;
+        basePayload.default_amount = input.default_amount ?? null;
+        basePayload.default_unit = input.default_unit ?? null;
+      }
       const { data, error } = await (supabase as any)
         .from(table)
-        .insert(payload)
+        .insert(basePayload)
         .select()
         .single();
       if (error) throw error;
@@ -128,17 +143,37 @@ function useTenantLookup({ table }: UseTenantLookupOptions): UseTenantLookupRetu
 
   const update: UseTenantLookupReturn["update"] = async (id, patch) => {
     try {
+      // Same column-stripping as create — keep only fields that exist
+      // on the target table to avoid "column not found" 400s.
+      const isServiceTable = table === "tenant_billable_services";
+      const cleanPatch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (patch.label !== undefined) cleanPatch.label = patch.label;
+      if (patch.sort_order !== undefined) cleanPatch.sort_order = patch.sort_order;
+      if (isServiceTable) {
+        if (patch.description !== undefined) cleanPatch.description = patch.description;
+        if (patch.default_amount !== undefined) cleanPatch.default_amount = patch.default_amount;
+        if (patch.default_unit !== undefined) cleanPatch.default_unit = patch.default_unit;
+      }
       const { error } = await (supabase as any)
         .from(table)
-        .update({ ...patch, updated_at: new Date().toISOString() })
+        .update(cleanPatch)
         .eq("id", id);
       if (error) throw error;
       toast({ title: "Modifié" });
       await fetchRows();
-    } catch (e) {
-      console.error(`[useTenantLookup:${table}] update error`, e);
-      const msg = e instanceof Error ? e.message : "Erreur";
-      toast({ title: "Erreur", description: msg, variant: "destructive" });
+    } catch (e: any) {
+      console.error(`[useTenantLookup:${table}] update error`, {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+        raw: e,
+      });
+      const msg =
+        e?.message || e?.details || e?.hint || (e instanceof Error ? e.message : "Erreur");
+      toast({ title: "Erreur lors de la modification", description: msg, variant: "destructive" });
     }
   };
 

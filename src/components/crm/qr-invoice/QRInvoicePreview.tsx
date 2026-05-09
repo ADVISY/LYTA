@@ -635,32 +635,16 @@ export function QRInvoicePreview({
               </div>
             )}
 
-            {/* Payment Info */}
-            <div style={{ 
-              marginBottom: '6mm',
-              padding: '4mm 5mm',
-              backgroundColor: '#f0fdf4',
-              borderRadius: '2mm',
-              border: '1px solid #bbf7d0'
-            }}>
-              <div style={{ 
-                fontSize: '8pt', 
-                fontWeight: '600', 
-                color: '#166534',
-                marginBottom: '2mm',
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-              }}>
-                Informations de paiement
-              </div>
-              <div style={{ fontSize: '8.5pt', color: '#15803d' }}>
-                <div><strong>IBAN:</strong> {formatIBANDisplay(tenantIBAN)}</div>
-                <div><strong>Référence:</strong> {formatQRReference(qrReference)}</div>
-              </div>
-            </div>
+            {/*
+              Payment Info green box removed (Habib 09/05) — IBAN +
+              référence are already printed in the QR-bill section
+              below, the green box was a redundant duplicate that got
+              cropped by the QR section after the spacing fix. We just
+              keep the location + date line.
+            */}
 
             {/* Location and Date */}
-            <div style={{ fontSize: '8.5pt', color: '#64748b', marginTop: '8mm' }}>
+            <div style={{ fontSize: '8.5pt', color: '#64748b', marginTop: '4mm' }}>
               {invoice.location}, le {format(new Date(invoice.invoice_date), 'dd MMMM yyyy', { locale: fr })}
             </div>
           </div>
