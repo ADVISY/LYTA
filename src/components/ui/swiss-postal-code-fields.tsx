@@ -133,6 +133,14 @@ export function SwissPostalCodeFields({
   }, []);
 
   useEffect(() => {
+    if (typeof console !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log("[SwissPostalCodeFields] effect tick", {
+        postalCode,
+        country,
+        lookupEnabled,
+      });
+    }
     if (!lookupEnabled) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -154,7 +162,15 @@ export function SwissPostalCodeFields({
     const timer = window.setTimeout(async () => {
       try {
         const url = `https://openplz.org/api/ch/Localities?postalCode=${encodeURIComponent(trimmed)}`;
+        if (typeof console !== "undefined") {
+          // eslint-disable-next-line no-console
+          console.log("[SwissPostalCodeFields] fetching", url);
+        }
         const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (typeof console !== "undefined") {
+          // eslint-disable-next-line no-console
+          console.log("[SwissPostalCodeFields] response", res.status, res.statusText);
+        }
         if (!res.ok) {
           if (!cancelled) {
             setSuggestions([]);

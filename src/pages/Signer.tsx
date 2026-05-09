@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import html2pdf from "html2pdf.js";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -181,13 +182,26 @@ export default function Signer() {
     return () => { cancelled = true; };
   }, [screen, token, importedPdfUrl]);
 
+  /**
+   * Convert a binary buffer to base64 in 32 KB chunks (avoids the
+   * "argument list too long" error you get from spreading a 5 MB PDF
+   * through String.fromCharCode in one shot).
+   */
+  const bytesToBase64 = (bytes: Uint8Array): string => {
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+    }
+    return btoa(binary);
+  };
+
   const generateSignedPdfBase64 = async (): Promise<string> => {
-    // For mandat: render the full mandat template with both signatures.
-    // For imported: render only the attestation page (the original PDF is preserved separately).
-    const target = screen.kind === "ready" && (screen.request.document_kind === "imported" || screen.request.document_kind === "autre")
-      ? attestationRef.current
-      : documentRef.current;
-    if (!target) throw new Error("Aperçu indisponible");
+    if (screen.kind !== "ready" && screen.kind !== "submitting") {
+      throw new Error("État invalide");
+    }
+    const r = screen.request;
+    const isImported = r.document_kind === "imported" || r.document_kind === "autre";
 
     const opt = {
       margin: [8, 10, 8, 10] as [number, number, number, number],
@@ -198,15 +212,117 @@ export default function Signer() {
       pagebreak: { mode: ["avoid-all", "css", "legacy"] },
     };
 
-    const blob: Blob = await html2pdf().set(opt).from(target).output("blob");
-    const arrayBuffer = await blob.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    let binary = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+    // ---------------- Mandat path (unchanged) ----------------
+    if (!isImported) {
+      const target = documentRef.current;
+      if (!target) throw new Error("Aperçu indisponible");
+      const blob: Blob = await html2pdf().set(opt).from(target).output("blob");
+      return bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
     }
-    return btoa(binary);
+
+    // ---------------- Imported document path ----------------
+    // The previous implementation only sent the attestation certificate
+    // as the "signed PDF" — the original document the client read was
+    // not bundled, which made the signature legally hollow (the client
+    // had nothing tying their signature to the document content).
+    //
+    // New behaviour:
+    //   1. Fetch the original imported PDF the client just reviewed.
+    //   2. Stamp the client's signature image on the bottom-right of
+    //      the last page (so the document itself is visibly signed).
+    //   3. Append the attestation certificate (existing HTML page)
+    //      as the trailing page(s) — preserves the SHA-256 hash of
+    //      the ORIGINAL doc + IP + timestamp + legal note.
+    //   4. Return the merged PDF as a single base64 blob.
+    if (!attestationRef.current) throw new Error("Attestation indisponible");
+    if (!importedPdfUrl) throw new Error("Document original indisponible");
+    if (!signatureClient) throw new Error("Signature manquante");
+
+    // 1. Generate the attestation page(s) as a PDF blob via html2pdf
+    const attestationBlob: Blob = await html2pdf()
+      .set(opt)
+      .from(attestationRef.current)
+      .output("blob");
+    const attestationBytes = new Uint8Array(await attestationBlob.arrayBuffer());
+
+    // 2. Fetch the original PDF bytes
+    const origResp = await fetch(importedPdfUrl);
+    if (!origResp.ok) throw new Error("Téléchargement du PDF original échoué");
+    const origBytes = new Uint8Array(await origResp.arrayBuffer());
+
+    // 3. Load both with pdf-lib
+    let origDoc: PDFDocument;
+    try {
+      origDoc = await PDFDocument.load(origBytes, { ignoreEncryption: true });
+    } catch (err) {
+      throw new Error(
+        "Le PDF original n'a pas pu être lu (peut-être protégé par mot de passe ou corrompu).",
+      );
+    }
+    const attestDoc = await PDFDocument.load(attestationBytes);
+
+    // 4. Stamp the signature image on the bottom-right of the last page
+    //    of the original document. signatureClient is a base64 data URL
+    //    produced by SignaturePad ("data:image/png;base64,…").
+    const dataUrlMatch = signatureClient.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+    if (!dataUrlMatch) throw new Error("Format de signature invalide");
+    const isPng = dataUrlMatch[1] === "png";
+    const sigB64 = dataUrlMatch[2];
+    const sigBytes = Uint8Array.from(atob(sigB64), (c) => c.charCodeAt(0));
+    const sigImage = isPng
+      ? await origDoc.embedPng(sigBytes)
+      : await origDoc.embedJpg(sigBytes);
+
+    const helveticaFont = await origDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await origDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const pages = origDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    const { width: pageW } = lastPage.getSize();
+
+    // Compute sig box: max ~35 % of page width, max ~60 pt height,
+    // preserves the natural aspect ratio of the user's stroke.
+    const naturalDims = sigImage.scale(1);
+    const targetW = Math.min(pageW * 0.35, 160);
+    const scale = targetW / naturalDims.width;
+    const drawnW = naturalDims.width * scale;
+    const drawnH = Math.min(naturalDims.height * scale, 60);
+    const recomputedW =
+      drawnH < naturalDims.height * scale ? drawnH * (naturalDims.width / naturalDims.height) : drawnW;
+
+    const margin = 30;
+    const baseX = pageW - recomputedW - margin;
+    const baseY = margin + 28; // leaves space for label below
+    lastPage.drawImage(sigImage, {
+      x: baseX,
+      y: baseY,
+      width: recomputedW,
+      height: drawnH,
+    });
+
+    // Caption below the signature
+    const caption1 = `Signé par ${fullName || ""}`;
+    const caption2 = new Date().toLocaleString("fr-CH");
+    lastPage.drawText(caption1, {
+      x: baseX,
+      y: baseY - 10,
+      size: 8,
+      font: helveticaBold,
+    });
+    lastPage.drawText(caption2, {
+      x: baseX,
+      y: baseY - 20,
+      size: 7,
+      font: helveticaFont,
+    });
+
+    // 5. Append the attestation pages to the merged document
+    const attestPages = await origDoc.copyPages(attestDoc, attestDoc.getPageIndices());
+    attestPages.forEach((p) => origDoc.addPage(p));
+
+    // 6. Serialise & return
+    const merged = await origDoc.save();
+    return bytesToBase64(merged);
   };
 
   const callCompleteSignature = async (body: Record<string, unknown>) => {
