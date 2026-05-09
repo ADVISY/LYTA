@@ -165,21 +165,82 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
 
-  // Get companies that the client already has contracts with
+  // Helper: a policy is "live" (counts for dedup) unless it's been cancelled
+  // or expired. We don't want to block re-insuring a client whose previous
+  // health contract with the same company was cancelled.
+  const isLivePolicy = (p: { status?: string | null }): boolean => {
+    const s = (p.status || '').toLowerCase();
+    return s !== 'cancelled' && s !== 'expired';
+  };
+
+  // Companies the client already has a live contract with — kept for the
+  // informational dimming in the company picker dropdown (it's not the
+  // blocking signal anymore).
   const companiesWithExistingContracts = useMemo(() => {
     return clientExistingPolicies
-      .filter(p => p.id !== policyId) // Exclude current policy in edit mode
+      .filter(p => p.id !== policyId)
+      .filter(isLivePolicy)
       .map(p => p.company_name)
       .filter(Boolean);
   }, [clientExistingPolicies, policyId]);
 
-  // Check if selected company already has a contract
-  const hasExistingContractWithCompany = useMemo(() => {
-    if (!selectedCompanyId || editMode) return false;
+  // Set of "<company-lowercased>|<normalized-category>" keys covering every
+  // (company, product category) pair the client already holds a live policy
+  // for. Looks into products_data first (multi-product contracts) and falls
+  // back to the legacy product_type column.
+  const existingDuplicateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const p of clientExistingPolicies) {
+      if (editMode && p.id === policyId) continue;
+      if (!isLivePolicy(p)) continue;
+
+      const company = (p.company_name || '').trim().toLowerCase();
+      if (!company) continue;
+
+      const productsData = p.products_data as Array<{ category?: string | null }> | null;
+      if (productsData && productsData.length > 0) {
+        for (const prod of productsData) {
+          const cat = normalizeCategoryFromDB(prod?.category);
+          if (cat && cat !== 'other') keys.add(`${company}|${cat}`);
+        }
+      } else if (p.product_type) {
+        const cat = normalizeCategoryFromDB(p.product_type);
+        if (cat && cat !== 'other') keys.add(`${company}|${cat}`);
+      }
+    }
+    return keys;
+  }, [clientExistingPolicies, policyId, editMode]);
+
+  // For the currently-selected company + selected products, list the
+  // (category, [productNames]) pairs that would create a duplicate.
+  const duplicateProductConflicts = useMemo(() => {
+    if (!selectedCompanyId || editMode) return [] as { category: string; productNames: string[] }[];
     const selectedCompany = companies.find(c => c.id === selectedCompanyId);
-    if (!selectedCompany) return false;
-    return companiesWithExistingContracts.includes(selectedCompany.name);
-  }, [selectedCompanyId, companies, companiesWithExistingContracts, editMode]);
+    if (!selectedCompany) return [];
+    const companyKey = selectedCompany.name.trim().toLowerCase();
+
+    const grouped = new Map<string, string[]>();
+    for (const p of selectedProducts) {
+      const cat = normalizeCategoryFromDB(p.category);
+      if (!cat || cat === 'other') continue;
+      if (existingDuplicateKeys.has(`${companyKey}|${cat}`)) {
+        const list = grouped.get(cat) || [];
+        list.push(p.name || cat);
+        grouped.set(cat, list);
+      }
+    }
+    return Array.from(grouped.entries()).map(([category, productNames]) => ({
+      category,
+      productNames,
+    }));
+  }, [selectedProducts, selectedCompanyId, companies, existingDuplicateKeys, editMode]);
+
+  // Replaces the old hasExistingContractWithCompany — now blocks ONLY when
+  // the same client already has a live contract with the same company AND
+  // the same product category (e.g. another health policy with Generali).
+  // Different categories with the same company are now allowed (e.g. you
+  // can have Generali health + Generali life).
+  const hasDuplicateContract = duplicateProductConflicts.length > 0;
 
   useEffect(() => {
     if (open) {
@@ -194,9 +255,12 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   }, [open, editMode, policyId]);
 
   const fetchClientExistingPolicies = async () => {
+    // Pull product_type + products_data so we can detect duplicates at the
+    // (company, product category) level instead of just (company).
+    // Cancelled / expired policies are ignored client-side below.
     const { data } = await supabase
       .from('policies')
-      .select('id, company_name')
+      .select('id, company_name, product_type, products_data, status')
       .eq('client_id', clientId);
     setClientExistingPolicies(data || []);
   };
@@ -458,11 +522,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       return;
     }
 
-    if (hasExistingContractWithCompany) {
+    if (hasDuplicateContract) {
       const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+      const conflictLabel = duplicateProductConflicts
+        .map(c => categoryLabels[c.category] || c.category)
+        .join(', ');
       toast({
         title: t("common.error"),
-        description: t("forms.clientHasContractWithCompany", { company: selectedCompany?.name }),
+        description: `Ce client a déjà un contrat actif chez ${selectedCompany?.name ?? ''} pour : ${conflictLabel}. Modifie le contrat existant ou choisis une autre catégorie.`,
         variant: "destructive"
       });
       return;
@@ -667,17 +734,20 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.company")} *</Label>
                 <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
-                  <SelectTrigger className={hasExistingContractWithCompany ? "border-destructive" : ""}>
+                  <SelectTrigger className={hasDuplicateContract ? "border-destructive" : ""}>
                     <SelectValue placeholder={t("common.select")} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((company) => {
+                      // Informational tag only — same-company contracts in
+                      // a different category are now allowed, so we don't
+                      // dim or block the entry, just hint that the client
+                      // already has something with this company.
                       const hasContract = companiesWithExistingContracts.includes(company.name);
                       return (
-                        <SelectItem 
-                          key={company.id} 
+                        <SelectItem
+                          key={company.id}
                           value={company.id}
-                          className={hasContract ? "text-muted-foreground" : ""}
                         >
                           {company.name}
                           {hasContract && ` ${t("forms.contract.existingContract")}`}
@@ -686,9 +756,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                     })}
                   </SelectContent>
                 </Select>
-                {hasExistingContractWithCompany && (
-                  <p className="text-xs text-destructive">
-                    {t("forms.contract.existingContractWarning")}
+                {hasDuplicateContract && (
+                  <p className="text-xs text-destructive leading-snug">
+                    Doublon{duplicateProductConflicts.length > 1 ? 's' : ''} :{' '}
+                    {duplicateProductConflicts
+                      .map(c => categoryLabels[c.category] || c.category)
+                      .join(', ')}{' '}
+                    déjà couvert
+                    {duplicateProductConflicts.length > 1 ? 's' : ''} chez cette compagnie.
                   </p>
                 )}
               </div>
@@ -1104,7 +1179,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit" disabled={submitting || selectedProducts.length === 0 || hasExistingContractWithCompany}>
+                <Button type="submit" disabled={submitting || selectedProducts.length === 0 || hasDuplicateContract}>
                   {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editMode ? t('common.save') : t('forms.contract.createContract')}
                 </Button>
