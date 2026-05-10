@@ -239,7 +239,7 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
       if (uploadError) throw uploadError;
 
       // Créer l'entrée dans la table documents
-      await createDocument({
+      const createdDoc = await createDocument({
         owner_id: client.id,
         owner_type: 'client',
         file_name: fileName,
@@ -248,6 +248,72 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
         size_bytes: pdfBlob.size,
         doc_kind: 'mandat_gestion',
       });
+
+      // Bridge to the dispatch flow:
+      // The "Envoyer aux compagnies" button on the signed mandat lives
+      // on the signature_requests table (it's the canonical place
+      // for any signed legal doc + its structured payload). Mandats
+      // signed in-person via this form historically only created a
+      // documents row — invisible to the dispatch panel.
+      // Insert a matching signature_requests row with status='signed'
+      // and the full insurances payload so the broker can dispatch
+      // the freshly signed mandat to each carrier listed inside.
+      try {
+        const payloadForDispatch = {
+          insurances,
+          lieu,
+          clientFirstName: client.first_name ?? null,
+          clientLastName: client.last_name ?? null,
+          clientName: getClientName(),
+          clientAddress: client.address ?? null,
+          clientPostalCode: client.zip_code ?? null,
+          clientCity: client.city ?? null,
+          clientBirthDate: client.birth_date ?? null,
+          clientEmail: client.email ?? null,
+          cabinetName: companyName,
+          brokerEmail: companyEmail || null,
+          // Signed in-person — both signer and broker are the same
+          // session. We capture the client signature image so the
+          // dispatch email can include it later if needed.
+          inPerson: true,
+        };
+
+        // crypto.randomUUID is available in modern browsers + edge runtimes
+        const accessToken =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? (crypto as Crypto).randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        const nowIso = new Date().toISOString();
+        const { error: srErr } = await (supabase as any)
+          .from("signature_requests")
+          .insert({
+            tenant_id: tenantId,
+            client_id: client.id,
+            created_by: user.id,
+            document_kind: "mandat_gestion",
+            payload: payloadForDispatch,
+            preview_file_key: fileKey,
+            signed_file_key: fileKey,
+            signed_document_id: createdDoc?.id ?? null,
+            client_signature_image: signatureClient,
+            client_full_name: getClientName(),
+            status: "signed",
+            access_token: accessToken,
+            // Token never used for signing (already signed) — keep it
+            // valid 30 days just so the row passes any expiry check.
+            expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+            invited_at: nowIso,
+            signed_at: nowIso,
+          });
+        if (srErr) {
+          // Don't block the save — dispatch can be triggered manually
+          // later via the documents tab if we add a fallback there.
+          console.warn("Could not create dispatch-bridge signature_request:", srErr);
+        }
+      } catch (bridgeErr) {
+        console.warn("Dispatch bridge insert failed:", bridgeErr);
+      }
 
       const deliveryWarnings: string[] = [];
       const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
