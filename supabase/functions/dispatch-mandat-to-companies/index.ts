@@ -487,9 +487,32 @@ serve(async (req) => {
         .join(" ")
         .trim() ??
       "Client";
-    const cabinetName = payload.cabinetName ?? "Cabinet";
+    // Fresh branding lookup (Habib 10/05 — E2 phase 1.3 "branding email frais"):
+    // The mandat signature_requests row caches the cabinet name + broker
+    // info at signature time. If the tenant later renames the cabinet,
+    // changes the logo, or updates contact info, the dispatch email
+    // would still display the stale snapshot. Re-read tenant_branding
+    // here so the email always reflects the CURRENT cabinet identity.
+    let freshCabinetName = payload.cabinetName ?? "Cabinet";
+    let freshReplyTo = payload.brokerEmail ?? undefined;
+    try {
+      const { data: brandingRow } = await admin
+        .from("tenant_branding")
+        .select("display_name, company_email")
+        .eq("tenant_id", mandat.tenant_id)
+        .maybeSingle();
+      if (brandingRow?.display_name && brandingRow.display_name.trim()) {
+        freshCabinetName = brandingRow.display_name.trim();
+      }
+      if (brandingRow?.company_email && brandingRow.company_email.trim()) {
+        freshReplyTo = brandingRow.company_email.trim();
+      }
+    } catch {
+      /* non-fatal: fall back to payload snapshot */
+    }
+    const cabinetName = freshCabinetName;
     const brokerSignerName = payload.brokerName ?? cabinetName;
-    const replyTo = payload.brokerEmail ?? undefined;
+    const replyTo = freshReplyTo;
     const clientAddressLine = [
       payload.clientAddress,
       [payload.clientPostalCode, payload.clientCity].filter(Boolean).join(" "),
