@@ -24,7 +24,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FileText, X, Check, Heart, Car, Home, Shield, Scale } from "lucide-react";
+import { useClientMandatStatus } from "@/hooks/useClientMandatStatus";
+import { Loader2, FileText, X, Check, Heart, Car, Home, Shield, Scale, AlertTriangle } from "lucide-react";
 import DocumentUpload from "./DocumentUpload";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -164,6 +165,16 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   // Selected products
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
+
+  // Habib clarified that a signed Mandat de gestion is NOT a hard
+  // requirement before creating a contract — some clients sign later,
+  // some files are imported without one. So we just *warn* the broker
+  // and show a quick way to launch the mandate flow, without blocking
+  // the save.
+  const { hasSignedMandat, loading: mandatStatusLoading } =
+    useClientMandatStatus(clientId);
+  const showNoMandatWarning =
+    !editMode && !mandatStatusLoading && hasSignedMandat === false;
 
   // Helper: a policy is "live" (counts for dedup) unless it's been cancelled
   // or expired. We don't want to block re-insuring a client whose previous
@@ -743,6 +754,29 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden gap-4">
+            {/*
+              No-mandat warning banner. A signed Mandat de gestion is
+              best-practice before creating contracts on behalf of a
+              client (FINMA-aligned), but Habib confirmed it's not
+              hard-blocking — some clients sign later, some files are
+              imported retroactively. So we WARN, link to the mandat
+              flow, and let the broker continue.
+            */}
+            {showNoMandatWarning && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1 text-sm">
+                  <div className="font-medium text-amber-900">
+                    Aucun mandat de gestion signé pour ce client
+                  </div>
+                  <div className="text-amber-800 mt-0.5">
+                    Vous pouvez créer le contrat, mais la conformité
+                    FINMA recommande d'avoir un mandat signé au préalable.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Common Fields Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
