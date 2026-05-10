@@ -113,8 +113,23 @@ async function invokeWithToken<T>(
   const headers = new Headers(options.headers ?? {});
   headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
 
+  // Supabase Edge gateway rejects every request that doesn't include
+  // an `apikey` header — even authenticated ones. Without this we get
+  // 401 BEFORE the function code ever runs (no auth headers visible
+  // to the function), which silently breaks every wrapper-based call
+  // (send-sms, send-crm-email, dispatch-mandat-to-companies, …). Set
+  // it unconditionally so all calls reach the function. The Bearer
+  // below carries the per-user identity for `requireAuth` checks.
+  headers.set("apikey", supabaseConfig.publishableKey);
+
   if (options.requireAuth !== false) {
     headers.set("Authorization", `Bearer ${await getFreshAccessToken(forceRefresh)}`);
+  } else {
+    // Anonymous public calls: still need an Authorization Bearer so
+    // the gateway proxies the request — use the publishable key.
+    if (!headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${supabaseConfig.publishableKey}`);
+    }
   }
 
   const response = await fetch(`${supabaseConfig.url}/functions/v1/${name}`, {

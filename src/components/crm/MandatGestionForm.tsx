@@ -249,15 +249,19 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
         doc_kind: 'mandat_gestion',
       });
 
-      // Bridge to the dispatch flow:
-      // The "Envoyer aux compagnies" button on the signed mandat lives
-      // on the signature_requests table (it's the canonical place
-      // for any signed legal doc + its structured payload). Mandats
-      // signed in-person via this form historically only created a
-      // documents row — invisible to the dispatch panel.
-      // Insert a matching signature_requests row with status='signed'
-      // and the full insurances payload so the broker can dispatch
-      // the freshly signed mandat to each carrier listed inside.
+      // Bridge to the dispatch flow + AUTO-dispatch.
+      //
+      // Step 1 — insert a signature_requests row with status='signed'
+      // so the dispatch button appears on the Signatures tab AND so
+      // we have a row id to pass to the dispatch Edge Function.
+      //
+      // Step 2 — fire the dispatch Edge Function automatically. The
+      // broker explicitly expects "le mandat soit envoyé aux compagnies"
+      // as a side-effect of saving the mandat (Habib 10/05). The
+      // existing manual "Envoyer aux compagnies" button stays as a
+      // retry / re-dispatch lever.
+      let dispatchSignatureRequestId: string | null = null;
+      const dispatchWarnings: string[] = [];
       try {
         const payloadForDispatch = {
           insurances,
@@ -272,20 +276,16 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
           clientEmail: client.email ?? null,
           cabinetName: companyName,
           brokerEmail: companyEmail || null,
-          // Signed in-person — both signer and broker are the same
-          // session. We capture the client signature image so the
-          // dispatch email can include it later if needed.
           inPerson: true,
         };
 
-        // crypto.randomUUID is available in modern browsers + edge runtimes
         const accessToken =
           typeof crypto !== "undefined" && "randomUUID" in crypto
             ? (crypto as Crypto).randomUUID()
             : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
         const nowIso = new Date().toISOString();
-        const { error: srErr } = await (supabase as any)
+        const { data: srRow, error: srErr } = await (supabase as any)
           .from("signature_requests")
           .insert({
             tenant_id: tenantId,
@@ -300,22 +300,60 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
             client_full_name: getClientName(),
             status: "signed",
             access_token: accessToken,
-            // Token never used for signing (already signed) — keep it
-            // valid 30 days just so the row passes any expiry check.
             expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
             invited_at: nowIso,
             signed_at: nowIso,
-          });
-        if (srErr) {
-          // Don't block the save — dispatch can be triggered manually
-          // later via the documents tab if we add a fallback there.
+          })
+          .select("id")
+          .single();
+
+        if (srErr || !srRow) {
           console.warn("Could not create dispatch-bridge signature_request:", srErr);
+          dispatchWarnings.push("Lien dispatch non créé (envoi compagnies à faire manuellement).");
+        } else {
+          dispatchSignatureRequestId = srRow.id as string;
         }
       } catch (bridgeErr) {
         console.warn("Dispatch bridge insert failed:", bridgeErr);
+        dispatchWarnings.push("Lien dispatch non créé (envoi compagnies à faire manuellement).");
       }
 
-      const deliveryWarnings: string[] = [];
+      // Step 2 — fire the dispatch automatically. Failures are
+      // non-fatal: the manual button on the signed mandat can always
+      // retry. We collect warnings so the toast can summarise.
+      let dispatchSummary: { sent: number; manual: number; failed: number } | null = null;
+      if (dispatchSignatureRequestId) {
+        try {
+          const dispatchResp = await invokeSupabaseFunction<{
+            ok?: true;
+            dispatched?: number;
+            manual_required?: number;
+            failed?: number;
+          }>("dispatch-mandat-to-companies", {
+            body: { signature_request_id: dispatchSignatureRequestId },
+          });
+          if (dispatchResp && "ok" in dispatchResp) {
+            dispatchSummary = {
+              sent: dispatchResp.dispatched ?? 0,
+              manual: dispatchResp.manual_required ?? 0,
+              failed: dispatchResp.failed ?? 0,
+            };
+            if (dispatchSummary.failed > 0) {
+              dispatchWarnings.push(`${dispatchSummary.failed} compagnie(s) en échec d'envoi.`);
+            }
+            if (dispatchSummary.manual > 0) {
+              dispatchWarnings.push(
+                `${dispatchSummary.manual} compagnie(s) sans email courtier configuré.`,
+              );
+            }
+          }
+        } catch (dispatchErr) {
+          console.error("Auto-dispatch failed:", dispatchErr);
+          dispatchWarnings.push("Envoi automatique aux compagnies échoué — utilisez le bouton manuel.");
+        }
+      }
+
+      const deliveryWarnings: string[] = [...dispatchWarnings];
       const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
       const clientLoginUrl = buildTenantLoginUrl(tenant?.slug, "client");
 
