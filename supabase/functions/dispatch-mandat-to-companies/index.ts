@@ -601,7 +601,25 @@ serve(async (req) => {
     }
     const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
     const pdfBase64 = uint8ToBase64(pdfBytes);
-    const pdfFilename = `mandat_${mandat.id}.pdf`;
+
+    // Pretty filename per Habib's request:
+    //   "Advisy-Habib-Agharbi-Mandat.pdf"
+    //   = <cabinet display name>-<client first>-<client last>-Mandat.pdf
+    // Sanitize each segment so it's safe in any filesystem / email
+    // client (no quotes, slashes, or non-ASCII issues).
+    const sanitizeForFilename = (s: string | null | undefined): string =>
+      (s ?? "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "") // strip diacritics
+        .replace(/[^A-Za-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const filenameParts = [
+      sanitizeForFilename(payload.cabinetName ?? "Cabinet"),
+      sanitizeForFilename(payload.clientFirstName ?? ""),
+      sanitizeForFilename(payload.clientLastName ?? ""),
+      "Mandat",
+    ].filter((s) => s.length > 0);
+    const pdfFilename = filenameParts.join("-") + ".pdf";
 
     // -- Resolve client/cabinet display fields -------------------------
     const payload = mandat.payload ?? {};
