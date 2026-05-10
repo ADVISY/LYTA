@@ -194,10 +194,7 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
           onClick={onClientClick}
           className="w-full flex items-center gap-4 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
         >
-          {/* Tenant primary color (driven by --primary HSL var) instead
-              of hardcoded Tailwind blue/emerald/amber. Habib wants every
-              CTA on the login flow to wear the cabinet brand. */}
-          <div className="p-4 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+          <div className="p-4 rounded-full bg-blue-500/10 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
             <User className="h-8 w-8" />
           </div>
           <div className="text-left">
@@ -212,7 +209,7 @@ const ChoiceScreen = ({ onClientClick, onTeamClick, onSuperAdminClick, showSuper
         onClick={onTeamClick}
         className="w-full flex items-center gap-4 p-6 border-2 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group"
       >
-        <div className="p-4 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+        <div className="p-4 rounded-full bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
           <Users className="h-8 w-8" />
         </div>
         <div className="text-left">
@@ -291,7 +288,7 @@ const TeamChoiceScreen = ({ onBack, onCRMLogin, translations }: TeamChoiceScreen
         to="/deposer-contrat"
         className="flex items-center gap-4 p-5 border rounded-xl hover:bg-muted transition-colors text-left group"
       >
-        <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+        <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
           <FileUp className="h-7 w-7" />
         </div>
         <div>
