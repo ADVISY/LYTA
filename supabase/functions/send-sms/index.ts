@@ -29,10 +29,42 @@ interface TwilioPhoneNumber {
 }
 
 function normalizePhone(value: string): string {
+  // Strip everything except digits and the leading `+`. Spaces, dashes,
+  // parentheses, dots, no-break spaces — all gone.
   let phone = (value || "").trim().replace(/[^\d+]/g, "");
   if (!phone) return "";
+
+  // 0041 79 ... → +41 79 ...
   if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
+
+  // Defensive cleanup against double prefixes typed by humans.
+  // Examples observed:
+  //   "+41+41791234567"  → user typed +41 again over an already-prefixed
+  //                        number from a saved record
+  //   "++41791234567"    → double-tap on the keyboard
+  //   "+41+791234567"    → less likely but cheap to handle
+  while (/^\++/.test(phone) && (phone.match(/^\++/)?.[0].length ?? 0) > 1) {
+    phone = `+${phone.replace(/^\++/, "")}`;
+  }
+  // "+41+41…" or "+41+…" → keep one +41 only
+  phone = phone.replace(/^\+41\+/, "+");
+  // Normalise a "+0…" anomaly (someone typed +0... instead of +41 0…)
+  if (/^\+0/.test(phone)) phone = `+41${phone.slice(2)}`;
+
+  // "+410791234567" → user kept the leading 0 of the Swiss national
+  // format AFTER adding the country code → strip the 0 so we don't
+  // ship 13 digits to Twilio.
+  if (/^\+410\d{9}$/.test(phone)) {
+    phone = `+41${phone.slice(4)}`;
+  }
+  // Same idea for France: "+330612345678" → "+33612345678"
+  if (/^\+330\d{9}$/.test(phone)) {
+    phone = `+33${phone.slice(4)}`;
+  }
+
   if (phone.startsWith("+")) return phone;
+
+  // No prefix shape recognised → assume Swiss
   if (phone.startsWith("41") && phone.length >= 11) return `+${phone}`;
   if (phone.startsWith("0")) return `+41${phone.slice(1)}`;
   return `+41${phone}`;
