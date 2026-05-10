@@ -226,8 +226,34 @@ serve(async (req: Request): Promise<Response> => {
   let reservedAmount = 0;
 
   try {
-    const { user } = await requireAuth(req);
-    await checkRateLimit(req, "send-sms", 10);
+    // Detailed logs at each step so the response body in F12 Network
+    // tells us exactly WHICH guard rejected (auth, rate limit, tenant
+    // access, normalization, Twilio…).
+    log.info("send-sms: starting", {
+      hasAuth: !!req.headers.get("Authorization"),
+      hasApikey: !!req.headers.get("apikey"),
+    });
+
+    let user: { id: string };
+    try {
+      const authResult = await requireAuth(req);
+      user = authResult.user;
+      log.info("send-sms: auth OK", { userId: user.id });
+    } catch (authErr) {
+      log.error("send-sms: requireAuth failed", {
+        error: authErr instanceof Error ? authErr.message : String(authErr),
+      });
+      throw authErr;
+    }
+
+    try {
+      await checkRateLimit(req, "send-sms", 10);
+    } catch (rlErr) {
+      log.error("send-sms: rate limit hit", {
+        error: rlErr instanceof Error ? rlErr.message : String(rlErr),
+      });
+      throw rlErr;
+    }
 
     const { recipients, message, tenantId: requestedTenantId }: SmsRequest = await req.json();
 
