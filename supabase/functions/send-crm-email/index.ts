@@ -1201,9 +1201,48 @@ const handler = async (req: Request): Promise<Response> => {
 
     log.info("Email sent successfully", { emailId: emailResult.id });
 
+    // Centralised tenant_email_log entry — feeds the unified
+    // "Suivi emails" tab in Publicité (Habib 10/05). Map the
+    // request `type` to the canonical kinds tracked in the log.
+    if (resolvedTenantId) {
+      const kindMap: Record<string, string> = {
+        welcome: "account_created",
+        partner_welcome: "account_created",
+        contract_signed: "transactional",
+        mandat_signed: "mandat_signed",
+        account_created: "account_created",
+        relation_client: "transactional",
+        offre_speciale: "campaign",
+      };
+      const loggedKind = kindMap[type] ?? "crm_email";
+      try {
+        await supabaseAdmin
+          .from("tenant_email_log")
+          .insert({
+            tenant_id: resolvedTenantId,
+            kind: loggedKind,
+            recipient_email: clientEmail,
+            recipient_name: clientName,
+            sender_name: senderName,
+            subject,
+            status: "sent",
+            resend_message_id: emailResult.id ?? null,
+            related_entity_type: createdUserId ? "client_user" : null,
+            related_entity_id: createdUserId,
+            context: { email_type: type },
+            sent_at: new Date().toISOString(),
+          });
+      } catch (logErr) {
+        // Non-fatal — never let logging break the actual email response.
+        log.warn("tenant_email_log insert failed", {
+          error: logErr instanceof Error ? logErr.message : String(logErr),
+        });
+      }
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         emailId: emailResult.id,
         userCreated: createdUserId !== null,
         userId: createdUserId,

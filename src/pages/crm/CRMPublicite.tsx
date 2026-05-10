@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, MessageSquare, FileText, History, Settings, Megaphone, Zap } from "lucide-react";
+import { Mail, MessageSquare, FileText, History, Settings, Megaphone, Zap, Inbox } from "lucide-react";
 import { EmailTemplatesList } from "@/components/crm/publicite/EmailTemplatesList";
 import { EmailComposer } from "@/components/crm/publicite/EmailComposer";
 import { SmsComposer } from "@/components/crm/publicite/SmsComposer";
 import { CampaignHistory } from "@/components/crm/publicite/CampaignHistory";
+import { EmailDeliveryHistory } from "@/components/crm/publicite/EmailDeliveryHistory";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { CampaignStats } from "@/components/crm/publicite/CampaignStats";
 import { ModuleGatePage, ModuleGate } from "@/components/ModuleGate";
@@ -40,7 +41,7 @@ export default function CRMPublicite() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid h-auto p-1">
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid h-auto p-1">
           <TabsTrigger value="email" className="gap-2 py-2.5">
             <Mail className="h-4 w-4" />
             <span className="hidden sm:inline">{t('advertising.email')}</span>
@@ -56,6 +57,12 @@ export default function CRMPublicite() {
           <TabsTrigger value="history" className="gap-2 py-2.5">
             <History className="h-4 w-4" />
             <span className="hidden sm:inline">{t('advertising.history')}</span>
+          </TabsTrigger>
+          {/* New: unified email-delivery audit trail (mandat dispatch,
+              account creation, signature invites, campaigns…) */}
+          <TabsTrigger value="suivi" className="gap-2 py-2.5">
+            <Inbox className="h-4 w-4" />
+            <span className="hidden sm:inline">Suivi emails</span>
           </TabsTrigger>
           <TabsTrigger value="automation" className="gap-2 py-2.5">
             <Settings className="h-4 w-4" />
@@ -77,6 +84,10 @@ export default function CRMPublicite() {
 
         <TabsContent value="history" className="space-y-6">
           <CampaignHistory />
+        </TabsContent>
+
+        <TabsContent value="suivi" className="space-y-6">
+          <EmailDeliveryHistory />
         </TabsContent>
 
         <TabsContent value="automation" className="space-y-6">

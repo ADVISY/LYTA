@@ -191,6 +191,7 @@ serve(async (req: Request): Promise<Response> => {
       });
       const { fromAddress } = getSenderAddress(branding, tenantName);
 
+      const emailSubject = `${documentLabel} à signer - ${brokerName}`;
       const emailResp = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -200,15 +201,51 @@ serve(async (req: Request): Promise<Response> => {
         body: JSON.stringify({
           from: fromAddress,
           to: [client.email],
-          subject: `${documentLabel} à signer - ${brokerName}`,
+          subject: emailSubject,
           html,
         }),
       });
 
+      let resendMessageId: string | null = null;
+      let emailErrorMessage: string | null = null;
       if (!emailResp.ok) {
         const txt = await emailResp.text();
         log.error("Resend error", { status: emailResp.status, txt });
+        emailErrorMessage = txt || `Resend ${emailResp.status}`;
         warnings.push("Email non envoyé.");
+      } else {
+        try {
+          const respJson = await emailResp.json();
+          resendMessageId = (respJson as { id?: string })?.id ?? null;
+        } catch {
+          /* ignore parse error */
+        }
+      }
+
+      // Centralised tenant_email_log entry — feeds Suivi emails
+      // (Habib 10/05). signature_invite kind so the broker can
+      // filter to all signing-link emails sent.
+      try {
+        await supabaseAdmin
+          .from("tenant_email_log")
+          .insert({
+            tenant_id: sr.tenant_id,
+            kind: "signature_invite",
+            recipient_email: client.email,
+            recipient_name: recipientName,
+            sender_name: brokerName,
+            subject: emailSubject,
+            status: emailErrorMessage ? "failed" : "sent",
+            error_message: emailErrorMessage,
+            resend_message_id: resendMessageId,
+            related_entity_type: "signature_request",
+            related_entity_id: sr.id,
+            context: { document_kind: sr.document_kind, sign_link: signLink },
+            triggered_by: sr.created_by,
+            sent_at: emailErrorMessage ? null : new Date().toISOString(),
+          });
+      } catch (logErr) {
+        log.warn("tenant_email_log insert failed", { err: String(logErr) });
       }
     } else {
       warnings.push("Aucune adresse email cliente.");
