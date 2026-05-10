@@ -41,7 +41,7 @@ export default function CRMPublicite() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid h-auto p-1">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid h-auto p-1">
           <TabsTrigger value="email" className="gap-2 py-2.5">
             <Mail className="h-4 w-4" />
             <span className="hidden sm:inline">{t('advertising.email')}</span>
@@ -54,15 +54,13 @@ export default function CRMPublicite() {
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">{t('advertising.templates')}</span>
           </TabsTrigger>
+          {/* "Historique" merged with the unified email-delivery audit
+              trail (mandat dispatch, account creation, signature invites,
+              campaigns) — the existing CampaignHistory was campaign-only,
+              the new EmailDeliveryHistory covers everything. */}
           <TabsTrigger value="history" className="gap-2 py-2.5">
             <History className="h-4 w-4" />
             <span className="hidden sm:inline">{t('advertising.history')}</span>
-          </TabsTrigger>
-          {/* New: unified email-delivery audit trail (mandat dispatch,
-              account creation, signature invites, campaigns…) */}
-          <TabsTrigger value="suivi" className="gap-2 py-2.5">
-            <Inbox className="h-4 w-4" />
-            <span className="hidden sm:inline">Suivi emails</span>
           </TabsTrigger>
           <TabsTrigger value="automation" className="gap-2 py-2.5">
             <Settings className="h-4 w-4" />
@@ -83,11 +81,16 @@ export default function CRMPublicite() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
-          <CampaignHistory />
-        </TabsContent>
-
-        <TabsContent value="suivi" className="space-y-6">
+          {/*
+            Two complementary views inside one tab:
+              1. The unified email-delivery audit trail (every email sent
+                 by LYTA — mandats, signatures, accounts, campaigns).
+                 This is the "Suivi emails" Habib asked for.
+              2. The marketing-campaign-specific history (CampaignHistory)
+                 stays underneath for campaign drill-down.
+          */}
           <EmailDeliveryHistory />
+          <CampaignHistory />
         </TabsContent>
 
         <TabsContent value="automation" className="space-y-6">
