@@ -65,6 +65,20 @@ export default function Signer() {
   const [refusalMode, setRefusalMode] = useState(false);
   const [refusalReason, setRefusalReason] = useState("");
 
+  // Where on the imported PDF to stamp the signature.
+  //   page : "last" (most contracts), "first" (some declarations sign at top)
+  //   anchor : a 3×3 grid keyword. Default bottom-right matches the historical
+  //            placement Habib confirmed was good — the grid lets the client
+  //            move it for documents with different layouts (e.g. a form
+  //            where the signature line is centered or top-left).
+  type SignatureAnchor =
+    | "top-left" | "top-center" | "top-right"
+    | "middle-left" | "middle-center" | "middle-right"
+    | "bottom-left" | "bottom-center" | "bottom-right";
+  type SignaturePagePick = "first" | "last";
+  const [signaturePage, setSignaturePage] = useState<SignaturePagePick>("last");
+  const [signatureAnchor, setSignatureAnchor] = useState<SignatureAnchor>("bottom-right");
+
   const documentRef = useRef<HTMLDivElement>(null);
   const attestationRef = useRef<HTMLDivElement>(null);
 
@@ -277,39 +291,56 @@ export default function Signer() {
     const helveticaBold = await origDoc.embedFont(StandardFonts.HelveticaBold);
 
     const pages = origDoc.getPages();
-    const lastPage = pages[pages.length - 1];
-    const { width: pageW } = lastPage.getSize();
+    // Pick the page the client chose: "first" or "last". We never let
+    // the user pick a middle page from the UI to keep it simple — most
+    // Swiss broker docs only need first or last anyway.
+    const targetPage = pages[signaturePage === "first" ? 0 : pages.length - 1];
+    const { width: pageW, height: pageH } = targetPage.getSize();
 
-    // Compute sig box: max ~35 % of page width, max ~60 pt height,
-    // preserves the natural aspect ratio of the user's stroke.
+    // Compute sig box dimensions: max ~35% of page width, max 60pt
+    // height, natural aspect ratio preserved.
     const naturalDims = sigImage.scale(1);
     const targetW = Math.min(pageW * 0.35, 160);
-    const scale = targetW / naturalDims.width;
-    const drawnW = naturalDims.width * scale;
-    const drawnH = Math.min(naturalDims.height * scale, 60);
-    const recomputedW =
-      drawnH < naturalDims.height * scale ? drawnH * (naturalDims.width / naturalDims.height) : drawnW;
+    const scaleFactor = targetW / naturalDims.width;
+    const drawnW = naturalDims.width * scaleFactor;
+    const drawnH = Math.min(naturalDims.height * scaleFactor, 60);
 
+    // Translate the 3×3 anchor into actual page coordinates.
+    // pdf-lib origin is BOTTOM-LEFT, so y increases going up.
     const margin = 30;
-    const baseX = pageW - recomputedW - margin;
-    const baseY = margin + 28; // leaves space for label below
-    lastPage.drawImage(sigImage, {
+    const captionSpace = 24; // room below for "Signé par … / date"
+    const [vAnchor, hAnchor] = signatureAnchor.split("-") as [
+      "top" | "middle" | "bottom",
+      "left" | "center" | "right",
+    ];
+
+    let baseX: number;
+    if (hAnchor === "left") baseX = margin;
+    else if (hAnchor === "center") baseX = (pageW - drawnW) / 2;
+    else baseX = pageW - drawnW - margin;
+
+    let baseY: number;
+    if (vAnchor === "bottom") baseY = margin + captionSpace;
+    else if (vAnchor === "middle") baseY = (pageH - drawnH) / 2;
+    else baseY = pageH - drawnH - margin;
+
+    targetPage.drawImage(sigImage, {
       x: baseX,
       y: baseY,
-      width: recomputedW,
+      width: drawnW,
       height: drawnH,
     });
 
     // Caption below the signature
     const caption1 = `Signé par ${fullName || ""}`;
     const caption2 = new Date().toLocaleString("fr-CH");
-    lastPage.drawText(caption1, {
+    targetPage.drawText(caption1, {
       x: baseX,
       y: baseY - 10,
       size: 8,
       font: helveticaBold,
     });
-    lastPage.drawText(caption2, {
+    targetPage.drawText(caption2, {
       x: baseX,
       y: baseY - 20,
       size: 7,
@@ -694,6 +725,116 @@ export default function Signer() {
               </div>
             </div>
           </div>
+        )}
+
+        {/*
+          Signature placement picker — only for imported PDFs (mandat de
+          gestion has its own template with built-in signature slots).
+          Lets the client choose which page (first/last) and which of
+          9 grid positions the signature image is stamped at, instead
+          of always defaulting to bottom-right.
+        */}
+        {!refusalMode && (request.document_kind === "imported" || request.document_kind === "autre") && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Position de votre signature</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Choisissez où votre signature apparaîtra sur le document.
+                Par défaut : bas à droite de la dernière page.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Page selector */}
+              <div className="space-y-2">
+                <Label>Page</Label>
+                <div className="flex gap-2">
+                  {(
+                    [
+                      { value: "last", label: "Dernière page" },
+                      { value: "first", label: "Première page" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => setSignaturePage(opt.value)}
+                      className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                        signaturePage === opt.value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background hover:bg-accent"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3×3 grid representing the page */}
+              <div className="space-y-2">
+                <Label>Emplacement sur la page</Label>
+                <div className="flex items-start gap-4">
+                  <div
+                    className="aspect-[210/297] w-44 shrink-0 border-2 border-slate-300 rounded-md p-2 bg-slate-50"
+                    aria-label="Aperçu de la page"
+                  >
+                    <div className="h-full grid grid-cols-3 grid-rows-3 gap-1">
+                      {(
+                        [
+                          "top-left", "top-center", "top-right",
+                          "middle-left", "middle-center", "middle-right",
+                          "bottom-left", "bottom-center", "bottom-right",
+                        ] as const
+                      ).map((a) => {
+                        const selected = signatureAnchor === a;
+                        return (
+                          <button
+                            key={a}
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => setSignatureAnchor(a)}
+                            aria-label={a}
+                            className={`rounded flex items-center justify-center transition-all text-xs ${
+                              selected
+                                ? "bg-primary text-primary-foreground ring-2 ring-primary"
+                                : "bg-white border border-slate-200 hover:border-primary hover:bg-primary/5"
+                            }`}
+                          >
+                            {selected && <Check className="h-3.5 w-3.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground space-y-1 mt-1">
+                    <div>
+                      <span className="font-medium text-foreground">
+                        Position sélectionnée :
+                      </span>{" "}
+                      {(() => {
+                        const labels: Record<typeof signatureAnchor, string> = {
+                          "top-left": "Haut gauche",
+                          "top-center": "Haut centre",
+                          "top-right": "Haut droite",
+                          "middle-left": "Milieu gauche",
+                          "middle-center": "Milieu centre",
+                          "middle-right": "Milieu droite",
+                          "bottom-left": "Bas gauche",
+                          "bottom-center": "Bas centre",
+                          "bottom-right": "Bas droite",
+                        };
+                        return labels[signatureAnchor];
+                      })()}
+                    </div>
+                    <div className="text-xs">
+                      sur la {signaturePage === "first" ? "première" : "dernière"} page
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Signature form */}
