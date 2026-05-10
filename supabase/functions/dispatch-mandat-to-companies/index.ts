@@ -44,6 +44,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { logEmail } from "../_shared/email-log.ts";
 
 // -- Types ----------------------------------------------------------------
 
@@ -612,6 +613,30 @@ serve(async (req) => {
         })
         .select("id")
         .single();
+
+      // Centralised tenant_email_log entry — Habib's "suivi emails"
+      // unified view. We keep mandat_dispatch_log for dispatch-specific
+      // metadata (per-company status) and mirror here for the global
+      // audit trail.
+      void logEmail({
+        tenantId: mandat.tenant_id,
+        kind: "mandat_dispatch",
+        recipientEmail: bestContact.value,
+        senderName: cabinetName,
+        subject,
+        status: success ? "sent" : "failed",
+        errorMessage: sendError,
+        resendMessageId: resendId ?? null,
+        relatedEntityType: "signature_request",
+        relatedEntityId: mandat.id,
+        context: {
+          insurance_company_name: company_name,
+          insurance_company_id: company_id,
+          client_id: mandat.client_id,
+          mandat_dispatch_log_id: logRow?.id ?? null,
+        },
+        triggeredBy,
+      });
 
       if (success) dispatched += 1;
       details.push({
