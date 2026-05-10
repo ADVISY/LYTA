@@ -153,12 +153,20 @@ export function SwissAddressInput({
   const handlePick = useCallback(
     (hit: AddressHit) => {
       // Build the visible street value the user will see in the input.
-      // Prefer "<street> <number>" when both are present, otherwise the
-      // full label (covers oddities the parser may have missed).
-      const visible =
-        hit.street && hit.houseNumber
-          ? `${hit.street} ${hit.houseNumber}`
-          : hit.street || hit.label;
+      // Goal: ONLY street + number, never the postal code / city — those
+      // belong in their own form fields per Habib's feedback.
+      let visible: string;
+      if (hit.street && hit.houseNumber) {
+        visible = `${hit.street} ${hit.houseNumber}`;
+      } else if (hit.street) {
+        visible = hit.street;
+      } else {
+        // Defensive last resort: take the label and aggressively strip
+        // any trailing "<plz> <city>" pattern, so we never leak PLZ /
+        // city into the address field even when the parser failed.
+        visible = (hit.label || "").replace(/[,;]?\s*\d{4}\s+\S.*$/u, "").trim();
+        if (!visible) visible = hit.label || "";
+      }
       onChange(visible);
       setValidatedLabel(visible);
       onResolvedRef.current?.({

@@ -66,22 +66,35 @@ function parseAddressLabel(rawLabel: string): {
   if (!rawLabel) return { street: null, houseNumber: null, postalCode: null, city: null };
 
   // Strip <b>...</b> highlight markers
-  const label = rawLabel.replace(/<\/?b>/gi, "").trim();
+  let label = rawLabel.replace(/<\/?b>/gi, "").trim();
 
-  const lastComma = label.lastIndexOf(",");
-  const left = lastComma >= 0 ? label.slice(0, lastComma).trim() : label;
-  const right = lastComma >= 0 ? label.slice(lastComma + 1).trim() : "";
+  // First try to peel off the trailing "<plz> <city>" — this is more
+  // reliable than splitting on the last comma because some swisstopo
+  // labels DON'T have a comma (e.g. "Bahnhofstrasse 11 8001 Zürich").
+  // Match: optional comma + whitespace + 4 digits + whitespace + city
+  // (the city can contain spaces and hyphens).
+  const tailRegex = /\s*,?\s*(\d{4})\s+([^,]+?)\s*$/;
+  const tailMatch = label.match(tailRegex);
 
-  // Right side: "1003 Lausanne" → split by first space
-  const plzMatch = right.match(/^(\d{4})\s+(.+)$/);
-  const postalCode = plzMatch ? plzMatch[1] : null;
-  const city = plzMatch ? plzMatch[2].trim() : right || null;
+  let postalCode: string | null = null;
+  let city: string | null = null;
+  let left: string;
+  if (tailMatch) {
+    postalCode = tailMatch[1];
+    city = tailMatch[2].trim();
+    left = label.slice(0, label.length - tailMatch[0].length).trim();
+    // Drop a trailing comma the regex may have left behind
+    left = left.replace(/[,;]+\s*$/, "").trim();
+  } else {
+    // No PLZ + city tail visible → assume the whole label is the street
+    left = label;
+  }
 
   // Left side: "Rue de Bourg 12" → trailing token is the house number
-  // if it starts with a digit (handles "12", "12a", "12bis")
-  const leftTokens = left.split(/\s+/);
+  // if it starts with a digit (handles "12", "12a", "12bis", "12 ter")
   let street = left;
   let houseNumber: string | null = null;
+  const leftTokens = left.split(/\s+/);
   if (leftTokens.length >= 2) {
     const last = leftTokens[leftTokens.length - 1];
     if (/^\d+[A-Za-z]?(?:bis|ter)?$/i.test(last)) {
