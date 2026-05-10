@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { SwissPostalCodeFields } from "@/components/ui/swiss-postal-code-fields";
+import { SwissAddressInput } from "@/components/ui/swiss-address-input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -293,7 +294,28 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
                       <FormItem className="col-span-2">
                         <FormLabel>{t('qrInvoice.clientAddress')}</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          {/*
+                            Swiss address autocomplete — picking a hit
+                            auto-fills client_postal_code + client_city.
+                          */}
+                          <SwissAddressInput
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            onAddressResolved={(r) => {
+                              if (r.postalCode) {
+                                form.setValue("client_postal_code", r.postalCode, {
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                });
+                              }
+                              if (r.city) {
+                                form.setValue("client_city", r.city, {
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                });
+                              }
+                            }}
+                          />
                         </FormControl>
                       </FormItem>
                     )}

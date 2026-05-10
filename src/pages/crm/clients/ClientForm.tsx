@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SwissPostalCodeFields } from "@/components/ui/swiss-postal-code-fields";
+import { SwissAddressInput } from "@/components/ui/swiss-address-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Building2, User as UserIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -608,7 +609,28 @@ export default function ClientForm() {
                     <FormItem>
                       <FormLabel>{t('clientForm.address')}</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} />
+                        {/*
+                          Swiss street-address autocomplete via swisstopo.
+                          Picking a suggestion auto-fills postal code +
+                          city (and the country defaults to Suisse).
+                        */}
+                        <SwissAddressInput
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onAddressResolved={(r) => {
+                            if (r.postalCode) {
+                              form.setValue("zip_code", r.postalCode, { shouldDirty: true, shouldTouch: true });
+                            }
+                            if (r.city) {
+                              form.setValue("city", r.city, { shouldDirty: true, shouldTouch: true });
+                            }
+                            // Force country to Suisse since we only validate against CH data
+                            const currentCountry = (form.getValues("country") || "").toString().trim();
+                            if (!currentCountry) {
+                              form.setValue("country", "Suisse", { shouldDirty: true });
+                            }
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
