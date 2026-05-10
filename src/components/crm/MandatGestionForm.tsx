@@ -368,57 +368,11 @@ export default function MandatGestionForm({ client, onSaved }: MandatGestionForm
         deliveryWarnings.push("Aucun email client renseigné.");
       }
 
-      const phone = client.mobile || client.phone;
-      if (phone) {
-        // Bypass invokeSupabaseFunction here — its built-in session
-        // refresh logic was the root of Habib's "saving a mandat
-        // disconnects me from LYTA" loop: when send-sms returned a
-        // 401, the wrapper would `refreshSession`; if that refresh
-        // failed for any reason, supabase-js fired SIGNED_OUT and
-        // the broker landed on the login page mid-save. Doing a
-        // direct fetch keeps the SMS call isolated from auth
-        // bookkeeping. Failures are swallowed loudly to console
-        // and surfaced as a soft toast warning.
-        try {
-          const {
-            data: { session: smsSession },
-          } = await supabase.auth.getSession();
-          const accessToken = smsSession?.access_token;
-          if (!accessToken) {
-            deliveryWarnings.push("SMS non envoyé (session expirée).");
-          } else {
-            const smsRes = await fetch(
-              `${supabaseConfig.url}/functions/v1/send-sms`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: supabaseConfig.publishableKey,
-                  Authorization: `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({
-                  recipients: [{ phone, name: clientName }],
-                  tenantId,
-                  message: `Bonjour ${clientName}, votre mandat de gestion a été signé. Votre espace client est disponible ici: ${clientLoginUrl}`,
-                }),
-              },
-            );
-            if (!smsRes.ok) {
-              const text = await smsRes.text().catch(() => "");
-              console.error(
-                `[MandatGestion] send-sms ${smsRes.status}:`,
-                text || smsRes.statusText,
-              );
-              deliveryWarnings.push(`SMS non envoyé (${smsRes.status}).`);
-            }
-          }
-        } catch (smsError) {
-          // Network error etc. — never let this propagate, otherwise
-          // it can take the broker's session down with it.
-          console.error("Erreur envoi SMS mandat:", smsError);
-          deliveryWarnings.push("SMS non envoyé.");
-        }
-      }
+      // SMS notification removed (Habib 10/05): "retire l'envoi par
+      // SMS sur le mandat de courtage". The send-sms call was at the
+      // root of a recurring session-loss loop and we're keeping just
+      // email delivery for the mandat-signed welcome. SMS can be
+      // reintroduced later from a dedicated Comms tab.
 
       toast({
         title: deliveryWarnings.length ? "Mandat enregistré, envoi à vérifier" : t('mandatForm.mandatSaved'),

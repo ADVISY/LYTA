@@ -1115,17 +1115,28 @@ const handler = async (req: Request): Promise<Response> => {
 
         log.info(`User account created`, { email: clientEmail });
       } else {
-        log.info(`User already exists, resetting password`, { email: clientEmail });
-        
-        const newTemporaryPassword = generateTemporaryPassword();
-        const { error: updatePasswordError } = await supabaseAdmin.auth.admin.updateUserById(
-          existingUser.id,
-          { password: newTemporaryPassword },
+        // CRITICAL FIX (Habib 10/05): the previous behaviour was to
+        // call admin.updateUserById with a fresh random password every
+        // time a mandat was signed for an email that already had a
+        // user account. In LYTA, a broker can legitimately also be a
+        // client of their own cabinet (same email used for admin AND
+        // client roles). The blind password reset would invalidate
+        // every existing JWT for that user — bouncing the broker out
+        // of LYTA mid-save and locking them out (their old password
+        // no longer worked, the new one was sent to "client email"
+        // which is also their admin email but they didn't realise
+        // their admin password was now random).
+        //
+        // New behaviour: NEVER overwrite the password of an existing
+        // user. Just (re)apply the client role + tenant assignment so
+        // the existing account gains client-portal access, and send a
+        // welcome email pointing to the password-reset flow if they
+        // need credentials. The broker keeps their current password
+        // and stays logged in.
+        log.info(
+          `User already exists — preserving password, applying client role`,
+          { email: clientEmail },
         );
-
-        if (updatePasswordError) {
-          throw new Error(`Failed to reset user password: ${updatePasswordError.message}`);
-        }
 
         await supabaseAdmin
           .from('user_roles')
@@ -1160,7 +1171,11 @@ const handler = async (req: Request): Promise<Response> => {
 
         emailData = {
           ...emailData,
-          temporaryPassword: newTemporaryPassword,
+          // No temporary password — the user already has an account.
+          // The email template will surface a "use your existing
+          // password, or click here to reset" call-to-action instead
+          // of a fresh password.
+          temporaryPassword: undefined,
           clientEmail,
           loginUrl: buildTenantLoginUrl(emailData),
         };
