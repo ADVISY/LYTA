@@ -115,22 +115,21 @@ async function invokeWithToken<T>(
 
   // Supabase Edge gateway rejects every request that doesn't include
   // an `apikey` header — even authenticated ones. Without this we get
-  // 401 BEFORE the function code ever runs (no auth headers visible
-  // to the function), which silently breaks every wrapper-based call
-  // (send-sms, send-crm-email, dispatch-mandat-to-companies, …). Set
-  // it unconditionally so all calls reach the function. The Bearer
-  // below carries the per-user identity for `requireAuth` checks.
+  // 401 BEFORE the function code ever runs, which silently breaks
+  // every wrapper-based call (send-sms, send-crm-email, dispatch-…).
+  // Set it unconditionally; the per-user Bearer below still carries
+  // the user identity for `requireAuth` checks inside the function.
   headers.set("apikey", supabaseConfig.publishableKey);
 
   if (options.requireAuth !== false) {
     headers.set("Authorization", `Bearer ${await getFreshAccessToken(forceRefresh)}`);
-  } else {
-    // Anonymous public calls: still need an Authorization Bearer so
-    // the gateway proxies the request — use the publishable key.
-    if (!headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${supabaseConfig.publishableKey}`);
-    }
   }
+  // Note: for `requireAuth: false`, we deliberately DON'T inject a
+  // publishable-key Bearer — some Edge Functions interpret a present
+  // Authorization header as "user-scoped, please verify it" and 401
+  // on a non-user token. Caller code that needs anonymous gateway
+  // access can pass `headers: { Authorization: "Bearer <publishable>" }`
+  // explicitly.
 
   const response = await fetch(`${supabaseConfig.url}/functions/v1/${name}`, {
     method: "POST",
