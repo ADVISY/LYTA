@@ -135,71 +135,167 @@ function renderEmailHtml(opts: {
   clientBirthDate?: string;
   clientAddress?: string;
   brokerSignerName?: string;
+  brokerEmail?: string | null;
+  cabinetPhone?: string | null;
+  cabinetWebsite?: string | null;
   insuranceCompanyName: string;
+  primaryColor?: string | null;
+  reference: string;
+  dateLine: string;
 }): string {
   const safeClient = escapeHtml(opts.clientFullName);
   const safeCabinet = escapeHtml(opts.cabinetName);
   const safeBroker = escapeHtml(opts.brokerSignerName ?? opts.cabinetName);
   const safeCompany = escapeHtml(opts.insuranceCompanyName);
-  const safeAddress = opts.clientAddress
-    ? escapeHtml(opts.clientAddress)
-    : "";
-  const safeDob = opts.clientBirthDate
-    ? escapeHtml(opts.clientBirthDate)
-    : "";
+  const safeAddress = opts.clientAddress ? escapeHtml(opts.clientAddress) : "";
+  const safeDob = opts.clientBirthDate ? escapeHtml(opts.clientBirthDate) : "";
+  const safeRef = escapeHtml(opts.reference);
+  const safeDate = escapeHtml(opts.dateLine);
+  const safeBrokerEmail = opts.brokerEmail ? escapeHtml(opts.brokerEmail) : "";
+  const safePhone = opts.cabinetPhone ? escapeHtml(opts.cabinetPhone) : "";
+  const safeWebsite = opts.cabinetWebsite ? escapeHtml(opts.cabinetWebsite) : "";
+  const accent =
+    opts.primaryColor && /^#[0-9a-fA-F]{3,8}$/.test(opts.primaryColor)
+      ? opts.primaryColor
+      : "#1e3a8a";
 
+  // Formal Swiss business letter style. Serif typography, inline-only CSS
+  // (Outlook / Lotus Notes / IBM Verse strip <style> tags), reference
+  // number + dateline in the top-right corner, "Concerne" subject, three
+  // numbered requests, footer with cabinet website. Drives the tenant
+  // brand color from the accent param.
   return `<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="utf-8"><title>Mandat de gestion</title></head>
-<body style="margin:0;padding:24px;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;line-height:1.55;">
-  <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-    <div style="padding:24px 28px;border-bottom:1px solid #e5e7eb;background:linear-gradient(135deg,#1e3a8a 0%,#3730a3 100%);color:#fff;">
-      <div style="font-size:13px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.85;">Mandat de gestion</div>
-      <div style="font-size:20px;font-weight:600;margin-top:4px;">À l'attention du Service Courtage — ${safeCompany}</div>
-    </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mandat de gestion — ${safeClient}</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;line-height:1.6;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f6f8;padding:32px 0;">
+    <tr><td>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%;max-width:680px;background:#ffffff;border:1px solid #e1e5ea;">
+        <tr>
+          <td style="padding:28px 36px 0 36px;border-top:6px solid ${accent};">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td valign="top">
+                  <div style="font-size:18px;font-weight:700;color:${accent};letter-spacing:0.3px;">${safeCabinet}</div>
+                  ${safeAddress ? `<div style="font-size:11px;color:#4b5563;margin-top:4px;">${safeAddress}</div>` : ""}
+                  <div style="font-size:11px;color:#4b5563;margin-top:2px;">
+                    ${safePhone ? `Tél. ${safePhone}` : ""}
+                    ${safePhone && safeBrokerEmail ? " — " : ""}
+                    ${safeBrokerEmail ? safeBrokerEmail : ""}
+                  </div>
+                </td>
+                <td valign="top" align="right" style="font-size:11px;color:#4b5563;">
+                  <div>Réf. ${safeRef}</div>
+                  <div style="margin-top:2px;">${safeDate}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-    <div style="padding:28px;">
-      <p>Madame, Monsieur,</p>
+        <tr>
+          <td style="padding:28px 36px 0 36px;font-size:13px;color:#1a1a1a;">
+            <div style="font-weight:600;">${safeCompany}</div>
+            <div style="color:#4b5563;font-size:12px;">À l'attention du Service Courtage</div>
+          </td>
+        </tr>
 
-      <p>Veuillez trouver ci-joint le mandat de gestion signé par notre client
-        <strong>${safeClient}</strong>${
-    safeDob ? `, né(e) le ${safeDob}` : ""
-  }${
-    safeAddress ? `, domicilié(e) ${safeAddress}` : ""
-  }, par lequel notre cabinet <strong>${safeCabinet}</strong> est
-        autorisé à gérer ses contrats d'assurance auprès de votre compagnie.</p>
+        <tr>
+          <td style="padding:28px 36px 0 36px;">
+            <div style="font-size:14px;font-weight:600;color:#1a1a1a;border-bottom:2px solid ${accent};padding-bottom:6px;display:inline-block;">
+              Concerne : transmission d'un mandat de gestion signé&nbsp;—&nbsp;client ${safeClient}
+            </div>
+          </td>
+        </tr>
 
-      <p>Nous vous prions de bien vouloir :</p>
-      <ol style="padding-left:20px;margin:12px 0;">
-        <li style="margin-bottom:8px;">
-          <strong>Nous reconnaître comme courtier officiel</strong> sur les
-          contrats existants et futurs de ce client.
-        </li>
-        <li style="margin-bottom:8px;">
-          <strong>Nous transmettre l'ensemble des polices actuellement en
-          cours</strong> pour ce client (numéro de police, type de couverture,
-          prime, échéance, conditions particulières).
-        </li>
-        <li style="margin-bottom:8px;">
-          Nous adresser à l'avenir toute correspondance, échéance ou
-          notification de sinistre concernant ce client.
-        </li>
-      </ol>
+        <tr>
+          <td style="padding:24px 36px 0 36px;font-size:13px;color:#1a1a1a;line-height:1.7;">
+            <p style="margin:0 0 14px 0;">Madame, Monsieur,</p>
 
-      <p>Restant à votre disposition pour tout complément d'information,
-         nous vous adressons, Madame, Monsieur, nos salutations distinguées.</p>
+            <p style="margin:0 0 14px 0;">
+              Nous avons le plaisir de vous transmettre, en pièce jointe, le
+              <strong>mandat de gestion dûment signé</strong> par notre client
+              <strong>${safeClient}</strong>${safeDob ? `, né(e) le ${safeDob}` : ""}${safeAddress ? `, domicilié(e) ${safeAddress}` : ""}.
+              Par ce mandat, ce dernier nous confie la gestion de ses contrats
+              d'assurance souscrits auprès de votre compagnie et nous autorise
+              à le représenter dans toutes les démarches y afférentes.
+            </p>
 
-      <p style="margin-top:24px;">
-        <strong>${safeBroker}</strong><br>
-        ${safeCabinet}
-      </p>
-    </div>
+            <p style="margin:0 0 8px 0;">
+              Conformément à ce mandat, nous vous saurions gré de bien vouloir :
+            </p>
 
-    <div style="padding:16px 28px;border-top:1px solid #e5e7eb;background:#f9fafb;font-size:12px;color:#6b7280;text-align:center;">
-      Document généré automatiquement via LYTA — gestion de mandats. Le PDF
-      signé est joint à cet email.
-    </div>
-  </div>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px 0;">
+              <tr>
+                <td valign="top" style="width:24px;color:${accent};font-weight:700;padding-top:2px;">1.</td>
+                <td style="padding-bottom:8px;">
+                  <strong>Reconnaître ${safeCabinet}</strong> en qualité de
+                  courtier officiel sur l'ensemble des contrats — actuels et
+                  futurs — de notre client.
+                </td>
+              </tr>
+              <tr>
+                <td valign="top" style="width:24px;color:${accent};font-weight:700;padding-top:2px;">2.</td>
+                <td style="padding-bottom:8px;">
+                  <strong>Nous communiquer copie de l'ensemble des polices
+                  en cours</strong> au nom de notre client (numéro de police,
+                  branche, prime, échéance, franchise et conditions
+                  particulières).
+                </td>
+              </tr>
+              <tr>
+                <td valign="top" style="width:24px;color:${accent};font-weight:700;padding-top:2px;">3.</td>
+                <td>
+                  <strong>Nous adresser, à l'avenir,</strong> toute
+                  correspondance, échéance, avis de prime ou notification de
+                  sinistre relative à ces contrats.
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 14px 0;">
+              Nous restons à votre entière disposition pour toute information
+              complémentaire et vous remercions par avance de l'attention que
+              vous porterez à la présente.
+            </p>
+
+            <p style="margin:0 0 4px 0;">
+              Veuillez agréer, Madame, Monsieur, l'expression de nos
+              salutations distinguées.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:28px 36px 0 36px;font-size:13px;color:#1a1a1a;">
+            <div style="font-weight:600;">${safeBroker}</div>
+            <div style="font-size:12px;color:#4b5563;">Pour ${safeCabinet}</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:18px 36px 4px 36px;">
+            <div style="border-top:1px solid #e1e5ea;padding-top:14px;font-size:11px;color:#6b7280;">
+              <strong style="color:#1a1a1a;">Pièce jointe :</strong>
+              ${safeRef}.pdf — mandat de gestion signé électroniquement
+              (signature électronique simple, droit suisse).
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:14px 36px 28px 36px;font-size:10px;color:#9ca3af;border-top:1px solid #f1f3f5;text-align:center;">
+            Courrier généré et expédié automatiquement par ${safeCabinet}${safeWebsite ? ` — ${safeWebsite}` : ""}.
+            <br>Pour toute question, répondez directement à ce message${safeBrokerEmail ? ` ou contactez ${safeBrokerEmail}` : ""}.
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`;
 }
@@ -259,7 +355,19 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 /** Send via Resend with attachment support. Throws on hard failure. */
+/**
+ * Quote-escape a display name for the RFC 5322 "From" header. Insurance
+ * companies look at the visible sender name first (cabinet name) rather
+ * than the email address — we definitely don't want "lyta.ch" there.
+ */
+function buildFromHeader(senderName: string | undefined | null, fromEmail: string): string {
+  const cleaned = (senderName ?? "").replace(/[\\"]/g, " ").trim();
+  if (!cleaned) return fromEmail;
+  return `"${cleaned}" <${fromEmail}>`;
+}
+
 async function sendResendWithAttachment(opts: {
+  fromName?: string | null;
   to: string;
   subject: string;
   html: string;
@@ -267,7 +375,7 @@ async function sendResendWithAttachment(opts: {
   attachment: { filename: string; contentBase64: string };
 }): Promise<{ id?: string }> {
   const body = {
-    from: FROM_EMAIL,
+    from: buildFromHeader(opts.fromName, FROM_EMAIL),
     to: [opts.to],
     subject: opts.subject,
     html: opts.html,
@@ -476,7 +584,21 @@ serve(async (req) => {
     }
     const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
     const pdfBase64 = uint8ToBase64(pdfBytes);
-    const pdfFilename = `mandat_${mandat.id}.pdf`;
+    // Pretty filename: "Advisy-Habib-Agharbi-Mandat.pdf"
+    // Sanitise each segment so it's safe in any filesystem / email client.
+    const sanitizeForFilename = (s: string | null | undefined): string =>
+      (s ?? "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^A-Za-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const filenameParts = [
+      sanitizeForFilename(payload.cabinetName ?? "Cabinet"),
+      sanitizeForFilename(payload.clientFirstName ?? ""),
+      sanitizeForFilename(payload.clientLastName ?? ""),
+      "Mandat",
+    ].filter((s) => s.length > 0);
+    const pdfFilename = filenameParts.join("-") + ".pdf";
 
     // -- Resolve client/cabinet display fields -------------------------
     const payload = mandat.payload ?? {};
@@ -495,10 +617,15 @@ serve(async (req) => {
     // here so the email always reflects the CURRENT cabinet identity.
     let freshCabinetName = payload.cabinetName ?? "Cabinet";
     let freshReplyTo = payload.brokerEmail ?? undefined;
+    let freshPhone: string | null = null;
+    let freshWebsite: string | null = null;
+    let freshPrimaryColor: string | null = null;
     try {
       const { data: brandingRow } = await admin
         .from("tenant_branding")
-        .select("display_name, company_email")
+        .select(
+          "display_name, company_email, company_phone, company_website, primary_color",
+        )
         .eq("tenant_id", mandat.tenant_id)
         .maybeSingle();
       if (brandingRow?.display_name && brandingRow.display_name.trim()) {
@@ -507,18 +634,34 @@ serve(async (req) => {
       if (brandingRow?.company_email && brandingRow.company_email.trim()) {
         freshReplyTo = brandingRow.company_email.trim();
       }
+      freshPhone = brandingRow?.company_phone ?? null;
+      freshWebsite = brandingRow?.company_website ?? null;
+      freshPrimaryColor = brandingRow?.primary_color ?? null;
     } catch {
       /* non-fatal: fall back to payload snapshot */
     }
     const cabinetName = freshCabinetName;
     const brokerSignerName = payload.brokerName ?? cabinetName;
     const replyTo = freshReplyTo;
+    const cabinetPhone = freshPhone;
+    const cabinetWebsite = freshWebsite;
+    const cabinetPrimaryColor = freshPrimaryColor;
     const clientAddressLine = [
       payload.clientAddress,
       [payload.clientPostalCode, payload.clientCity].filter(Boolean).join(" "),
     ]
       .filter(Boolean)
       .join(", ");
+    // Letter dateline + short reference for the formal letter format
+    const dateLine = (() => {
+      const d = new Date();
+      const months = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+      ];
+      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    })();
+    const reference = `MGE-${mandat.id.slice(-6).toUpperCase()}`;
 
     // -- Process each company -----------------------------------------
     const details: DispatchDetail[] = [];
@@ -597,7 +740,13 @@ serve(async (req) => {
         clientBirthDate: payload.clientBirthDate,
         clientAddress: clientAddressLine || undefined,
         brokerSignerName,
+        brokerEmail: replyTo ?? null,
+        cabinetPhone,
+        cabinetWebsite,
         insuranceCompanyName: company_name,
+        primaryColor: cabinetPrimaryColor,
+        reference,
+        dateLine,
       });
       const subject = `Mandat de gestion — ${clientFullName} — ${cabinetName}`;
 
@@ -605,6 +754,7 @@ serve(async (req) => {
       let sendError: string | null = null;
       try {
         const r = await sendResendWithAttachment({
+          fromName: cabinetName,
           to: bestContact.value,
           subject,
           html,
