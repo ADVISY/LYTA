@@ -161,6 +161,11 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   // Health insurance specific - Global LAMal fields
   const [lamalPremium, setLamalPremium] = useState("");
   const [lamalFranchise, setLamalFranchise] = useState("");
+  // Accident coverage included in LAMal — defaults to TRUE because a
+  // freshly insured client without employer coverage MUST include it.
+  // Employed clients with >8h/week LAA cover from employer can uncheck.
+  // Stored in products_data on each LAMal product so it survives reload.
+  const [lamalAccidentIncluded, setLamalAccidentIncluded] = useState(true);
   
   // Selected products
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
@@ -334,11 +339,17 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           // Normalize category to handle legacy IA Scan values (LAMal, LCA -> health)
           const normalizedCategory = normalizeCategoryFromDB(prod.category);
           const isLamal = normalizedCategory === 'health' && isLamalProduct(prod.name);
-          
+
           // Set LAMal fields if applicable
           if (isLamal && prod.premium) {
             setLamalPremium(String(prod.premium));
             if (prod.deductible) setLamalFranchise(String(prod.deductible));
+            // Restore accidentIncluded if saved on this LAMal line.
+            // Legacy rows pre-this-feature don't carry the field —
+            // default to TRUE in that case (safer for a fresh contract).
+            if (prod.accidentIncluded !== undefined && prod.accidentIncluded !== null) {
+              setLamalAccidentIncluded(prod.accidentIncluded === true);
+            }
           }
           
           // If productId is missing, try to find it by name
@@ -402,6 +413,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     setProductSearch("");
     setLamalPremium("");
     setLamalFranchise("");
+    setLamalAccidentIncluded(true);
   };
 
   const fetchCompaniesAndProducts = async () => {
@@ -574,9 +586,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const productsData = selectedProducts.map(product => {
         let premium = 0;
         let deductible: number | null = null;
-        
+        // LAMal-specific: per-product accidentIncluded flag persisted in
+        // products_data so it survives reload. Only meaningful for the
+        // LAMal product(s); ignored for non-LAMal lines.
+        const isLamalLine =
+          product.category === 'health' && isLamalProduct(product.name);
+
         if (product.category === 'health') {
-          if (isLamalProduct(product.name)) {
+          if (isLamalLine) {
             premium = parseFloat(lamalPremium) || 0;
             deductible = parseFloat(lamalFranchise) || null;
           } else {
@@ -588,7 +605,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium = parseFloat(product.premium) || 0;
           deductible = parseFloat(product.deductible) || null;
         }
-        
+
         return {
           productId: product.productId,
           name: product.name,
@@ -596,6 +613,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium,
           deductible,
           durationYears: product.durationYears ? parseInt(product.durationYears) : null,
+          // Non-LAMal lines: emit `null` so the column stays present but
+          // semantically "n/a". LAMal lines carry the toggle value.
+          accidentIncluded: isLamalLine ? lamalAccidentIncluded : null,
         };
       });
 
@@ -1008,6 +1028,31 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           <SelectItem value="2500">2'500 CHF</SelectItem>
                                         </SelectContent>
                                       </Select>
+                                    </div>
+                                  </div>
+                                  {/* Accident coverage included toggle. Specific
+                                      to LAMal: a client without employer LAA
+                                      cover MUST include it, an employee may
+                                      opt out. Default: true (most common). */}
+                                  <div className="mt-3 flex items-start gap-2 p-2 rounded-md bg-white/80 border border-emerald-200">
+                                    <Checkbox
+                                      id="lamal-accident"
+                                      checked={lamalAccidentIncluded}
+                                      onCheckedChange={(checked) =>
+                                        setLamalAccidentIncluded(checked === true)
+                                      }
+                                      className="mt-0.5"
+                                    />
+                                    <div className="flex-1">
+                                      <Label
+                                        htmlFor="lamal-accident"
+                                        className="text-xs font-medium cursor-pointer"
+                                      >
+                                        {t("forms.contract.lamalAccident")}
+                                      </Label>
+                                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                                        {t("forms.contract.lamalAccidentHelp")}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="mt-2 text-xs text-muted-foreground">

@@ -1576,7 +1576,11 @@
         "companyRequired": "Compagnia richiesta",
         "startDateRequired": "Data di inizio richiesta",
         "atLeastOneProduct": "Seleziona almeno un prodotto"
-      }
+      },
+      "lamalAccident": "Copertura infortuni inclusa",
+      "lamalAccidentHelp": "Selezionato: la copertura infortuni è inclusa nella LAMal. Deselezionato: copertura gestita dal datore di lavoro (LAINF).",
+      "reclassifyCategory": "Cambia categoria",
+      "reclassifyHelp": "L'IA potrebbe aver classificato male il prodotto. Scegli la categoria corretta."
     }
   },
   "qrInvoice": {

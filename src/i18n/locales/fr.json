@@ -1472,7 +1472,11 @@
         "companyRequired": "Compagnie requise",
         "startDateRequired": "Date de début requise",
         "atLeastOneProduct": "Sélectionnez au moins un produit"
-      }
+      },
+      "lamalAccident": "Assurance accident incluse",
+      "lamalAccidentHelp": "Coché : la couverture accident est intégrée à votre LAMal. Décoché : couverture accident gérée par votre employeur (LAA).",
+      "reclassifyCategory": "Changer de catégorie",
+      "reclassifyHelp": "L'IA a peut-être mal classé ce produit. Choisissez la bonne catégorie."
     }
   },
   "qrInvoice": {

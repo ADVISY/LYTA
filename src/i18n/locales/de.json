@@ -1619,7 +1619,11 @@
         "companyRequired": "Versicherung erforderlich",
         "startDateRequired": "Startdatum erforderlich",
         "atLeastOneProduct": "Wählen Sie mindestens ein Produkt"
-      }
+      },
+      "lamalAccident": "Unfallversicherung inkludiert",
+      "lamalAccidentHelp": "Aktiv: Unfallschutz ist in der LAMal enthalten. Inaktiv: Unfallschutz wird vom Arbeitgeber (UVG) abgedeckt.",
+      "reclassifyCategory": "Kategorie ändern",
+      "reclassifyHelp": "Die KI hat das Produkt möglicherweise falsch eingestuft. Wählen Sie die richtige Kategorie."
     }
   },
   "qrInvoice": {

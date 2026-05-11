@@ -1582,7 +1582,11 @@
         "companyRequired": "Company required",
         "startDateRequired": "Start date required",
         "atLeastOneProduct": "Select at least one product"
-      }
+      },
+      "lamalAccident": "Accident coverage included",
+      "lamalAccidentHelp": "Checked: accident coverage is part of LAMal. Unchecked: accident coverage handled by employer (LAA).",
+      "reclassifyCategory": "Change category",
+      "reclassifyHelp": "The AI may have miscategorised this product. Choose the correct category."
     }
   },
   "qrInvoice": {
