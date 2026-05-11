@@ -87,6 +87,44 @@ export default function Signer() {
   const [importedPdfHash, setImportedPdfHash] = useState<string | null>(null);
   const [importedPdfLoading, setImportedPdfLoading] = useState(false);
 
+  // Expired/cancelled-link renewal request state
+  type RenewalState = "idle" | "loading" | "sent" | "error";
+  const [renewalState, setRenewalState] = useState<RenewalState>("idle");
+  const [renewalError, setRenewalError] = useState<string | null>(null);
+
+  const requestRenewal = async () => {
+    if (!token) return;
+    setRenewalState("loading");
+    setRenewalError(null);
+    try {
+      const resp = await fetch(
+        `${supabaseConfig.url}/functions/v1/request-signature-link-renewal`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseConfig.publishableKey,
+            Authorization: `Bearer ${supabaseConfig.publishableKey}`,
+          },
+          body: JSON.stringify({ token }),
+        },
+      );
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setRenewalState("error");
+        setRenewalError(
+          (body as { error?: string })?.error ??
+            `Erreur (${resp.status})`,
+        );
+        return;
+      }
+      setRenewalState("sent");
+    } catch (err) {
+      setRenewalState("error");
+      setRenewalError(err instanceof Error ? err.message : "Erreur réseau");
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -478,7 +516,44 @@ export default function Signer() {
         <div className="text-center space-y-4 py-8">
           <AlertCircle className="h-16 w-16 mx-auto text-amber-500" />
           <h1 className="text-2xl font-bold">Lien expiré</h1>
-          <p className="text-muted-foreground">Ce lien de signature a expiré. Contactez votre conseiller pour en recevoir un nouveau.</p>
+          <p className="text-muted-foreground">
+            Ce lien de signature a expiré.
+          </p>
+          {renewalState === "idle" && (
+            <Button
+              onClick={requestRenewal}
+              size="lg"
+              className="mt-2"
+            >
+              Demander un nouveau lien à mon conseiller
+            </Button>
+          )}
+          {renewalState === "loading" && (
+            <Button disabled size="lg" className="mt-2 gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Envoi en cours…
+            </Button>
+          )}
+          {renewalState === "sent" && (
+            <Alert className="mt-2 text-left">
+              <Check className="h-4 w-4" />
+              <AlertTitle>Demande envoyée</AlertTitle>
+              <AlertDescription>
+                Votre conseiller a été notifié et vous renverra un nouveau lien
+                par email rapidement.
+              </AlertDescription>
+            </Alert>
+          )}
+          {renewalState === "error" && (
+            <Alert variant="destructive" className="mt-2 text-left">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Impossible d'envoyer la demande</AlertTitle>
+              <AlertDescription>
+                {renewalError ?? "Erreur inconnue."}{" "}
+                Contactez directement votre conseiller.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </CenterCard>
     );
@@ -490,7 +565,41 @@ export default function Signer() {
         <div className="text-center space-y-4 py-8">
           <XCircle className="h-16 w-16 mx-auto text-slate-500" />
           <h1 className="text-2xl font-bold">Demande annulée</h1>
-          <p className="text-muted-foreground">Cette demande de signature a été annulée par l'expéditeur.</p>
+          <p className="text-muted-foreground">
+            Cette demande de signature a été annulée par l'expéditeur.
+          </p>
+          {renewalState === "idle" && (
+            <Button
+              onClick={requestRenewal}
+              size="lg"
+              variant="outline"
+              className="mt-2"
+            >
+              Demander un nouveau lien à mon conseiller
+            </Button>
+          )}
+          {renewalState === "loading" && (
+            <Button disabled size="lg" className="mt-2 gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Envoi en cours…
+            </Button>
+          )}
+          {renewalState === "sent" && (
+            <Alert className="mt-2 text-left">
+              <Check className="h-4 w-4" />
+              <AlertTitle>Demande envoyée</AlertTitle>
+              <AlertDescription>
+                Votre conseiller a été notifié.
+              </AlertDescription>
+            </Alert>
+          )}
+          {renewalState === "error" && (
+            <Alert variant="destructive" className="mt-2 text-left">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Impossible d'envoyer la demande</AlertTitle>
+              <AlertDescription>{renewalError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </CenterCard>
     );
