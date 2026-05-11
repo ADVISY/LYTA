@@ -529,9 +529,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   }, [lamalPremium, categorizedSelection, selectedProducts]);
 
   const contractFormSchema = z.object({
-    selectedCompanyId: z.string().min(1, "Compagnie requise"),
-    startDate: z.string().min(1, "Date de début requise"),
-    selectedProducts: z.array(z.any()).min(1, "Sélectionnez au moins un produit"),
+    selectedCompanyId: z.string().min(1, t("forms.contract.validation.companyRequired")),
+    startDate: z.string().min(1, t("forms.contract.validation.startDateRequired")),
+    selectedProducts: z.array(z.any()).min(1, t("forms.contract.validation.atLeastOneProduct")),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -554,7 +554,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         .join(', ');
       toast({
         title: t("common.error"),
-        description: `Ce client a déjà un contrat actif chez ${selectedCompany?.name ?? ''} pour : ${conflictLabel}. Modifie le contrat existant ou choisis une autre catégorie.`,
+        description: t("forms.contract.duplicateClientHasContractFor", {
+          company: selectedCompany?.name ?? '',
+          categories: conflictLabel,
+        }),
         variant: "destructive"
       });
       return;
@@ -668,31 +671,64 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       } else {
         const policy = await createPolicy(policyData);
 
-        // Save documents linked to the policy
+        // Save documents linked to the policy.
+        // Use Promise.allSettled so a single PDF upload failure doesn't
+        // silently lose the others — the broker is told which file(s)
+        // didn't make it. Previously a thrown createDocument bubbled
+        // out of the try/catch with no surfaced message and the form
+        // closed anyway, hiding the lost attachment.
+        let docsFailedCount = 0;
         if (documents.length > 0 && policy?.id) {
-          for (const doc of documents) {
-            await createDocument({
-              owner_id: policy.id,
-              owner_type: 'policy',
-              file_key: doc.file_key,
-              file_name: doc.file_name,
-              doc_kind: doc.doc_kind,
-              mime_type: doc.mime_type,
-              size_bytes: doc.size_bytes,
+          const results = await Promise.allSettled(
+            documents.map((doc) =>
+              createDocument({
+                owner_id: policy.id,
+                owner_type: 'policy',
+                file_key: doc.file_key,
+                file_name: doc.file_name,
+                doc_kind: doc.doc_kind,
+                mime_type: doc.mime_type,
+                size_bytes: doc.size_bytes,
+              }),
+            ),
+          );
+          docsFailedCount = results.filter((r) => r.status === "rejected").length;
+          if (docsFailedCount > 0) {
+            // Log every individual failure for diagnosability
+            results.forEach((r, i) => {
+              if (r.status === "rejected") {
+                console.error(
+                  `[ContractForm] createDocument failed for "${documents[i]?.file_name ?? "?"}"`,
+                  r.reason,
+                );
+              }
             });
           }
         }
+
+        // If at least one doc upload failed, raise a destructive toast
+        // and DON'T close the dialog so the broker can retry the upload
+        // — but the contract itself is saved and stays so.
+        if (docsFailedCount > 0) {
+          toast({
+            variant: "destructive",
+            title: t("forms.contract.documentUploadFailedTitle"),
+            description: t("forms.contract.documentUploadFailedDesc", {
+              count: docsFailedCount,
+            }),
+          });
+        }
       }
-      
+
       // Celebrate the new contract!
       if (!editMode) {
         celebrate('contract_added');
       }
-      
+
       toast({
         title: editMode ? t("forms.contract.contractUpdated") : t("forms.contract.contractCreated"),
-        description: editMode 
-          ? t("forms.contract.contractUpdatedDesc") 
+        description: editMode
+          ? t("forms.contract.contractUpdatedDesc")
           : t("forms.contract.contractCreatedDesc", { count: selectedProducts.length })
       });
 
@@ -767,11 +803,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="flex-1 text-sm">
                   <div className="font-medium text-amber-900">
-                    Aucun mandat de gestion signé pour ce client
+                    {t("forms.contract.noMandatTitle")}
                   </div>
                   <div className="text-amber-800 mt-0.5">
-                    Vous pouvez créer le contrat, mais la conformité
-                    FINMA recommande d'avoir un mandat signé au préalable.
+                    {t("forms.contract.noMandatDescription")}
                   </div>
                 </div>
               </div>
@@ -806,18 +841,21 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 </Select>
                 {hasDuplicateContract && (
                   <p className="text-xs text-destructive leading-snug">
-                    Doublon{duplicateProductConflicts.length > 1 ? 's' : ''} :{' '}
+                    {t("forms.contract.duplicateLabel", {
+                      plural: duplicateProductConflicts.length > 1 ? "s" : "",
+                    })}{" "}
                     {duplicateProductConflicts
                       .map(c => categoryLabels[c.category] || c.category)
-                      .join(', ')}{' '}
-                    déjà couvert
-                    {duplicateProductConflicts.length > 1 ? 's' : ''} chez cette compagnie.
+                      .join(', ')}{" "}
+                    {duplicateProductConflicts.length > 1
+                      ? t("forms.contract.duplicateAlreadyCoveredMany")
+                      : t("forms.contract.duplicateAlreadyCoveredOne")}
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Date début *</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.startDate")} *</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -827,22 +865,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Statut</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.status")}</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">En attente</SelectItem>
-                    <SelectItem value="active">Actif</SelectItem>
-                    <SelectItem value="expired">Expiré</SelectItem>
-                    <SelectItem value="cancelled">Annulé</SelectItem>
+                    <SelectItem value="pending">{t("forms.contract.statuses.pending")}</SelectItem>
+                    <SelectItem value="active">{t("forms.contract.statuses.active")}</SelectItem>
+                    <SelectItem value="expired">{t("forms.contract.statuses.expired")}</SelectItem>
+                    <SelectItem value="cancelled">{t("forms.contract.statuses.cancelled")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2 lg:col-span-2">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Documents</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.documents")}</Label>
                 <DocumentUpload
                   documents={documents}
                   onUpload={(doc) => setDocuments(prev => [...prev, doc])}
@@ -857,9 +895,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 {/* Left: Product Selection List */}
                 <div className="space-y-3 overflow-hidden flex flex-col border rounded-lg p-3">
                   <div className="space-y-2">
-                    <Label className="font-semibold">Produits disponibles</Label>
+                    <Label className="font-semibold">{t("forms.contract.availableProducts")}</Label>
                     <Input
-                      placeholder="Rechercher..."
+                      placeholder={t("forms.contract.searchProduct")}
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
                       className="h-9"
@@ -894,7 +932,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                     <div className={`h-4 w-4 rounded border flex items-center justify-center ${selected ? 'bg-primary-foreground border-primary-foreground' : 'border-input'}`}>
                                       {selected && <Check className="h-3 w-3 text-primary" />}
                                     </div>
-                                    <span className="flex-1 truncate">{product.name || 'Produit'}</span>
+                                    <span className="flex-1 truncate">{product.name || t("forms.contract.fallbackProductName")}</span>
                                     {lamal && (
                                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${selected ? 'bg-primary-foreground/20' : 'bg-emerald-100 text-emerald-700'}`}>
                                         LAMal
@@ -909,7 +947,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                       })}
                       {Object.keys(groupedProducts).length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                          Aucun produit trouvé
+                          {t("forms.contract.noProductsFound")}
                         </p>
                       )}
                     </div>
@@ -923,7 +961,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                       {selectedProducts.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                           <FileText className="h-12 w-12 mb-4 opacity-30" />
-                          <p className="text-sm">Sélectionnez des produits dans la liste</p>
+                          <p className="text-sm">{t("forms.contract.selectProductsHint")}</p>
                         </div>
                       ) : (
                         <>
@@ -932,19 +970,19 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             <div className={`p-4 rounded-xl border-2 ${categoryColors.health}`}>
                               <div className="flex items-center gap-2 mb-4">
                                 {categoryIcons.health}
-                                <h3 className="font-bold">Assurance Maladie</h3>
+                                <h3 className="font-bold">{t("forms.contract.healthInsurance")}</h3>
                               </div>
                               
                               {/* LAMal Section */}
                               {categorizedSelection.healthLamal.length > 0 && (
                                 <div className="mb-4 p-3 bg-white/60 rounded-lg">
                                   <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-emerald-600 text-white rounded text-xs">LAMal</span>
-                                    Assurance de base obligatoire
+                                    <span className="px-2 py-0.5 bg-emerald-600 text-white rounded text-xs">{t("forms.contract.lamal")}</span>
+                                    {t("forms.contract.lamalBase")}
                                   </h4>
                                   <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <Label className="text-xs">Prime mensuelle (CHF) *</Label>
+                                      <Label className="text-xs">{t("forms.contract.lamalPremium")} *</Label>
                                       <Input
                                         type="number"
                                         step="0.05"
@@ -956,10 +994,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                       />
                                     </div>
                                     <div>
-                                      <Label className="text-xs">Franchise annuelle (CHF)</Label>
+                                      <Label className="text-xs">{t("forms.contract.lamalFranchise")}</Label>
                                       <Select value={lamalFranchise} onValueChange={setLamalFranchise}>
                                         <SelectTrigger className="h-9 bg-white">
-                                          <SelectValue placeholder="Sélectionner" />
+                                          <SelectValue placeholder={t("common.select")} />
                                         </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="300">300 CHF</SelectItem>
@@ -973,7 +1011,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                     </div>
                                   </div>
                                   <div className="mt-2 text-xs text-muted-foreground">
-                                    Produit: {categorizedSelection.healthLamal.map(p => p.name || 'Produit').join(', ')}
+                                    {t("forms.contract.productHint")}: {categorizedSelection.healthLamal.map(p => p.name || t("forms.contract.fallbackProductName")).join(', ')}
                                   </div>
                                 </div>
                               )}
@@ -982,8 +1020,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                               {categorizedSelection.healthLca.length > 0 && (
                                 <div className="p-3 bg-white/60 rounded-lg">
                                   <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-teal-600 text-white rounded text-xs">LCA</span>
-                                    Assurances complémentaires ({categorizedSelection.healthLca.length})
+                                    <span className="px-2 py-0.5 bg-teal-600 text-white rounded text-xs">{t("forms.contract.lca")}</span>
+                                    {t("forms.contract.lcaComplement")} ({categorizedSelection.healthLca.length})
                                   </h4>
                                   <div className="space-y-3">
                                     {categorizedSelection.healthLca.map((product) => {
@@ -991,14 +1029,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                       return (
                                         <div key={product.id} className="flex items-center gap-3 p-2 bg-white rounded border">
                                           <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{product.name || 'Produit'}</p>
+                                            <p className="text-sm font-medium truncate">{product.name || t("forms.contract.fallbackProductName")}</p>
                                           </div>
                                           <div className="w-32">
                                             <Input
                                               type="number"
                                               step="0.05"
                                               min="0"
-                                              placeholder="Prime/mois"
+                                              placeholder={t("forms.contract.premiumMonth")}
                                               value={product.premium || ""}
                                               onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
                                               className="h-8 text-sm"
@@ -1019,7 +1057,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                   </div>
                                   {totals.lcaTotal > 0 && (
                                     <p className="mt-2 text-sm font-medium text-right">
-                                      Total LCA: {totals.lcaTotal.toFixed(2)} CHF/mois
+                                      {t("forms.contract.totalLcaInline", { amount: totals.lcaTotal.toFixed(2) })}
                                     </p>
                                   )}
                                 </div>
@@ -1029,7 +1067,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                               {totals.healthTotal > 0 && (
                                 <div className="mt-4 pt-3 border-t border-emerald-300">
                                   <div className="flex justify-between items-center">
-                                    <span className="font-semibold">Total Santé mensuel</span>
+                                    <span className="font-semibold">{t("forms.contract.healthTotal")}</span>
                                     <span className="text-lg font-bold">{totals.healthTotal.toFixed(2)} CHF</span>
                                   </div>
                                 </div>
@@ -1042,7 +1080,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             <div className={`p-4 rounded-xl border-2 ${categoryColors.life}`}>
                               <div className="flex items-center gap-2 mb-4">
                                 {categoryIcons.life}
-                                <h3 className="font-bold">Vie / Prévoyance / 3e Pilier</h3>
+                                <h3 className="font-bold">{t("forms.contract.lifeInsurance")}</h3>
                               </div>
                               <div className="space-y-3">
                                 {categorizedSelection.life.map((product) => {
@@ -1050,7 +1088,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                   return (
                                     <div key={product.id} className="p-3 bg-white/60 rounded-lg">
                                       <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-sm">{product.name || 'Produit'}</p>
+                                        <p className="font-medium text-sm">{product.name || t("forms.contract.fallbackProductName")}</p>
                                         <Button
                                           type="button"
                                           variant="ghost"
@@ -1063,7 +1101,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                       </div>
                                       <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                          <Label className="text-xs">Prime mensuelle (CHF)</Label>
+                                          <Label className="text-xs">{t("forms.contract.premium")}</Label>
                                           <Input
                                             type="number"
                                             step="0.05"
@@ -1075,7 +1113,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           />
                                         </div>
                                         <div>
-                                          <Label className="text-xs">Durée (années)</Label>
+                                          <Label className="text-xs">{t("forms.contract.duration")}</Label>
                                           <Input
                                             type="number"
                                             min="1"
@@ -1099,7 +1137,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                               {totals.lifeTotal > 0 && (
                                 <div className="mt-4 pt-3 border-t border-violet-300">
                                   <div className="flex justify-between items-center">
-                                    <span className="font-semibold">Total Vie mensuel</span>
+                                    <span className="font-semibold">{t("forms.contract.lifeTotal")}</span>
                                     <span className="text-lg font-bold">{totals.lifeTotal.toFixed(2)} CHF</span>
                                   </div>
                                 </div>
@@ -1125,7 +1163,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${categoryColors[category] || 'bg-gray-100 text-gray-800'}`}>
                                             {categoryLabels[category] || category}
                                           </span>
-                                          <p className="font-medium text-sm">{product.name || 'Produit'}</p>
+                                          <p className="font-medium text-sm">{product.name || t("forms.contract.fallbackProductName")}</p>
                                         </div>
                                         <Button
                                           type="button"
@@ -1139,7 +1177,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                       </div>
                                       <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                          <Label className="text-xs">Prime mensuelle (CHF)</Label>
+                                          <Label className="text-xs">{t("forms.contract.premium")}</Label>
                                           <Input
                                             type="number"
                                             step="0.05"
@@ -1151,7 +1189,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           />
                                         </div>
                                         <div>
-                                          <Label className="text-xs">Franchise (CHF)</Label>
+                                          <Label className="text-xs">{t("forms.contract.deductible")}</Label>
                                           <Input
                                             type="number"
                                             step="100"
@@ -1219,7 +1257,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                 {documents.length > 0 && (
                   <span className="flex items-center gap-1">
                     <FileText className="h-4 w-4" />
-                    {documents.length} document(s)
+                    {t('forms.contract.documentsCount', { count: documents.length })}
                   </span>
                 )}
               </div>
