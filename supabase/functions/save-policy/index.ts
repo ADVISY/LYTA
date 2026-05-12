@@ -336,6 +336,11 @@ serve(async (req: Request): Promise<Response> => {
       products_data: hasField(policyData, "products_data")
         ? policyData.products_data ?? null
         : existingPolicy?.products_data ?? null,
+      // Per-policy branch override (overrides the product's branch in the UI).
+      // Kept null when the broker hasn't picked an explicit branch on this contract.
+      tenant_branch_id: hasField(policyData, "tenant_branch_id")
+        ? asNullableString(policyData.tenant_branch_id)
+        : existingPolicy?.tenant_branch_id ?? null,
     };
 
     if (!payload.product_id) {

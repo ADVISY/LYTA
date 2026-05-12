@@ -155,7 +155,12 @@ export function usePolicies() {
       policyData: updates,
     });
 
-    refetch();
+    // Hard invalidate so contract cards on every page (client detail,
+    // CRMContracts list, etc.) re-fetch and show the new branch / amounts
+    // immediately. refetch() alone only updates the current useQuery
+    // instance.
+    await queryClient.invalidateQueries({ queryKey: ['policies'] });
+    await refetch();
   };
 
   const deletePolicy = async (id: string) => {
