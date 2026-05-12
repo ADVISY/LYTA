@@ -395,10 +395,15 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       setStartDate(existingPolicy.start_date || new Date().toISOString().split('T')[0]);
       setStatus(existingPolicy.status || 'active');
       setNotes(existingPolicy.notes || '');
-      
+
       // Set company from product
       if (existingPolicy.product?.company_id) {
         setSelectedCompanyId(existingPolicy.product.company_id);
+      }
+
+      // Restore per-contract branch override (if any)
+      if ((existingPolicy as any).tenant_branch_id) {
+        setSelectedBranchId((existingPolicy as any).tenant_branch_id);
       }
       
       // Check if we have products_data (multi-product contract)
@@ -863,6 +868,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         company_name: companyName,
         product_type: mainCategory,
         products_data: productsData,
+        // Per-contract branch override — picked by the broker in the
+        // cascade selector. Falls back to product's branch in the UI
+        // when null.
+        tenant_branch_id: selectedBranchId || null,
       };
 
       if (editMode && policyId) {

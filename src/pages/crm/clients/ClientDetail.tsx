@@ -930,8 +930,12 @@ export default function ClientDetail() {
                         const companyLogoUrl = policy.product?.company?.logo_url || null;
                         const companyInitial = (companyName || '?').trim().charAt(0).toUpperCase();
 
-                        // Branch chip (preferred over legacy category)
-                        const branchFromProduct = (policy.product as any)?.tenant_branch || null;
+                        // Branch chip — per-policy override wins, otherwise inherit
+                        // from the product's branch, otherwise legacy fallback.
+                        const branchFromProduct =
+                          (policy as any).tenant_branch
+                          || (policy.product as any)?.tenant_branch
+                          || null;
 
                         return (
                           <div

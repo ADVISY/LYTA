@@ -24,6 +24,8 @@ export type Policy = {
   notes?: string | null;
   company_name?: string | null;
   product_type?: string | null;
+  /** Per-contract branch override. When NULL, fall back to product.tenant_branch. */
+  tenant_branch_id?: string | null;
   products_data?: Array<{
     productId: string;
     name: string;
@@ -37,6 +39,13 @@ export type Policy = {
   client?: any;
   product?: any;
   partner?: any;
+  tenant_branch?: {
+    id: string;
+    code: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+  } | null;
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -71,6 +80,13 @@ export function usePolicies() {
         .from('policies')
         .select(`
           *,
+          tenant_branch:tenant_branches (
+            id,
+            code,
+            name,
+            icon,
+            color
+          ),
           client:clients!policies_client_id_fkey (
             id,
             first_name,
