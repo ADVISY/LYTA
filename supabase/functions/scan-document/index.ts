@@ -1292,12 +1292,17 @@ serve(async (req) => {
 
           const mainCategory = branchCodeToLegacyMainCategory(resolvedBranchCode);
 
+          // Pass tenant_id + tenant_branch_id so the new product is created
+          // ACTIVE in the tenant's Partenaires catalog (broker sees it
+          // immediately and can reuse it on future contracts).
           const { data: candidateId, error: candidateError } = await supabase.rpc('create_candidate_product', {
             p_detected_name: product.product_name,
             p_company_name: product.company || null,
             p_main_category: mainCategory,
             p_subcategory: resolvedBranchCode === 'LAMAL' ? 'lamal' : null,
-            p_scan_id: scanId
+            p_scan_id: scanId,
+            p_tenant_id: validTenantId,
+            p_tenant_branch_id: resolvedBranchId,
           });
 
           if (candidateError) {
@@ -1308,15 +1313,7 @@ serve(async (req) => {
             product.match_score = 0;
             product.is_candidate = true;
 
-            // Set tenant_branch_id on the freshly created candidate
-            if (resolvedBranchId) {
-              await supabase
-                .from('insurance_products')
-                .update({ tenant_branch_id: resolvedBranchId })
-                .eq('id', candidateId);
-            }
-
-            log.info(`Created candidate product: ${candidateId} for "${product.product_name}" → branch ${resolvedBranchCode}`);
+            log.info(`Created ACTIVE product: ${candidateId} for "${product.product_name}" → tenant=${validTenantId}, branch=${resolvedBranchCode}`);
           }
         }
 
