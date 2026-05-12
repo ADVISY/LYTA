@@ -576,17 +576,26 @@ function buildSingleDocumentUserPrompt(
   index: number,
   total: number,
   formType?: string,
+  catalogContext?: string,
 ): string {
   return `Analyse ce fichier (${index + 1}/${total})${formType ? ` pour le formulaire ${formType.toUpperCase()}` : ""}: ${fileName}.
 
-Extrait uniquement les informations visibles et utiles pour pre-remplir le dossier:
-- client: nom, prenom, date_naissance, nationalite, adresse, npa, localite, telephone, email, numero_avs
-- ancienne police: ancienne_compagnie, ancien_numero_police, ancien_type_produit, ancienne_date_debut, ancienne_date_fin, ancienne_prime_mensuelle, ancienne_franchise
-- nouvelle police/offre: nouvelle_compagnie, nouveau_numero_police, nouveau_type_produit, nouvelle_date_debut, nouvelle_date_fin, nouvelle_prime_mensuelle, nouvelle_franchise
-- produits: chaque produit separe avec product_name, product_category, company, insured_person_name, premium_monthly, franchise, start_date, end_date
+CONTEXTE — dossier multi-fichiers:
+Tu analyses UN fichier d'un dossier qui en contient ${total}. Les autres fichiers contiennent des infos complémentaires (pièce d'identité, contrats, justificatifs). Extrais ici TOUT ce qui est visible dans CE fichier, même si ce sont juste des infos client (nom, prénom, date de naissance) provenant d'une pièce d'identité — elles seront combinées avec les produits trouvés dans les autres fichiers.
+
+${catalogContext ? `CATALOGUE DU COURTIER (à utiliser pour matcher exactement):
+${catalogContext}
+
+IMPORTANT: pour chaque produit détecté, utilise EXACTEMENT le nom commercial du catalogue ci-dessus si tu reconnais le produit (même avec orthographe légèrement différente sur la facture). Sinon, utilise le nom commercial standard de la compagnie. Mets product_name + branch_code + company conformément au catalogue.
+
+` : ""}Extrait uniquement les informations visibles et utiles pour pré-remplir le dossier:
+- client: nom, prenom, date_naissance, nationalite, adresse, npa, localite, telephone, email, numero_avs (pris depuis pièce d'identité ou contrat)
+- primary_holder: titulaire principal du contrat avec last_name, first_name, birthdate
+- family_members_detected: chaque membre de famille avec last_name (obligatoire), first_name (obligatoire), birthdate, relationship (conjoint/enfant/parent/autre). Ne crée PAS de family_member sans nom complet.
+- produits (new_products_detected ou old_products_detected): chaque produit séparément avec OBLIGATOIREMENT product_name (nom commercial exact), product_category (LAMal/LCA/VIE/AUTO/NON-VIE/LAA/LPP), branch_code (LAMAL/LCA/VIE/LPP/AUTO/MENAGE_RC/JURIDIQUE/VOYAGE/ENTREPRISE/PGM/ACCIDENT/HYPO_CREDIT), company, insured_person_first_name, insured_person_last_name, premium_monthly, franchise (LAMal/LCA), accident_included (LAMal), start_date, end_date, policy_number
 - resiliation: date_resiliation, motif_resiliation, compagnie_resiliee
 
-Si une information n'est pas visible, ne l'invente pas. Retourne uniquement le JSON.`;
+Si une information n'est pas visible dans CE fichier, mets null — ne pas inventer. Retourne uniquement le JSON.`;
 }
 
 function parseAiAnalysisResponse(aiContent: string, fallbackFileName?: string): ParsedResult {
@@ -703,11 +712,12 @@ async function analyzeSingleFile(
   index: number,
   total: number,
   formType?: string,
+  catalogContext?: string,
 ): Promise<ParsedResult> {
   const userContent: Record<string, unknown>[] = [
     {
       type: "text",
-      text: buildSingleDocumentUserPrompt(fileContent.fileName, index, total, formType),
+      text: buildSingleDocumentUserPrompt(fileContent.fileName, index, total, formType, catalogContext),
     },
     buildChatDocumentContent(fileContent),
   ];
@@ -928,9 +938,26 @@ function mergeParsedResults(outcomes: SingleAnalysisOutcome[]): ParsedResult {
   const qualityScore = qualityScores.length > 0
     ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
     : 0;
-  const primaryHolderSource =
-    successes.find((success) => success.result.has_identity_doc && success.result.primary_holder)?.result.primary_holder ||
-    successes.find((success) => success.result.primary_holder)?.result.primary_holder;
+  // Build the primary_holder by merging fragments across all files: identity
+  // doc gives name + DOB + nationality, contract may add address/phone, etc.
+  // First non-null wins per field — never lose info that was extracted somewhere.
+  const primaryHolderSource = (() => {
+    const allHolders = successes
+      .map((s) => s.result.primary_holder)
+      .filter((h): h is NonNullable<typeof h> => Boolean(h));
+    if (allHolders.length === 0) return undefined;
+    // Prefer the one from an identity doc as base (most authoritative on name+DOB)
+    const idBased = successes.find((s) => s.result.has_identity_doc && s.result.primary_holder)?.result.primary_holder;
+    const base: any = { ...(idBased || allHolders[0]) };
+    for (const h of allHolders) {
+      for (const k of Object.keys(h as any)) {
+        if (base[k] == null || base[k] === "") {
+          base[k] = (h as any)[k];
+        }
+      }
+    }
+    return base;
+  })();
   const summaries = uniqueStrings(successes.map((success) => success.result.dossier_summary));
   const failureMessages = failures.map((failure) =>
     `Analyse IA non terminee pour ${failure.file.fileName}: ${failure.error}`
@@ -1097,17 +1124,55 @@ serve(async (req) => {
       reservedAmount = fileContents.length;
     }
 
+    // Build a compact catalog snapshot to feed the IA so it matches scanned
+    // products against the broker's actual catalog (not an invented label).
+    // ⚠️ Token budget: top 80 products only, grouped by company. We trust the
+    // server-side find_product_by_alias to do the final fuzzy match anyway.
+    let catalogContext = "";
+    if (supabase && validTenantId) {
+      try {
+        const { data: catalogRows } = await supabase
+          .from("insurance_products")
+          .select(`
+            name,
+            company:insurance_companies!insurance_products_company_id_fkey ( name ),
+            tenant_branch:tenant_branches ( code, name )
+          `)
+          .or(`tenant_id.eq.${validTenantId},tenant_id.is.null`)
+          .eq("is_active", true)
+          .eq("status", "active")
+          .limit(200);
+
+        if (Array.isArray(catalogRows) && catalogRows.length > 0) {
+          // Group by company → list product names + branch code
+          const grouped = new Map<string, string[]>();
+          for (const row of catalogRows as any[]) {
+            const company = row.company?.name || "";
+            const branchCode = row.tenant_branch?.code || "";
+            if (!company || !row.name) continue;
+            if (!grouped.has(company)) grouped.set(company, []);
+            const label = branchCode ? `${row.name} [${branchCode}]` : row.name;
+            grouped.get(company)!.push(label);
+          }
+          const lines: string[] = [];
+          for (const [company, products] of grouped) {
+            lines.push(`- ${company}: ${products.slice(0, 12).join(", ")}`);
+          }
+          catalogContext = lines.join("\n");
+        }
+      } catch (e) {
+        log.warn("Failed to build catalog context for IA prompt", { error: String(e) });
+      }
+    }
+
     // Analyze each file independently and in parallel, then merge results.
-    // With one automatic retry on timeout/rate-limit so a slow upstream
-    // doesn't drop products from the batch (the previous behaviour where
-    // 3 out of 4 files silently failed for Habib's SWICA dossier).
     const analysisResults = await mapWithConcurrency(fileContents, concurrency, async (fileContent, index): Promise<SingleAnalysisOutcome> => {
       const fileStartTime = Date.now();
       let lastErr: unknown = null;
 
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType);
+          const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType, catalogContext);
           if (attempt > 1) {
             log.info("File analysis succeeded on retry", { fileName: fileContent.fileName, attempt });
           }
