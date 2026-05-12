@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useClientMandatStatus } from "@/hooks/useClientMandatStatus";
 import { Loader2, FileText, X, Check, Heart, Car, Home, Shield, Scale, AlertTriangle } from "lucide-react";
 import DocumentUpload from "./DocumentUpload";
+import { BranchSelector, BranchChip } from "./BranchSelector";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -40,6 +41,14 @@ type Product = {
   name: string;
   category: string;
   company_id: string;
+  tenant_branch_id?: string | null;
+  tenant_branch?: {
+    id: string;
+    code: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+  } | null;
 };
 
 type SelectedProduct = {
@@ -54,6 +63,42 @@ type SelectedProduct = {
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
 
+/**
+ * Optional prefill payload — used when the dialog is opened from the
+ * IA Scan flow. The form fills its fields from the OCR extraction so
+ * the broker sees the exact same form as a manual creation, just
+ * pre-populated. Everything is fully editable, and the submit path
+ * is identical (createPolicy + createDocument) — guaranteeing zero
+ * divergence between manual and scan-driven contract creation.
+ */
+export interface ContractFormPrefill {
+  /** Insurance company id (preferred) */
+  companyId?: string;
+  /** Free-text company name when companyId can't be resolved upstream */
+  companyName?: string;
+  startDate?: string;
+  status?: string;
+  notes?: string;
+  /** Per-line products extracted from the scan */
+  products?: Array<{
+    productId?: string;
+    productName?: string;
+    /** Normalized category (health / life / auto / home / legal / property / other) */
+    category?: string;
+    premium?: number;
+    deductible?: number;
+    durationYears?: number;
+    /** Hint: this line is a LAMal product (overrides isLamalProduct heuristic) */
+    isLamal?: boolean;
+  }>;
+  /** Global LAMal fields when scan detected a LAMal product */
+  lamalPremium?: number;
+  lamalFranchise?: number;
+  lamalAccidentIncluded?: boolean;
+  /** When true, the post-submit hook can fire a "résiliation" suivi for this client */
+  hasResiliationToCreate?: boolean;
+}
+
 interface ContractFormProps {
   clientId: string;
   open: boolean;
@@ -61,6 +106,11 @@ interface ContractFormProps {
   onSuccess?: () => void;
   editMode?: boolean;
   policyId?: string;
+  /**
+   * When provided, the form is pre-populated from this payload (IA Scan
+   * pipeline). Mutually exclusive with editMode; ignored if editMode=true.
+   */
+  prefill?: ContractFormPrefill;
 }
 
 const getCategoryLabels = (t: (key: string) => string): Record<string, string> => ({
@@ -136,7 +186,7 @@ const normalizeCategoryFromDB = (rawCategory: string | null | undefined): string
   return 'other';
 };
 
-export default function ContractForm({ clientId, open, onOpenChange, onSuccess, editMode = false, policyId }: ContractFormProps) {
+export default function ContractForm({ clientId, open, onOpenChange, onSuccess, editMode = false, policyId, prefill }: ContractFormProps) {
   const { t } = useTranslation();
   const { createDocument } = useDocuments();
   const { createPolicy, updatePolicy, policies } = usePolicies();
@@ -153,6 +203,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   
   // Common fields
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
@@ -278,11 +329,32 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       fetchClientExistingPolicies();
       if (editMode && policyId) {
         loadExistingPolicy();
+      } else if (prefill) {
+        // IA-Scan-driven path: same form, same fields, same submit —
+        // just pre-populated. We still need company/product catalogs
+        // loaded before applying the prefill (resolveCompanyFromName
+        // depends on `companies`), so applyPrefill runs in a small
+        // chained effect below once those have arrived.
+        resetForm();
       } else {
         resetForm();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editMode, policyId]);
+
+  // Apply prefill ONCE the company/product catalogs are loaded so that
+  // company resolution from a free-text name + product matching by name
+  // can work. This decouples the network round-trip from the prefill
+  // state assignment.
+  useEffect(() => {
+    if (!open) return;
+    if (editMode) return;
+    if (!prefill) return;
+    if (companies.length === 0) return; // catalogs not yet loaded
+    applyPrefill(prefill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editMode, prefill, companies.length, allProducts.length]);
 
   const fetchClientExistingPolicies = async () => {
     // Pull product_type + products_data so we can detect duplicates at the
@@ -416,11 +488,113 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     setLamalAccidentIncluded(true);
   };
 
+  /**
+   * Hydrate the form from an IA Scan extraction. Tries to resolve
+   * companyId / productId by name when only names are provided. All
+   * fields stay editable — this is just a starting point for the
+   * broker to verify.
+   */
+  const applyPrefill = (data: ContractFormPrefill) => {
+    // 1. Resolve company from companyId OR companyName (case-insensitive fuzzy)
+    let resolvedCompanyId = "";
+    if (data.companyId) {
+      const exists = companies.find((c) => c.id === data.companyId);
+      if (exists) resolvedCompanyId = exists.id;
+    }
+    if (!resolvedCompanyId && data.companyName) {
+      const target = data.companyName.trim().toLowerCase();
+      const hit =
+        companies.find((c) => c.name.trim().toLowerCase() === target) ||
+        companies.find((c) => {
+          const n = c.name.trim().toLowerCase();
+          return n.includes(target) || target.includes(n);
+        });
+      if (hit) resolvedCompanyId = hit.id;
+    }
+    if (resolvedCompanyId) setSelectedCompanyId(resolvedCompanyId);
+
+    // 2. Top-level fields
+    if (data.startDate) setStartDate(data.startDate);
+    if (data.status) setStatus(data.status);
+    if (data.notes) setNotes(data.notes);
+
+    // 3. Global LAMal fields
+    if (typeof data.lamalPremium === "number") {
+      setLamalPremium(String(data.lamalPremium));
+    }
+    if (typeof data.lamalFranchise === "number") {
+      setLamalFranchise(String(data.lamalFranchise));
+    }
+    if (typeof data.lamalAccidentIncluded === "boolean") {
+      setLamalAccidentIncluded(data.lamalAccidentIncluded);
+    }
+
+    // 4. Map each extracted line into a SelectedProduct entry. Try to
+    //    resolve productId by name within the resolved company; fall
+    //    back to a "ghost" product (productId="") whose name + category
+    //    still drive the UI groupings.
+    if (data.products && data.products.length > 0) {
+      const productsToSelect: SelectedProduct[] = data.products.map((p) => {
+        const targetName = (p.productName ?? "").trim().toLowerCase();
+        let resolvedProductId = p.productId ?? "";
+        let resolvedName = p.productName ?? "Produit";
+        let resolvedCategory = normalizeCategoryFromDB(p.category);
+        if (!resolvedProductId && targetName) {
+          const candidates = allProducts.filter(
+            (pr) =>
+              !resolvedCompanyId || pr.company_id === resolvedCompanyId,
+          );
+          const hit =
+            candidates.find(
+              (pr) => pr.name.trim().toLowerCase() === targetName,
+            ) ||
+            candidates.find((pr) => {
+              const n = pr.name.trim().toLowerCase();
+              return n.includes(targetName) || targetName.includes(n);
+            });
+          if (hit) {
+            resolvedProductId = hit.id;
+            resolvedName = hit.name;
+            resolvedCategory = normalizeCategoryFromDB(hit.category);
+          }
+        }
+        // If the scan tagged this as LAMal explicitly, force the
+        // category to "health" so the LAMal grouping picks it up,
+        // even if the matched product is mis-categorized in catalog.
+        if (p.isLamal) resolvedCategory = "health";
+
+        return {
+          id: generateId(),
+          productId: resolvedProductId,
+          name: resolvedName,
+          category: resolvedCategory,
+          premium:
+            typeof p.premium === "number" ? String(p.premium) : "",
+          deductible:
+            typeof p.deductible === "number" ? String(p.deductible) : "",
+          durationYears:
+            typeof p.durationYears === "number"
+              ? String(p.durationYears)
+              : "",
+        };
+      });
+      setSelectedProducts(productsToSelect);
+    }
+  };
+
   const fetchCompaniesAndProducts = async () => {
     setLoading(true);
     const [companiesRes, productsRes] = await Promise.all([
-      supabase.from('insurance_companies').select('id, name').order('name'),
-      supabase.from('insurance_products').select('id, name, category, company_id').order('category, name'),
+      supabase.from('insurance_companies').select('id, name, logo_url').order('name'),
+      supabase
+        .from('insurance_products')
+        .select(`
+          id, name, category, company_id, tenant_branch_id,
+          tenant_branch:tenant_branches!insurance_products_tenant_branch_id_fkey (
+            id, code, name, icon, color
+          )
+        `)
+        .order('name'),
     ]);
     
     if (companiesRes.data) setCompanies(companiesRes.data);
@@ -432,12 +606,17 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     if (!selectedCompanyId) return [];
     try {
       let products = allProducts.filter(p => p && p.company_id === selectedCompanyId);
+      // Filter by selected branch (cascade)
+      if (selectedBranchId) {
+        products = products.filter(p => p.tenant_branch_id === selectedBranchId);
+      }
       if (productSearch) {
         const search = productSearch.toLowerCase();
         products = products.filter(p => {
           const nameMatch = p.name ? p.name.toLowerCase().includes(search) : false;
           const categoryMatch = p.category ? (categoryLabels[p.category] || p.category).toLowerCase().includes(search) : false;
-          return nameMatch || categoryMatch;
+          const branchMatch = p.tenant_branch?.name ? p.tenant_branch.name.toLowerCase().includes(search) : false;
+          return nameMatch || categoryMatch || branchMatch;
         });
       }
       return products;
@@ -833,27 +1012,35 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             )}
 
             {/* Common Fields Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">{t("forms.contract.company")} *</Label>
-                <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+                <Select value={selectedCompanyId} onValueChange={(v) => { handleCompanyChange(v); setSelectedBranchId(null); }}>
                   <SelectTrigger className={hasDuplicateContract ? "border-destructive" : ""}>
                     <SelectValue placeholder={t("common.select")} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((company) => {
-                      // Informational tag only — same-company contracts in
-                      // a different category are now allowed, so we don't
-                      // dim or block the entry, just hint that the client
-                      // already has something with this company.
                       const hasContract = companiesWithExistingContracts.includes(company.name);
                       return (
                         <SelectItem
                           key={company.id}
                           value={company.id}
                         >
-                          {company.name}
-                          {hasContract && ` ${t("forms.contract.existingContract")}`}
+                          <div className="flex items-center gap-2">
+                            {(company as any).logo_url ? (
+                              <img
+                                src={(company as any).logo_url}
+                                alt={company.name}
+                                className="h-5 w-5 object-contain"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : null}
+                            <span>{company.name}</span>
+                            {hasContract && (
+                              <span className="text-xs text-muted-foreground">{t("forms.contract.existingContract")}</span>
+                            )}
+                          </div>
                         </SelectItem>
                       );
                     })}
@@ -872,6 +1059,16 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                       : t("forms.contract.duplicateAlreadyCoveredOne")}
                   </p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Branche</Label>
+                <BranchSelector
+                  value={selectedBranchId}
+                  onChange={(branchId) => setSelectedBranchId(branchId)}
+                  placeholder="Toutes branches"
+                />
+                <p className="text-[10px] text-muted-foreground">Filtre les produits par catégorie.</p>
               </div>
 
               <div className="space-y-2">

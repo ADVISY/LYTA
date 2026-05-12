@@ -47,6 +47,9 @@ import {
 import { cn } from "@/lib/utils";
 import { recordAuditLog } from "@/lib/audit";
 import { savePolicy } from "@/lib/policiesApi";
+import { ProductBranchEditor } from "@/components/crm/ia-scan/ProductBranchEditor";
+import { IAScanContractsWizard } from "@/components/crm/ia-scan/IAScanContractsWizard";
+import { Sparkles } from "lucide-react";
 
 /** Extended primary_holder type that allows arbitrary string field access from AI snapshots */
 interface PrimaryHolderData {
@@ -177,13 +180,21 @@ export default function ScanValidationDialog({
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [editingField, setEditingField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Creation options
   const [createOldContract, setCreateOldContract] = useState(true);
   const [createNewContract, setCreateNewContract] = useState(true);
   const [createSuivis, setCreateSuivis] = useState(true);
   const [linkDocuments, setLinkDocuments] = useState(true);
   const [createFamilyMembers, setCreateFamilyMembers] = useState(true);
+
+  // F5 — Unified-form wizard (Beta): opens the SAME ContractForm as manual
+  // creation, pre-filled from the scan. Strict mandat gate, sequential
+  // multi-policy support. Lives next to the legacy "Valider & créer" so we
+  // can A/B test before removing the old path.
+  const [betaWizardOpen, setBetaWizardOpen] = useState(false);
+  const [betaWizardClientId, setBetaWizardClientId] = useState<string | null>(null);
+  const [betaResolvingClient, setBetaResolvingClient] = useState(false);
 
   const logAudit = async (
     tenantId: string | null,
@@ -356,6 +367,154 @@ export default function ScanValidationDialog({
       tenantId,
       policyData,
     });
+
+  /**
+   * F5 — Open the unified ContractForm wizard.
+   * Tries to resolve an existing client (by email/phone/name) so the wizard
+   * has a clientId. If none is found, the wizard's own gates show a clear
+   * message ("Fiche client manquante") and the broker can fall back to the
+   * legacy "Valider & créer" path which creates the client itself.
+   */
+  const openBetaWizard = async () => {
+    if (!scan || !tenantIdFromHook) return;
+    setBetaResolvingClient(true);
+    try {
+      // Helper: pull a value from scan fields by any of several aliases.
+      const getField = (names: string[]): string | null => {
+        for (const n of names) {
+          const f = scan.fields.find(
+            (ff) => ff.name?.toLowerCase() === n.toLowerCase() && ff.value,
+          );
+          if (f?.value) return f.value.trim();
+        }
+        return null;
+      };
+      const email = getField(["email", "e-mail", "courriel"]);
+      const phone = getField(["telephone", "téléphone", "phone", "mobile"]);
+      const lastName = getField(["nom", "last_name"]);
+      const firstName = getField(["prenom", "prénom", "first_name"]);
+
+      // --- 1. Try to match an existing client (email > name > phone) ---
+      let clientId: string | null = null;
+      if (email) {
+        const { data } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("tenant_id", tenantIdFromHook)
+          .ilike("email", email)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id) clientId = data.id;
+      }
+      if (!clientId && lastName && firstName) {
+        const { data } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("tenant_id", tenantIdFromHook)
+          .ilike("last_name", lastName)
+          .ilike("first_name", firstName)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id) clientId = data.id;
+      }
+      if (!clientId && phone) {
+        const phoneClean = phone.replace(/\s+/g, "");
+        const { data } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("tenant_id", tenantIdFromHook)
+          .ilike("phone", `%${phoneClean.slice(-8)}%`)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id) clientId = data.id;
+      }
+
+      // --- 2. If no match, create the client from scan fields ---
+      if (!clientId) {
+        const rawGender = getField(["genre", "sexe", "gender"]);
+        const normalizedGender =
+          rawGender && /^(m|h|homme|male|masculin)$/i.test(rawGender)
+            ? "male"
+            : rawGender && /^(f|femme|female|feminin|féminin)$/i.test(rawGender)
+              ? "female"
+              : null;
+
+        const birthRaw = getField(["date_naissance", "birthdate", "ddn"]);
+        const birthIso = (() => {
+          if (!birthRaw) return null;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(birthRaw)) return birthRaw;
+          const m = birthRaw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+          if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+          return null;
+        })();
+
+        const willHaveActiveContract =
+          (scan.new_products_detected && scan.new_products_detected.length > 0) || false;
+
+        const newClient = {
+          tenant_id: tenantIdFromHook,
+          last_name: lastName,
+          first_name: firstName,
+          email,
+          phone,
+          mobile: getField(["mobile"]),
+          address: getField(["adresse", "address"]),
+          postal_code: getField(["npa", "code_postal", "postal_code"]),
+          city: getField(["localite", "localité", "city", "ville"]),
+          canton: getField(["canton"]),
+          nationality: getField(["nationalite", "nationalité", "nationality"]),
+          civil_status: getField(["etat_civil", "civil_status"]),
+          profession: getField(["profession"]),
+          employer: getField(["employeur", "employer"]),
+          permit_type: getField(["permis", "permit_type"]),
+          gender: normalizedGender,
+          birthdate: birthIso,
+          status: willHaveActiveContract ? "actif" : "prospect",
+        };
+
+        const { data: created, error: createErr } = await supabase
+          .from("clients")
+          .insert(newClient)
+          .select("id")
+          .single();
+
+        if (createErr || !created?.id) {
+          toast({
+            title: "Échec de création du client",
+            description: createErr?.message || "Impossible de créer la fiche client depuis le scan.",
+            variant: "destructive",
+          });
+          return;
+        }
+        clientId = created.id;
+
+        await logAudit(tenantIdFromHook, "create", "client", clientId, {
+          source: "ia_scan_wizard",
+          scan_id: scan.id,
+        });
+
+        toast({
+          title: "Fiche client créée",
+          description: `${firstName ?? ""} ${lastName ?? ""}`.trim() || "Nouveau client créé depuis le scan.",
+        });
+      }
+
+      setBetaWizardClientId(clientId);
+      setBetaWizardOpen(true);
+    } finally {
+      setBetaResolvingClient(false);
+    }
+  };
+
+  const handleBetaWizardDone = (createdPolicyIds: string[]) => {
+    setBetaWizardOpen(false);
+    toast({
+      title: "Contrats créés",
+      description: `${createdPolicyIds.length} contrat${createdPolicyIds.length > 1 ? "s" : ""} créé${createdPolicyIds.length > 1 ? "s" : ""} via le formulaire pré-rempli.`,
+    });
+    onValidated();
+    onOpenChange(false);
+  };
 
   const handleValidate = async () => {
     console.log('[ScanValidation] Starting validation...', { userId: user?.id, tenantId: tenantIdFromHook });
@@ -1844,9 +2003,21 @@ export default function ScanValidationDialog({
                           </div>
                           <div className="space-y-1.5">
                             {products.map((product, pi) => (
-                              <div key={`old-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5">
-                                <span className="font-medium">{product.product_name}</span>
-                                <div className="flex items-center gap-3 text-muted-foreground">
+                              <div key={`old-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="font-medium truncate">{product.product_name}</span>
+                                  <ProductBranchEditor
+                                    branchId={product.resolved_branch_id}
+                                    branchCode={product.resolved_branch_code || product.branch_code}
+                                    onChange={(branchId, branchCode) => {
+                                      // Mutate the scan-local product so the branch is used at submit time.
+                                      product.resolved_branch_id = branchId;
+                                      product.resolved_branch_code = branchCode;
+                                    }}
+                                    lowConfidence={!product.resolved_branch_id && !product.branch_code}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3 text-muted-foreground flex-shrink-0">
                                   {product.premium_monthly && (
                                     <span className="text-orange-600 dark:text-orange-400 font-medium">
                                       CHF {product.premium_monthly.toFixed(2)}/mois
@@ -1898,9 +2069,20 @@ export default function ScanValidationDialog({
                           </div>
                           <div className="space-y-1.5">
                             {products.map((product, pi) => (
-                              <div key={`new-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5">
-                                <span className="font-medium">{product.product_name}</span>
-                                <div className="flex items-center gap-3 text-muted-foreground">
+                              <div key={`new-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="font-medium truncate">{product.product_name}</span>
+                                  <ProductBranchEditor
+                                    branchId={product.resolved_branch_id}
+                                    branchCode={product.resolved_branch_code || product.branch_code}
+                                    onChange={(branchId, branchCode) => {
+                                      product.resolved_branch_id = branchId;
+                                      product.resolved_branch_code = branchCode;
+                                    }}
+                                    lowConfidence={!product.resolved_branch_id && !product.branch_code}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3 text-muted-foreground flex-shrink-0">
                                   {product.premium_monthly && (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                                       CHF {product.premium_monthly.toFixed(2)}/mois
@@ -2083,31 +2265,62 @@ export default function ScanValidationDialog({
         </ScrollArea>
 
         {/* Fixed action buttons at the bottom */}
-        <div className="flex gap-3 p-6 pt-4 border-t bg-background flex-shrink-0">
+        <div className="flex flex-col gap-2 p-6 pt-4 border-t bg-background flex-shrink-0">
+          {/* F5 Beta: unified form path */}
           <Button
+            type="button"
+            onClick={openBetaWizard}
+            disabled={isSubmitting || betaResolvingClient || tenantLoading || !user || !scan}
             variant="outline"
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="flex-1"
-            disabled={isSubmitting}
+            className="w-full border-primary/30 bg-primary/5 hover:bg-primary/10"
           >
-            Annuler
-          </Button>
-          <Button
-            type="button"
-            onClick={safeHandleValidate}
-            disabled={isSubmitting || tenantLoading || !user}
-            className="flex-1 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90"
-          >
-            {isSubmitting ? (
+            {betaResolvingClient ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Check className="h-4 w-4 mr-2" />
+              <Sparkles className="h-4 w-4 mr-2 text-primary" />
             )}
-            Valider & créer
+            Créer via formulaire pré-rempli (recommandé)
           </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+              disabled={isSubmitting}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              onClick={safeHandleValidate}
+              disabled={isSubmitting || tenantLoading || !user}
+              variant="ghost"
+              className="flex-1 text-muted-foreground"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Valider en bloc (ancien)
+            </Button>
+          </div>
         </div>
       </DialogContent>
+
+      {/* F5 wizard: opens the same ContractForm as manual creation, pre-filled */}
+      {scan && (
+        <IAScanContractsWizard
+          open={betaWizardOpen}
+          onOpenChange={setBetaWizardOpen}
+          scan={scan}
+          clientId={betaWizardClientId}
+          products={scan.new_products_detected || []}
+          hasResiliation={!!(scan.has_termination || (scan.fields || []).some(f => f.field_category === 'termination'))}
+          onAllDone={handleBetaWizardDone}
+        />
+      )}
     </Dialog>
   );
 }

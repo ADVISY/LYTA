@@ -17,6 +17,9 @@ export interface DocumentDetected {
   doc_type: string;
   doc_type_confidence: number;
   description: string;
+  /** True only when the document is a mandate AND a signature/date is visible. */
+  is_signed?: boolean;
+  signature_date?: string;
 }
 
 export interface ProductDetected {
@@ -30,10 +33,19 @@ export interface ProductDetected {
   premium_monthly?: number;
   premium_yearly?: number;
   franchise?: number;
+  /** LAMal-specific: whether the accident coverage is included in the policy */
+  accident_included?: boolean;
   start_date?: string;
   end_date?: string;
   policy_number?: string;
   notes?: string;
+  /** Branch code emitted by the IA OR resolved server-side by heuristics
+   *  (LAMAL / LCA / VIE / LPP / AUTO / MENAGE_RC / JURIDIQUE / VOYAGE / ENTREPRISE / HYPO_CREDIT / PGM / ACCIDENT) */
+  branch_code?: string;
+  /** Pre-resolved tenant_branches.id when the server could map branch_code. */
+  resolved_branch_id?: string;
+  /** Same as branch_code, kept for traceability when the value was inferred server-side. */
+  resolved_branch_code?: string;
 }
 
 export interface FamilyMemberDetected {

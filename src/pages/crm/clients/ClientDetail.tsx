@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter, Building2, Heart, Activity, Car, Home as HomeIcon, Scale, Shield } from "lucide-react";
 import { useTenantDocumentTypes } from "@/hooks/useTenantLookups";
 import {
   AlertDialog,
@@ -36,6 +36,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
 import ContractForm from "@/components/crm/ContractForm";
+import { BranchChip } from "@/components/crm/BranchSelector";
 import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
@@ -885,54 +886,87 @@ export default function ClientDetail() {
                       {clientPolicies.map((policy) => {
                         const category = policy.product?.category;
                         const notes = policy.notes || '';
-                        
+
                         // Get products_data from policy
                         const productsData = policy.products_data || [];
                         const hasMultipleProducts = productsData.length > 1;
-                        
+
                         // Parse health details from notes (flexible regex) - fallback for old contracts
-                        const lamalMatch = notes.match(/LAMal[:\s]*([\d.,]+)\s*CHF/i);
-                        const lcaMatch = notes.match(/LCA[:\s]*([\d.,]+)\s*CHF/i);
                         const franchiseMatch = notes.match(/Franchise[:\s]*([\d.,]+)\s*CHF/i);
-                        const lamalAmount = lamalMatch ? parseFloat(lamalMatch[1].replace(',', '.')) : null;
-                        const lcaAmount = lcaMatch ? parseFloat(lcaMatch[1].replace(',', '.')) : null;
                         const franchiseFromNotes = franchiseMatch ? parseFloat(franchiseMatch[1].replace(',', '.')) : null;
-                        
-                        // Parse life duration from notes
-                        const durationMatch = notes.match(/Durée[:\s]*(\d+)\s*ans/i);
-                        const durationYears = durationMatch ? parseInt(durationMatch[1]) : null;
-                        
+
                         // Use deductible from field, parsed from notes, or from products_data
                         let displayDeductible = policy.deductible || franchiseFromNotes;
-                        
-                        // If no deductible found yet, try to get it from products_data
                         if (!displayDeductible && productsData.length > 0) {
-                          // Find first product with a deductible
                           const productWithDeductible = productsData.find((p) => p.deductible && p.deductible > 0);
                           if (productWithDeductible) {
                             displayDeductible = productWithDeductible.deductible;
                           }
                         }
-                        
-                        // Calculate totals from products_data
+
+                        // Calculate totals from products_data (used as fallback when policy.premium_monthly is empty)
                         const totalFromProducts = productsData.reduce((sum, p) => sum + (p.premium || 0), 0);
-                        
+                        const monthlyTotal = policy.premium_monthly
+                          ? Number(policy.premium_monthly)
+                          : totalFromProducts;
+
                         // Extract real product name from IA Scan notes (format: "PRODUCT_NAME - Nouvelle/Ancienne police importée via IA Scan")
                         const iaScanProductMatch = notes.match(/^([^-]+)\s*-\s*(?:Nouvelle|Ancienne)\s*police\s*importée\s*via\s*IA\s*Scan/i);
                         const iaScanProductName = iaScanProductMatch ? iaScanProductMatch[1].trim() : null;
-                        
-                        // Determine the display name for the product
-                        const displayProductName = iaScanProductName 
-                          || (hasMultipleProducts 
+
+                        // Determine the display name (in order of preference)
+                        const displayProductName = iaScanProductName
+                          || policy.product?.name
+                          || (productsData[0]?.name)
+                          || (hasMultipleProducts
                               ? `${t('clientDetail.multiProductContract')} (${productsData.length})`
-                              : (policy.product?.name || t('clientDetail.unknownProduct')));
-                        
+                              : t('clientDetail.unknownProduct'));
+
+                        const companyName = policy.product?.company?.name
+                          || policy.company_name
+                          || productsData[0]?.company
+                          || t('clientDetail.unknownCompany');
+                        const companyLogoUrl = policy.product?.company?.logo_url || null;
+                        const companyInitial = (companyName || '?').trim().charAt(0).toUpperCase();
+
+                        // Branch chip (preferred over legacy category)
+                        const branchFromProduct = (policy.product as any)?.tenant_branch || null;
+
                         return (
-                            <div key={policy.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-                            <div className="flex items-start justify-between">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold">
+                          <div
+                            key={policy.id}
+                            className="border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                            onClick={() => {
+                              setEditPolicyId(policy.id);
+                              setEditContractOpen(true);
+                            }}
+                          >
+                            <div className="flex items-start gap-4">
+                              {/* Company logo */}
+                              <div className="flex-shrink-0">
+                                {companyLogoUrl ? (
+                                  <div className="h-12 w-12 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                                    <img
+                                      src={companyLogoUrl}
+                                      alt={companyName}
+                                      className="max-h-10 max-w-10 object-contain"
+                                      onError={(e) => {
+                                        // Hide broken images and let the fallback render via parent
+                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-12 w-12 rounded-lg border bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                                    {companyInitial !== '?' ? companyInitial : <Building2 className="h-5 w-5" />}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Main info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold truncate">
                                     {displayProductName}
                                   </span>
                                   <Badge
@@ -941,19 +975,43 @@ export default function ClientDetail() {
                                   >
                                     {getPolicyStatusLabel(policy.status, t)}
                                   </Badge>
+                                  {hasMultipleProducts && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {productsData.length} produits
+                                    </Badge>
+                                  )}
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                  {policy.product?.company?.name || policy.company_name || t('clientDetail.unknownCompany')} • {policy.policy_number || t('clientDetail.noNumber')}
+                                <p className="text-sm text-muted-foreground truncate">
+                                  {companyName}
+                                  {policy.policy_number ? ` • ${policy.policy_number}` : ''}
                                 </p>
-                              </div>
-                              <div className="flex items-start gap-4">
-                                <div className="text-right text-sm">
-                                  <p className="text-muted-foreground">{t('clientDetail.startDate')}</p>
-                                  <p className="font-medium">
-                                    {policy.start_date ? format(new Date(policy.start_date), "dd.MM.yyyy") : "-"}
-                                  </p>
+                                {/* Branch chip + franchise (if any) */}
+                                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                  <BranchChip branch={branchFromProduct} />
+                                  {displayDeductible ? (
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                      Fr. {displayDeductible} CHF
+                                    </Badge>
+                                  ) : null}
                                 </div>
-                                <div className="flex items-center gap-1">
+                              </div>
+
+                              {/* Right column: premium + date + actions */}
+                              <div className="flex items-start gap-3 flex-shrink-0">
+                                <div className="text-right text-sm">
+                                  <p className="text-base font-bold text-primary leading-tight">
+                                    {monthlyTotal > 0 ? `${monthlyTotal.toFixed(2)} CHF` : '-'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    /mois
+                                  </p>
+                                  {policy.start_date && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {format(new Date(policy.start_date), "dd.MM.yyyy")}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -979,157 +1037,6 @@ export default function ClientDetail() {
                                 </div>
                               </div>
                             </div>
-                            
-                            {/* Multi-products display */}
-                            {hasMultipleProducts && (
-                              <div className="mt-3 p-3 bg-primary/5 rounded-lg">
-                                <h4 className="font-medium text-sm mb-2">{t('clientDetail.productsIncluded')}</h4>
-                                <div className="space-y-2">
-                                  {productsData.map((prod, idx) => (
-                                    <div key={idx} className="flex items-center justify-between text-sm p-2 bg-background rounded border">
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {prod.category === 'health' ? 'Santé' : 
-                                           prod.category === 'life' ? 'Vie' :
-                                           prod.category === 'auto' ? 'Auto' :
-                                           prod.category === 'home' ? 'Ménage' :
-                                           prod.category === 'legal' ? 'Juridique' : 'Autre'}
-                                        </Badge>
-                                        <span>{prod.name}</span>
-                                      </div>
-                                      <div className="text-right">
-                                        <span className="font-semibold">{prod.premium?.toFixed(2) || '0.00'} CHF/mois</span>
-                                        {prod.deductible && (
-                                          <span className="text-muted-foreground ml-2">(Fr. {prod.deductible} CHF)</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-3 pt-2 border-t flex justify-between items-center">
-                                  <span className="font-semibold">Total mensuel</span>
-                                  <span className="text-lg font-bold text-primary">
-                                    {policy.premium_monthly ? Number(policy.premium_monthly).toFixed(2) : totalFromProducts.toFixed(2)} CHF
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Single product - Health Insurance Details */}
-                            {!hasMultipleProducts && category === 'health' && (
-                              <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-muted-foreground">Prime LAMal</p>
-                                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                                      {lamalAmount !== null ? `${lamalAmount.toFixed(2)} CHF/mois` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Prime LCA</p>
-                                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                                      {lcaAmount !== null ? `${lcaAmount.toFixed(2)} CHF/mois` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Total mensuel</p>
-                                    <p className="font-semibold">
-                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Franchise LAMal</p>
-                                    <p className="font-semibold">
-                                      {displayDeductible ? `${displayDeductible} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Single product - Life Insurance Details */}
-                            {!hasMultipleProducts && category === 'life' && (
-                              <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-950/30 rounded-lg">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-muted-foreground">Prime mensuelle</p>
-                                    <p className="font-semibold text-violet-700 dark:text-violet-400">
-                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Prime annuelle</p>
-                                    <p className="font-semibold text-violet-700 dark:text-violet-400">
-                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Durée</p>
-                                    <p className="font-semibold">
-                                      {durationYears ? `${durationYears} ans` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Date de fin</p>
-                                    <p className="font-semibold">
-                                      {policy.end_date ? format(new Date(policy.end_date), "dd.MM.yyyy") : '-'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Single product - Other Insurance Types */}
-                            {!hasMultipleProducts && category && !['health', 'life'].includes(category) && (
-                              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-muted-foreground">Prime mensuelle</p>
-                                    <p className="font-semibold text-blue-700 dark:text-blue-400">
-                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Prime annuelle</p>
-                                    <p className="font-semibold text-blue-700 dark:text-blue-400">
-                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Franchise</p>
-                                    <p className="font-semibold">
-                                      {displayDeductible ? `${displayDeductible} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Fallback for contracts without category */}
-                            {!hasMultipleProducts && !category && (
-                              <div className="mt-3 p-3 bg-muted/50 rounded-lg">
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-muted-foreground">Prime mensuelle</p>
-                                    <p className="font-semibold">
-                                      {policy.premium_monthly ? `${Number(policy.premium_monthly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Prime annuelle</p>
-                                    <p className="font-semibold">
-                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '-'}
-                                    </p>
-                                  </div>
-                                  {displayDeductible && (
-                                    <div>
-                                      <p className="text-muted-foreground">Franchise</p>
-                                      <p className="font-semibold">{displayDeductible} CHF</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         );
                       })}

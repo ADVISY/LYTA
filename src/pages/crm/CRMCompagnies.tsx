@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CompanyContactsPanel } from "@/components/crm/CompanyContactsPanel";
 import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
+import { BranchChip, BranchSelector } from "@/components/crm/BranchSelector";
+import { TenantBranchesPanel } from "@/components/crm/TenantBranchesPanel";
 import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +54,14 @@ type Product = {
   commission_type: string | null;
   commission_value: number | null;
   commission_description: string | null;
+  tenant_branch_id: string | null;
+  tenant_branch?: {
+    id: string;
+    code: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+  } | null;
 };
 
 type Company = {
@@ -114,7 +124,15 @@ export default function CRMCompagnies() {
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [productCompanyId, setProductCompanyId] = useState<string | null>(null);
-  const [productForm, setProductForm] = useState({ name: '', category: 'health', description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
+  const [productForm, setProductForm] = useState<{
+    name: string;
+    category: string;
+    tenant_branch_id: string | null;
+    description: string;
+    commission_type: string;
+    commission_value: string;
+    commission_description: string;
+  }>({ name: '', category: 'health', tenant_branch_id: null, description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
   const [deleteProductDialog, setDeleteProductDialog] = useState<Product | null>(null);
   
   const categoryLabels = getCategoryLabels(t);
@@ -136,8 +154,17 @@ export default function CRMCompagnies() {
 
       const { data: productsData, error: productsError } = await supabase
         .from('insurance_products')
-        .select('*')
-        .order('category, name');
+        .select(`
+          *,
+          tenant_branch:tenant_branches!insurance_products_tenant_branch_id_fkey (
+            id,
+            code,
+            name,
+            icon,
+            color
+          )
+        `)
+        .order('name');
       
       if (productsError) throw productsError;
 
@@ -310,7 +337,7 @@ export default function CRMCompagnies() {
   const openAddProduct = (companyId: string) => {
     setProductToEdit(null);
     setProductCompanyId(companyId);
-    setProductForm({ name: '', category: 'health', description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
+    setProductForm({ name: '', category: 'health', tenant_branch_id: null, description: '', commission_type: 'multiplier', commission_value: '', commission_description: '' });
     setProductDialogOpen(true);
   };
 
@@ -320,6 +347,7 @@ export default function CRMCompagnies() {
     setProductForm({
       name: product.name,
       category: product.category,
+      tenant_branch_id: product.tenant_branch_id ?? null,
       description: product.description || '',
       commission_type: product.commission_type || 'multiplier',
       commission_value: product.commission_value?.toString() || '',
@@ -347,9 +375,10 @@ export default function CRMCompagnies() {
         }
       }
       
-      const productData = {
+      const productData: any = {
         name: productForm.name,
         category: productForm.category,
+        tenant_branch_id: productForm.tenant_branch_id,
         description: productForm.description || null,
         commission_type: productForm.commission_type,
         commission_value: parseFloat(productForm.commission_value) || 0,
@@ -433,13 +462,33 @@ export default function CRMCompagnies() {
             <p className="text-muted-foreground">{t('companies.subtitle')}</p>
           </div>
         </div>
-        <Button onClick={openAddCompany} className="gap-2">
-          <Plus className="h-4 w-4" />
-          {t('companyForm.addCompany')}
-        </Button>
       </div>
 
-      {/* Stats */}
+      <Tabs defaultValue="companies" className="w-full">
+        <TabsList>
+          <TabsTrigger value="companies" className="gap-1.5">
+            <Building2 className="h-4 w-4" />
+            Compagnies &amp; Produits
+          </TabsTrigger>
+          <TabsTrigger value="branches" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            Mes branches
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="branches" className="mt-6">
+          <TenantBranchesPanel />
+        </TabsContent>
+
+        <TabsContent value="companies" className="mt-6 space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={openAddCompany} className="gap-2">
+              <Plus className="h-4 w-4" />
+              {t('companyForm.addCompany')}
+            </Button>
+          </div>
+
+          {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-0 shadow-md bg-card/80 backdrop-blur">
           <CardContent className="p-4">
@@ -630,12 +679,18 @@ export default function CRMCompagnies() {
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </div>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={cn("text-xs mt-1", categoryLabels[product.category]?.color)}
-                                >
-                                  {categoryLabels[product.category]?.label || product.category}
-                                </Badge>
+                                <div className="mt-1">
+                                  {product.tenant_branch ? (
+                                    <BranchChip branch={product.tenant_branch} />
+                                  ) : (
+                                    <Badge
+                                      variant="secondary"
+                                      className={cn("text-xs", categoryLabels[product.category]?.color)}
+                                    >
+                                      {categoryLabels[product.category]?.label || product.category}
+                                    </Badge>
+                                  )}
+                                </div>
                                 
                                 {/* Commission Display/Edit */}
                                 {editingProduct === product.id ? (
@@ -723,6 +778,8 @@ export default function CRMCompagnies() {
           </Collapsible>
         ))}
       </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Company Dialog */}
       <Dialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen}>
@@ -794,20 +851,15 @@ export default function CRMCompagnies() {
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('productForm.category')} *</Label>
-              <Select
-                value={productForm.category}
-                onValueChange={(value) => setProductForm(prev => ({ ...prev, category: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Branche d'assurance *</Label>
+              <BranchSelector
+                value={productForm.tenant_branch_id}
+                onChange={(branchId) => setProductForm(prev => ({ ...prev, tenant_branch_id: branchId }))}
+                placeholder="Sélectionner une branche"
+              />
+              <p className="text-xs text-muted-foreground">
+                La branche définit la catégorie du produit (LAMal, LCA, Vie, Auto…). Gérez vos branches dans l'onglet "Mes branches".
+              </p>
             </div>
             <div className="space-y-2">
               <Label>{t('productForm.description')}</Label>

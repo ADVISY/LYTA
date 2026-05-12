@@ -19,6 +19,7 @@ const DOC_TYPES = [
   'avenant',                 // Policy amendment
   'resiliation',             // Cancellation letter
   'attestation',             // Certificate/attestation
+  'mandat_gestion',          // Signed broker mandate (FINMA pre-requisite for any client management)
   'piece_identite',          // ID document (passport, ID card, permit)
   'justificatif_domicile',   // Proof of address
   'bulletin_salaire',        // Salary slip
@@ -248,6 +249,7 @@ Pour chaque document, identifie son type parmi:
 - avenant: Avenant de modification
 - resiliation: Lettre de résiliation (du client ou de l'assureur)
 - attestation: Attestation d'affiliation/couverture
+- mandat_gestion: Mandat de courtage / mandat de gestion / mandat d'intermédiation (FR/DE/IT). Signaux: "Mandat de courtage", "Mandat de gestion", "Vollmacht", "Maklervollmacht", "Mandato di intermediazione". DOIT inclure une signature manuscrite ou électronique visible + une date de signature. ⚠️ Pour qu'un mandat soit considéré valide ici, mets is_signed=true UNIQUEMENT si tu vois la signature/date manifestement présente.
 - piece_identite: Pièce d'identité (passeport, carte ID, permis de séjour)
 - justificatif_domicile: Justificatif de domicile
 - bulletin_salaire: Bulletin de salaire
@@ -295,13 +297,38 @@ Depuis TOUS les documents:
 - Coordonnées (adresse, téléphone, email)
 - N° AVS, état civil, profession
 
-Types de produits suisses:
-- LAMal: Assurance maladie obligatoire (résiliation au 30.11 pour 01.01)
-- LCA: Assurance complémentaire (délais variables)
-- VIE: Assurance vie/prévoyance/3e pilier
-- NON-VIE: RC, ménage, auto, etc.
-- LAA: Assurance accidents
-- LPP: Prévoyance professionnelle
+## BRANCHES D'ASSURANCE (CRITIQUE — pour chaque produit, indique branch_code)
+
+Tu dois TOUJOURS classer chaque produit dans UNE branche parmi cette liste fermée, et la sortir dans le champ "branch_code":
+
+- LAMAL — Assurance maladie OBLIGATOIRE de base (KVG / LAMal)
+  Signaux: "obligatoire", "base", "KVG", "LAMal", "loi sur l'assurance-maladie"
+  Noms typiques: BASIS, BASE, FAVORIT, FAVORIT MEDPHARM, HMO, TELMED, CASAMED, PREMED, QUALIMED, BENEFIT, MONACA
+  Franchise toujours présente: 300/500/1000/1500/2000/2500
+  Prime adulte typique: 200-700 CHF/mois
+  ⚠️ NE JAMAIS classer un produit LAMal en LCA même si la facture les groupe ensemble.
+
+- LCA — Assurance maladie COMPLÉMENTAIRE (VVG)
+  Signaux: "complémentaire", "complementaire", "Zusatz", "VVG"
+  Noms typiques: COMPLETA, COMPLETA TOP, HOSPITA, HOSPITA FLEX, MIVITA, DIVERSA, BONUSPLAN, PLENA, SANA TOP
+  Couvre: ambulatoire, hospitalisation (commune/demi-privée/privée), dentaire, médecines complémentaires
+  Prime souvent < 200 CHF/mois.
+
+- PGM — Indemnités journalières maladie/accident (perte de gain)
+- ACCIDENT — LAA obligatoire + complémentaires accident (LAAC)
+- VIE — Vie individuelle, 3e pilier A/B, vie risque, vie mixte, rente viagère
+- LPP — 2e pilier, prévoyance professionnelle
+- AUTO — Véhicules (auto RC, casco partielle/complète, moto, bateau, camping-car)
+- MENAGE_RC — RC privée, ménage, bâtiment privé, animaux
+- JURIDIQUE — Protection juridique (privée, circulation, entreprise)
+- VOYAGE — Voyage, annulation, assistance
+- ENTREPRISE — Couvertures PME (RC pro, choses entreprise, pertes d'expl., D&O, cyber, construction, transport)
+- HYPO_CREDIT — Hypothèque, crédit personnel, leasing
+
+Délais de résiliation (Suisse):
+- LAMAL: résiliation au 30.11 pour effet 01.01
+- LCA: variable (1 à 3 mois avant l'échéance)
+- AUTO/MENAGE_RC: 3 mois avant l'échéance annuelle
 
 IMPORTANT: Date du jour = ${today}
 
@@ -314,6 +341,14 @@ Réponds UNIQUEMENT en JSON valide:
       "doc_type": "nouvelle_police",
       "doc_type_confidence": 0.95,
       "description": "Proposition Swica avec 4 produits"
+    },
+    {
+      "file_name": "mandat-courtage-signe.pdf",
+      "doc_type": "mandat_gestion",
+      "doc_type_confidence": 0.98,
+      "description": "Mandat de courtage signé le 15.03.2026",
+      "is_signed": true,
+      "signature_date": "2026-03-15"
     }
   ],
   "primary_holder": {
@@ -355,6 +390,7 @@ Réponds UNIQUEMENT en JSON valide:
     {
       "product_name": "LAMal FAVORIT MEDPHARM",
       "product_category": "LAMal",
+      "branch_code": "LAMAL",
       "company": "Swica",
       "insured_person_name": "Marie Dupont",
       "insured_person_first_name": "Marie",
@@ -362,11 +398,13 @@ Réponds UNIQUEMENT en JSON valide:
       "insured_person_birthdate": "1985-03-15",
       "premium_monthly": 429.50,
       "franchise": 2500,
+      "accident_included": false,
       "start_date": "2024-01-01"
     },
     {
       "product_name": "COMPLETA TOP",
       "product_category": "LCA",
+      "branch_code": "LCA",
       "company": "Swica",
       "insured_person_name": "Pierre Dupont",
       "insured_person_first_name": "Pierre",
@@ -1110,8 +1148,62 @@ serve(async (req) => {
       product.product_name && product.product_name.toLowerCase() !== 'autres assurances'
     );
 
+    // Smart branch resolver: prefer IA's branch_code, fallback to name heuristics.
+    // This is the structural fix for the LAMal-vs-LCA misclassification bug.
+    function resolveBranchCode(p: any): string {
+      const raw = (p.branch_code || '').toString().toUpperCase().trim();
+      const ALLOWED = ['LAMAL','LCA','PGM','ACCIDENT','VIE','LPP','AUTO','MENAGE_RC','JURIDIQUE','VOYAGE','ENTREPRISE','HYPO_CREDIT'];
+      if (ALLOWED.includes(raw)) return raw;
+
+      const name = (p.product_name || '').toLowerCase();
+      const cat = (p.product_category || '').toLowerCase();
+
+      // LAMal detection (priority over any LCA classification)
+      if (/(lamal|kvg|favorit|medpharm|telmed|casamed|premed|qualimed|monaca|hmo|^basis|^base)/i.test(name)) return 'LAMAL';
+      if (cat === 'lamal') return 'LAMAL';
+
+      if (cat === 'lca' || /complement|compl[eé]|hospita|completa|sana top|mivita|diversa|bonusplan|plena/i.test(name)) return 'LCA';
+      if (cat === 'vie' || cat.includes('3') || cat.includes('pilier') || cat === 'lpp' || /pilier|3a|3b|swiss life|prévoyance|prevoyance/i.test(name)) {
+        return cat === 'lpp' ? 'LPP' : 'VIE';
+      }
+      if (cat === 'laa' || cat === 'accident' || /accident|laa|infortuna/i.test(name)) return 'ACCIDENT';
+      if (cat.includes('pgm') || /indemnité|indemnite|perte de gain|krankentaggeld/i.test(name)) return 'PGM';
+      if (/(auto|casco|moto|bateau|camping)/i.test(name)) return 'AUTO';
+      if (/(menage|ménage|inventaire|rc priv)/i.test(name)) return 'MENAGE_RC';
+      if (/(juridique|protek|orion|legal)/i.test(name)) return 'JURIDIQUE';
+      if (/(voyage|annulation|assistance|travel)/i.test(name)) return 'VOYAGE';
+      if (cat.includes('hypo') || cat.includes('crédit') || cat.includes('credit') || /(hypo|crédit|credit|leasing)/i.test(name)) return 'HYPO_CREDIT';
+      return 'MENAGE_RC';
+    }
+
+    // Map branch_code → main_category enum (legacy) for create_candidate_product RPC
+    function branchCodeToLegacyMainCategory(code: string): string {
+      if (code === 'VIE' || code === 'LPP') return 'VIE';
+      if (code === 'LCA' || code === 'LAMAL' || code === 'PGM') return 'LCA';
+      if (code === 'HYPO_CREDIT') return 'HYPO';
+      return 'NON_VIE';
+    }
+
+    // Resolve tenant_branch_id once per scan
+    let tenantBranchByCode: Record<string, string> = {};
+    if (validTenantId) {
+      const { data: branchRows } = await supabase
+        .from('tenant_branches')
+        .select('id, code')
+        .eq('tenant_id', validTenantId);
+      if (Array.isArray(branchRows)) {
+        tenantBranchByCode = Object.fromEntries(branchRows.map((b: any) => [b.code, b.id]));
+      }
+    }
+
     const productMatchResults = await mapWithConcurrency(productsToMatch, getProductMatchConcurrency(), async (product) => {
       try {
+        // Resolve branch up-front so it's available for both match and candidate paths
+        const resolvedBranchCode = resolveBranchCode(product);
+        const resolvedBranchId = tenantBranchByCode[resolvedBranchCode] || null;
+        product.resolved_branch_code = resolvedBranchCode;
+        product.resolved_branch_id = resolvedBranchId;
+
         // Try to find a matching product using fuzzy matching
         const { data: matches, error: matchError } = await supabase.rpc('find_product_by_alias', {
           search_term: product.product_name,
@@ -1130,28 +1222,34 @@ serve(async (req) => {
           product.match_type = bestMatch.match_type;
           product.match_score = parseFloat(bestMatch.match_score);
           product.is_candidate = false;
-          
-          log.info(`Matched "${product.product_name}" → "${bestMatch.product_name}" (${bestMatch.match_type}, score: ${bestMatch.match_score})`);
+
+          log.info(`Matched "${product.product_name}" → "${bestMatch.product_name}" (${bestMatch.match_type}, score: ${bestMatch.match_score}, branch: ${resolvedBranchCode})`);
+
+          // If matched product has no tenant_branch_id yet, backfill it now.
+          if (resolvedBranchId) {
+            const { data: prodRow } = await supabase
+              .from('insurance_products')
+              .select('tenant_branch_id')
+              .eq('id', bestMatch.product_id)
+              .maybeSingle();
+            if (prodRow && !prodRow.tenant_branch_id) {
+              await supabase
+                .from('insurance_products')
+                .update({ tenant_branch_id: resolvedBranchId })
+                .eq('id', bestMatch.product_id);
+            }
+          }
         } else {
           // No match found - create a candidate product
-          log.info(`No match for "${product.product_name}" - creating candidate product`);
-          
-          // Map category to main_category
-          let mainCategory = 'NON_VIE';
-          const cat = (product.product_category || '').toUpperCase();
-          if (cat.includes('VIE') || cat.includes('3') || cat.includes('PILIER') || cat.includes('LPP')) {
-            mainCategory = 'VIE';
-          } else if (cat.includes('LCA') || cat.includes('COMPLÉ') || cat.includes('HOSP') || cat.includes('AMBUL')) {
-            mainCategory = 'LCA';
-          } else if (cat.includes('HYPO') || cat.includes('CRÉDIT') || cat.includes('CREDIT')) {
-            mainCategory = 'HYPO';
-          }
-          
+          log.info(`No match for "${product.product_name}" - creating candidate product (branch: ${resolvedBranchCode})`);
+
+          const mainCategory = branchCodeToLegacyMainCategory(resolvedBranchCode);
+
           const { data: candidateId, error: candidateError } = await supabase.rpc('create_candidate_product', {
             p_detected_name: product.product_name,
             p_company_name: product.company || null,
             p_main_category: mainCategory,
-            p_subcategory: null,
+            p_subcategory: resolvedBranchCode === 'LAMAL' ? 'lamal' : null,
             p_scan_id: scanId
           });
 
@@ -1162,8 +1260,16 @@ serve(async (req) => {
             product.match_type = 'candidate';
             product.match_score = 0;
             product.is_candidate = true;
-            
-            log.info(`Created candidate product: ${candidateId} for "${product.product_name}"`);
+
+            // Set tenant_branch_id on the freshly created candidate
+            if (resolvedBranchId) {
+              await supabase
+                .from('insurance_products')
+                .update({ tenant_branch_id: resolvedBranchId })
+                .eq('id', candidateId);
+            }
+
+            log.info(`Created candidate product: ${candidateId} for "${product.product_name}" → branch ${resolvedBranchCode}`);
           }
         }
 
