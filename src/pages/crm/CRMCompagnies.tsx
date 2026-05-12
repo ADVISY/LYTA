@@ -150,6 +150,7 @@ export default function CRMCompagnies() {
       const { data: companiesData, error: companiesError } = await supabase
         .from('insurance_companies')
         .select('*')
+        .eq('is_active', true)
         .order('name');
       
       if (companiesError) throw companiesError;

@@ -24,6 +24,7 @@ export function useInsuranceCompanies() {
     buildQuery: (client) =>
       client.from('insurance_companies')
         .select('*')
+        .eq('is_active', true)
         .order('name', { ascending: true }),
     pageSize: 100,
   });

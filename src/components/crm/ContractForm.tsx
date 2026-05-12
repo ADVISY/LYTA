@@ -590,7 +590,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const fetchCompaniesAndProducts = async () => {
     setLoading(true);
     const [companiesRes, productsRes] = await Promise.all([
-      supabase.from('insurance_companies').select('id, name, logo_url').order('name'),
+      supabase.from('insurance_companies').select('id, name, logo_url').eq('is_active', true).order('name'),
       supabase
         .from('insurance_products')
         .select(`
