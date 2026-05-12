@@ -964,7 +964,7 @@ export default function CRMDashboard() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">{t('dashboard.iaScanDeposits')}</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t('dashboard.smartflow', 'Smartflow')}</p>
                     <p className="text-3xl font-bold">{pendingScanCount}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {t('dashboard.pendingScans')}

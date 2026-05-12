@@ -20,6 +20,8 @@ import {
   Eye,
   UserPlus,
   X,
+  Sparkles,
+  Package,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -115,6 +117,26 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
 
   const overallPercent = Math.round((scan.overall_confidence || 0) * 100);
 
+  // Smartflow summary: who, what, how much
+  const clientFieldsLookup = (names: string[]): string | null => {
+    for (const n of names) {
+      const f = scan.fields.find((ff) => ff.field_name?.toLowerCase() === n.toLowerCase() && ff.extracted_value);
+      if (f?.extracted_value) return f.extracted_value.trim();
+    }
+    return null;
+  };
+  const detectedFirstName = clientFieldsLookup(["prenom", "prénom", "first_name"]);
+  const detectedLastName = clientFieldsLookup(["nom", "last_name"]);
+  const detectedFullName = [detectedFirstName, detectedLastName].filter(Boolean).join(" ").trim();
+  const detectedEmail = clientFieldsLookup(["email", "e-mail", "courriel"]);
+
+  const newProducts = scan.new_products_detected || [];
+  const oldProducts = scan.old_products_detected || [];
+  const totalNewProducts = newProducts.length;
+  const totalOldProducts = oldProducts.length;
+  const distinctNewCompanies = Array.from(new Set(newProducts.map((p) => (p.company || "").trim()).filter(Boolean)));
+  const monthlyTotal = newProducts.reduce((sum, p) => sum + (p.premium_monthly || 0), 0);
+
   return (
     <Card className={cn(
       "border-l-4 transition-all hover:shadow-lg",
@@ -195,6 +217,67 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
                 <AlertCircle className="h-3 w-3 text-destructive" />
                 {lowConfidence}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Smartflow summary block: at-a-glance overview of who + what + how much */}
+        {scan.status === 'completed' && (totalNewProducts > 0 || totalOldProducts > 0 || detectedFullName) && (
+          <div className="mt-3 rounded-lg border border-primary/15 bg-gradient-to-r from-primary/5 via-cyan-500/5 to-transparent p-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-primary mb-2">
+              <Sparkles className="h-3.5 w-3.5" />
+              Aperçu Smartflow
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              {/* Client */}
+              <div className="flex items-start gap-2 min-w-0">
+                <User className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Client</div>
+                  <div className="font-medium truncate">
+                    {detectedFullName || <span className="italic text-muted-foreground">Non identifié</span>}
+                  </div>
+                  {detectedEmail && (
+                    <div className="text-xs text-muted-foreground truncate">{detectedEmail}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Companies + products */}
+              <div className="flex items-start gap-2 min-w-0">
+                <Building2 className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Compagnies</div>
+                  <div className="font-medium truncate">
+                    {distinctNewCompanies.length > 0
+                      ? distinctNewCompanies.slice(0, 2).join(", ") + (distinctNewCompanies.length > 2 ? ` +${distinctNewCompanies.length - 2}` : '')
+                      : <span className="italic text-muted-foreground">—</span>}
+                  </div>
+                  {totalNewProducts > 0 && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Package className="h-3 w-3" />
+                      {totalNewProducts} nouveau{totalNewProducts > 1 ? 'x' : ''} contrat{totalNewProducts > 1 ? 's' : ''}
+                      {totalOldProducts > 0 ? ` · ${totalOldProducts} archivé${totalOldProducts > 1 ? 's' : ''}` : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Total premium */}
+              <div className="flex items-start gap-2 min-w-0">
+                <CreditCard className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Total mensuel</div>
+                  <div className="font-bold text-emerald-700 dark:text-emerald-400">
+                    {monthlyTotal > 0 ? `CHF ${monthlyTotal.toFixed(2)}` : <span className="font-normal italic text-muted-foreground">—</span>}
+                  </div>
+                  {monthlyTotal > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      ≈ CHF {(monthlyTotal * 12).toFixed(0)}/an
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -295,8 +378,8 @@ export default function PendingScanCard({ scan, onValidate, onReject, isRejectin
               onClick={() => onValidate(scan)}
               className="flex-1 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90"
             >
-              <UserPlus className="h-4 w-4 mr-1" />
-              Valider & créer client
+              <Sparkles className="h-4 w-4 mr-1" />
+              Traiter ce dossier
             </Button>
           </div>
         )}

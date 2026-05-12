@@ -811,6 +811,9 @@
   "propositions": {
     "title": "Propositions",
     "subtitle": "Gérez vos propositions commerciales",
+    "smartflow": "Smartflow",
+    "smartflowSubtitle": "Suivi des dossiers scannés et traités par l'IA",
+    "iaScanDeposits": "Smartflow",
     "newProposition": "Nouvelle proposition",
     "drafts": "Brouillons",
     "sent": "Envoyées",
