@@ -37,6 +37,7 @@ import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
 import ContractForm from "@/components/crm/ContractForm";
 import { BranchChip } from "@/components/crm/BranchSelector";
+import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
@@ -942,25 +943,16 @@ export default function ClientDetail() {
                             }}
                           >
                             <div className="flex items-start gap-4">
-                              {/* Company logo — initial is always rendered as fallback BACKGROUND,
-                                   img overlays it if it loads. If img fails (404 / CORS), we hide
-                                   it via onError and the initial remains visible. */}
+                              {/* Company logo — uses the shared component that already
+                                   handles local catalog logos by name, remote URL fallback,
+                                   and initials/icon fallback. Same component as Partenaires
+                                   and CRMContracts pages. */}
                               <div className="flex-shrink-0">
-                                <div className="relative h-12 w-12 rounded-lg border bg-primary/10 text-primary flex items-center justify-center font-semibold overflow-hidden">
-                                  <span className="select-none">
-                                    {companyInitial !== '?' ? companyInitial : <Building2 className="h-5 w-5" />}
-                                  </span>
-                                  {companyLogoUrl ? (
-                                    <img
-                                      src={companyLogoUrl}
-                                      alt={companyName}
-                                      className="absolute inset-0 h-full w-full object-contain bg-white p-1"
-                                      onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                      }}
-                                    />
-                                  ) : null}
-                                </div>
+                                <InsuranceCompanyLogo
+                                  name={companyName}
+                                  logoUrl={companyLogoUrl}
+                                  size="lg"
+                                />
                               </div>
 
                               {/* Main info */}
