@@ -386,11 +386,18 @@ export default function CRMCompagnies() {
       };
       
       if (productToEdit) {
-        const { error } = await supabase
+        // Use .select() to detect silent RLS blocks (UPDATE returning 0 rows
+        // with no error — used to make "modification" appear successful while
+        // nothing was actually persisted).
+        const { data, error } = await supabase
           .from('insurance_products')
           .update(productData)
-          .eq('id', productToEdit.id);
+          .eq('id', productToEdit.id)
+          .select('id');
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error("La modification n'a rien changé (probablement bloqué par les permissions RLS — vérifie ton rôle).");
+        }
         toast({ title: "Succès", description: "Produit modifié" });
       } else {
         const { error } = await supabase
@@ -399,9 +406,9 @@ export default function CRMCompagnies() {
         if (error) throw error;
         toast({ title: "Succès", description: "Produit créé" });
       }
-      
+
       setProductDialogOpen(false);
-      fetchCompanies();
+      await fetchCompanies();
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } finally {
