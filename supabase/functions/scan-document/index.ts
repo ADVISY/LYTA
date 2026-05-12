@@ -1098,33 +1098,54 @@ serve(async (req) => {
     }
 
     // Analyze each file independently and in parallel, then merge results.
-    // This keeps wall-clock time under the Edge Function limit for folders with several PDFs.
+    // With one automatic retry on timeout/rate-limit so a slow upstream
+    // doesn't drop products from the batch (the previous behaviour where
+    // 3 out of 4 files silently failed for Habib's SWICA dossier).
     const analysisResults = await mapWithConcurrency(fileContents, concurrency, async (fileContent, index): Promise<SingleAnalysisOutcome> => {
       const fileStartTime = Date.now();
+      let lastErr: unknown = null;
 
-      try {
-        const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType);
-        return {
-          ok: true,
-          file: fileContent,
-          result,
-          durationMs: Date.now() - fileStartTime,
-        };
-      } catch (fileError) {
-        const errorMessage = fileError instanceof Error ? fileError.message : String(fileError);
-        log.error("Failed to analyze file", {
-          scanId,
-          fileName: fileContent.fileName,
-          error: errorMessage,
-        });
-
-        return {
-          ok: false,
-          file: fileContent,
-          error: errorMessage,
-          durationMs: Date.now() - fileStartTime,
-        };
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType);
+          if (attempt > 1) {
+            log.info("File analysis succeeded on retry", { fileName: fileContent.fileName, attempt });
+          }
+          return {
+            ok: true,
+            file: fileContent,
+            result,
+            durationMs: Date.now() - fileStartTime,
+          };
+        } catch (fileError) {
+          lastErr = fileError;
+          const msg = fileError instanceof Error ? fileError.message : String(fileError);
+          // Retry only when it makes sense (timeout / rate-limit / 5xx).
+          const retryable = isAiTimeoutError(fileError)
+            || /timeout|rate limit|429|503|temporarily/i.test(msg);
+          if (attempt < 2 && retryable) {
+            log.warn("Retrying file analysis", { fileName: fileContent.fileName, msg, attempt });
+            // Small backoff before retrying
+            await new Promise((res) => setTimeout(res, 1500));
+            continue;
+          }
+          log.error("Failed to analyze file (final)", {
+            scanId,
+            fileName: fileContent.fileName,
+            error: msg,
+            attempts: attempt,
+          });
+          break;
+        }
       }
+
+      const errorMessage = lastErr instanceof Error ? lastErr.message : String(lastErr);
+      return {
+        ok: false,
+        file: fileContent,
+        error: errorMessage,
+        durationMs: Date.now() - fileStartTime,
+      };
     });
 
     const parsedResult = mergeParsedResults(analysisResults);
