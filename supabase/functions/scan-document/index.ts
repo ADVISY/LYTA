@@ -141,11 +141,10 @@ type SingleAnalysisFailure = {
 
 type SingleAnalysisOutcome = SingleAnalysisSuccess | SingleAnalysisFailure;
 
-// 75s × retry × 6 in parallel pushed Habib's dossiers over 120s. Cut the
-// per-file budget aggressively: gpt-5-mini handles single PDFs in 12-25s
-// when the prompt is tight, so 50s is plenty even with one retry.
-const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 50000;
-const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 4;
+// Smartflow speed-first config. Tight prompt + small model + high
+// concurrency. Most insurance PDFs return in 8-15s with this setup.
+const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 35000;
+const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 8;
 const DEFAULT_PRODUCT_MATCH_CONCURRENCY = 6;
 
 function readPositiveIntegerEnv(
@@ -537,15 +536,12 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 function buildSingleDocumentSystemPrompt(): string {
   const today = new Date().toLocaleDateString('fr-CH');
 
-  return `Tu es un responsable back-office senior en assurance suisse. Analyse un fichier du dossier client. Le fichier peut contenir une ou plusieurs pages.
-
-Priorite: repondre vite avec les informations utiles, sans commentaire hors JSON.
-
-Classifie chaque document detecte avec doc_type parmi:
-police_active, ancienne_police, nouvelle_police, offre, avenant, resiliation, attestation, piece_identite, justificatif_domicile, bulletin_salaire, autre.
-
-Detecte tous les produits d'assurance visibles. Une ligne de prime = un produit separe. Precise la personne assuree quand elle est visible.
-
+  return `Back-office assurance suisse. Sors UNIQUEMENT du JSON valide.
+Une ligne de prime = un produit. Précise l'assuré (insured_person_first_name + insured_person_last_name + insured_person_birthdate) à chaque produit.
+doc_type ∈ {police_active, ancienne_police, nouvelle_police, offre, avenant, resiliation, attestation, mandat_gestion, piece_identite, justificatif_domicile, bulletin_salaire, autre}.
+branch_code ∈ {LAMAL, LCA, PGM, ACCIDENT, VIE, LPP, AUTO, MENAGE_RC, JURIDIQUE, VOYAGE, ENTREPRISE, HYPO_CREDIT}.
+LAMal = base obligatoire (Favorit, BeneFit, KPTwin, BASIS, HMO, Telmed, etc.) → toujours branch_code=LAMAL + accident_included true/false.
+LCA = complémentaires (COMPLETA, HOSPITA, NATURA, DENTA, Pulse, etc.).
 Date du jour: ${today}
 
 Retourne uniquement un JSON valide avec cette structure:
@@ -581,24 +577,18 @@ function buildSingleDocumentUserPrompt(
   formType?: string,
   catalogContext?: string,
 ): string {
-  return `Analyse ce fichier (${index + 1}/${total})${formType ? ` pour le formulaire ${formType.toUpperCase()}` : ""}: ${fileName}.
+  return `Fichier ${index + 1}/${total}: ${fileName}.${catalogContext ? `
 
-CONTEXTE — dossier multi-fichiers:
-Tu analyses UN fichier d'un dossier qui en contient ${total}. Les autres fichiers contiennent des infos complémentaires (pièce d'identité, contrats, justificatifs). Extrais ici TOUT ce qui est visible dans CE fichier, même si ce sont juste des infos client (nom, prénom, date de naissance) provenant d'une pièce d'identité — elles seront combinées avec les produits trouvés dans les autres fichiers.
+Catalogue courtier (match EXACT si reconnu):
+${catalogContext}` : ""}
 
-${catalogContext ? `CATALOGUE DU COURTIER (à utiliser pour matcher exactement):
-${catalogContext}
+Extrais:
+- client (depuis identité ou contrat): nom, prenom, date_naissance, adresse, npa, localite, telephone, email
+- primary_holder: {last_name, first_name, birthdate}
+- family_members_detected: [{last_name, first_name, birthdate, relationship}] — REQUIS: first_name ET last_name non vides
+- new_products_detected / old_products_detected: pour CHAQUE ligne de prime → {product_name, branch_code, company, insured_person_first_name, insured_person_last_name, premium_monthly, franchise, accident_included (LAMAL), start_date, end_date, policy_number}
 
-IMPORTANT: pour chaque produit détecté, utilise EXACTEMENT le nom commercial du catalogue ci-dessus si tu reconnais le produit (même avec orthographe légèrement différente sur la facture). Sinon, utilise le nom commercial standard de la compagnie. Mets product_name + branch_code + company conformément au catalogue.
-
-` : ""}Extrait uniquement les informations visibles et utiles pour pré-remplir le dossier:
-- client: nom, prenom, date_naissance, nationalite, adresse, npa, localite, telephone, email, numero_avs (pris depuis pièce d'identité ou contrat)
-- primary_holder: titulaire principal du contrat avec last_name, first_name, birthdate
-- family_members_detected: chaque membre de famille avec last_name (obligatoire), first_name (obligatoire), birthdate, relationship (conjoint/enfant/parent/autre). Ne crée PAS de family_member sans nom complet.
-- produits (new_products_detected ou old_products_detected): chaque produit séparément avec OBLIGATOIREMENT product_name (nom commercial exact), product_category (LAMal/LCA/VIE/AUTO/NON-VIE/LAA/LPP), branch_code (LAMAL/LCA/VIE/LPP/AUTO/MENAGE_RC/JURIDIQUE/VOYAGE/ENTREPRISE/PGM/ACCIDENT/HYPO_CREDIT), company, insured_person_first_name, insured_person_last_name, premium_monthly, franchise (LAMal/LCA), accident_included (LAMal), start_date, end_date, policy_number
-- resiliation: date_resiliation, motif_resiliation, compagnie_resiliee
-
-Si une information n'est pas visible dans CE fichier, mets null — ne pas inventer. Retourne uniquement le JSON.`;
+Aucune valeur inventée: null si non visible. JSON uniquement.`;
 }
 
 function parseAiAnalysisResponse(aiContent: string, fallbackFileName?: string): ParsedResult {
@@ -731,7 +721,7 @@ async function analyzeSingleFile(
       { role: "system", content: buildSingleDocumentSystemPrompt() },
       { role: "user", content: userContent },
     ],
-    max_tokens: 5000,
+    max_tokens: 2500,
     temperature: 0.1,
   }, getScanDocumentTimeoutMs());
 
