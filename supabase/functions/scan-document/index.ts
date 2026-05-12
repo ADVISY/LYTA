@@ -255,22 +255,34 @@ Pour chaque document, identifie son type parmi:
 - bulletin_salaire: Bulletin de salaire
 - autre: Autre document
 
-## 2. DÉTECTER TOUS LES PRODUITS D'ASSURANCE (CRITIQUE!)
-⚠️ TRÈS IMPORTANT: Une proposition ou police peut contenir PLUSIEURS produits!
-Exemple: Une proposition Swica peut inclure:
-- LAMal FAVORIT MEDPHARM (assurance de base obligatoire)
-- LCA COMPLETA TOP (complémentaire ambulatoire)
-- HOSPITA FLEX (hospitalisation)
-- INFORTUNA (accidents)
+## 2. DÉTECTER **TOUS** LES PRODUITS D'ASSURANCE (CRITIQUE — ZÉRO OUBLI!)
 
-Tu dois extraire CHAQUE produit séparément dans "products_detected" ou "new_products_detected".
-Chaque ligne de produit avec une prime = un produit séparé!
-Pour CHAQUE produit, indique la personne assurée concernée dans:
-- insured_person_name
-- insured_person_first_name
-- insured_person_last_name
-- insured_person_birthdate (si disponible)
+⚠️ RÈGLE ABSOLUE : si tu vois un nom de produit + une prime dans le document, c'est UN produit séparé. Tu DOIS l'extraire dans new_products_detected (ou old_products_detected pour les contrats résiliés / remplacés).
+
+Exemple type d'une proposition Swica complète — tu dois ressortir TOUS ces produits en lignes séparées :
+- LAMal FAVORIT MEDPHARM (base obligatoire)   → branch_code=LAMAL, accident_included=true|false
+- COMPLETA TOP / COMPLETA FORTE (ambulatoire) → branch_code=LCA
+- HOSPITA (hospitalisation commune / demi-privée / privée) → branch_code=LCA
+- DENTA (dentaire complémentaire) → branch_code=LCA
+- INFORTUNA / Accident complémentaire → branch_code=ACCIDENT
+
+Si la facture liste 5 produits avec 5 primes différentes, ton tableau new_products_detected DOIT contenir EXACTEMENT 5 entrées. Ne fusionne jamais. Ne résume jamais en "Pack complet".
+
+Pour CHAQUE produit, remplis OBLIGATOIREMENT :
+- product_name  (nom commercial exact — ex. "COMPLETA FORTE", "HOSPITA commune")
+- product_category  (LAMal | LCA | VIE | AUTO | NON-VIE | LAA | LPP | …)
+- branch_code   (LAMAL | LCA | VIE | LPP | AUTO | MENAGE_RC | JURIDIQUE | VOYAGE | ENTREPRISE | PGM | ACCIDENT | HYPO_CREDIT)
+- company       (nom de la compagnie, ex. "Swica")
+- premium_monthly  (prime mensuelle en CHF, nombre)
+- franchise     (LAMal/LCA santé seulement : 300/500/1000/1500/2000/2500)
+- accident_included  (booléen, OBLIGATOIRE pour les LAMal — true si la couverture accident est incluse, false sinon)
+- start_date / end_date / policy_number (si visibles)
+- insured_person_name / insured_person_first_name / insured_person_last_name / insured_person_birthdate (l'assuré concerné — un produit par assuré)
+- Pour les LCA d'hospitalisation, précise le niveau dans le product_name : "HOSPITA commune", "HOSPITA demi-privée", "HOSPITA privée"
+
 Ne fusionne jamais des produits appartenant à plusieurs assurés dans un seul objet.
+
+⚠️ Avant de finir, vérifie : si tu as vu plusieurs primes mensuelles distinctes dans le document mais qu'il n'y a qu'1 ou 2 entrées dans new_products_detected, c'est que tu en as oublié. Refais le travail.
 
 ## 3. DÉTECTER LES MEMBRES DE LA FAMILLE
 Si le dossier contient plusieurs personnes (conjoint, enfants):
