@@ -624,12 +624,47 @@ function normalizeParsedResult(value: unknown, fallbackFileName?: string): Parse
     ? Math.max(0, Math.min(1, record.quality_score))
     : 0;
 
+  // ⚠️ Some LLM responses use legacy French-prefixed field names
+  // ("nouvelle_compagnie", "nouveau_type_produit", "nouvelle_prime_mensuelle"...)
+  // instead of the canonical schema. Normalize them here so downstream code
+  // (DB persistence, wizard, ContractForm prefill) always sees the same shape.
+  function normalizeProduct(raw: any): ProductDetected {
+    if (!raw || typeof raw !== "object") return raw;
+    const parseAmount = (v: any): number | undefined => {
+      if (typeof v === "number" && isFinite(v)) return v;
+      if (typeof v === "string") {
+        const cleaned = v.replace(/[^\d.,-]/g, "").replace(/,/g, ".");
+        const n = parseFloat(cleaned);
+        return isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    };
+    return {
+      ...raw,
+      product_name: raw.product_name ?? raw.nouveau_type_produit ?? raw.type_produit ?? raw.name,
+      product_category: raw.product_category ?? raw.categorie_produit ?? raw.category,
+      company: raw.company ?? raw.nouvelle_compagnie ?? raw.compagnie,
+      premium_monthly: raw.premium_monthly ?? parseAmount(raw.nouvelle_prime_mensuelle) ?? parseAmount(raw.prime_mensuelle),
+      premium_yearly: raw.premium_yearly ?? parseAmount(raw.nouvelle_prime_annuelle) ?? parseAmount(raw.prime_annuelle),
+      franchise: raw.franchise ?? parseAmount(raw.nouvelle_franchise) ?? parseAmount(raw.franchise_annuelle),
+      start_date: raw.start_date ?? raw.nouvelle_date_debut ?? raw.date_debut,
+      end_date: raw.end_date ?? raw.nouvelle_date_de_fin ?? raw.date_de_fin ?? raw.date_fin,
+      policy_number: raw.policy_number ?? raw.nouveau_numero_police ?? raw.numero_police,
+      insured_person_name: raw.insured_person_name ?? raw.nom_assure ?? raw.titulaire,
+      insured_person_first_name: raw.insured_person_first_name ?? raw.prenom_assure,
+      insured_person_last_name: raw.insured_person_last_name ?? raw.nom_de_famille_assure,
+      insured_person_birthdate: raw.insured_person_birthdate ?? raw.date_naissance_assure,
+      branch_code: raw.branch_code ?? raw.code_branche,
+      accident_included: raw.accident_included ?? raw.accident_inclus,
+    };
+  }
+
   return {
     dossier_summary: typeof record.dossier_summary === "string" ? record.dossier_summary : undefined,
     documents_detected: ensureArray<DocumentDetected>(record.documents_detected),
-    products_detected: ensureArray<ProductDetected>(record.products_detected),
-    old_products_detected: ensureArray<ProductDetected>(record.old_products_detected),
-    new_products_detected: ensureArray<ProductDetected>(record.new_products_detected),
+    products_detected: ensureArray<ProductDetected>(record.products_detected).map(normalizeProduct),
+    old_products_detected: ensureArray<ProductDetected>(record.old_products_detected).map(normalizeProduct),
+    new_products_detected: ensureArray<ProductDetected>(record.new_products_detected).map(normalizeProduct),
     family_members_detected: ensureArray<FamilyMemberDetected>(record.family_members_detected),
     primary_holder: record.primary_holder && typeof record.primary_holder === "object"
       ? record.primary_holder as ParsedResult["primary_holder"]
