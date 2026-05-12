@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ const getCategoryOptions = (t: any) => [
 export default function CRMCompagnies() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -409,6 +411,9 @@ export default function CRMCompagnies() {
 
       setProductDialogOpen(false);
       await fetchCompanies();
+      // Invalidate the policies cache so contract cards on client pages
+      // immediately reflect the new branch/category for this product.
+      await queryClient.invalidateQueries({ queryKey: ['policies'] });
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } finally {
