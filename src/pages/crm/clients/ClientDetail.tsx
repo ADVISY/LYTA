@@ -933,7 +933,7 @@ export default function ClientDetail() {
                         // Branch chip — per-policy override wins, otherwise inherit
                         // from the product's branch, otherwise legacy fallback.
                         const branchFromProduct =
-                          (policy as any).tenant_branch
+                          (policy as any).policy_branch
                           || (policy.product as any)?.tenant_branch
                           || null;
 

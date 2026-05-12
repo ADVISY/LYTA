@@ -39,7 +39,8 @@ export type Policy = {
   client?: any;
   product?: any;
   partner?: any;
-  tenant_branch?: {
+  /** Per-policy branch override, joined as `policy_branch` in the query. */
+  policy_branch?: {
     id: string;
     code: string;
     name: string;
@@ -80,7 +81,7 @@ export function usePolicies() {
         .from('policies')
         .select(`
           *,
-          tenant_branch:tenant_branches (
+          policy_branch:tenant_branches!policies_tenant_branch_id_fkey (
             id,
             code,
             name,
