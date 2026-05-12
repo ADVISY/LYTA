@@ -803,11 +803,72 @@ export default function CRMCompagnies() {
             </div>
             <div className="space-y-2">
               <Label>{t('companyForm.logoUrl')}</Label>
-              <Input
-                value={companyForm.logo_url}
-                onChange={(e) => setCompanyForm(prev => ({ ...prev, logo_url: e.target.value }))}
-                placeholder={t('companyForm.logoUrlPlaceholder')}
-              />
+              <div className="flex items-center gap-3">
+                {/* Preview */}
+                <div className="h-14 w-14 rounded-lg border bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {companyForm.logo_url ? (
+                    <img
+                      src={companyForm.logo_url}
+                      alt="logo"
+                      className="max-h-12 max-w-12 object-contain"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Building2 className="h-6 w-6 text-muted-foreground" />
+                  )}
+                </div>
+                {/* Upload + URL input */}
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    id="company-logo-upload"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        toast({ title: "Fichier trop volumineux", description: "Maximum 2 Mo.", variant: "destructive" });
+                        return;
+                      }
+                      try {
+                        setSaving(true);
+                        const ext = file.name.split('.').pop() || 'png';
+                        const filePath = `companies/${crypto.randomUUID()}.${ext}`;
+                        const { error: upErr } = await supabase.storage
+                          .from('tenant-logos')
+                          .upload(filePath, file, { cacheControl: '3600', upsert: true });
+                        if (upErr) throw upErr;
+                        const { data: { publicUrl } } = supabase.storage.from('tenant-logos').getPublicUrl(filePath);
+                        setCompanyForm(prev => ({ ...prev, logo_url: publicUrl }));
+                        toast({ title: "Logo uploadé", description: "N'oublie pas d'enregistrer." });
+                      } catch (err: any) {
+                        toast({ title: "Erreur d'upload", description: err.message, variant: "destructive" });
+                      } finally {
+                        setSaving(false);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('company-logo-upload')?.click()}
+                    disabled={saving}
+                    className="w-full"
+                  >
+                    {saving ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
+                    Uploader un logo (PNG/JPG/SVG, max 2 Mo)
+                  </Button>
+                  <Input
+                    value={companyForm.logo_url}
+                    onChange={(e) => setCompanyForm(prev => ({ ...prev, logo_url: e.target.value }))}
+                    placeholder="…ou coller une URL d'image"
+                    className="text-xs"
+                  />
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>{t('companyForm.website')}</Label>

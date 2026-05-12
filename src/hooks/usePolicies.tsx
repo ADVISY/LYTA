@@ -141,12 +141,26 @@ export function usePolicies() {
 
   const deletePolicy = async (id: string) => {
     try {
-      const { error } = await supabase
+      // Use .select() to detect silent RLS blocks: a DELETE with no matching
+      // permitted row returns 0 rows WITHOUT raising an error.
+      const { data, error } = await supabase
         .from('policies')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
-      if (error) throw error;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('[deletePolicy] postgres error:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        // Silent block — usually RLS denying the operation
+        // eslint-disable-next-line no-console
+        console.error('[deletePolicy] no rows deleted (likely RLS). policyId=', id);
+        throw new Error('RLS_SILENT_BLOCK');
+      }
 
       toast({
         title: 'Police supprimée',
@@ -155,13 +169,15 @@ export function usePolicies() {
 
       refetch();
     } catch (error) {
-      // Surface the underlying reason so the broker can react (e.g. linked
-      // commissions/decomptes blocking the FK). The generic fallback used
-      // to swallow the real cause behind "Impossible de supprimer".
       const raw = getErrorMessage(error, '');
       let userMsg = translateError(raw) || raw;
-      if (/foreign key|violates|constraint/i.test(raw)) {
-        userMsg = "Ce contrat ne peut pas être supprimé car il est lié à d'autres éléments (commissions, décomptes, suivis). Supprime-les d'abord ou passe le statut du contrat à 'résilié'.";
+      if (raw === 'RLS_SILENT_BLOCK') {
+        userMsg = "La suppression a été bloquée par les permissions de sécurité (RLS). Ton compte n'a pas les droits pour supprimer ce contrat. Contacte un administrateur ou vérifie que tu as bien le rôle 'admin' sur ce cabinet.";
+      } else if (/foreign key|violates|constraint/i.test(raw)) {
+        // Try to extract the constraint name to help diagnose
+        const match = raw.match(/constraint "([^"]+)"/i);
+        const constraintName = match ? match[1] : 'inconnue';
+        userMsg = `Ce contrat est lié à d'autres éléments qui empêchent sa suppression (contrainte: ${constraintName}). Cause probable: commission(s) non encore réglée(s), décompte, ou suivi. Passe plutôt le statut à 'résilié' ou contacte le support.`;
       } else if (/row-level security|permission denied|rls/i.test(raw)) {
         userMsg = "Tu n'as pas les droits pour supprimer ce contrat (RLS). Vérifie ton rôle.";
       }
@@ -170,7 +186,6 @@ export function usePolicies() {
         description: userMsg || 'Impossible de supprimer le contrat',
         variant: 'destructive',
       });
-      // Log the full error for diagnostics
       // eslint-disable-next-line no-console
       console.error('[deletePolicy] failed:', error);
       throw error;
