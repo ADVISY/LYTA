@@ -6,6 +6,7 @@ import { translateError } from '@/lib/errorTranslations';
 import { ClientNotifications } from '@/lib/clientNotifications';
 import { savePolicy } from '@/lib/policiesApi';
 import { usePaginatedQuery } from './usePaginatedQuery';
+import { useQueryClient } from '@tanstack/react-query';
 
 export type Policy = {
   id: string;
@@ -50,6 +51,7 @@ export function usePolicies() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { tenantId, loading: tenantLoading } = useUserTenant();
+  const queryClient = useQueryClient();
 
   const {
     data: policies,
@@ -167,7 +169,17 @@ export function usePolicies() {
         description: "La police d'assurance a été supprimée avec succès",
       });
 
-      refetch();
+      // Optimistic local removal: strip the deleted row from any cached page
+      // BEFORE refetching. This guarantees the UI updates immediately even
+      // if the server takes a moment to propagate.
+      queryClient.setQueriesData<Policy[]>(
+        { queryKey: ['policies'] },
+        (old) => (Array.isArray(old) ? old.filter((p) => p.id !== id) : old),
+      );
+
+      // Hard refetch on top — replaces optimistic state with real server data.
+      await queryClient.invalidateQueries({ queryKey: ['policies'] });
+      await refetch();
     } catch (error) {
       const raw = getErrorMessage(error, '');
       let userMsg = translateError(raw) || raw;
