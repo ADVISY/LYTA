@@ -117,6 +117,34 @@ export interface ProductGroup {
   products: ProductDetected[];
 }
 
+/** Stable key for grouping insureds across the same person spelled
+ *  inconsistently by the IA. Sorted lowercase words + accent strip. */
+function insuredCanonical(p: ProductDetected): string {
+  const raw = [
+    p.insured_person_first_name,
+    p.insured_person_last_name,
+  ].filter(Boolean).join(" ").trim()
+    || (p.insured_person_name || "").trim()
+    || "Titulaire";
+  return raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(" ");
+}
+
+function companyCanonical(p: ProductDetected): string {
+  return (p.company || "Inconnue")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+}
+
 export function groupScannedProducts(products: ProductDetected[]): ProductGroup[] {
   if (!products.length) return [];
 
@@ -128,7 +156,9 @@ export function groupScannedProducts(products: ProductDetected[]): ProductGroup[
       p.insured_person_last_name,
     ].filter(Boolean).join(" ").trim() || (p.insured_person_name || "").trim() || "Titulaire";
 
-    const key = `${company.toLowerCase()}|${insured.toLowerCase()}`;
+    // Use canonical keys so "Maxime Rieben" and "Rieben Maxime" land in the
+    // same group, and so accent/casing differences don't split a contract.
+    const key = `${companyCanonical(p)}|${insuredCanonical(p)}`;
     if (!map.has(key)) {
       map.set(key, {
         key,
