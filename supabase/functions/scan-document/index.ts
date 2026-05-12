@@ -1327,7 +1327,11 @@ serve(async (req) => {
     // Determine main document type from detected documents
     const mainDocType = parsedResult.documents_detected?.[0]?.doc_type || 'autre';
 
-    // Update scan record with results
+    // Update scan record with results — including the structured AI output
+    // (documents_detected, new/old_products_detected, family, summary, …).
+    // These columns are required for the Smartflow wizard to surface detected
+    // contracts; without them the broker only saw the client form but no
+    // products to materialise.
     const { error: updateError } = await supabase
       .from("document_scans")
       .update({
@@ -1340,6 +1344,25 @@ serve(async (req) => {
         processing_time_ms: processingTime,
         ai_model_used: getAiModel(),
         updated_at: new Date().toISOString(),
+        // === structured AI output ===
+        dossier_summary: parsedResult.dossier_summary ?? null,
+        documents_detected: parsedResult.documents_detected ?? [],
+        new_products_detected: parsedResult.new_products_detected ?? [],
+        old_products_detected: parsedResult.old_products_detected ?? [],
+        family_members_detected: parsedResult.family_members_detected ?? [],
+        primary_holder: parsedResult.primary_holder ?? null,
+        has_multiple_products: !!parsedResult.has_multiple_products
+          || ((parsedResult.new_products_detected?.length ?? 0)
+              + (parsedResult.old_products_detected?.length ?? 0)) > 1,
+        has_family_members: !!parsedResult.has_family_members
+          || (parsedResult.family_members_detected?.length ?? 0) > 0,
+        has_old_policy: (parsedResult.old_products_detected?.length ?? 0) > 0,
+        has_new_policy: (parsedResult.new_products_detected?.length ?? 0) > 0,
+        has_termination: !!parsedResult.documents_detected?.some(
+          (d: any) => d?.doc_type === "resiliation",
+        ),
+        engagement_analysis: (parsedResult as any).engagement_analysis ?? null,
+        workflow_actions: (parsedResult as any).workflow_actions ?? [],
       })
       .eq("id", scanId);
 
