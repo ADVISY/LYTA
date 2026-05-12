@@ -152,11 +152,30 @@ const categoryColors: Record<string, string> = {
   other: "bg-gray-50 text-gray-800 border-gray-200",
 };
 
-// Helper to detect if a health product is LAMal or LCA
+// Helper to detect if a health product is LAMal or LCA based on its name.
+// Covers both generic labels ("LAMal", "Assurance de base", "obligatoire")
+// AND the actual commercial brand names used by Swiss insurers for their
+// LAMal alternative models. Without this list, a product called "Swica
+// Favorit Medpharm" or "Helsana BeneFit PLUS Flexmed" would be misclassified
+// as LCA in the ContractForm grouping.
+const LAMAL_BRAND_PATTERNS = [
+  /\blamal\b/, /\bkvg\b/,
+  /\bbase\b/, /\bobligatoire\b/, /\bassurance\s+(de\s+)?base\b/,
+  /\bfavorit\b/, /\bmedpharm\b/, /\btelmed\b/, /\bcasamed\b/, /\bpremed\b/,
+  /\bqualimed\b/, /\bbenefit\b/, /\bmonaca\b/,
+  /\bhmo\b/, /\bbasis\b/, /\bsmartcare\b/, /\btelfirst\b/, /\bcaremed\b/,
+  /\bflexcare\b/, /\bmycss\b/, /\bcompact one\b/, /\bcompact\b/, /\bcallmed\b/,
+  /\bmultiaccess\b/, /\bcasamed\b/, /\bkptwin\b/,
+  /\bmydoc\b/, /\bprimaflex\b/, /\boptimed\b/, /\bsanatel\b/, /\bprimapharma\b/,
+  /\bpharmed\b/, /\bpreventomed\b/, /\bqualimed\b/, /\bhausspital\b/, /\bfemina\b/,
+  /\bviva\b/, /\bmanaged care\b/, /\bmed direct\b/, /\btel doc\b/, /\btel care\b/,
+  /\bmed call\b/,
+];
+
 const isLamalProduct = (productName: string | null | undefined): boolean => {
   if (!productName) return false;
   const name = productName.toLowerCase();
-  return name.includes('lamal') || name.includes('base') || name.includes('obligatoire');
+  return LAMAL_BRAND_PATTERNS.some((re) => re.test(name));
 };
 
 // Helper to normalize category from database (handles legacy IA Scan values like 'LAMal', 'LCA')

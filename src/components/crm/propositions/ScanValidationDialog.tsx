@@ -515,7 +515,14 @@ export default function ScanValidationDialog({
       }
       if (familyMembers.length > 0 && clientId) {
         for (const fm of familyMembers) {
-          if (!fm?.first_name && !fm?.last_name) continue;
+          // Tight guard: require at least one usable name. Trim away whitespace
+          // so the IA never produces nameless client cards.
+          const fmFirstClean = String(fm?.first_name || "").trim();
+          const fmLastClean = String(fm?.last_name || "").trim();
+          if (!fmFirstClean && !fmLastClean) {
+            console.warn("[scan] family member skipped (no name)", fm);
+            continue;
+          }
 
           const fmBirthIso = (() => {
             const raw = fm.birthdate || fm.birth_date;
@@ -537,8 +544,8 @@ export default function ScanValidationDialog({
             .from("clients")
             .insert({
               tenant_id: tenantIdFromHook,
-              first_name: fm.first_name,
-              last_name: fm.last_name,
+              first_name: fmFirstClean || null,
+              last_name: fmLastClean || null,
               birthdate: fmBirthIso,
               gender: fmGender,
               nationality: fm.nationality ?? null,
@@ -552,10 +559,6 @@ export default function ScanValidationDialog({
             continue;
           }
           familyClientIds.push(fmClient.id);
-          // Map "FirstName LastName" → familyClient.id so the wizard can route
-          // each scanned contract to the right person's file.
-          const fmFullName = `${fm.first_name} ${fm.last_name}`.toLowerCase().trim();
-          if (fmFullName) familyMap[fmFullName] = fmClient.id;
 
           // Link this family member to the primary client (table family_members)
           const relation = (() => {
@@ -569,12 +572,16 @@ export default function ScanValidationDialog({
           await supabase.from("family_members").insert({
             client_id: clientId,
             linked_client_id: fmClient.id,
-            first_name: fm.first_name,
-            last_name: fm.last_name,
+            first_name: fmFirstClean || "—",
+            last_name: fmLastClean || "—",
             birth_date: fmBirthIso,
             relation_type: relation,
             nationality: fm.nationality ?? null,
           });
+
+          // Mapping uses whatever name parts the IA gave us.
+          const fmFullName = `${fmFirstClean} ${fmLastClean}`.toLowerCase().trim();
+          if (fmFullName) familyMap[fmFullName] = fmClient.id;
         }
 
         if (familyClientIds.length > 0) {
