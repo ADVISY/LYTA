@@ -942,25 +942,25 @@ export default function ClientDetail() {
                             }}
                           >
                             <div className="flex items-start gap-4">
-                              {/* Company logo */}
+                              {/* Company logo — initial is always rendered as fallback BACKGROUND,
+                                   img overlays it if it loads. If img fails (404 / CORS), we hide
+                                   it via onError and the initial remains visible. */}
                               <div className="flex-shrink-0">
-                                {companyLogoUrl ? (
-                                  <div className="h-12 w-12 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                                <div className="relative h-12 w-12 rounded-lg border bg-primary/10 text-primary flex items-center justify-center font-semibold overflow-hidden">
+                                  <span className="select-none">
+                                    {companyInitial !== '?' ? companyInitial : <Building2 className="h-5 w-5" />}
+                                  </span>
+                                  {companyLogoUrl ? (
                                     <img
                                       src={companyLogoUrl}
                                       alt={companyName}
-                                      className="max-h-10 max-w-10 object-contain"
+                                      className="absolute inset-0 h-full w-full object-contain bg-white p-1"
                                       onError={(e) => {
-                                        // Hide broken images and let the fallback render via parent
                                         (e.currentTarget as HTMLImageElement).style.display = 'none';
                                       }}
                                     />
-                                  </div>
-                                ) : (
-                                  <div className="h-12 w-12 rounded-lg border bg-primary/10 text-primary flex items-center justify-center font-semibold">
-                                    {companyInitial !== '?' ? companyInitial : <Building2 className="h-5 w-5" />}
-                                  </div>
-                                )}
+                                  ) : null}
+                                </div>
                               </div>
 
                               {/* Main info */}

@@ -155,11 +155,24 @@ export function usePolicies() {
 
       refetch();
     } catch (error) {
+      // Surface the underlying reason so the broker can react (e.g. linked
+      // commissions/decomptes blocking the FK). The generic fallback used
+      // to swallow the real cause behind "Impossible de supprimer".
+      const raw = getErrorMessage(error, '');
+      let userMsg = translateError(raw) || raw;
+      if (/foreign key|violates|constraint/i.test(raw)) {
+        userMsg = "Ce contrat ne peut pas être supprimé car il est lié à d'autres éléments (commissions, décomptes, suivis). Supprime-les d'abord ou passe le statut du contrat à 'résilié'.";
+      } else if (/row-level security|permission denied|rls/i.test(raw)) {
+        userMsg = "Tu n'as pas les droits pour supprimer ce contrat (RLS). Vérifie ton rôle.";
+      }
       toast({
-        title: 'Erreur',
-        description: translateError(getErrorMessage(error, 'Impossible de supprimer le contrat')),
+        title: 'Erreur de suppression',
+        description: userMsg || 'Impossible de supprimer le contrat',
         variant: 'destructive',
       });
+      // Log the full error for diagnostics
+      // eslint-disable-next-line no-console
+      console.error('[deletePolicy] failed:', error);
       throw error;
     }
   };
