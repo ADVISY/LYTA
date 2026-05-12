@@ -602,6 +602,84 @@ export default function ScanValidationDialog({
       });
     }
 
+    // === DOCUMENTS — attach every scanned file to the primary client =======
+    // The broker can re-attach individual files to specific policies later
+    // from the contract form, but auto-attaching to the client guarantees
+    // they're not lost.
+    if (clientId && Array.isArray(scan?.documents_detected)) {
+      const docRows = (scan.documents_detected as any[])
+        .filter((d) => d?.file_key && d?.file_name)
+        .map((d) => ({
+          owner_id: clientId,
+          owner_type: "client",
+          tenant_id: tenantIdFromHook,
+          file_key: d.file_key,
+          file_name: d.file_name,
+          mime_type: "application/pdf",
+          doc_kind: (() => {
+            const t = (d.doc_type || "").toLowerCase();
+            if (t === "police_active" || t === "nouvelle_police" || t === "ancienne_police") return "police";
+            if (t === "resiliation") return "resiliation";
+            if (t === "mandat_gestion") return "mandat_gestion";
+            if (t === "piece_identite") return "piece_identite";
+            if (t === "justificatif_domicile") return "justificatif_domicile";
+            if (t === "bulletin_salaire") return "bulletin_salaire";
+            if (t === "attestation") return "attestation";
+            if (t === "offre") return "offre";
+            if (t === "avenant") return "avenant";
+            return "autre";
+          })(),
+        }));
+
+      if (docRows.length > 0) {
+        const { error: docErr } = await supabase.from("documents").insert(docRows);
+        if (docErr) console.warn("[scan] docs attach failed", docErr);
+      }
+    }
+
+    // === SUIVIS — auto-create from suggested_followups / résiliation ======
+    if (clientId) {
+      const followups: Array<{ kind?: string; label?: string; due_date?: string; notes?: string }> =
+        ((scan as any)?.workflow_actions as any[] | undefined) || [];
+
+      // Also fire a default résiliation suivi if has_termination flag is true
+      const hasTerm = !!(scan as any)?.has_termination;
+      const allSuivis: typeof followups = [...followups];
+      if (hasTerm && !followups.some((f) => /resil/i.test(f.kind || ""))) {
+        allSuivis.push({
+          kind: "resiliation",
+          label: "Suivi résiliation — vérifier ancien contrat",
+          due_date: undefined,
+          notes: "Créé automatiquement depuis Smartflow (résiliation détectée dans le scan)",
+        });
+      }
+
+      if (allSuivis.length > 0) {
+        const suiviRows = allSuivis
+          .filter((f) => f.label || f.kind)
+          .map((f) => ({
+            tenant_id: tenantIdFromHook,
+            client_id: clientId,
+            title: f.label || f.kind || "Suivi Smartflow",
+            description: f.notes || null,
+            type: f.kind === "resiliation" ? "resiliation"
+              : f.kind === "renouvellement" ? "renouvellement"
+              : f.kind === "anniversaire" ? "anniversaire"
+              : "rappel",
+            status: "pending",
+            due_date: f.due_date || null,
+          }));
+        if (suiviRows.length > 0) {
+          const { error: suErr } = await supabase.from("suivis").insert(suiviRows);
+          if (suErr) console.warn("[scan] suivis create failed", suErr);
+          else toast({
+            title: `${suiviRows.length} suivi${suiviRows.length > 1 ? "s" : ""} créé${suiviRows.length > 1 ? "s" : ""}`,
+            description: "Visible dans la fiche client → onglet Suivis.",
+          });
+        }
+      }
+    }
+
     setBetaWizardClientId(clientId);
     setBetaFamilyClientMap(familyMap);
     setPendingCreates(null);  // mark as materialised → won't re-run

@@ -536,12 +536,23 @@ Retourne UNIQUEMENT le JSON, sans texte additionnel.`;
 function buildSingleDocumentSystemPrompt(): string {
   const today = new Date().toLocaleDateString('fr-CH');
 
-  return `Back-office assurance suisse. Sors UNIQUEMENT du JSON valide.
-Une ligne de prime = un produit. Précise l'assuré (insured_person_first_name + insured_person_last_name + insured_person_birthdate) à chaque produit.
-doc_type ∈ {police_active, ancienne_police, nouvelle_police, offre, avenant, resiliation, attestation, mandat_gestion, piece_identite, justificatif_domicile, bulletin_salaire, autre}.
-branch_code ∈ {LAMAL, LCA, PGM, ACCIDENT, VIE, LPP, AUTO, MENAGE_RC, JURIDIQUE, VOYAGE, ENTREPRISE, HYPO_CREDIT}.
-LAMal = base obligatoire (Favorit, BeneFit, KPTwin, BASIS, HMO, Telmed, etc.) → toujours branch_code=LAMAL + accident_included true/false.
-LCA = complémentaires (COMPLETA, HOSPITA, NATURA, DENTA, Pulse, etc.).
+  return `Back-office assurance suisse — CRM LYTA. Sors UNIQUEMENT du JSON valide.
+
+Tu extrais EXACTEMENT ce qu'il faut pour remplir le CRM:
+1. FICHE CLIENT (primary_holder + family_members): tous les champs visibles (nom, prénom, naissance, AVS, sexe, état civil, profession, employeur, permis, nationalité, adresse complète, NPA, localité, canton, téléphone, mobile, email).
+2. FICHE CONTRAT (new_products_detected + old_products_detected): toutes les lignes — chaque ligne de prime = un produit séparé. Champs: product_name, branch_code, company, insured_person_first_name, insured_person_last_name, premium_monthly, premium_yearly, franchise (LAMal/LCA), accident_included (LAMal), start_date, end_date, policy_number, notes.
+3. DOCUMENTS (documents_detected): un par fichier — doc_type + description + signature/date pour mandat.
+4. SUIVIS (suggested_followups): tableau d'événements importants à créer dans le CRM. Format: [{kind: 'resiliation'|'renouvellement'|'anniversaire'|'rappel', label, due_date, notes}]. Ex: si résiliation détectée → kind=resiliation avec due_date = date_resiliation.
+
+Règles:
+- Une ligne de prime = un produit. Toujours préciser l'assuré (insured_person_first_name + last_name + birthdate).
+- doc_type ∈ {police_active, ancienne_police, nouvelle_police, offre, avenant, resiliation, attestation, mandat_gestion, piece_identite, justificatif_domicile, bulletin_salaire, autre}.
+- branch_code ∈ {LAMAL, LCA, PGM, ACCIDENT, VIE, LPP, AUTO, MENAGE_RC, JURIDIQUE, VOYAGE, ENTREPRISE, HYPO_CREDIT}.
+- LAMal = base obligatoire (Favorit, BeneFit, KPTwin, BASIS, HMO, Telmed, MyCSS, etc.) → branch_code=LAMAL + accident_included obligatoire.
+- LCA = complémentaires (COMPLETA, HOSPITA, NATURA, DENTA, Pulse, MyFlex, etc.).
+- family_members: REQUIS first_name ET last_name non vides, sinon ne pas inclure.
+- "null" si info pas visible. Aucune valeur inventée.
+
 Date du jour: ${today}
 
 Retourne uniquement un JSON valide avec cette structure:
@@ -694,7 +705,11 @@ function normalizeParsedResult(value: unknown, fallbackFileName?: string): Parse
       : undefined,
     inconsistencies: ensureArray<string>(record.inconsistencies).filter((item) => typeof item === "string"),
     missing_documents: ensureArray<string>(record.missing_documents).filter((item) => typeof item === "string"),
-    workflow_actions: ensureArray<WorkflowAction>(record.workflow_actions),
+    // Accept both names: 'workflow_actions' (legacy) and 'suggested_followups'
+    // (new prompt). They map to the same structure.
+    workflow_actions: ensureArray<WorkflowAction>(
+      record.workflow_actions || record.suggested_followups,
+    ),
     quality_score: qualityScore,
     fields,
   };
