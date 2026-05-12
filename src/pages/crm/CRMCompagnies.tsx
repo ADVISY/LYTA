@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserTenant } from "@/hooks/useUserTenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,7 @@ export default function CRMCompagnies() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { tenantId } = useUserTenant();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -403,9 +405,12 @@ export default function CRMCompagnies() {
         }
         toast({ title: "Succès", description: "Produit modifié" });
       } else {
+        if (!tenantId) {
+          throw new Error("Tenant introuvable — impossible de créer le produit.");
+        }
         const { error } = await supabase
           .from('insurance_products')
-          .insert({ ...productData, company_id: productCompanyId });
+          .insert({ ...productData, company_id: productCompanyId, tenant_id: tenantId });
         if (error) throw error;
         toast({ title: "Succès", description: "Produit créé" });
       }
