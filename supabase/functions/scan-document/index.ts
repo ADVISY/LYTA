@@ -141,8 +141,11 @@ type SingleAnalysisFailure = {
 
 type SingleAnalysisOutcome = SingleAnalysisSuccess | SingleAnalysisFailure;
 
-const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 75000;
-const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 6;
+// 75s × retry × 6 in parallel pushed Habib's dossiers over 120s. Cut the
+// per-file budget aggressively: gpt-5-mini handles single PDFs in 12-25s
+// when the prompt is tight, so 50s is plenty even with one retry.
+const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 50000;
+const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 4;
 const DEFAULT_PRODUCT_MATCH_CONCURRENCY = 6;
 
 function readPositiveIntegerEnv(

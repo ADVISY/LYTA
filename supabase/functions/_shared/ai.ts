@@ -1,9 +1,10 @@
 const DEFAULT_AI_GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
-// Upgraded from "gpt-5-mini" → "gpt-5" because the mini model was timing
-// out on multi-PDF dossiers with the detailed extraction prompt (Habib
-// observed only 1/4 files getting analysed). Override via AI_MODEL env if
-// you need a cheaper / smaller model for testing.
-const DEFAULT_AI_MODEL = "gpt-5";
+// Back to gpt-5-mini — gpt-5 was reliable but too slow (Habib reported
+// analyses over 120s). Mini handles a single insurance PDF in 12-25s
+// when the prompt is tight + the DB-side fuzzy matching compensates for
+// the smaller model's accuracy gap. Override via AI_MODEL env if you
+// need the larger model for a specific deployment.
+const DEFAULT_AI_MODEL = "gpt-5-mini";
 
 export class AiTimeoutError extends Error {
   readonly timeoutMs: number;
@@ -131,7 +132,7 @@ export async function buildAiError(response: Response): Promise<Error> {
 
 export async function fetchAiChatCompletions(
   payload: Record<string, unknown>,
-  timeoutMs = 60000,
+  timeoutMs = 45000,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
