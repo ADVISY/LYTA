@@ -88,7 +88,7 @@ export function usePolicies() {
               name,
               logo_url
             ),
-            tenant_branch:tenant_branches!insurance_products_tenant_branch_id_fkey (
+            tenant_branch:tenant_branches (
               id,
               code,
               name,

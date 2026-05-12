@@ -590,7 +590,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         .from('insurance_products')
         .select(`
           id, name, category, company_id, tenant_branch_id,
-          tenant_branch:tenant_branches!insurance_products_tenant_branch_id_fkey (
+          tenant_branch:tenant_branches (
             id, code, name, icon, color
           )
         `)
