@@ -40,10 +40,21 @@ const INSURANCE_COMPANY_ALIASES: Record<string, string> = {
   "zurich assurances": "zurich-assurances",
 };
 
+// Common company-form suffixes that should be stripped to improve matching.
+// e.g. "Assura SA", "Helsana AG", "Swica Assurances", "Groupe Mutuel Holding"
+// should all resolve to their bare brand name in the catalog.
+const COMPANY_SUFFIXES = [
+  "sa", "ag", "sarl", "gmbh", "ltd", "limited",
+  "assurance", "assurances", "versicherung", "versicherungen",
+  "insurance", "insurances",
+  "holding", "group", "groupe", "gruppe",
+  "suisse", "switzerland", "schweiz", "ch",
+];
+
 function normalizeInsuranceCompanyName(name?: string | null) {
   if (!name) return "";
 
-  return name
+  let cleaned = name
     .trim()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -52,14 +63,45 @@ function normalizeInsuranceCompanyName(name?: string | null) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  // Strip known trailing suffixes \u2014 iteratively, so "Assura SA Assurances"
+  // collapses to "assura". Order doesn't matter, but we cap iterations to
+  // avoid pathological loops.
+  for (let i = 0; i < 4; i++) {
+    let stripped = false;
+    for (const suffix of COMPANY_SUFFIXES) {
+      const re = new RegExp(`\\s${suffix}$`);
+      if (re.test(cleaned)) {
+        cleaned = cleaned.replace(re, "").trim();
+        stripped = true;
+      }
+    }
+    if (!stripped) break;
+  }
+
+  return cleaned;
 }
 
 export function getLocalInsuranceCompanyLogo(name?: string | null) {
   const normalized = normalizeInsuranceCompanyName(name);
   if (!normalized) return null;
 
+  // Try alias first, then the slug form, then a final pass with no suffix at all
   const slug =
     INSURANCE_COMPANY_ALIASES[normalized] || normalized.replace(/\s+/g, "-");
 
-  return LOCAL_INSURANCE_COMPANY_LOGOS[slug] || null;
+  if (LOCAL_INSURANCE_COMPANY_LOGOS[slug]) {
+    return LOCAL_INSURANCE_COMPANY_LOGOS[slug];
+  }
+
+  // Last-resort: try the first word alone (catches "Assura Standard" \u2192 "assura")
+  const firstWord = normalized.split(" ")[0];
+  if (firstWord && firstWord !== slug) {
+    const firstWordSlug = INSURANCE_COMPANY_ALIASES[firstWord] || firstWord;
+    if (LOCAL_INSURANCE_COMPANY_LOGOS[firstWordSlug]) {
+      return LOCAL_INSURANCE_COMPANY_LOGOS[firstWordSlug];
+    }
+  }
+
+  return null;
 }
