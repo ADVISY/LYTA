@@ -195,6 +195,7 @@ export default function ScanValidationDialog({
   const [betaWizardOpen, setBetaWizardOpen] = useState(false);
   const [betaWizardClientId, setBetaWizardClientId] = useState<string | null>(null);
   const [betaResolvingClient, setBetaResolvingClient] = useState(false);
+  const [betaFamilyClientMap, setBetaFamilyClientMap] = useState<Record<string, string>>({});
 
   const logAudit = async (
     tenantId: string | null,
@@ -499,7 +500,93 @@ export default function ScanValidationDialog({
         });
       }
 
+      // === FAMILY MEMBERS ==================================================
+      // For every family member detected by the IA, create a SEPARATE client
+      // record (per Habib's spec: a family of 4 = 4 client cards) and link
+      // them to the primary client via the family_members table so the
+      // primary's "Famille" tab shows them.
+      const familyMembers = (scan.family_members_detected || []) as any[];
+      const familyClientIds: string[] = [];
+      const familyMap: Record<string, string> = {};
+      // Always map the primary's own name to the primary client id, so contracts
+      // where the insured_person_name matches the primary holder route correctly.
+      if (firstName && lastName && clientId) {
+        familyMap[`${firstName} ${lastName}`.toLowerCase().trim()] = clientId;
+      }
+      if (familyMembers.length > 0 && clientId) {
+        for (const fm of familyMembers) {
+          if (!fm?.first_name && !fm?.last_name) continue;
+
+          const fmBirthIso = (() => {
+            const raw = fm.birthdate || fm.birth_date;
+            if (!raw) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            const m = String(raw).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+            if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+            return null;
+          })();
+
+          const fmGender = (() => {
+            const g = (fm.gender || fm.sexe || "").toString().toLowerCase();
+            if (/^(m|h|homme|male|masculin)$/i.test(g)) return "male";
+            if (/^(f|femme|female|feminin|féminin)$/i.test(g)) return "female";
+            return null;
+          })();
+
+          const { data: fmClient, error: fmErr } = await supabase
+            .from("clients")
+            .insert({
+              tenant_id: tenantIdFromHook,
+              first_name: fm.first_name,
+              last_name: fm.last_name,
+              birthdate: fmBirthIso,
+              gender: fmGender,
+              nationality: fm.nationality ?? null,
+              status: "actif",
+            })
+            .select("id")
+            .single();
+
+          if (fmErr || !fmClient?.id) {
+            console.warn("[scan] family member client create failed", fmErr);
+            continue;
+          }
+          familyClientIds.push(fmClient.id);
+          // Map "FirstName LastName" → familyClient.id so the wizard can route
+          // each scanned contract to the right person's file.
+          const fmFullName = `${fm.first_name} ${fm.last_name}`.toLowerCase().trim();
+          if (fmFullName) familyMap[fmFullName] = fmClient.id;
+
+          // Link this family member to the primary client (table family_members)
+          const relation = (() => {
+            const r = (fm.relationship || fm.relation_type || "").toString().toLowerCase();
+            if (/conjoint|époux|epouse|partenaire|spouse/i.test(r)) return "conjoint";
+            if (/enfant|fils|fille|child/i.test(r)) return "enfant";
+            if (/parent|père|pere|mère|mere/i.test(r)) return "parent";
+            return "autre";
+          })();
+
+          await supabase.from("family_members").insert({
+            client_id: clientId,
+            linked_client_id: fmClient.id,
+            first_name: fm.first_name,
+            last_name: fm.last_name,
+            birth_date: fmBirthIso,
+            relation_type: relation,
+            nationality: fm.nationality ?? null,
+          });
+        }
+
+        if (familyClientIds.length > 0) {
+          toast({
+            title: `${familyClientIds.length} membre${familyClientIds.length > 1 ? "s" : ""} de famille créé${familyClientIds.length > 1 ? "s" : ""}`,
+            description: "Chacun aura sa propre fiche et ses propres contrats.",
+          });
+        }
+      }
+
       setBetaWizardClientId(clientId);
+      setBetaFamilyClientMap(familyMap);
       setBetaWizardOpen(true);
     } finally {
       setBetaResolvingClient(false);
@@ -2316,6 +2403,7 @@ export default function ScanValidationDialog({
           onOpenChange={setBetaWizardOpen}
           scan={scan}
           clientId={betaWizardClientId}
+          familyClientMap={betaFamilyClientMap}
           products={scan.new_products_detected || []}
           hasResiliation={!!(scan.has_termination || (scan.fields || []).some(f => f.field_category === 'termination'))}
           onAllDone={handleBetaWizardDone}

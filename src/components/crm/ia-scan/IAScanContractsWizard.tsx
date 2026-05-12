@@ -46,12 +46,20 @@ import {
   type ProductGroup,
 } from "./scanToContractPrefill";
 
+/** Map of insured-person-name (lowercased, trimmed) → client_id. Used to
+ *  route each contract to the right person in a family scan. */
+export type InsuredPersonClientMap = Record<string, string>;
+
 export interface IAScanContractsWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scan: PendingScan;
-  /** Resolved client id. Must be non-null — the wizard creates contracts FOR a client, so the client must already exist. */
+  /** Primary client (the responsable de famille / titulaire principal). */
   clientId: string | null;
+  /** Optional: family members each as their own client. Used to route the
+   *  per-contract "client_id" so each insured person gets contracts on
+   *  their own card. Key = lowercased "FirstName LastName". */
+  familyClientMap?: InsuredPersonClientMap;
   /** Which set of products to materialise. Typically scan.new_products_detected. */
   products: ProductDetected[];
   /** Whether the scan included a résiliation doc → fire a suivi after each contract is created. */
@@ -65,6 +73,7 @@ export function IAScanContractsWizard({
   onOpenChange,
   scan,
   clientId,
+  familyClientMap,
   products,
   hasResiliation = false,
   onAllDone,
@@ -74,6 +83,14 @@ export function IAScanContractsWizard({
     () => groupScannedProducts(products),
     [products],
   );
+
+  // Resolve the client id for a given group's insured person
+  const resolveClientForGroup = (group: ProductGroup): string | null => {
+    if (!familyClientMap) return clientId;
+    const key = (group.insuredName || "").trim().toLowerCase();
+    if (key && familyClientMap[key]) return familyClientMap[key];
+    return clientId;
+  };
 
   // 2. Per-group lifecycle: pending → opened → done
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -257,16 +274,22 @@ export function IAScanContractsWizard({
         </DialogContent>
       </Dialog>
 
-      {/* The active ContractForm — same component as manual creation */}
-      {currentGroup && currentPrefill && (
-        <ContractForm
-          clientId={clientId}
-          open={contractFormOpen}
-          onOpenChange={setContractFormOpen}
-          onSuccess={handleGroupSuccess}
-          prefill={currentPrefill}
-        />
-      )}
+      {/* The active ContractForm — same component as manual creation.
+          clientId is resolved per-group: in a family scan, each group's
+          insured person routes to their own client card. */}
+      {currentGroup && currentPrefill && (() => {
+        const groupClientId = resolveClientForGroup(currentGroup);
+        if (!groupClientId) return null;
+        return (
+          <ContractForm
+            clientId={groupClientId}
+            open={contractFormOpen}
+            onOpenChange={setContractFormOpen}
+            onSuccess={handleGroupSuccess}
+            prefill={currentPrefill}
+          />
+        );
+      })()}
     </>
   );
 }
