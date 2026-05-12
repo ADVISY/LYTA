@@ -505,24 +505,57 @@ export default function ScanValidationDialog({
       // record (per Habib's spec: a family of 4 = 4 client cards) and link
       // them to the primary client via the family_members table so the
       // primary's "Famille" tab shows them.
-      const familyMembers = (scan.family_members_detected || []) as any[];
+      const familyMembersRaw = (scan.family_members_detected || []) as any[];
       const familyClientIds: string[] = [];
       const familyMap: Record<string, string> = {};
+
+      // Build a canonical key (sorted lowercase words, no accents) so the
+      // same person spelled different ways collapses to one entry.
+      const canonName = (first?: string | null, last?: string | null) => {
+        const raw = `${first ?? ""} ${last ?? ""}`
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9 ]+/g, " ")
+          .split(/\s+/)
+          .filter(Boolean)
+          .sort()
+          .join(" ");
+        return raw;
+      };
+      const primaryKey = canonName(firstName, lastName);
+
       // Always map the primary's own name to the primary client id, so contracts
       // where the insured_person_name matches the primary holder route correctly.
-      if (firstName && lastName && clientId) {
-        familyMap[`${firstName} ${lastName}`.toLowerCase().trim()] = clientId;
+      if (primaryKey && clientId) {
+        familyMap[primaryKey] = clientId;
       }
+
+      // Strict filter + dedup pass:
+      //   - require BOTH first_name AND last_name non-empty (skip "Mr Rieben" rows)
+      //   - drop duplicates of the same canonical name
+      //   - drop family rows that match the primary holder (same person, no clone)
+      const seen = new Set<string>([primaryKey].filter(Boolean));
+      const familyMembers = familyMembersRaw.filter((fm: any) => {
+        const f = String(fm?.first_name || "").trim();
+        const l = String(fm?.last_name || "").trim();
+        if (!f || !l) {
+          console.warn("[scan] family member dropped (incomplete name)", fm);
+          return false;
+        }
+        const key = canonName(f, l);
+        if (seen.has(key)) {
+          console.warn("[scan] family member dropped (duplicate of primary or another member)", fm);
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+
       if (familyMembers.length > 0 && clientId) {
         for (const fm of familyMembers) {
-          // Tight guard: require at least one usable name. Trim away whitespace
-          // so the IA never produces nameless client cards.
           const fmFirstClean = String(fm?.first_name || "").trim();
           const fmLastClean = String(fm?.last_name || "").trim();
-          if (!fmFirstClean && !fmLastClean) {
-            console.warn("[scan] family member skipped (no name)", fm);
-            continue;
-          }
 
           const fmBirthIso = (() => {
             const raw = fm.birthdate || fm.birth_date;
