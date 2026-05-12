@@ -64,6 +64,11 @@ export interface IAScanContractsWizardProps {
   products: ProductDetected[];
   /** Whether the scan included a résiliation doc → fire a suivi after each contract is created. */
   hasResiliation?: boolean;
+  /** Lazy materialiser: when set, the wizard calls this BEFORE the first
+   *  ContractForm opens. It performs the deferred DB inserts (primary +
+   *  family clients) and returns the resolved clientId + familyMap. Until
+   *  the broker clicks the first "Démarrer", nothing is written. */
+  onMaterialise?: () => Promise<{ clientId: string | null; familyMap: InsuredPersonClientMap }>;
   /** Called when all groups have been validated (or the user explicitly closes the wizard). */
   onAllDone: (createdPolicyIds: string[]) => void;
 }
@@ -76,8 +81,21 @@ export function IAScanContractsWizard({
   familyClientMap,
   products,
   hasResiliation = false,
+  onMaterialise,
   onAllDone,
 }: IAScanContractsWizardProps) {
+  // Lazy state: when onMaterialise is provided, we don't have a clientId
+  // until the broker clicks "Démarrer" on the first group. We then call
+  // onMaterialise() to perform the deferred inserts and stash the result.
+  const [materialisedClientId, setMaterialisedClientId] = useState<string | null>(clientId);
+  const [materialisedFamilyMap, setMaterialisedFamilyMap] = useState<InsuredPersonClientMap>(familyClientMap || {});
+  const [isMaterialising, setIsMaterialising] = useState(false);
+
+  // Re-sync when props change (e.g. scan switched)
+  useEffect(() => {
+    setMaterialisedClientId(clientId);
+    setMaterialisedFamilyMap(familyClientMap || {});
+  }, [clientId, familyClientMap]);
   // 1. Compute product groups (one ContractForm per coherent unit)
   const groups = useMemo<ProductGroup[]>(
     () => groupScannedProducts(products),
@@ -86,10 +104,14 @@ export function IAScanContractsWizard({
 
   // Resolve the client id for a given group's insured person
   const resolveClientForGroup = (group: ProductGroup): string | null => {
-    if (!familyClientMap) return clientId;
+    const canonKey = (group.insuredName || "")
+      .toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
+    if (canonKey && materialisedFamilyMap[canonKey]) return materialisedFamilyMap[canonKey];
+    // Fallback: legacy non-canonical key
     const key = (group.insuredName || "").trim().toLowerCase();
-    if (key && familyClientMap[key]) return familyClientMap[key];
-    return clientId;
+    if (key && materialisedFamilyMap[key]) return materialisedFamilyMap[key];
+    return materialisedClientId;
   };
 
   // 2. Per-group lifecycle: pending → opened → done
@@ -110,7 +132,25 @@ export function IAScanContractsWizard({
 
   const allDone = groups.length > 0 && doneIndexes.size === groups.length;
 
-  const handleStartGroup = (index: number) => {
+  const handleStartGroup = async (index: number) => {
+    // Lazy materialisation: if onMaterialise is set and we haven't created
+    // the primary client yet (or no client id is known), do it now —
+    // before opening the ContractForm. This guarantees that closing the
+    // wizard BEFORE this click leaves the DB untouched.
+    if (onMaterialise && !materialisedClientId) {
+      setIsMaterialising(true);
+      try {
+        const result = await onMaterialise();
+        if (!result.clientId) {
+          // Materialisation failed (toast already shown by parent)
+          return;
+        }
+        setMaterialisedClientId(result.clientId);
+        setMaterialisedFamilyMap(result.familyMap);
+      } finally {
+        setIsMaterialising(false);
+      }
+    }
     setCurrentIndex(index);
     setContractFormOpen(true);
   };
@@ -144,8 +184,10 @@ export function IAScanContractsWizard({
 
   // No mandat check at all — flow direct creation as requested by Habib.
 
-  // No client id → can't create contracts (should have been handled upstream, but guard)
-  if (!clientId) {
+  // No clientId AND no lazy materialiser → genuinely can't create contracts.
+  // With a materialiser we ARE allowed to render (client will be created at
+  // first 'Démarrer' click).
+  if (!materialisedClientId && !onMaterialise) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>

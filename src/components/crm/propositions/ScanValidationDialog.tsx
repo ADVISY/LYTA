@@ -196,6 +196,15 @@ export default function ScanValidationDialog({
   const [betaWizardClientId, setBetaWizardClientId] = useState<string | null>(null);
   const [betaResolvingClient, setBetaResolvingClient] = useState(false);
   const [betaFamilyClientMap, setBetaFamilyClientMap] = useState<Record<string, string>>({});
+  // Lazy creation state: prepared in openBetaWizard, executed only when the
+  // broker confirms by starting the first contract group. If they close the
+  // wizard before that, NOTHING is written to the DB.
+  const [pendingCreates, setPendingCreates] = useState<{
+    existingClientId: string | null;
+    primaryPayload: Record<string, unknown> | null;
+    familyPayloads: Array<{ payload: Record<string, unknown>; relation: string; fullNameLower: string }>;
+    primaryFullNameLower: string;
+  } | null>(null);
 
   const logAudit = async (
     tenantId: string | null,
@@ -380,7 +389,13 @@ export default function ScanValidationDialog({
     if (!scan || !tenantIdFromHook) return;
     setBetaResolvingClient(true);
     try {
-      // Helper: pull a value from scan fields by any of several aliases.
+      // ============================================================
+      // LAZY: this function NEVER inserts into the DB. It only
+      // prepares the payloads and resolves existing matches. The
+      // actual inserts happen at the first 'Démarrer' click in the
+      // wizard via materialiseBetaPendingCreates(). If the broker
+      // closes the wizard before that, NOTHING is written.
+      // ============================================================
       const getField = (names: string[]): string | null => {
         for (const n of names) {
           const f = scan.fields.find(
@@ -395,242 +410,202 @@ export default function ScanValidationDialog({
       const lastName = getField(["nom", "last_name"]);
       const firstName = getField(["prenom", "prénom", "first_name"]);
 
-      // --- 1. Try to match an existing client (email > name > phone) ---
-      let clientId: string | null = null;
+      // 1. Resolve an EXISTING client (no insert)
+      let existingClientId: string | null = null;
       if (email) {
         const { data } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("tenant_id", tenantIdFromHook)
-          .ilike("email", email)
-          .limit(1)
-          .maybeSingle();
-        if (data?.id) clientId = data.id;
+          .from("clients").select("id")
+          .eq("tenant_id", tenantIdFromHook).ilike("email", email)
+          .limit(1).maybeSingle();
+        if (data?.id) existingClientId = data.id;
       }
-      if (!clientId && lastName && firstName) {
+      if (!existingClientId && lastName && firstName) {
         const { data } = await supabase
-          .from("clients")
-          .select("id")
+          .from("clients").select("id")
           .eq("tenant_id", tenantIdFromHook)
-          .ilike("last_name", lastName)
-          .ilike("first_name", firstName)
-          .limit(1)
-          .maybeSingle();
-        if (data?.id) clientId = data.id;
+          .ilike("last_name", lastName).ilike("first_name", firstName)
+          .limit(1).maybeSingle();
+        if (data?.id) existingClientId = data.id;
       }
-      if (!clientId && phone) {
+      if (!existingClientId && phone) {
         const phoneClean = phone.replace(/\s+/g, "");
         const { data } = await supabase
-          .from("clients")
-          .select("id")
+          .from("clients").select("id")
           .eq("tenant_id", tenantIdFromHook)
           .ilike("phone", `%${phoneClean.slice(-8)}%`)
-          .limit(1)
-          .maybeSingle();
-        if (data?.id) clientId = data.id;
+          .limit(1).maybeSingle();
+        if (data?.id) existingClientId = data.id;
       }
 
-      // --- 2. If no match, create the client from scan fields ---
-      if (!clientId) {
-        const rawGender = getField(["genre", "sexe", "gender"]);
-        const normalizedGender =
-          rawGender && /^(m|h|homme|male|masculin)$/i.test(rawGender)
-            ? "male"
-            : rawGender && /^(f|femme|female|feminin|féminin)$/i.test(rawGender)
-              ? "female"
-              : null;
+      // 2. Build the primary client payload (no insert yet)
+      const rawGender = getField(["genre", "sexe", "gender"]);
+      const normalizedGender =
+        rawGender && /^(m|h|homme|male|masculin)$/i.test(rawGender) ? "male"
+          : rawGender && /^(f|femme|female|feminin|féminin)$/i.test(rawGender) ? "female"
+          : null;
+      const birthRaw = getField(["date_naissance", "birthdate", "ddn"]);
+      const birthIso = (() => {
+        if (!birthRaw) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(birthRaw)) return birthRaw;
+        const m = birthRaw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+        if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+        return null;
+      })();
+      const willHaveActiveContract =
+        (scan.new_products_detected && scan.new_products_detected.length > 0) || false;
 
-        const birthRaw = getField(["date_naissance", "birthdate", "ddn"]);
-        const birthIso = (() => {
-          if (!birthRaw) return null;
-          if (/^\d{4}-\d{2}-\d{2}$/.test(birthRaw)) return birthRaw;
-          const m = birthRaw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+      const primaryPayload = existingClientId ? null : {
+        tenant_id: tenantIdFromHook,
+        last_name: lastName,
+        first_name: firstName,
+        email,
+        phone,
+        mobile: getField(["mobile"]),
+        address: getField(["adresse", "address"]),
+        postal_code: getField(["npa", "code_postal", "postal_code"]),
+        city: getField(["localite", "localité", "city", "ville"]),
+        canton: getField(["canton"]),
+        nationality: getField(["nationalite", "nationalité", "nationality"]),
+        civil_status: getField(["etat_civil", "civil_status"]),
+        profession: getField(["profession"]),
+        employer: getField(["employeur", "employer"]),
+        permit_type: getField(["permis", "permit_type"]),
+        gender: normalizedGender,
+        birthdate: birthIso,
+        status: willHaveActiveContract ? "actif" : "prospect",
+      };
+
+      // 3. Build family member payloads (no insert) with strict dedup
+      const canonName = (first?: string | null, last?: string | null) => {
+        return `${first ?? ""} ${last ?? ""}`
+          .toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean)
+          .sort().join(" ");
+      };
+      const primaryFullNameLower = canonName(firstName, lastName);
+      const familyMembersRaw = (scan.family_members_detected || []) as any[];
+      const seen = new Set<string>([primaryFullNameLower].filter(Boolean));
+      const familyPayloads: Array<{ payload: Record<string, unknown>; relation: string; fullNameLower: string }> = [];
+
+      for (const fm of familyMembersRaw) {
+        const f = String(fm?.first_name || "").trim();
+        const l = String(fm?.last_name || "").trim();
+        if (!f || !l) continue;  // skip nameless
+        const key = canonName(f, l);
+        if (seen.has(key)) continue;  // dedup + skip primary clone
+        seen.add(key);
+
+        const fmBirthIso = (() => {
+          const raw = fm.birthdate || fm.birth_date;
+          if (!raw) return null;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+          const m = String(raw).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
           if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
           return null;
         })();
+        const fmGender = (() => {
+          const g = (fm.gender || fm.sexe || "").toString().toLowerCase();
+          if (/^(m|h|homme|male|masculin)$/i.test(g)) return "male";
+          if (/^(f|femme|female|feminin|féminin)$/i.test(g)) return "female";
+          return null;
+        })();
+        const relation = (() => {
+          const r = (fm.relationship || fm.relation_type || "").toString().toLowerCase();
+          if (/conjoint|époux|epouse|partenaire|spouse/i.test(r)) return "conjoint";
+          if (/enfant|fils|fille|child/i.test(r)) return "enfant";
+          if (/parent|père|pere|mère|mere/i.test(r)) return "parent";
+          return "autre";
+        })();
 
-        const willHaveActiveContract =
-          (scan.new_products_detected && scan.new_products_detected.length > 0) || false;
-
-        const newClient = {
-          tenant_id: tenantIdFromHook,
-          last_name: lastName,
-          first_name: firstName,
-          email,
-          phone,
-          mobile: getField(["mobile"]),
-          address: getField(["adresse", "address"]),
-          postal_code: getField(["npa", "code_postal", "postal_code"]),
-          city: getField(["localite", "localité", "city", "ville"]),
-          canton: getField(["canton"]),
-          nationality: getField(["nationalite", "nationalité", "nationality"]),
-          civil_status: getField(["etat_civil", "civil_status"]),
-          profession: getField(["profession"]),
-          employer: getField(["employeur", "employer"]),
-          permit_type: getField(["permis", "permit_type"]),
-          gender: normalizedGender,
-          birthdate: birthIso,
-          status: willHaveActiveContract ? "actif" : "prospect",
-        };
-
-        const { data: created, error: createErr } = await supabase
-          .from("clients")
-          .insert(newClient)
-          .select("id")
-          .single();
-
-        if (createErr || !created?.id) {
-          toast({
-            title: "Échec de création du client",
-            description: createErr?.message || "Impossible de créer la fiche client depuis le scan.",
-            variant: "destructive",
-          });
-          return;
-        }
-        clientId = created.id;
-
-        await logAudit(tenantIdFromHook, "create", "client", clientId, {
-          source: "ia_scan_wizard",
-          scan_id: scan.id,
-        });
-
-        toast({
-          title: "Fiche client créée",
-          description: `${firstName ?? ""} ${lastName ?? ""}`.trim() || "Nouveau client créé depuis le scan.",
-        });
-      }
-
-      // === FAMILY MEMBERS ==================================================
-      // For every family member detected by the IA, create a SEPARATE client
-      // record (per Habib's spec: a family of 4 = 4 client cards) and link
-      // them to the primary client via the family_members table so the
-      // primary's "Famille" tab shows them.
-      const familyMembersRaw = (scan.family_members_detected || []) as any[];
-      const familyClientIds: string[] = [];
-      const familyMap: Record<string, string> = {};
-
-      // Build a canonical key (sorted lowercase words, no accents) so the
-      // same person spelled different ways collapses to one entry.
-      const canonName = (first?: string | null, last?: string | null) => {
-        const raw = `${first ?? ""} ${last ?? ""}`
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[̀-ͯ]/g, "")
-          .replace(/[^a-z0-9 ]+/g, " ")
-          .split(/\s+/)
-          .filter(Boolean)
-          .sort()
-          .join(" ");
-        return raw;
-      };
-      const primaryKey = canonName(firstName, lastName);
-
-      // Always map the primary's own name to the primary client id, so contracts
-      // where the insured_person_name matches the primary holder route correctly.
-      if (primaryKey && clientId) {
-        familyMap[primaryKey] = clientId;
-      }
-
-      // Strict filter + dedup pass:
-      //   - require BOTH first_name AND last_name non-empty (skip "Mr Rieben" rows)
-      //   - drop duplicates of the same canonical name
-      //   - drop family rows that match the primary holder (same person, no clone)
-      const seen = new Set<string>([primaryKey].filter(Boolean));
-      const familyMembers = familyMembersRaw.filter((fm: any) => {
-        const f = String(fm?.first_name || "").trim();
-        const l = String(fm?.last_name || "").trim();
-        if (!f || !l) {
-          console.warn("[scan] family member dropped (incomplete name)", fm);
-          return false;
-        }
-        const key = canonName(f, l);
-        if (seen.has(key)) {
-          console.warn("[scan] family member dropped (duplicate of primary or another member)", fm);
-          return false;
-        }
-        seen.add(key);
-        return true;
-      });
-
-      if (familyMembers.length > 0 && clientId) {
-        for (const fm of familyMembers) {
-          const fmFirstClean = String(fm?.first_name || "").trim();
-          const fmLastClean = String(fm?.last_name || "").trim();
-
-          const fmBirthIso = (() => {
-            const raw = fm.birthdate || fm.birth_date;
-            if (!raw) return null;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-            const m = String(raw).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
-            if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-            return null;
-          })();
-
-          const fmGender = (() => {
-            const g = (fm.gender || fm.sexe || "").toString().toLowerCase();
-            if (/^(m|h|homme|male|masculin)$/i.test(g)) return "male";
-            if (/^(f|femme|female|feminin|féminin)$/i.test(g)) return "female";
-            return null;
-          })();
-
-          const { data: fmClient, error: fmErr } = await supabase
-            .from("clients")
-            .insert({
-              tenant_id: tenantIdFromHook,
-              first_name: fmFirstClean || null,
-              last_name: fmLastClean || null,
-              birthdate: fmBirthIso,
-              gender: fmGender,
-              nationality: fm.nationality ?? null,
-              status: "actif",
-            })
-            .select("id")
-            .single();
-
-          if (fmErr || !fmClient?.id) {
-            console.warn("[scan] family member client create failed", fmErr);
-            continue;
-          }
-          familyClientIds.push(fmClient.id);
-
-          // Link this family member to the primary client (table family_members)
-          const relation = (() => {
-            const r = (fm.relationship || fm.relation_type || "").toString().toLowerCase();
-            if (/conjoint|époux|epouse|partenaire|spouse/i.test(r)) return "conjoint";
-            if (/enfant|fils|fille|child/i.test(r)) return "enfant";
-            if (/parent|père|pere|mère|mere/i.test(r)) return "parent";
-            return "autre";
-          })();
-
-          await supabase.from("family_members").insert({
-            client_id: clientId,
-            linked_client_id: fmClient.id,
-            first_name: fmFirstClean || "—",
-            last_name: fmLastClean || "—",
-            birth_date: fmBirthIso,
-            relation_type: relation,
+        familyPayloads.push({
+          payload: {
+            tenant_id: tenantIdFromHook,
+            first_name: f,
+            last_name: l,
+            birthdate: fmBirthIso,
+            gender: fmGender,
             nationality: fm.nationality ?? null,
-          });
-
-          // Mapping uses whatever name parts the IA gave us.
-          const fmFullName = `${fmFirstClean} ${fmLastClean}`.toLowerCase().trim();
-          if (fmFullName) familyMap[fmFullName] = fmClient.id;
-        }
-
-        if (familyClientIds.length > 0) {
-          toast({
-            title: `${familyClientIds.length} membre${familyClientIds.length > 1 ? "s" : ""} de famille créé${familyClientIds.length > 1 ? "s" : ""}`,
-            description: "Chacun aura sa propre fiche et ses propres contrats.",
-          });
-        }
+            status: "actif",
+            __fmBirthIso: fmBirthIso,  // for the family_members link row
+          } as any,
+          relation,
+          fullNameLower: key,
+        });
       }
 
-      setBetaWizardClientId(clientId);
-      setBetaFamilyClientMap(familyMap);
+      // 4. Stash the prepared payloads — DB inserts deferred until first 'Démarrer'.
+      setPendingCreates({
+        existingClientId,
+        primaryPayload,
+        familyPayloads,
+        primaryFullNameLower,
+      });
+      setBetaWizardClientId(existingClientId);  // null if not yet created
+      setBetaFamilyClientMap({});  // filled at materialise time
       setBetaWizardOpen(true);
     } finally {
       setBetaResolvingClient(false);
     }
+  };
+
+  /** Lazy insert: runs at first 'Démarrer' click in the wizard. Idempotent. */
+  const materialiseBetaPendingCreates = async (): Promise<{ clientId: string | null; familyMap: Record<string, string> }> => {
+    if (!pendingCreates || !tenantIdFromHook) {
+      return { clientId: betaWizardClientId, familyMap: betaFamilyClientMap };
+    }
+    const { existingClientId, primaryPayload, familyPayloads, primaryFullNameLower } = pendingCreates;
+    let clientId = existingClientId;
+
+    // Already materialised?
+    if (!primaryPayload && existingClientId && Object.keys(betaFamilyClientMap).length >= (familyPayloads.length + (primaryFullNameLower ? 1 : 0))) {
+      return { clientId: existingClientId, familyMap: betaFamilyClientMap };
+    }
+
+    if (!clientId && primaryPayload) {
+      const { data: created, error } = await supabase.from("clients").insert(primaryPayload).select("id").single();
+      if (error || !created?.id) {
+        toast({ title: "Échec de création du client", description: error?.message || "", variant: "destructive" });
+        return { clientId: null, familyMap: {} };
+      }
+      clientId = created.id;
+      await logAudit(tenantIdFromHook, "create", "client", clientId, { source: "ia_scan_wizard", scan_id: scan!.id });
+      toast({ title: "Fiche client créée", description: `${primaryPayload.first_name ?? ""} ${primaryPayload.last_name ?? ""}`.trim() });
+    }
+
+    const familyMap: Record<string, string> = {};
+    if (clientId && primaryFullNameLower) familyMap[primaryFullNameLower] = clientId;
+
+    for (const fp of familyPayloads) {
+      const { payload, relation, fullNameLower } = fp;
+      const { __fmBirthIso, ...cleanPayload } = payload as any;
+      const { data: fmClient, error: fmErr } = await supabase.from("clients").insert(cleanPayload).select("id").single();
+      if (fmErr || !fmClient?.id) {
+        console.warn("[scan] family member client create failed", fmErr);
+        continue;
+      }
+      await supabase.from("family_members").insert({
+        client_id: clientId,
+        linked_client_id: fmClient.id,
+        first_name: cleanPayload.first_name,
+        last_name: cleanPayload.last_name,
+        birth_date: __fmBirthIso ?? null,
+        relation_type: relation,
+        nationality: cleanPayload.nationality ?? null,
+      });
+      familyMap[fullNameLower] = fmClient.id;
+    }
+
+    if (familyPayloads.length > 0) {
+      toast({
+        title: `${familyPayloads.length} membre${familyPayloads.length > 1 ? "s" : ""} de famille créé${familyPayloads.length > 1 ? "s" : ""}`,
+        description: "Chacun aura sa propre fiche et ses propres contrats.",
+      });
+    }
+
+    setBetaWizardClientId(clientId);
+    setBetaFamilyClientMap(familyMap);
+    setPendingCreates(null);  // mark as materialised → won't re-run
+    return { clientId, familyMap };
   };
 
   const handleBetaWizardDone = (createdPolicyIds: string[]) => {
@@ -2436,16 +2411,23 @@ export default function ScanValidationDialog({
         </div>
       </DialogContent>
 
-      {/* F5 wizard: opens the same ContractForm as manual creation, pre-filled */}
+      {/* F5 wizard: opens the same ContractForm as manual creation, pre-filled.
+          onMaterialise = lazy DB inserts at first 'Démarrer' click. */}
       {scan && (
         <IAScanContractsWizard
           open={betaWizardOpen}
-          onOpenChange={setBetaWizardOpen}
+          onOpenChange={(open) => {
+            setBetaWizardOpen(open);
+            // If broker closes without materialising, clear the pending state
+            // so a re-open re-resolves cleanly.
+            if (!open) setPendingCreates(null);
+          }}
           scan={scan}
           clientId={betaWizardClientId}
           familyClientMap={betaFamilyClientMap}
           products={scan.new_products_detected || []}
           hasResiliation={!!(scan.has_termination || (scan.fields || []).some(f => f.field_category === 'termination'))}
+          onMaterialise={pendingCreates ? materialiseBetaPendingCreates : undefined}
           onAllDone={handleBetaWizardDone}
         />
       )}
