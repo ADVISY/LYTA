@@ -132,7 +132,7 @@ export async function buildAiError(response: Response): Promise<Error> {
 
 export async function fetchAiChatCompletions(
   payload: Record<string, unknown>,
-  timeoutMs = 45000,
+  timeoutMs = 70000,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

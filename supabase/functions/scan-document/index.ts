@@ -141,10 +141,11 @@ type SingleAnalysisFailure = {
 
 type SingleAnalysisOutcome = SingleAnalysisSuccess | SingleAnalysisFailure;
 
-// Smartflow speed-first config. Tight prompt + small model + high
-// concurrency. Most insurance PDFs return in 8-15s with this setup.
-const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 35000;
-const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 8;
+// 35s was too tight on multi-page contract PDFs (Habib's SWICA dossier
+// had 3 of 4 files timeout). 70s gives gpt-5-mini enough room for big
+// contracts while still bounding worst-case to ~140s with 1 retry.
+const DEFAULT_SCAN_DOCUMENT_TIMEOUT_MS = 70000;
+const DEFAULT_SCAN_DOCUMENT_CONCURRENCY = 6;
 const DEFAULT_PRODUCT_MATCH_CONCURRENCY = 6;
 
 function readPositiveIntegerEnv(
