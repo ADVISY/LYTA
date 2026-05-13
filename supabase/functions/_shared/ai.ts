@@ -1,10 +1,10 @@
 const DEFAULT_AI_GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
-// Back to gpt-5-mini — gpt-5 was reliable but too slow (Habib reported
-// analyses over 120s). Mini handles a single insurance PDF in 12-25s
-// when the prompt is tight + the DB-side fuzzy matching compensates for
-// the smaller model's accuracy gap. Override via AI_MODEL env if you
-// need the larger model for a specific deployment.
-const DEFAULT_AI_MODEL = "gpt-5-mini";
+// gpt-5 (full, not mini). Mini was failing on multi-page insurance
+// contracts with "No response from AI" — it silently refused to process
+// big scanned PDFs. Logs from Habib's 2026-05-12 SWICA scan showed 3/4
+// files failing this way. The full model handles them reliably at the
+// cost of ~2-3x OpenAI billing. Override via AI_MODEL env.
+const DEFAULT_AI_MODEL = "gpt-5";
 
 export class AiTimeoutError extends Error {
   readonly timeoutMs: number;
