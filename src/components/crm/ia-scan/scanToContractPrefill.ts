@@ -89,8 +89,17 @@ export function scanToContractFormPrefill(
   // (so a future operator can audit the original extraction).
   const traceabilityNote = `Pré-rempli via IA Scan (${scan.id})`;
 
+  // Strip corporate suffixes ("SWICA Assurance-maladie SA" → "SWICA") so the
+  // ContractForm's company match doesn't fail on legal-entity variations.
+  const companyName = (() => {
+    const canon = companyCanonical(first);
+    return canon
+      ? canon.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+      : first.company || "";
+  })();
+
   return {
-    companyName: first.company,  // ContractForm.applyPrefill resolves to companyId via fuzzy match
+    companyName,
     startDate,
     status: options.status || "active",
     notes: traceabilityNote,
@@ -137,12 +146,38 @@ function insuredCanonical(p: ProductDetected): string {
     .join(" ");
 }
 
+/** Canonical company key that strips corporate suffixes so
+ *  "SWICA Assurance-maladie SA" and "SWICA Assurances SA" collapse to
+ *  "swica" — the broker sees a single contract with LAMal+LCA bundled. */
 function companyCanonical(p: ProductDetected): string {
-  return (p.company || "Inconnue")
+  let s = (p.company || "Inconnue")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+
+  // Iteratively strip trailing corporate suffixes
+  const suffixes = [
+    "sa", "ag", "sarl", "gmbh", "ltd", "limited",
+    "assurance", "assurances", "assurance maladie", "assurance-maladie",
+    "versicherung", "versicherungen", "insurance", "insurances",
+    "holding", "group", "groupe", "gruppe",
+    "suisse", "switzerland", "schweiz", "ch",
+  ];
+  for (let i = 0; i < 6; i++) {
+    let stripped = false;
+    for (const suffix of suffixes) {
+      const re = new RegExp(`\\s${suffix}$`);
+      if (re.test(s)) {
+        s = s.replace(re, "").trim();
+        stripped = true;
+      }
+    }
+    if (!stripped) break;
+  }
+  return s;
 }
 
 export function groupScannedProducts(products: ProductDetected[]): ProductGroup[] {
@@ -150,20 +185,23 @@ export function groupScannedProducts(products: ProductDetected[]): ProductGroup[
 
   const map = new Map<string, ProductGroup>();
   for (const p of products) {
-    const company = (p.company || "Inconnue").trim();
+    // Display the canonical (suffix-free) form to the broker so "SWICA"
+    // appears once, not "SWICA Assurance-maladie SA" + "SWICA Assurances SA".
+    const companyCanon = companyCanonical(p);
+    const companyDisplay = companyCanon
+      ? companyCanon.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+      : (p.company || "Inconnue").trim();
     const insured = [
       p.insured_person_first_name,
       p.insured_person_last_name,
     ].filter(Boolean).join(" ").trim() || (p.insured_person_name || "").trim() || "Titulaire";
 
-    // Use canonical keys so "Maxime Rieben" and "Rieben Maxime" land in the
-    // same group, and so accent/casing differences don't split a contract.
-    const key = `${companyCanonical(p)}|${insuredCanonical(p)}`;
+    const key = `${companyCanon}|${insuredCanonical(p)}`;
     if (!map.has(key)) {
       map.set(key, {
         key,
-        label: `${insured} — ${company}`,
-        company,
+        label: `${insured} — ${companyDisplay}`,
+        company: companyDisplay,
         insuredName: insured,
         products: [],
       });

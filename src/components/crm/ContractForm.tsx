@@ -526,12 +526,46 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       if (exists) resolvedCompanyId = exists.id;
     }
     if (!resolvedCompanyId && data.companyName) {
-      const target = data.companyName.trim().toLowerCase();
+      // Normalise: strip accents + corporate suffixes ("SA", "AG",
+      // "Assurance-maladie", etc.) so "SWICA Assurance-maladie SA"
+      // matches "Swica" in the catalog.
+      const stripSuffixes = (s: string) => {
+        let out = s
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9 ]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const sfx = [
+          "sa", "ag", "sarl", "gmbh", "ltd",
+          "assurance", "assurances", "assurance maladie", "assurance-maladie",
+          "versicherung", "versicherungen", "insurance",
+          "holding", "group", "groupe", "suisse",
+        ];
+        for (let i = 0; i < 6; i++) {
+          let stripped = false;
+          for (const f of sfx) {
+            const re = new RegExp(`\\s${f}$`);
+            if (re.test(out)) { out = out.replace(re, "").trim(); stripped = true; }
+          }
+          if (!stripped) break;
+        }
+        return out;
+      };
+      const target = stripSuffixes(data.companyName);
       const hit =
-        companies.find((c) => c.name.trim().toLowerCase() === target) ||
+        // Exact match on normalised name
+        companies.find((c) => stripSuffixes(c.name) === target) ||
+        // First-word match (catches "Vaudoise" matching "La Vaudoise")
         companies.find((c) => {
-          const n = c.name.trim().toLowerCase();
-          return n.includes(target) || target.includes(n);
+          const cNorm = stripSuffixes(c.name);
+          return cNorm && target && (cNorm.startsWith(target) || target.startsWith(cNorm));
+        }) ||
+        // Substring fallback
+        companies.find((c) => {
+          const cNorm = stripSuffixes(c.name);
+          return cNorm.includes(target) || target.includes(cNorm);
         });
       if (hit) resolvedCompanyId = hit.id;
     }
@@ -553,28 +587,65 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       setLamalAccidentIncluded(data.lamalAccidentIncluded);
     }
 
-    // 4. Map each extracted line into a SelectedProduct entry. Try to
-    //    resolve productId by name within the resolved company; fall
-    //    back to a "ghost" product (productId="") whose name + category
-    //    still drive the UI groupings.
+    // 4. Map each extracted line into a SelectedProduct entry. Match
+    //    against the catalog using a tolerant normaliser: strip accents,
+    //    drop the company prefix (so "Swica Favorit Medpharm" matches
+    //    "Favorit Medpharm"), and try several strategies in order
+    //    (exact > prefix match > substring > first-word).
     if (data.products && data.products.length > 0) {
+      // Normaliser that strips company prefix + accents + punctuation
+      const normProduct = (s: string) => {
+        let out = (s || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9 ]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const companyPrefixes = [
+          "swica", "helsana", "sanitas", "css", "concordia", "atupri", "assura",
+          "sympany", "visana", "kpt", "cpt", "groupe mutuel", "gm",
+          "swiss life", "helvetia", "baloise", "generali", "axa", "zurich",
+          "la mobiliere", "mobiliere", "la vaudoise", "vaudoise", "pax",
+          "liechtenstein life", "zugerberg finanz", "zugerberg",
+        ];
+        for (const p of companyPrefixes) {
+          const re = new RegExp(`^${p}\\s+`);
+          if (re.test(out)) out = out.replace(re, "");
+        }
+        return out;
+      };
+
       const productsToSelect: SelectedProduct[] = data.products.map((p) => {
-        const targetName = (p.productName ?? "").trim().toLowerCase();
+        const targetName = normProduct(p.productName ?? "");
         let resolvedProductId = p.productId ?? "";
         let resolvedName = p.productName ?? "Produit";
         let resolvedCategory = normalizeCategoryFromDB(p.category);
+
         if (!resolvedProductId && targetName) {
           const candidates = allProducts.filter(
-            (pr) =>
-              !resolvedCompanyId || pr.company_id === resolvedCompanyId,
+            (pr) => !resolvedCompanyId || pr.company_id === resolvedCompanyId,
           );
           const hit =
-            candidates.find(
-              (pr) => pr.name.trim().toLowerCase() === targetName,
-            ) ||
+            // 1. Exact normalised match
+            candidates.find((pr) => normProduct(pr.name) === targetName) ||
+            // 2. Catalog name contains target (prefix)
+            candidates.find((pr) => normProduct(pr.name).startsWith(targetName)) ||
+            // 3. Target contains catalog name
             candidates.find((pr) => {
-              const n = pr.name.trim().toLowerCase();
+              const n = normProduct(pr.name);
+              return n && targetName.startsWith(n);
+            }) ||
+            // 4. Substring fallback
+            candidates.find((pr) => {
+              const n = normProduct(pr.name);
               return n.includes(targetName) || targetName.includes(n);
+            }) ||
+            // 5. First-word match (last resort: "Favorit" matches "Swica Favorit Medpharm")
+            candidates.find((pr) => {
+              const n = normProduct(pr.name);
+              const firstWord = targetName.split(" ")[0];
+              return firstWord && firstWord.length >= 4 && n.includes(firstWord);
             });
           if (hit) {
             resolvedProductId = hit.id;
@@ -583,8 +654,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           }
         }
         // If the scan tagged this as LAMal explicitly, force the
-        // category to "health" so the LAMal grouping picks it up,
-        // even if the matched product is mis-categorized in catalog.
+        // category to "health" so the LAMal grouping picks it up.
         if (p.isLamal) resolvedCategory = "health";
 
         return {
@@ -592,14 +662,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           productId: resolvedProductId,
           name: resolvedName,
           category: resolvedCategory,
-          premium:
-            typeof p.premium === "number" ? String(p.premium) : "",
-          deductible:
-            typeof p.deductible === "number" ? String(p.deductible) : "",
-          durationYears:
-            typeof p.durationYears === "number"
-              ? String(p.durationYears)
-              : "",
+          premium: typeof p.premium === "number" ? String(p.premium) : "",
+          deductible: typeof p.deductible === "number" ? String(p.deductible) : "",
+          durationYears: typeof p.durationYears === "number" ? String(p.durationYears) : "",
         };
       });
       setSelectedProducts(productsToSelect);
