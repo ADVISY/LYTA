@@ -93,6 +93,10 @@ export interface ContractFormPrefill {
     durationYears?: number;
     /** Hint: this line is a LAMal product (overrides isLamalProduct heuristic) */
     isLamal?: boolean;
+    /** Canonical branch code (LAMAL / LCA / VIE / AUTO / …) from the IA or
+     *  catalog match. Used by the categorisation in priority over the
+     *  legacy 'category' field. */
+    branchCode?: string;
   }>;
   /** Global LAMal fields when scan detected a LAMal product */
   lamalPremium?: number;
@@ -693,6 +697,14 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         if (p.isLamal) {
           resolvedCategory = "health";
           if (!resolvedBranchCode) resolvedBranchCode = "LAMAL";
+        }
+        // If the scan provided a branchCode and the catalog match didn't
+        // give us one, trust the scan's value — this fixes products
+        // detected by the IA but not yet matched against the catalog
+        // (e.g. a brand-new HOSPITA variant) which would otherwise fall
+        // back to the legacy category and land in the wrong section.
+        if (!resolvedBranchCode && p.branchCode) {
+          resolvedBranchCode = p.branchCode;
         }
 
         return {

@@ -92,6 +92,7 @@ export function scanToContractFormPrefill(
       deductible: p.franchise,
       durationYears: undefined,  // not extracted by IA today; user fills if life
       isLamal: isLamal(p),
+      branchCode: branchCode || undefined,  // propagate so categorizedSelection routes correctly
     };
   });
 

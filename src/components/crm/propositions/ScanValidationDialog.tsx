@@ -398,19 +398,26 @@ export default function ScanValidationDialog({
       // wizard via materialiseBetaPendingCreates(). If the broker
       // closes the wizard before that, NOTHING is written.
       // ============================================================
+      // Read both from scan.fields (correct prop names: field_name +
+      // extracted_value / validated_value) AND from scan.primary_holder
+      // (the IA also stores the holder identity there, sometimes with
+      // info that's not in fields).
       const getField = (names: string[]): string | null => {
         for (const n of names) {
-          const f = scan.fields.find(
-            (ff) => ff.name?.toLowerCase() === n.toLowerCase() && ff.value,
+          const target = n.toLowerCase();
+          const f = (scan.fields || []).find(
+            (ff: any) => (ff.field_name || ff.name || "").toLowerCase() === target,
           );
-          if (f?.value) return f.value.trim();
+          const raw = f?.validated_value ?? f?.extracted_value ?? f?.value;
+          if (typeof raw === "string" && raw.trim()) return raw.trim();
         }
         return null;
       };
-      const email = getField(["email", "e-mail", "courriel"]);
-      const phone = getField(["telephone", "téléphone", "phone", "mobile"]);
-      const lastName = getField(["nom", "last_name"]);
-      const firstName = getField(["prenom", "prénom", "first_name"]);
+      const primary: any = (scan as any).primary_holder || {};
+      const email = getField(["email", "e-mail", "courriel"]) || primary.email || null;
+      const phone = getField(["telephone", "téléphone", "phone", "mobile"]) || primary.phone || null;
+      const lastName = getField(["nom", "last_name"]) || primary.last_name || null;
+      const firstName = getField(["prenom", "prénom", "first_name"]) || primary.first_name || null;
 
       // 1. Resolve an EXISTING client (no insert)
       let existingClientId: string | null = null;
@@ -456,22 +463,26 @@ export default function ScanValidationDialog({
       const willHaveActiveContract =
         (scan.new_products_detected && scan.new_products_detected.length > 0) || false;
 
+      // Every field: try scan.fields first, fall back to primary_holder JSONB.
+      const fieldOrPrimary = (names: string[], primaryKey?: string) =>
+        getField(names) || (primaryKey ? (primary[primaryKey] ?? null) : null);
+
       const primaryPayload = existingClientId ? null : {
         tenant_id: tenantIdFromHook,
         last_name: lastName,
         first_name: firstName,
         email,
         phone,
-        mobile: getField(["mobile"]),
-        address: getField(["adresse", "address"]),
-        postal_code: getField(["npa", "code_postal", "postal_code"]),
-        city: getField(["localite", "localité", "city", "ville"]),
-        canton: getField(["canton"]),
-        nationality: getField(["nationalite", "nationalité", "nationality"]),
-        civil_status: getField(["etat_civil", "civil_status"]),
-        profession: getField(["profession"]),
-        employer: getField(["employeur", "employer"]),
-        permit_type: getField(["permis", "permit_type"]),
+        mobile: fieldOrPrimary(["mobile"], "mobile"),
+        address: fieldOrPrimary(["adresse", "address"], "address"),
+        postal_code: fieldOrPrimary(["npa", "code_postal", "postal_code"], "postal_code"),
+        city: fieldOrPrimary(["localite", "localité", "city", "ville"], "city"),
+        canton: fieldOrPrimary(["canton"], "canton"),
+        nationality: fieldOrPrimary(["nationalite", "nationalité", "nationality"], "nationality"),
+        civil_status: fieldOrPrimary(["etat_civil", "civil_status"], "civil_status"),
+        profession: fieldOrPrimary(["profession"], "profession"),
+        employer: fieldOrPrimary(["employeur", "employer"], "employer"),
+        permit_type: fieldOrPrimary(["permis", "permit_type"], "permit_type"),
         gender: normalizedGender,
         birthdate: birthIso,
         status: willHaveActiveContract ? "actif" : "prospect",
