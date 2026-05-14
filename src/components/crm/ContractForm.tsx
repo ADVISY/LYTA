@@ -635,6 +635,25 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         let resolvedCategory = normalizeCategoryFromDB(p.category);
         let resolvedBranchCode: string | undefined;
 
+        // ✨ FAST PATH: the server already matched this product against the
+        // catalog (via find_product_by_alias with trigram fuzzy match). Trust
+        // that result — use the catalog product as the source of truth for
+        // name, category, branch, AND the company on the contract.
+        if (resolvedProductId) {
+          const catalogRow = allProducts.find((pr) => pr.id === resolvedProductId);
+          if (catalogRow) {
+            resolvedName = catalogRow.name;
+            resolvedCategory = normalizeCategoryFromDB(catalogRow.category);
+            resolvedBranchCode = (catalogRow.tenant_branch as any)?.code;
+            // Override the company too — the IA may have returned a legal
+            // entity name, but the catalog row knows the canonical one.
+            if (catalogRow.company_id && !resolvedCompanyId) {
+              resolvedCompanyId = catalogRow.company_id;
+              setSelectedCompanyId(resolvedCompanyId);
+            }
+          }
+        }
+
         if (!resolvedProductId && targetName) {
           const candidates = allProducts.filter(
             (pr) => !resolvedCompanyId || pr.company_id === resolvedCompanyId,
