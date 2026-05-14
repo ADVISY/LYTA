@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -176,6 +177,7 @@ export default function ScanValidationDialog({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { tenantId: tenantIdFromHook, loading: tenantLoading } = useUserTenant();
+  const queryClient = useQueryClient();
 
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -655,6 +657,8 @@ export default function ScanValidationDialog({
       }
 
       if (allSuivis.length > 0) {
+        // Schema constraints on suivis: status ∈ {ouvert, en_cours, fermé},
+        // date column is reminder_date (not due_date).
         const suiviRows = allSuivis
           .filter((f) => f.label || f.kind)
           .map((f) => ({
@@ -666,16 +670,19 @@ export default function ScanValidationDialog({
               : f.kind === "renouvellement" ? "renouvellement"
               : f.kind === "anniversaire" ? "anniversaire"
               : "rappel",
-            status: "pending",
-            due_date: f.due_date || null,
+            status: "ouvert",
+            reminder_date: f.due_date || null,
           }));
         if (suiviRows.length > 0) {
           const { error: suErr } = await supabase.from("suivis").insert(suiviRows);
-          if (suErr) console.warn("[scan] suivis create failed", suErr);
-          else toast({
-            title: `${suiviRows.length} suivi${suiviRows.length > 1 ? "s" : ""} créé${suiviRows.length > 1 ? "s" : ""}`,
-            description: "Visible dans la fiche client → onglet Suivis.",
-          });
+          if (suErr) {
+            console.warn("[scan] suivis create failed", suErr);
+          } else {
+            toast({
+              title: `${suiviRows.length} suivi${suiviRows.length > 1 ? "s" : ""} créé${suiviRows.length > 1 ? "s" : ""}`,
+              description: "Visible dans la fiche client → onglet Suivis.",
+            });
+          }
         }
       }
     }
@@ -683,6 +690,17 @@ export default function ScanValidationDialog({
     setBetaWizardClientId(clientId);
     setBetaFamilyClientMap(familyMap);
     setPendingCreates(null);  // mark as materialised → won't re-run
+
+    // Refresh every list that may now show the new client / family /
+    // documents / suivis so the broker sees them right away (without a
+    // page reload).
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["clients"] }),
+      queryClient.invalidateQueries({ queryKey: ["family_members"] }),
+      queryClient.invalidateQueries({ queryKey: ["documents"] }),
+      queryClient.invalidateQueries({ queryKey: ["suivis"] }),
+    ]);
+
     return { clientId, familyMap };
   };
 
