@@ -810,24 +810,38 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     setLamalFranchise("");
   };
 
-  // Categorize selected products safely
+  // Categorize selected products safely.
+  // Source of truth: branchCode (from catalog) > legacy category.
+  // Without this, a product with category='multirisque' but branchCode='LCA'
+  // landed in "other" instead of the health/LCA section.
   const categorizedSelection = useMemo(() => {
-    const safeProducts = (selectedProducts || []).filter(p => p?.id && p?.category);
-    const health = safeProducts.filter(p => p.category === 'health');
-    const life = safeProducts.filter(p => p.category === 'life');
-    const other = safeProducts.filter(p => p.category !== 'health' && p.category !== 'life');
-    
-    // Prefer the catalog's branch_code (authoritative) over the
-    // name-regex isLamalProduct() check (heuristic). Falls back to the
-    // regex when no branchCode is set (e.g. manual entry).
+    const safeProducts = (selectedProducts || []).filter((p) => p?.id);
+
+    const bucketOf = (p: SelectedProduct): 'health' | 'life' | 'other' => {
+      const branch = p.branchCode;
+      if (branch === 'LAMAL' || branch === 'LCA' || branch === 'PGM' || branch === 'ACCIDENT') return 'health';
+      if (branch === 'VIE' || branch === 'LPP') return 'life';
+      if (branch === 'AUTO' || branch === 'MENAGE_RC' || branch === 'JURIDIQUE' ||
+          branch === 'VOYAGE' || branch === 'ENTREPRISE' || branch === 'HYPO_CREDIT') return 'other';
+      // Fallback to legacy category for products with no branch yet
+      if (p.category === 'health') return 'health';
+      if (p.category === 'life') return 'life';
+      return 'other';
+    };
+
+    const health = safeProducts.filter((p) => bucketOf(p) === 'health');
+    const life = safeProducts.filter((p) => bucketOf(p) === 'life');
+    const other = safeProducts.filter((p) => bucketOf(p) === 'other');
+
+    // LAMal vs LCA inside the health bucket — also branch-driven.
     const isLamalRow = (p: SelectedProduct) => {
       if (p.branchCode === 'LAMAL') return true;
-      if (p.branchCode === 'LCA') return false;
+      if (p.branchCode === 'LCA' || p.branchCode === 'PGM' || p.branchCode === 'ACCIDENT') return false;
       return !!(p.name && isLamalProduct(p.name));
     };
     const healthLamal = health.filter(isLamalRow);
     const healthLca = health.filter((p) => !isLamalRow(p));
-    
+
     return { healthLamal, healthLca, life, other, health };
   }, [selectedProducts]);
 

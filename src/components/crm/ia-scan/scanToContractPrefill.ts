@@ -63,10 +63,20 @@ export function scanToContractFormPrefill(
     .sort();
   const startDate = startDates[0] || options.defaultStartDate || new Date().toISOString().split("T")[0];
 
-  // Detect LAMal in the group → pull franchise + accident_included from the LAMal line
+  // Detect LAMal in the group → pull franchise + accident_included from the LAMal line.
+  // Coerce string → number (the IA sometimes returns "CHF 2'500.-" or "2500").
+  const toNum = (v: unknown): number | undefined => {
+    if (typeof v === "number" && isFinite(v)) return v;
+    if (typeof v === "string") {
+      const cleaned = v.replace(/[^\d.,-]/g, "").replace(/,/g, ".");
+      const n = parseFloat(cleaned);
+      return isFinite(n) ? n : undefined;
+    }
+    return undefined;
+  };
   const lamalLine = products.find(isLamal);
-  const lamalPremium = lamalLine?.premium_monthly;
-  const lamalFranchise = lamalLine?.franchise;
+  const lamalPremium = toNum(lamalLine?.premium_monthly);
+  const lamalFranchise = toNum(lamalLine?.franchise);
   const lamalAccidentIncluded = lamalLine?.accident_included;
 
   // Build the products array. Each line carries the catalog mapping hints

@@ -300,16 +300,17 @@ export function IAScanContractsWizard({
           )}
 
           <DialogFooter className="flex justify-between sm:justify-between">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              {allDone ? "Fermer" : "Annuler"}
+            {/* Once at least one group is done, the broker can stop here —
+                the already-validated contracts stay in the DB. The label
+                makes this explicit so closing doesn't feel like "rollback". */}
+            <Button variant="outline" onClick={() => allDone || doneIndexes.size > 0 ? handleFinish() : onOpenChange(false)}>
+              {doneIndexes.size > 0
+                ? `Terminer (${doneIndexes.size} créé${doneIndexes.size > 1 ? "s" : ""})`
+                : "Annuler"}
             </Button>
-            {!allDone ? (
+            {!allDone && (
               <Button onClick={() => handleStartGroup(currentIndex)}>
                 {doneIndexes.size === 0 ? "Démarrer" : "Continuer"} ({doneIndexes.size}/{groups.length})
-              </Button>
-            ) : (
-              <Button onClick={handleFinish}>
-                Terminer ({groups.length} contrat{groups.length > 1 ? "s" : ""} créé{groups.length > 1 ? "s" : ""})
               </Button>
             )}
           </DialogFooter>
