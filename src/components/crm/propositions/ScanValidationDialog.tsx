@@ -447,17 +447,36 @@ export default function ScanValidationDialog({
       }
 
       // 2. Build the primary client payload (no insert yet)
-      const rawGender = getField(["genre", "sexe", "gender"]);
-      const normalizedGender =
-        rawGender && /^(m|h|homme|male|masculin)$/i.test(rawGender) ? "male"
-          : rawGender && /^(f|femme|female|feminin|féminin)$/i.test(rawGender) ? "female"
-          : null;
-      const birthRaw = getField(["date_naissance", "birthdate", "ddn"]);
+      // clients.gender ∈ {'homme', 'femme', 'enfant'} (CHECK constraint).
+      // Match IA-supplied raw genders, and override with 'enfant' when the
+      // person is under 18 — covers the broker's request to show child
+      // avatars for kids in the family.
+      const rawGender = getField(["genre", "sexe", "gender"]) || (primary?.gender || null);
+      const birthRaw = getField(["date_naissance", "birthdate", "ddn"]) || (primary?.birthdate || null);
       const birthIso = (() => {
         if (!birthRaw) return null;
         if (/^\d{4}-\d{2}-\d{2}$/.test(birthRaw)) return birthRaw;
-        const m = birthRaw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+        const m = String(birthRaw).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
         if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+        return null;
+      })();
+      const ageFromBirth = (() => {
+        if (!birthIso) return null;
+        const dob = new Date(birthIso);
+        const now = new Date();
+        if (isNaN(dob.getTime())) return null;
+        let age = now.getFullYear() - dob.getFullYear();
+        if (now.getMonth() < dob.getMonth() ||
+            (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
+        return age;
+      })();
+      const normalizedGender = (() => {
+        if (ageFromBirth !== null && ageFromBirth < 18) return "enfant";
+        if (!rawGender) return null;
+        const r = String(rawGender).toLowerCase();
+        if (/^(m|h|homme|male|masculin)$/i.test(r)) return "homme";
+        if (/^(f|femme|female|feminin|féminin)$/i.test(r)) return "femme";
+        if (/^enfant|child/i.test(r)) return "enfant";
         return null;
       })();
       const willHaveActiveContract =
@@ -466,6 +485,35 @@ export default function ScanValidationDialog({
       // Every field: try scan.fields first, fall back to primary_holder JSONB.
       const fieldOrPrimary = (names: string[], primaryKey?: string) =>
         getField(names) || (primaryKey ? (primary[primaryKey] ?? null) : null);
+
+      // Normalise civil status to match the CHECK constraint
+      // {célibataire, marié, pacsé, divorcé, séparé, veuf}.
+      const normCivilStatus = (raw: string | null) => {
+        if (!raw) return null;
+        const s = raw.toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        if (/^celib|^single|^non.marie|^c\.s\./i.test(s)) return "célibataire";
+        if (/^marie|^married|^m\.|^maritale/i.test(s)) return "marié";
+        if (/^pacs|^civil.union|^partenariat/i.test(s)) return "pacsé";
+        if (/^divorc/i.test(s)) return "divorcé";
+        if (/^sepa|^separated/i.test(s)) return "séparé";
+        if (/^veuf|^veuve|^widow/i.test(s)) return "veuf";
+        return null;
+      };
+      const civilStatusRaw = fieldOrPrimary(["etat_civil", "civil_status"], "civil_status");
+      const civilStatus = normCivilStatus(civilStatusRaw);
+
+      // Normalise permit type to {B, C, G, L, Autre}
+      const normPermit = (raw: string | null) => {
+        if (!raw) return null;
+        const s = raw.toString().trim().toUpperCase();
+        if (["B", "C", "G", "L"].includes(s)) return s;
+        if (/AUTRE|OTHER/i.test(s)) return "Autre";
+        if (/PERMIS\s*B/i.test(s)) return "B";
+        if (/PERMIS\s*C/i.test(s)) return "C";
+        return null;
+      };
+      const permitRaw = fieldOrPrimary(["permis", "permit_type"], "permit_type");
+      const permitType = normPermit(permitRaw);
 
       const primaryPayload = existingClientId ? null : {
         tenant_id: tenantIdFromHook,
@@ -479,10 +527,10 @@ export default function ScanValidationDialog({
         city: fieldOrPrimary(["localite", "localité", "city", "ville"], "city"),
         canton: fieldOrPrimary(["canton"], "canton"),
         nationality: fieldOrPrimary(["nationalite", "nationalité", "nationality"], "nationality"),
-        civil_status: fieldOrPrimary(["etat_civil", "civil_status"], "civil_status"),
+        civil_status: civilStatus,
         profession: fieldOrPrimary(["profession"], "profession"),
         employer: fieldOrPrimary(["employeur", "employer"], "employer"),
-        permit_type: fieldOrPrimary(["permis", "permit_type"], "permit_type"),
+        permit_type: permitType,
         gender: normalizedGender,
         birthdate: birthIso,
         status: willHaveActiveContract ? "actif" : "prospect",
@@ -516,10 +564,27 @@ export default function ScanValidationDialog({
           if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
           return null;
         })();
+        // family_members are scoped to the clients table (column gender
+        // accepts {homme, femme, enfant}). Children identified by age.
+        const fmAge = (() => {
+          if (!fmBirthIso) return null;
+          const dob = new Date(fmBirthIso);
+          const now = new Date();
+          if (isNaN(dob.getTime())) return null;
+          let a = now.getFullYear() - dob.getFullYear();
+          if (now.getMonth() < dob.getMonth() ||
+              (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) a--;
+          return a;
+        })();
         const fmGender = (() => {
+          if (fmAge !== null && fmAge < 18) return "enfant";
           const g = (fm.gender || fm.sexe || "").toString().toLowerCase();
-          if (/^(m|h|homme|male|masculin)$/i.test(g)) return "male";
-          if (/^(f|femme|female|feminin|féminin)$/i.test(g)) return "female";
+          if (/^(m|h|homme|male|masculin)$/i.test(g)) return "homme";
+          if (/^(f|femme|female|feminin|féminin)$/i.test(g)) return "femme";
+          if (/^enfant|child/i.test(g)) return "enfant";
+          // Relationship-based fallback: 'enfant' kind always → 'enfant'
+          const rel = (fm.relationship || "").toString().toLowerCase();
+          if (/enfant|fils|fille|child/i.test(rel)) return "enfant";
           return null;
         })();
         const relation = (() => {
