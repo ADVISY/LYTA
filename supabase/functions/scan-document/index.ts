@@ -737,7 +737,13 @@ async function analyzeSingleFile(
       { role: "system", content: buildSingleDocumentSystemPrompt() },
       { role: "user", content: userContent },
     ],
-    max_tokens: 2500,
+    // gpt-5 is a reasoning model — it spends tokens "thinking" before
+    // the visible answer. 2500 was too low: all the budget went to
+    // reasoning and the assistant message came back empty.
+    // 8000 gives ~5000 for visible content after thinking on small files
+    // and still costs less than the previous gpt-5-mini 5000-token call
+    // because gpt-5 is cheaper per output token in many tiers.
+    max_completion_tokens: 8000,
     temperature: 0.1,
   }, getScanDocumentTimeoutMs());
 
@@ -752,10 +758,24 @@ async function analyzeSingleFile(
   }
 
   const aiData = await aiResponse.json();
-  const aiContent = aiData.choices?.[0]?.message?.content;
+  const choice = aiData.choices?.[0];
+  const aiContent = choice?.message?.content;
 
   if (!aiContent) {
-    throw new Error("No response from AI");
+    // Log enough context to know WHY the model didn't answer (reasoning
+    // budget exhausted? safety refusal? truncated?).
+    log.error("Empty AI response", {
+      fileName: fileContent.fileName,
+      finish_reason: choice?.finish_reason,
+      refusal: choice?.message?.refusal,
+      usage: aiData.usage,
+    });
+    const reason = choice?.finish_reason === "length"
+      ? "réponse coupée (max_tokens atteint)"
+      : choice?.message?.refusal
+      ? `refus IA: ${choice.message.refusal}`
+      : "réponse vide";
+    throw new Error(`No response from AI (${reason})`);
   }
 
   return parseAiAnalysisResponse(aiContent, fileContent.fileName);
