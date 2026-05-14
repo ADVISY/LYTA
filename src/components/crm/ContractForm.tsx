@@ -59,6 +59,9 @@ type SelectedProduct = {
   premium: string; // Individual premium for this product
   deductible: string;
   durationYears: string; // For life insurance
+  /** Branch code from the catalog (LAMAL / LCA / VIE / …). When set,
+   *  it takes precedence over the name-regex isLamalProduct() check. */
+  branchCode?: string;
 };
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
@@ -589,11 +592,24 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
 
     // 4. Map each extracted line into a SelectedProduct entry. Match
     //    against the catalog using a tolerant normaliser: strip accents,
-    //    drop the company prefix (so "Swica Favorit Medpharm" matches
-    //    "Favorit Medpharm"), and try several strategies in order
-    //    (exact > prefix match > substring > first-word).
+    //    drop the company prefix dynamically using THIS tenant's actual
+    //    catalog (no hard-coded list), and try several fallback strategies.
     if (data.products && data.products.length > 0) {
-      // Normaliser that strips company prefix + accents + punctuation
+      // Build the list of company prefixes to strip from the live catalog,
+      // so this works generically for any insurer / product / branch the
+      // tenant adds — not just the 21 we shipped seeded.
+      const dynamicCompanyPrefixes = companies
+        .map((c) => (c.name || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/[^a-z0-9 ]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim())
+        .filter(Boolean)
+        // Longer first so "groupe mutuel" wins over "groupe"
+        .sort((a, b) => b.length - a.length);
+
       const normProduct = (s: string) => {
         let out = (s || "")
           .toLowerCase()
@@ -602,16 +618,12 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           .replace(/[^a-z0-9 ]+/g, " ")
           .replace(/\s+/g, " ")
           .trim();
-        const companyPrefixes = [
-          "swica", "helsana", "sanitas", "css", "concordia", "atupri", "assura",
-          "sympany", "visana", "kpt", "cpt", "groupe mutuel", "gm",
-          "swiss life", "helvetia", "baloise", "generali", "axa", "zurich",
-          "la mobiliere", "mobiliere", "la vaudoise", "vaudoise", "pax",
-          "liechtenstein life", "zugerberg finanz", "zugerberg",
-        ];
-        for (const p of companyPrefixes) {
+        for (const p of dynamicCompanyPrefixes) {
           const re = new RegExp(`^${p}\\s+`);
-          if (re.test(out)) out = out.replace(re, "");
+          if (re.test(out)) {
+            out = out.replace(re, "");
+            break;  // only strip once
+          }
         }
         return out;
       };
@@ -621,6 +633,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         let resolvedProductId = p.productId ?? "";
         let resolvedName = p.productName ?? "Produit";
         let resolvedCategory = normalizeCategoryFromDB(p.category);
+        let resolvedBranchCode: string | undefined;
 
         if (!resolvedProductId && targetName) {
           const candidates = allProducts.filter(
@@ -651,11 +664,17 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             resolvedProductId = hit.id;
             resolvedName = hit.name;
             resolvedCategory = normalizeCategoryFromDB(hit.category);
+            // Carry the catalog's branch code so the LAMal/LCA grouping
+            // works without relying on name-regex tricks.
+            resolvedBranchCode = (hit.tenant_branch as any)?.code;
           }
         }
         // If the scan tagged this as LAMal explicitly, force the
         // category to "health" so the LAMal grouping picks it up.
-        if (p.isLamal) resolvedCategory = "health";
+        if (p.isLamal) {
+          resolvedCategory = "health";
+          if (!resolvedBranchCode) resolvedBranchCode = "LAMAL";
+        }
 
         return {
           id: generateId(),
@@ -665,6 +684,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium: typeof p.premium === "number" ? String(p.premium) : "",
           deductible: typeof p.deductible === "number" ? String(p.deductible) : "",
           durationYears: typeof p.durationYears === "number" ? String(p.durationYears) : "",
+          branchCode: resolvedBranchCode,
         };
       });
       setSelectedProducts(productsToSelect);
@@ -778,8 +798,16 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     const life = safeProducts.filter(p => p.category === 'life');
     const other = safeProducts.filter(p => p.category !== 'health' && p.category !== 'life');
     
-    const healthLamal = health.filter(p => p.name && isLamalProduct(p.name));
-    const healthLca = health.filter(p => !isLamalProduct(p.name || ''));
+    // Prefer the catalog's branch_code (authoritative) over the
+    // name-regex isLamalProduct() check (heuristic). Falls back to the
+    // regex when no branchCode is set (e.g. manual entry).
+    const isLamalRow = (p: SelectedProduct) => {
+      if (p.branchCode === 'LAMAL') return true;
+      if (p.branchCode === 'LCA') return false;
+      return !!(p.name && isLamalProduct(p.name));
+    };
+    const healthLamal = health.filter(isLamalRow);
+    const healthLca = health.filter((p) => !isLamalRow(p));
     
     return { healthLamal, healthLca, life, other, health };
   }, [selectedProducts]);
