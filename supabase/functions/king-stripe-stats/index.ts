@@ -211,21 +211,38 @@ serve(async (req) => {
       })
     );
 
-    // Group payments by month
+    // Group payments by month — 12 mois glissants + 12 mois N-1 (pour YoY)
     const monthlyRevenue: Record<string, number> = {};
-    for (let i = 5; i >= 0; i--) {
+    const monthlyRevenuePrevYear: Record<string, number> = {};
+    const keyByMonthIdx: string[] = [];
+    for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
       monthlyRevenue[key] = 0;
+      monthlyRevenuePrevYear[key] = 0;
+      keyByMonthIdx.push(key);
     }
 
+    // Cutoffs pour matcher invoice → mois N ou N-1
+    const startN = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const startNMinus1 = new Date(now.getFullYear() - 1, now.getMonth() - 11, 1);
+    const endNMinus1 = new Date(now.getFullYear() - 1, now.getMonth() + 1, 1);
+
     for (const invoice of paidInvoices) {
-      if (invoice.status === 'paid' || invoice.paid) {
-        const paidAt = invoice.status_transitions?.paid_at || invoice.created;
-        const date = new Date(paidAt * 1000);
+      if (invoice.status !== 'paid' && !invoice.paid) continue;
+      const paidAt = invoice.status_transitions?.paid_at || invoice.created;
+      const date = new Date(paidAt * 1000);
+      const amount = (invoice.amount_paid || invoice.amount_due || 0) / 100;
+
+      if (date >= startN) {
         const key = date.toLocaleDateString('fr-CH', { month: 'short', year: '2-digit' });
-        if (monthlyRevenue.hasOwnProperty(key)) {
-          monthlyRevenue[key] += ((invoice.amount_paid || invoice.amount_due || 0) / 100);
+        if (monthlyRevenue.hasOwnProperty(key)) monthlyRevenue[key] += amount;
+      } else if (date >= startNMinus1 && date < endNMinus1) {
+        // Map à la position équivalente de cette année (même mois) pour comparaison
+        const monthsAgo = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth());
+        const idx = 11 - (monthsAgo - 12);
+        if (idx >= 0 && idx < keyByMonthIdx.length) {
+          monthlyRevenuePrevYear[keyByMonthIdx[idx]] += amount;
         }
       }
     }
@@ -244,10 +261,11 @@ serve(async (req) => {
       log.error('Error fetching invoices', { error: e instanceof Error ? e.message : e });
     }
 
-    // Prepare revenue chart data
+    // Prepare revenue chart data (12 mois + revenue_prev_year pour YoY)
     const revenueChartData = Object.entries(monthlyRevenue).map(([month, revenue]) => ({
       month,
       revenue,
+      revenue_prev_year: monthlyRevenuePrevYear[month] || 0,
     }));
 
     return new Response(JSON.stringify({

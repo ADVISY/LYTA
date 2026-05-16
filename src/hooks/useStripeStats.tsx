@@ -19,6 +19,7 @@ export interface TenantSubscription {
 export interface RevenueChartData {
   month: string;
   revenue: number;
+  revenue_prev_year?: number;
 }
 
 export interface StripeStats {

@@ -9,6 +9,8 @@ import { useStripeStats } from "@/hooks/useStripeStats";
 import { PLAN_CONFIGS, TenantPlan } from "@/config/plans";
 import { Badge } from "@/components/ui/badge";
 import { KingNotificationsInbox } from "@/components/king/KingNotificationsInbox";
+import { KingProductsByBranchCard } from "@/components/king/KingProductsByBranchCard";
+import { KingLiveFeedCard } from "@/components/king/KingLiveFeedCard";
 import { useKingNotifications } from "@/hooks/useKingNotifications";
 import { formatDistanceToNow, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -392,51 +394,82 @@ export default function KingDashboard() {
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Revenue Chart */}
+        {/* Revenue Chart — 12 mois glissants + comparaison année passée */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
-              Revenus mensuels
+              Revenus mensuels (12 mois)
+              {(() => {
+                const data = stripeStats?.revenueChart || [];
+                if (data.length === 0) return null;
+                const totalN = data.reduce((s, d) => s + (d.revenue || 0), 0);
+                const totalN1 = data.reduce((s, d) => s + (d.revenue_prev_year || 0), 0);
+                if (totalN1 === 0) return null;
+                const yoy = ((totalN - totalN1) / totalN1) * 100;
+                const positive = yoy >= 0;
+                return (
+                  <span className={`ml-auto text-sm font-normal flex items-center gap-1 ${positive ? "text-emerald-600" : "text-red-600"}`}>
+                    {positive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                    {positive ? "+" : ""}{yoy.toFixed(1)}% YoY
+                  </span>
+                );
+              })()}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={stripeStats?.revenueChart || []}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.35}/>
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="colorRevenuePrev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={false} 
+                  <XAxis
+                    dataKey="month"
+                    axisLine={false}
                     tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   />
-                  <YAxis 
-                    axisLine={false} 
+                  <YAxis
+                    axisLine={false}
                     tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     tickFormatter={(value) => `${value}.-`}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
+                  <Tooltip
+                    contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [formatCurrency(value), 'Revenu']}
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === "revenue" ? "Cette année" : "Année passée"
+                    ]}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorRevenue)" 
+                  <Area
+                    type="monotone"
+                    dataKey="revenue_prev_year"
+                    stroke="#94a3b8"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    fillOpacity={1}
+                    fill="url(#colorRevenuePrev)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorRevenue)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -488,6 +521,12 @@ export default function KingDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Catalog products by branch + Live feed temps réel */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <KingProductsByBranchCard />
+        <KingLiveFeedCard />
       </div>
 
       {/* Notifications Section */}
