@@ -292,6 +292,16 @@ serve(async (req) => {
       .update({ signup_completed_at: new Date().toISOString() })
       .eq("id", tenantId);
 
+    // Marquer le pending_signups comme finalisé (le tenant n'est plus orphelin)
+    await supabase
+      .from("pending_signups")
+      .update({
+        status: 'finalized',
+        finalized_at: new Date().toISOString(),
+        finalized_tenant_id: tenantId,
+      })
+      .eq("stripe_session_id", sessionId);
+
     return new Response(JSON.stringify({
       ok: true,
       tenant_id: tenantId,

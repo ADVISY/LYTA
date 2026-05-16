@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useTenantConsumptionSummary, TenantConsumptionData } from "@/hooks/useTenantConsumption";
 import { TenantConsumptionRow } from "@/components/king/TenantConsumptionRow";
+import { PendingSignupsPanel } from "@/components/king/PendingSignupsPanel";
 
 interface TenantStats {
   clients: number;
@@ -352,6 +353,9 @@ export default function KingTenants() {
           </CardContent>
         </Card>
       )}
+
+      {/* Self-signup en attente (paiement OK mais form pas finalisé) */}
+      <PendingSignupsPanel />
 
       {/* Tenants List */}
       <Card>

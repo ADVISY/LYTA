@@ -125,11 +125,29 @@ serve(async (req) => {
         log.info("Checkout completed", {
           customerId: session.customer,
           email: session.customer_email,
-          subscriptionId: session.subscription
+          subscriptionId: session.subscription,
+          signupFlow: session.metadata?.signup_flow === 'true',
         });
 
         // Get customer email
         const customerEmail = session.customer_email || session.customer_details?.email;
+
+        // Self-signup flow : on enregistre dans pending_signups pour suivi
+        // king (paiement OK mais form /access pas encore finalisé).
+        if (session.metadata?.signup_flow === 'true') {
+          await supabaseAdmin
+            .from('pending_signups')
+            .upsert({
+              stripe_session_id: session.id,
+              stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
+              stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+              customer_email: customerEmail,
+              plan_id: session.metadata?.plan_id || null,
+              amount_chf: (session.amount_total ?? 0) / 100,
+              status: 'pending',
+            }, { onConflict: 'stripe_session_id' });
+          log.info('pending_signups upserted', { sessionId: session.id });
+        }
         
         if (customerEmail) {
           // Find tenant by email
