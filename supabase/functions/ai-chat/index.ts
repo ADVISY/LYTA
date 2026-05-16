@@ -5,6 +5,7 @@ import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireAuth, AuthError } from "../_shared/auth.ts";
 import { buildAiError, fetchAiChatCompletions, getAiModel } from "../_shared/ai.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { trackOpenAiUsage, extractOpenAiUsage } from "../_shared/usage-tracker.ts";
 
 const log = createLogger("ai-chat");
 
@@ -269,6 +270,19 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
+
+    // Track OpenAI usage pour facturation/marge plateforme
+    const usage = extractOpenAiUsage(aiData);
+    trackOpenAiUsage({
+      model: getAiModel(),
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      tenantId: null,  // ai-chat actuellement utilisé pour le chat client/conseiller, pas par tenant
+      eventType: "ai_chat",
+      externalRef: usage.requestId,
+      metadata: { user_type: userType, session_id: sessionId },
+    });
+
     const assistantMessage = aiData.choices?.[0]?.message?.content;
 
     if (!assistantMessage) {

@@ -16,6 +16,7 @@ import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts"
 import { createLogger } from "../_shared/logger.ts";
 import { fetchAiChatCompletions, getAiModel, isAiTimeoutError } from "../_shared/ai.ts";
 import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
+import { trackOpenAiUsage, extractOpenAiUsage } from "../_shared/usage-tracker.ts";
 
 const log = createLogger("scan-commission-statement");
 
@@ -199,6 +200,18 @@ serve(async (req) => {
         status: 502, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
+
+    // Track OpenAI usage pour facturation/marge plateforme
+    const usage = extractOpenAiUsage(aiJson);
+    trackOpenAiUsage({
+      model: aiModel,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      tenantId: stmt.tenant_id,
+      eventType: "scan_commission_statement",
+      externalRef: usage.requestId,
+      metadata: { statement_id: statementId },
+    });
 
     const rawContent = aiJson?.choices?.[0]?.message?.content ?? "{}";
     let parsed: ScanOutput;

@@ -5,6 +5,7 @@ import { requireAuth, requireTenantAccess, AuthError } from "../_shared/auth.ts"
 import { checkRateLimit, RateLimitError } from "../_shared/rate-limit.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { buildAiError, fetchAiChatCompletions, getAiModel, isAiTimeoutError } from "../_shared/ai.ts";
+import { trackOpenAiUsage, extractOpenAiUsage } from "../_shared/usage-tracker.ts";
 import { QuotaError, releaseTenantQuota, reserveTenantQuota } from "../_shared/quota.ts";
 import { buildChatDocumentContent, normalizeDocumentMimeType } from "../_shared/document-inputs.ts";
 
@@ -722,6 +723,8 @@ async function analyzeSingleFile(
   total: number,
   formType?: string,
   catalogContext?: string,
+  trackingTenantId?: string | null,
+  trackingScanId?: string,
 ): Promise<ParsedResult> {
   const userContent: Record<string, unknown>[] = [
     {
@@ -758,6 +761,19 @@ async function analyzeSingleFile(
   }
 
   const aiData = await aiResponse.json();
+
+  // Track OpenAI usage pour facturation/marge plateforme
+  const usage = extractOpenAiUsage(aiData);
+  trackOpenAiUsage({
+    model: getAiModel(),
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    tenantId: trackingTenantId,
+    eventType: "scan_document",
+    externalRef: usage.requestId,
+    metadata: { scan_id: trackingScanId, file_name: fileContent.fileName },
+  });
+
   const choice = aiData.choices?.[0];
   const aiContent = choice?.message?.content;
 
@@ -1201,7 +1217,7 @@ serve(async (req) => {
 
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType, catalogContext);
+          const result = await analyzeSingleFile(fileContent, index, fileContents.length, formType, catalogContext, validTenantId, scanId);
           if (attempt > 1) {
             log.info("File analysis succeeded on retry", { fileName: fileContent.fileName, attempt });
           }
