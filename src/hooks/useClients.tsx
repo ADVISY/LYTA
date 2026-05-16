@@ -204,13 +204,14 @@ export function useClients(typeFilter?: string) {
       return { rows: [] as Client[], count: 0 };
     }
 
-    // count: "planned" → Postgres lit pg_class.reltuples (instantané)
-    // au lieu de scanner toutes les rows. Sur une table avec 1000+ rows
-    // et des RLS lourdes, "exact" peut prendre >12s. "planned" reste assez
-    // précis pour la pagination (refresh régulier via VACUUM ANALYZE).
+    // count: "exact" pour avoir le vrai nombre de pages (planned sous-estime
+    // après gros imports → des rows deviennent invisibles depuis la pagination).
+    // Avec les indexes composés ajoutés sur user_tenant_assignments(user_id,
+    // tenant_id) + user_tenant_roles(user_id, role_id, tenant_id), le RLS est
+    // assez rapide pour que count exact tienne en < 1s sur 1000+ rows.
     let query = supabase
       .from("clients")
-      .select("*", { count: "planned" })
+      .select("*", { count: "exact" })
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
