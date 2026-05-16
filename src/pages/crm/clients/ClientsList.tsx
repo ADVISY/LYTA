@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
 import { usePendingScanCount } from "@/hooks/usePendingScans";
@@ -43,8 +43,16 @@ export default function ClientsList() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("client");
+
+  // Debounce 300ms : évite de spammer Supabase à chaque frappe clavier
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
   const {
     clients,
     loading,
@@ -56,7 +64,7 @@ export default function ClientsList() {
     totalCount,
     totalPages,
     goToPage,
-  } = useClients(typeFilter);
+  } = useClients(typeFilter, debouncedSearch);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -77,18 +85,12 @@ export default function ClientsList() {
     { value: "ia-scan", label: t('propositions.smartflow', 'Smartflow'), icon: Sparkles, color: "from-cyan-500 to-blue-600", badge: pendingScanCount },
   ];
 
+  // Recherche serveur (déjà filtrée par useClients via Supabase ilike)
+  // → on garde uniquement le filtre statut local (3-4 valeurs, pas besoin
+  // d'aller-retour serveur).
   const filteredClients = clients.filter((client) => {
-    const matchesSearch =
-      !searchTerm ||
-      client.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || client.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+    if (statusFilter === "all") return true;
+    return client.status === statusFilter;
   });
 
   const handleDelete = async () => {

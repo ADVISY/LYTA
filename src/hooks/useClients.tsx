@@ -181,22 +181,25 @@ async function withAssignedAgents(rows: Client[], tenantId?: string | null): Pro
   }));
 }
 
-export function useClients(typeFilter?: string) {
+export function useClients(typeFilter?: string, searchTerm?: string) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { tenantId, loading: tenantLoading } = useUserTenant();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
+  // Reset page quand filtre type ou recherche change
   useEffect(() => {
     setPage(1);
-  }, [tenantId, typeFilter]);
+  }, [tenantId, typeFilter, searchTerm]);
+
+  const trimmedSearch = (searchTerm ?? "").trim();
 
   const from = (page - 1) * CLIENTS_PAGE_SIZE;
   const to = from + CLIENTS_PAGE_SIZE - 1;
   const baseQueryKey = useMemo(
-    () => ["clients", tenantId ?? "", typeFilter ?? ""],
-    [tenantId, typeFilter]
+    () => ["clients", tenantId ?? "", typeFilter ?? "", trimmedSearch],
+    [tenantId, typeFilter, trimmedSearch]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -204,10 +207,9 @@ export function useClients(typeFilter?: string) {
       return { rows: [] as Client[], count: 0 };
     }
 
-    // SELECT data (sans count — le count exact RLS dépasse le statement_timeout
-    // Postgres 8s sur gros tenants 1000+ rows). On fait le count en parallèle
-    // via la RPC count_clients_for_tenant (SECURITY DEFINER → bypass RLS, count
-    // instantané).
+    // SELECT data + recherche côté serveur (sans la recherche serveur, la
+    // barre de recherche front ne filtrait que la page courante de 50 = JCG
+    // perdait ses 928 contacts dès la page 2).
     let query = supabase
       .from("clients")
       .select("*")
@@ -216,6 +218,15 @@ export function useClients(typeFilter?: string) {
 
     if (typeFilter) {
       query = query.eq("type_adresse", typeFilter);
+    }
+
+    if (trimmedSearch) {
+      // Échappe les caractères PostgREST spéciaux (% , ()) dans la valeur user
+      const safe = trimmedSearch.replace(/[%,()]/g, " ");
+      const pattern = `%${safe}%`;
+      query = query.or(
+        `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern},company_name.ilike.${pattern},phone.ilike.${pattern}`
+      );
     }
 
     const [dataResult, countResult] = await Promise.all([
@@ -227,6 +238,7 @@ export function useClients(typeFilter?: string) {
       supabase.rpc("count_clients_for_tenant", {
         p_tenant_id: tenantId,
         p_type_adresse: typeFilter ?? null,
+        p_search: trimmedSearch || null,
       }),
     ]);
 
@@ -245,7 +257,7 @@ export function useClients(typeFilter?: string) {
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter]);
+  }, [from, tenantId, to, typeFilter, trimmedSearch]);
 
   const {
     data,
