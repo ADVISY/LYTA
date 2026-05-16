@@ -25,7 +25,13 @@ import {
   Download,
   Upload,
   BarChart3,
-  RefreshCw
+  RefreshCw,
+  Receipt,
+  Send,
+  FileDown,
+  CheckCircle2,
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +57,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { TenantLogoUpload } from "@/components/king/TenantLogoUpload";
 import { TenantConsumptionLimits } from "@/components/king/TenantConsumptionLimits";
+import { TenantInvoicesPanel } from "@/components/king/TenantInvoicesPanel";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getFunctionErrorMessage, invokeSupabaseFunction } from "@/lib/edgeFunctions";
@@ -394,6 +401,38 @@ export default function KingTenantDetail() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Sync Stripe
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const adminEmail = tenant.admin_email || tenant.email;
+              if (!adminEmail) {
+                toast({ title: 'Email admin manquant', description: 'Pas d\'admin_email sur ce tenant.', variant: 'destructive' });
+                return;
+              }
+              try {
+                const { data, error } = await supabase.functions.invoke('create-tenant-admin', {
+                  body: {
+                    tenant_id: tenantId,
+                    email: adminEmail,
+                    first_name: tenant.admin_first_name || 'Admin',
+                    last_name: tenant.admin_last_name || tenant.name,
+                    language: tenant.language || 'fr',
+                  },
+                });
+                if (error) throw error;
+                if (data?.email_sent) {
+                  toast({ title: 'Email renvoyé', description: `Email de bienvenue envoyé à ${adminEmail}` });
+                } else {
+                  toast({ title: 'Email non envoyé', description: data?.error || 'Vérifie la config Resend', variant: 'destructive' });
+                }
+              } catch (e: any) {
+                toast({ title: 'Erreur', description: e?.message || String(e), variant: 'destructive' });
+              }
+            }}
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Renvoyer email bienvenue
+          </Button>
           <Button variant="outline" onClick={() => navigate(`/king/tenants/${tenantId}/import`)}>
             <Upload className="h-4 w-4 mr-2" />
             Importer des données
@@ -477,6 +516,10 @@ export default function KingTenantDetail() {
           <TabsTrigger value="subscription" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Abonnement
+          </TabsTrigger>
+          <TabsTrigger value="invoices" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Factures
           </TabsTrigger>
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
@@ -875,6 +918,11 @@ export default function KingTenantDetail() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Invoices Tab */}
+        <TabsContent value="invoices">
+          <TenantInvoicesPanel tenantId={tenantId!} />
         </TabsContent>
 
         {/* Branding Tab */}
