@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard, ChevronDown, ChevronUp, RefreshCw, Loader2 } from "lucide-react";
+import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard, ChevronDown, ChevronUp, RefreshCw, Loader2, FileDown, Sparkles, Lock, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,8 +60,44 @@ export default function KingTenants() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"created_desc" | "name" | "mrr_desc" | "trial_ends" | "last_activity">("created_desc");
   const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+
+  const trialDaysLeft = (trialEndsAt: string | null | undefined): number | null => {
+    if (!trialEndsAt) return null;
+    const ms = new Date(trialEndsAt).getTime() - Date.now();
+    if (isNaN(ms)) return null;
+    return Math.ceil(ms / (1000 * 60 * 60 * 24));
+  };
+
+  const exportTenantsCSV = () => {
+    const list = filteredTenants ?? [];
+    if (list.length === 0) {
+      toast({ title: "Rien à exporter", description: "Aucun tenant dans la liste filtrée." });
+      return;
+    }
+    const headers = [
+      "id","name","slug","email","plan","status","tenant_status","payment_status",
+      "billing_mode","signup_source","mrr_amount","stripe_customer_id",
+      "stripe_subscription_id","trial_ends_at","created_at","last_activity_at",
+    ];
+    const escape = (v: any) => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = list.map(t => headers.map(h => escape((t as any)[h])).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lyta-tenants-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Export OK", description: `${list.length} tenants exportés.` });
+  };
 
   const syncAllFromStripe = async () => {
     setSyncingAll(true);
@@ -179,16 +215,36 @@ export default function KingTenants() {
   // Count pending tenants
   const pendingCount = tenants?.filter(t => t.status === 'pending').length || 0;
 
-  const filteredTenants = tenants?.filter(tenant => {
-    const matchesSearch = 
+  const filteredTenants = (tenants?.filter(tenant => {
+    const matchesSearch =
       tenant.name.toLowerCase().includes(search.toLowerCase()) ||
       tenant.slug.toLowerCase().includes(search.toLowerCase()) ||
       (tenant.email?.toLowerCase() || '').includes(search.toLowerCase()) ||
       (tenant.contact_name?.toLowerCase() || '').includes(search.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "all" || tenant.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
+  }) ?? []).slice().sort((a, b) => {
+    switch (sortBy) {
+      case "name":
+        return (a.name || "").localeCompare(b.name || "");
+      case "mrr_desc":
+        return (Number(b.mrr_amount) || 0) - (Number(a.mrr_amount) || 0);
+      case "trial_ends": {
+        const da = a.trial_ends_at ? new Date(a.trial_ends_at).getTime() : Infinity;
+        const db = b.trial_ends_at ? new Date(b.trial_ends_at).getTime() : Infinity;
+        return da - db;
+      }
+      case "last_activity": {
+        const da = a.last_activity_at ? new Date(a.last_activity_at).getTime() : 0;
+        const db = b.last_activity_at ? new Date(b.last_activity_at).getTime() : 0;
+        return db - da;
+      }
+      case "created_desc":
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
   });
 
   return (
@@ -200,6 +256,10 @@ export default function KingTenants() {
           <p className="text-muted-foreground">Gérez tous les cabinets qui utilisent LYTA</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={exportTenantsCSV} title="Exporter la liste filtrée en CSV">
+            <FileDown className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
           <Button
             variant="outline"
             onClick={syncAllFromStripe}
@@ -249,6 +309,18 @@ export default function KingTenants() {
                 <SelectItem value="active">Actif</SelectItem>
                 <SelectItem value="test">Test</SelectItem>
                 <SelectItem value="suspended">Suspendu</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tri" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">Plus récents d'abord</SelectItem>
+                <SelectItem value="name">Nom A → Z</SelectItem>
+                <SelectItem value="mrr_desc">MRR le plus élevé</SelectItem>
+                <SelectItem value="trial_ends">Trial expire bientôt</SelectItem>
+                <SelectItem value="last_activity">Dernière activité</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -365,10 +437,36 @@ export default function KingTenants() {
                             />
                           </div>
                           <div>
-                            <p className="font-semibold text-lg">{tenant.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-lg">{tenant.name}</p>
+                              {(tenant as any).signup_source === 'self_signup' && (
+                                <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200 gap-1 text-xs">
+                                  <Sparkles className="h-3 w-3" /> Self-signup
+                                </Badge>
+                              )}
+                              {(tenant as any).billing_mode === 'internal' && (
+                                <Badge variant="secondary" className="gap-1 text-xs">
+                                  <Lock className="h-3 w-3" /> Interne
+                                </Badge>
+                              )}
+                              {(tenant as any).billing_mode === 'test' && (
+                                <Badge variant="outline" className="text-xs">Test</Badge>
+                              )}
+                              {(() => {
+                                const d = trialDaysLeft((tenant as any).trial_ends_at);
+                                if (d === null) return null;
+                                if (d < 0) return <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 text-xs"><Clock className="h-3 w-3" />Trial expiré</Badge>;
+                                if (d <= 2) return <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 text-xs"><Clock className="h-3 w-3" />Trial: {d}j</Badge>;
+                                if (d <= 7) return <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1 text-xs"><Clock className="h-3 w-3" />Trial: {d}j</Badge>;
+                                return null;
+                              })()}
+                            </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <span>{tenant.slug}.lyta.ch</span>
                               <ExternalLink className="h-3 w-3" />
+                              {Number(tenant.mrr_amount) > 0 && (
+                                <span className="ml-2 text-emerald-700 font-medium">{Number(tenant.mrr_amount).toLocaleString('fr-CH')} CHF/mo</span>
+                              )}
                             </div>
                           </div>
                         </div>
