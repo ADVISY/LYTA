@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { DollarSign, TrendingUp, Wallet, PiggyBank, Search, MoreHorizontal, CheckCircle, Clock, AlertCircle, Eye, Trash2, Loader2, Plus, Users, ChevronDown, ChevronRight, Percent, Pencil, MinusCircle } from "lucide-react";
+import { DollarSign, TrendingUp, Wallet, PiggyBank, Search, MoreHorizontal, CheckCircle, Clock, AlertCircle, Eye, Trash2, Loader2, Plus, Users, ChevronDown, ChevronRight, Percent, Pencil, MinusCircle, ScanLine, Lock, Sparkles } from "lucide-react";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import ScanCommissionStatementDialog from "@/components/crm/compta/ScanCommissionStatementDialog";
+import QuickCreateClientFromStatementLine from "@/components/crm/compta/QuickCreateClientFromStatementLine";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useCommissions, Commission } from "@/hooks/useCommissions";
@@ -50,6 +54,109 @@ export default function CRMCommissions() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commissionToDelete, setCommissionToDelete] = useState<string | null>(null);
   const [commissionFormOpen, setCommissionFormOpen] = useState(false);
+  const [scanStatementDialogOpen, setScanStatementDialogOpen] = useState(false);
+  const { hasModule } = usePlanFeatures();
+  const hasSmartflow = hasModule('ia_scan');
+
+  // Smartflow Décomptes — file d'attente des lignes prêtes à valider
+  type PendingStatementLine = {
+    id: string;
+    matched_client_id: string | null;
+    raw_client_first_name: string | null;
+    raw_client_last_name: string | null;
+    raw_client_full_name: string | null;
+    raw_policy_number: string | null;
+    raw_product_name: string | null;
+    net_amount: number | null;
+    gross_amount: number | null;
+    period_year: number | null;
+    period_month: number | null;
+    match_status: string;
+    statement: { detected_company_name: string | null } | null;
+  };
+  const [pendingLines, setPendingLines] = useState<PendingStatementLine[]>([]);
+  const [activeLine, setActiveLine] = useState<PendingStatementLine | null>(null);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateLine, setQuickCreateLine] = useState<PendingStatementLine | null>(null);
+
+  const fetchPendingStatementLines = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('commission_statement_lines')
+      .select(`
+        id, matched_client_id, match_status,
+        raw_client_first_name, raw_client_last_name, raw_client_full_name,
+        raw_policy_number, raw_product_name,
+        net_amount, gross_amount, period_year, period_month,
+        statement:commission_statements ( detected_company_name )
+      `)
+      .is('validated_at', null)
+      // On inclut aussi 'no_match' pour que le broker puisse créer le client manquant
+      .in('match_status', ['matched', 'manual_match', 'ambiguous', 'no_match'])
+      .order('line_number', { ascending: true });
+    if (!error && Array.isArray(data)) {
+      setPendingLines(data as any);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingStatementLines();
+  }, [fetchPendingStatementLines]);
+
+  // Compteurs séparés pour la bannière
+  const linesToValidate = pendingLines.filter(l => !!l.matched_client_id);
+  const linesToCreateClient = pendingLines.filter(l => !l.matched_client_id);
+
+  // Route vers le bon dialog selon le status de la prochaine ligne
+  const processNextLine = () => {
+    // Priorité aux lignes avec client déjà matché (plus rapide à valider)
+    const nextMatched = linesToValidate[0];
+    if (nextMatched) {
+      setActiveLine(nextMatched);
+      setCommissionFormOpen(true);
+      return;
+    }
+    // Sinon : ligne sans client → mini-dialog de création
+    const nextNoMatch = linesToCreateClient[0];
+    if (nextNoMatch) {
+      setQuickCreateLine(nextNoMatch);
+      setQuickCreateOpen(true);
+    }
+  };
+
+  // Après création réussie d'une commission, on rafraîchit la liste et on enchaîne
+  const handleCommissionCreated = () => {
+    fetchCommissions();
+    setActiveLine(null);
+    fetchPendingStatementLines();
+  };
+
+  // Après création d'un client depuis une ligne no_match, on enchaîne automatiquement
+  // sur le CommissionForm pré-rempli avec ce nouveau client.
+  const handleClientCreatedFromLine = async (clientId: string, lineId: string) => {
+    setQuickCreateLine(null);
+    // Re-fetch pour récupérer la ligne fraîchement mise à jour avec matched_client_id
+    const { data: refetched } = await supabase
+      .from('commission_statement_lines')
+      .select(`
+        id, matched_client_id, match_status,
+        raw_client_first_name, raw_client_last_name, raw_client_full_name,
+        raw_policy_number, raw_product_name,
+        net_amount, gross_amount, period_year, period_month,
+        statement:commission_statements ( detected_company_name )
+      `)
+      .eq('id', lineId)
+      .maybeSingle();
+    if (refetched) {
+      setActiveLine(refetched as any);
+      setCommissionFormOpen(true);
+    }
+    fetchPendingStatementLines();
+  };
+
+  const handleSkippedFromLine = () => {
+    setQuickCreateLine(null);
+    fetchPendingStatementLines();
+  };
   
   // Commission parts state
   const [expandedCommission, setExpandedCommission] = useState<string | null>(null);
@@ -299,7 +406,17 @@ export default function CRMCommissions() {
             </h1>
             <p className="text-muted-foreground">{t('commissions.subtitle')}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={() => setScanStatementDialogOpen(true)}
+              disabled={!hasSmartflow}
+              variant="outline"
+              className="gap-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-60"
+              title={hasSmartflow ? "Smartflow Décomptes — scanner un PDF de décompte compagnie" : "Module Smartflow non inclus dans ton plan"}
+            >
+              {hasSmartflow ? <ScanLine className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              {hasSmartflow ? <>Scanner un décompte <Sparkles className="h-3 w-3" /></> : "Smartflow indisponible"}
+            </Button>
             <Button onClick={() => setDecommissionFormOpen(true)} variant="outline" className="gap-2 border-destructive text-destructive hover:bg-destructive/10">
               <MinusCircle className="h-4 w-4" />
               {t('commissions.decommission')}
@@ -338,6 +455,38 @@ export default function CRMCommissions() {
           </Card>
         ))}
       </div>
+
+      {/* Smartflow Décomptes — file d'attente */}
+      {pendingLines.length > 0 && (
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20">
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-amber-500/15">
+                <Sparkles className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-semibold">
+                  {pendingLines.length} ligne{pendingLines.length > 1 ? 's' : ''} à traiter depuis un décompte
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {linesToValidate.length > 0 && <>{linesToValidate.length} commission{linesToValidate.length > 1 ? 's' : ''} à valider</>}
+                  {linesToValidate.length > 0 && linesToCreateClient.length > 0 && ' · '}
+                  {linesToCreateClient.length > 0 && <>{linesToCreateClient.length} client{linesToCreateClient.length > 1 ? 's' : ''} à créer</>}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={processNextLine}
+                className="gap-2 bg-amber-600 hover:bg-amber-700"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Traiter suivante
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-lg">
@@ -853,11 +1002,19 @@ export default function CRMCommissions() {
         </DialogContent>
       </Dialog>
 
-      {/* Commission Form */}
+      {/* Commission Form — gère la création manuelle ET la validation Smartflow */}
       <CommissionForm
         open={commissionFormOpen}
-        onOpenChange={setCommissionFormOpen}
-        onSuccess={fetchCommissions}
+        onOpenChange={(o) => { setCommissionFormOpen(o); if (!o) setActiveLine(null); }}
+        onSuccess={handleCommissionCreated}
+        prefill={activeLine ? {
+          clientId: activeLine.matched_client_id ?? undefined,
+          amount: activeLine.net_amount ?? activeLine.gross_amount ?? undefined,
+          periodYear: activeLine.period_year ?? undefined,
+          periodMonth: activeLine.period_month ?? undefined,
+          notes: `Importé du décompte ${activeLine.statement?.detected_company_name || ''} (police ${activeLine.raw_policy_number || '—'})`.trim(),
+          statementLineId: activeLine.id,
+        } : undefined}
       />
 
       {/* Decommission Form */}
@@ -865,6 +1022,21 @@ export default function CRMCommissions() {
         open={decommissionFormOpen}
         onOpenChange={setDecommissionFormOpen}
         onSuccess={fetchCommissions}
+      />
+
+      {/* Smartflow Décomptes — upload PDF d'un décompte compagnie */}
+      <ScanCommissionStatementDialog
+        open={scanStatementDialogOpen}
+        onOpenChange={setScanStatementDialogOpen}
+      />
+
+      {/* Smartflow Décomptes — création rapide d'un client manquant */}
+      <QuickCreateClientFromStatementLine
+        open={quickCreateOpen}
+        onOpenChange={(o) => { setQuickCreateOpen(o); if (!o) setQuickCreateLine(null); }}
+        line={quickCreateLine}
+        onClientCreated={handleClientCreatedFromLine}
+        onSkip={handleSkippedFromLine}
       />
     </div>
   );

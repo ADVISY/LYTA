@@ -45,9 +45,23 @@ interface CommissionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /**
+   * Pre-fill values used when the form is launched from Smartflow Décomptes :
+   * une ligne extraite d'un PDF de décompte ouvre le formulaire avec
+   * client + montant + période + notes déjà remplis. L'agent/manager et
+   * leurs taux sont recalculés auto via les useEffect existants.
+   */
+  prefill?: {
+    clientId?: string;
+    amount?: number;
+    periodYear?: number;
+    periodMonth?: number;
+    notes?: string;
+    statementLineId?: string;
+  };
 }
 
-export default function CommissionForm({ open, onOpenChange, onSuccess }: CommissionFormProps) {
+export default function CommissionForm({ open, onOpenChange, onSuccess, prefill }: CommissionFormProps) {
   const { t } = useTranslation();
   const { clients, fetchClients } = useClients();
   const { policies, fetchPolicies } = usePolicies();
@@ -129,6 +143,32 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
       fetchPolicies();
     }
   }, [open]);
+
+  // Smartflow Décomptes : pré-remplissage à l'ouverture du dialog.
+  // - clientId → set selectedClient (déclenche la suite : polices, agent, manager, taux)
+  // - amount / notes → form.setValue
+  // - period → écrit dans les notes pour traçabilité (la table commissions n'a
+  //   pas de période native, c'est porté par 'date' et par les notes)
+  useEffect(() => {
+    if (!open || !prefill) return;
+    if (prefill.clientId && clients.length > 0) {
+      const client = clients.find(c => c.id === prefill.clientId);
+      if (client && client.id !== selectedClient?.id) {
+        setSelectedClient(client);
+      }
+    }
+    if (typeof prefill.amount === 'number' && prefill.amount > 0) {
+      form.setValue('amount', prefill.amount);
+    }
+    if (prefill.notes) {
+      form.setValue('notes', prefill.notes);
+    }
+    if (prefill.periodYear && prefill.periodMonth) {
+      // Date au 1er du mois de la période
+      const isoDate = `${prefill.periodYear}-${String(prefill.periodMonth).padStart(2, '0')}-01`;
+      form.setValue('date', isoDate);
+    }
+  }, [open, prefill, clients]);
 
   // Recalculate amounts when total amount changes
   useEffect(() => {
@@ -334,10 +374,28 @@ export default function CommissionForm({ open, onOpenChange, onSuccess }: Commis
           rate: p.rate,
           amount: p.amount
         }));
-        
+
         await addMultipleParts(partsToInsert);
       }
-      
+
+      // Smartflow Décomptes : si on a validé une ligne de décompte, on la marque
+      // comme traitée (matched_id + validated_at + lien vers la commission créée)
+      // pour qu'elle disparaisse de la file d'attente du broker.
+      if (commission && prefill?.statementLineId) {
+        try {
+          await supabase
+            .from('commission_statement_lines')
+            .update({
+              validated_at: new Date().toISOString(),
+              created_commission_id: commission.id,
+              match_status: 'manual_match',
+            })
+            .eq('id', prefill.statementLineId);
+        } catch (e) {
+          console.warn('Could not mark statement line as validated:', e);
+        }
+      }
+
       form.reset();
       setSelectedClient(null);
       setSearchQuery("");
