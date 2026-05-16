@@ -20,6 +20,7 @@ import {
   Handshake,
   AppWindow,
   DollarSign,
+  Inbox,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -41,6 +42,7 @@ const menuItems = [
   { to: "/king/users", icon: Users, label: "Utilisateurs" },
   { to: "/king/plans", icon: Package, label: "Offres & Plans" },
   { to: "/king/costs", icon: DollarSign, label: "Coûts plateforme" },
+  { to: "/king/support", icon: Inbox, label: "Support tickets" },
   { to: "/king/security", icon: Shield, label: "Sécurité" },
   { to: "/king/compliance", icon: FileCheck, label: "Conformité RGPD" },
   { to: "/king/settings", icon: Settings, label: "Paramètres" },

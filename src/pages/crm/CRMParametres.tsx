@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
+import { TenantSupportTickets } from "@/components/support/TenantSupportTickets";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
@@ -2156,6 +2157,9 @@ export default function CRMParametres() {
 
         {/* SUPPORT */}
         <TabsContent value="support" className="space-y-6 mt-6">
+          {/* Nouveau système de tickets intégré */}
+          <TenantSupportTickets />
+
           <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

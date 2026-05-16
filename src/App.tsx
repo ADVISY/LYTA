@@ -60,6 +60,7 @@ const KingSecurity = lazy(() => import("./pages/king/KingSecurity"));
 const KingSettings = lazy(() => import("./pages/king/KingSettings"));
 const KingPlans = lazy(() => import("./pages/king/KingPlans"));
 const KingCosts = lazy(() => import("./pages/king/KingCosts"));
+const KingSupport = lazy(() => import("./pages/king/KingSupport"));
 const ComplianceReport = lazy(() => import("./pages/king/ComplianceReport"));
 const TenantOnboarding = lazy(() => import("./pages/king/TenantOnboarding"));
 const KingTenantImport = lazy(() => import("./pages/king/KingTenantImport"));
@@ -140,6 +141,7 @@ const App = () => (
                 <Route path="users" element={<KingUsers />} />
                 <Route path="plans" element={<KingPlans />} />
                 <Route path="costs" element={<KingCosts />} />
+                <Route path="support" element={<KingSupport />} />
                 <Route path="security" element={<KingSecurity />} />
                 <Route path="settings" element={<KingSettings />} />
                 <Route path="compliance" element={<ComplianceReport />} />
