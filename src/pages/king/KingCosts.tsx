@@ -7,8 +7,11 @@
  * Data : alimentée par platform_usage_logs + RPCs get_platform_costs_*.
  */
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 import { useStripeStats } from "@/hooks/useStripeStats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +57,31 @@ const formatChf = (n: number) =>
   new Intl.NumberFormat("fr-CH", { style: "currency", currency: "CHF", minimumFractionDigits: 2 }).format(n);
 
 export default function KingCosts() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [period, setPeriod] = useState<"month" | "30d" | "year">("month");
+  const [syncing, setSyncing] = useState(false);
+
+  const syncExternalBilling = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-external-billing", {
+        body: { providers: ["resend", "twilio"] },
+      });
+      if (error) throw error;
+      const lines = (data?.results || []).map((r: any) =>
+        `${r.provider}: ${r.error ? `❌ ${r.error}` : `${r.inserted} insérés (${r.total_cost_chf.toFixed(2)} CHF)`}`
+      ).join(" · ");
+      toast({ title: "Sync coûts externes", description: lines || "Aucun résultat" });
+      queryClient.invalidateQueries({ queryKey: ["king-costs-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["king-costs-top-tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["king-costs-monthly"] });
+    } catch (e: any) {
+      toast({ title: "Erreur sync", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const periodRange = (() => {
     const now = new Date();
@@ -122,7 +149,16 @@ export default function KingCosts() {
           </h1>
           <p className="text-muted-foreground">Suivi en temps réel des dépenses (OpenAI, Resend, Twilio…) et de la marge LYTA.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={syncExternalBilling}
+            disabled={syncing}
+            title="Récupère depuis Resend (emails) et Twilio (SMS) les usages réels et les insère dans platform_usage_logs"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sync…" : "Sync Resend + Twilio"}
+          </Button>
           {[
             { v: "month", l: "Ce mois" },
             { v: "30d", l: "30 j" },
