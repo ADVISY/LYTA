@@ -24,7 +24,8 @@ import {
   RotateCcw,
   Download,
   Upload,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -363,7 +364,36 @@ export default function KingTenantDetail() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase.functions.invoke('sync-tenant-stripe', {
+                  body: { tenant_id: tenantId }
+                });
+                if (error) throw error;
+                const r = data?.results?.[0];
+                if (r?.status === 'updated') {
+                  toast({ title: 'Sync Stripe OK', description: `${r.tenant_name} → plan=${r.plan ?? '?'}, MRR=${r.mrr} CHF` });
+                  queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+                } else if (r?.status === 'no_change') {
+                  toast({ title: 'Déjà à jour', description: r.message });
+                } else if (r?.status === 'no_stripe_match') {
+                  toast({ title: 'Aucun match Stripe', description: r.message, variant: 'destructive' });
+                } else if (r?.status === 'ambiguous') {
+                  toast({ title: 'Sync ambiguë', description: r.message, variant: 'destructive' });
+                } else {
+                  toast({ title: 'Erreur', description: r?.message || 'Sync échouée', variant: 'destructive' });
+                }
+              } catch (e: any) {
+                toast({ title: 'Erreur', description: e?.message || String(e), variant: 'destructive' });
+              }
+            }}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Sync Stripe
+          </Button>
           <Button variant="outline" onClick={() => navigate(`/king/tenants/${tenantId}/import`)}>
             <Upload className="h-4 w-4 mr-2" />
             Importer des données

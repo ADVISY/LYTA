@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Building2, Plus, Search, ExternalLink, Settings, MoreHorizontal, Users, FileText, Briefcase, TrendingUp, Crown, Zap, Star, CreditCard, ChevronDown, ChevronUp, RefreshCw, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { PLAN_CONFIGS, TenantPlan } from "@/config/plans";
@@ -55,9 +56,35 @@ const BILLING_LABELS: Record<string, string> = {
 
 export default function KingTenants() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
+
+  const syncAllFromStripe = async () => {
+    setSyncingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-tenant-stripe', { body: { all: true } });
+      if (error) throw error;
+      const s = data?.summary;
+      if (s) {
+        toast({
+          title: `Sync Stripe terminée — ${s.total} tenants`,
+          description: `✅ ${s.updated} mis à jour · ${s.no_change} déjà à jour · ⚠️ ${s.no_stripe_match} sans match · ${s.ambiguous} ambigus · ❌ ${s.errors} erreurs`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['king-tenants'] });
+        queryClient.invalidateQueries({ queryKey: ['king-dashboard-stats-extended'] });
+      } else {
+        toast({ title: 'Sync terminée', description: 'Aucun résultat' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erreur sync', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
 
   // Fetch consumption summary for accordion data
   const { data: consumptionData } = useTenantConsumptionSummary();
@@ -172,13 +199,24 @@ export default function KingTenants() {
           <h1 className="text-3xl font-bold">Clients SaaS</h1>
           <p className="text-muted-foreground">Gérez tous les cabinets qui utilisent LYTA</p>
         </div>
-        <Button 
-          onClick={() => navigate('/king/wizard')}
-          className="bg-amber-500 hover:bg-amber-600"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau Client
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={syncAllFromStripe}
+            disabled={syncingAll}
+            title="Récupère depuis Stripe les customers/subscriptions et lie automatiquement aux tenants par email"
+          >
+            {syncingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            {syncingAll ? 'Sync en cours…' : 'Sync tous depuis Stripe'}
+          </Button>
+          <Button
+            onClick={() => navigate('/king/wizard')}
+            className="bg-amber-500 hover:bg-amber-600"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau Client
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
