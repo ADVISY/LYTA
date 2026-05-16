@@ -66,6 +66,8 @@ export default function KingAffiliates() {
     email: "",
     status: "active" as string,
     commission_rate: 10,
+    ref_code: "",
+    default_eligibility_months: 12,
     notes: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,6 +98,8 @@ export default function KingAffiliates() {
       email: "",
       status: "active",
       commission_rate: 10,
+      ref_code: "",
+      default_eligibility_months: 12,
       notes: ""
     });
   };
@@ -111,8 +115,10 @@ export default function KingAffiliates() {
         email: formData.email,
         status: formData.status,
         commission_rate: formData.commission_rate,
+        ref_code: formData.ref_code.trim() || null,
+        default_eligibility_months: formData.default_eligibility_months,
         notes: formData.notes || null
-      });
+      } as any);
       setIsCreateDialogOpen(false);
       resetForm();
     } catch (error) {
@@ -133,8 +139,10 @@ export default function KingAffiliates() {
         email: formData.email,
         status: formData.status,
         commission_rate: formData.commission_rate,
+        ref_code: formData.ref_code.trim() || null,
+        default_eligibility_months: formData.default_eligibility_months,
         notes: formData.notes || null
-      });
+      } as any);
       setIsEditDialogOpen(false);
       setSelectedAffiliate(null);
       resetForm();
@@ -168,6 +176,8 @@ export default function KingAffiliates() {
       email: affiliate.email,
       status: affiliate.status,
       commission_rate: affiliate.commission_rate,
+      ref_code: affiliate.ref_code || "",
+      default_eligibility_months: affiliate.default_eligibility_months ?? 12,
       notes: affiliate.notes || ""
     });
     setIsEditDialogOpen(true);
@@ -449,6 +459,31 @@ export default function KingAffiliates() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="ref_code">Code court (lien lyta.ch?ref=)</Label>
+                <Input
+                  id="ref_code"
+                  type="text"
+                  placeholder="ex: HABIB"
+                  value={formData.ref_code}
+                  onChange={(e) => setFormData({ ...formData, ref_code: e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase().slice(0, 30) })}
+                />
+                <p className="text-xs text-muted-foreground">3-30 caractères, alphanumériques. Le lien sera lyta.ch?ref={formData.ref_code.toLowerCase() || "CODE"}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="default_eligibility_months">Durée éligibilité (mois)</Label>
+                <Input
+                  id="default_eligibility_months"
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={formData.default_eligibility_months}
+                  onChange={(e) => setFormData({ ...formData, default_eligibility_months: parseInt(e.target.value, 10) || 12 })}
+                />
+                <p className="text-xs text-muted-foreground">Période pendant laquelle l'affilié touche des commissions sur ce tenant.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="commission_rate">Taux de commission (%)</Label>
                 <Input
                   id="commission_rate"
@@ -462,8 +497,8 @@ export default function KingAffiliates() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Statut</Label>
-                <Select 
-                  value={formData.status} 
+                <Select
+                  value={formData.status}
                   onValueChange={(v) => setFormData({ ...formData, status: v as "active" | "inactive" })}
                 >
                   <SelectTrigger>

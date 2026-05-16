@@ -29,6 +29,7 @@ interface ReqBody {
   email?: string;
   success_url?: string;
   cancel_url?: string;
+  affiliate_ref?: string;  // ?ref=CODE depuis lyta.ch (tracking apporteur d'affaires)
 }
 
 serve(async (req) => {
@@ -103,23 +104,37 @@ serve(async (req) => {
       });
     }
 
+    // Affiliate tracking : si ref valide trouvé en base, on l'attache aux metadata
+    let affiliateRefValidated: string | null = null;
+    if (body.affiliate_ref && body.affiliate_ref.trim()) {
+      const ref = body.affiliate_ref.trim().toLowerCase();
+      const { data: affiliate } = await supabase
+        .from("affiliates")
+        .select("id, status")
+        .eq("status", "active")
+        .filter("ref_code", "ilike", ref)
+        .maybeSingle();
+      if (affiliate) {
+        affiliateRefValidated = ref;
+      }
+    }
+
+    const metadata: Record<string, string> = {
+      signup_flow: "true",
+      plan_id: planId,
+      email,
+    };
+    if (affiliateRefValidated) metadata.affiliate_ref = affiliateRefValidated;
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
       customer_email: email,
       subscription_data: {
         trial_period_days: TRIAL_DAYS,
-        metadata: {
-          signup_flow: "true",
-          plan_id: planId,
-          email,
-        },
+        metadata,
       },
-      metadata: {
-        signup_flow: "true",
-        plan_id: planId,
-        email,
-      },
+      metadata,
       success_url: body.success_url || DEFAULT_SUCCESS_URL,
       cancel_url:  body.cancel_url  || DEFAULT_CANCEL_URL,
       allow_promotion_codes: true,

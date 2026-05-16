@@ -167,8 +167,34 @@ serve(async (req) => {
     }
 
     const planId = (session.metadata?.plan_id || "").toLowerCase().trim();
+    const affiliateRef = (session.metadata?.affiliate_ref || "").trim();
     const stripeCustomerId = typeof session.customer === "string" ? session.customer : session.customer?.id || null;
     const stripeSubscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id || null;
+
+    // Si affiliate_ref → lookup l'affilié + sa rate par défaut + son eligibility
+    let affiliateLink: {
+      id: string;
+      commission_rate: number;
+      eligibility_end: string;
+    } | null = null;
+    if (affiliateRef) {
+      const { data: affiliate } = await supabase
+        .from("affiliates")
+        .select("id, commission_rate, default_eligibility_months, status")
+        .filter("ref_code", "ilike", affiliateRef)
+        .eq("status", "active")
+        .maybeSingle();
+      if (affiliate) {
+        const months = affiliate.default_eligibility_months || 12;
+        const end = new Date();
+        end.setMonth(end.getMonth() + months);
+        affiliateLink = {
+          id: affiliate.id,
+          commission_rate: Number(affiliate.commission_rate),
+          eligibility_end: end.toISOString(),
+        };
+      }
+    }
 
     let trialEndsAt: string | null = null;
     if (session.subscription && typeof session.subscription === "object" && "trial_end" in session.subscription) {
@@ -206,6 +232,11 @@ serve(async (req) => {
         signup_source: "self_signup",
         signup_session_id: sessionId,
         trial_ends_at: trialEndsAt,
+        // Tracking apporteur d'affaires (si lien valide)
+        affiliate_id: affiliateLink?.id || null,
+        affiliate_commission_rate: affiliateLink?.commission_rate || null,
+        affiliate_linked_at: affiliateLink ? new Date().toISOString() : null,
+        affiliate_eligibility_end: affiliateLink?.eligibility_end || null,
       })
       .select("id")
       .single();

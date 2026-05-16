@@ -40,6 +40,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAffiliateCommissions, Affiliate, AffiliateCommission } from "@/hooks/useAffiliates";
+import { AffiliateInvoiceTab } from "@/components/king/AffiliateInvoiceTab";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { format, addMonths, isBefore } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -290,7 +291,12 @@ export default function KingAffiliateDetail() {
         <TabsList>
           <TabsTrigger value="tenants">Tenants ({tenants.length})</TabsTrigger>
           <TabsTrigger value="commissions">Commissions ({commissions.length})</TabsTrigger>
+          <TabsTrigger value="invoice">Facture mensuelle</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="invoice">
+          <AffiliateInvoiceTab affiliateId={id!} />
+        </TabsContent>
 
         <TabsContent value="tenants">
           <Card>

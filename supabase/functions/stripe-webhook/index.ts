@@ -216,7 +216,7 @@ serve(async (req) => {
             .update({
               payment_status: 'paid',
               billing_status: 'paid',
-              current_period_end: invoice.lines?.data?.[0]?.period?.end 
+              current_period_end: invoice.lines?.data?.[0]?.period?.end
                 ? new Date(invoice.lines.data[0].period.end * 1000).toISOString()
                 : null,
               updated_at: new Date().toISOString(),
@@ -239,6 +239,21 @@ serve(async (req) => {
                 amount: invoice.amount_paid,
               }
             });
+
+          // Affiliate : calcule auto la commission si tenant lié + éligible
+          try {
+            const { data: commissionId } = await supabaseAdmin.rpc('generate_affiliate_commission', {
+              p_tenant_id: tenant.id,
+              p_payment_id: invoice.id,
+              p_payment_amount: (invoice.amount_paid ?? 0) / 100,
+              p_payment_date: new Date(((invoice.status_transitions?.paid_at || invoice.created) ?? Date.now() / 1000) * 1000).toISOString(),
+            });
+            if (commissionId) {
+              log.info('Affiliate commission generated', { commissionId, tenantId: tenant.id });
+            }
+          } catch (e) {
+            log.warn('generate_affiliate_commission failed', { err: (e as any)?.message });
+          }
         }
         break;
       }

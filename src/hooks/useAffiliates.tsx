@@ -11,6 +11,8 @@ export type Affiliate = {
   email: string;
   status: string;
   commission_rate: number;
+  ref_code: string | null;
+  default_eligibility_months: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
