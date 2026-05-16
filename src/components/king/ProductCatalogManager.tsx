@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProductCatalog, ProductMainCategory, InsuranceProductExtended } from "@/hooks/useProductCatalog";
+import { useProductCatalog, ProductMainCategory, InsuranceProductExtended, BRANCH_CODES, BRANCH_LABELS, BranchCode } from "@/hooks/useProductCatalog";
 import { useInsuranceCompanies } from "@/hooks/useInsuranceCompanies";
 import { DataPagination } from "@/components/ui/DataPagination";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Package,
   Plus,
@@ -23,6 +24,9 @@ import {
   CheckCircle,
   Building2,
   Filter,
+  Lock,
+  GitBranch,
+  Clock,
 } from "lucide-react";
 
 const MAIN_CATEGORIES: { value: ProductMainCategory; label: string; color: string }[] = [
@@ -53,6 +57,7 @@ interface ProductFormData {
   main_category: ProductMainCategory;
   subcategory: string;
   description: string;
+  branch_code: BranchCode | '';
   aliases: string[];
 }
 
@@ -63,13 +68,30 @@ const emptyForm: ProductFormData = {
   main_category: 'NON_VIE',
   subcategory: '',
   description: '',
+  branch_code: '',
   aliases: [],
 };
 
+// Mapping main_category → branches autorisées (filtre du Select Branche
+// pour éviter qu'un produit VIE soit assigné à AUTO etc.)
+const BRANCHES_FOR_MAIN: Record<ProductMainCategory, BranchCode[]> = {
+  VIE: ['VIE', 'LPP'],
+  LCA: ['LAMAL', 'LCA', 'PGM', 'ACCIDENT'],
+  NON_VIE: ['AUTO', 'MENAGE_RC', 'JURIDIQUE', 'VOYAGE', 'ENTREPRISE'],
+  HYPO: ['HYPO_CREDIT'],
+};
+
 export default function ProductCatalogManager() {
-  const { products, loading, page, totalCount, totalPages, goToPage, createProduct, updateProduct, deleteProduct, addAlias, removeAlias } = useProductCatalog();
+  const { roles } = useUserRole();
+  const isKing = roles.includes('king');
+
+  const [filterStatus, setFilterStatus] = useState<'active' | 'pending' | 'all'>('active');
+  const [filterBranch, setFilterBranch] = useState<BranchCode | 'all' | 'none'>('all');
+  const [filterOrigin, setFilterOrigin] = useState<'all' | 'system' | 'tenant'>('all');
+
+  const { products, loading, page, totalCount, totalPages, goToPage, createProduct, updateProduct, deleteProduct, addAlias, removeAlias } = useProductCatalog(undefined, { statusFilter: filterStatus });
   const { companies } = useInsuranceCompanies();
-  
+
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<ProductMainCategory | 'all'>('all');
   const [filterCompany, setFilterCompany] = useState<string>('all');
@@ -88,8 +110,19 @@ export default function ProductCatalogManager() {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterCategory !== 'all' && p.main_category !== filterCategory) return false;
     if (filterCompany !== 'all' && p.company_id !== filterCompany) return false;
+    if (filterBranch === 'none') {
+      if (p.branch_code) return false;
+    } else if (filterBranch !== 'all') {
+      if (p.branch_code !== filterBranch) return false;
+    }
+    if (filterOrigin === 'system' && p.tenant_id !== null) return false;
+    if (filterOrigin === 'tenant' && p.tenant_id === null) return false;
     return true;
   });
+
+  // Un produit système (tenant_id NULL) est verrouillé pour un tenant non-king.
+  // Le king peut tout éditer.
+  const canEdit = (p: InsuranceProductExtended) => isKing || p.tenant_id !== null;
 
   const openCreateDialog = () => {
     setEditingProduct(null);
@@ -106,6 +139,7 @@ export default function ProductCatalogManager() {
       main_category: product.main_category,
       subcategory: product.subcategory || '',
       description: product.description || '',
+      branch_code: product.branch_code ?? '',
       aliases: [],
     });
     setDialogOpen(true);
@@ -119,10 +153,12 @@ export default function ProductCatalogManager() {
       if (editingProduct) {
         await updateProduct(editingProduct.id, {
           name: formData.name,
+          company_id: formData.company_id,
           category: formData.category || MAIN_CATEGORY_TO_LEGACY[formData.main_category],
           main_category: formData.main_category,
           subcategory: formData.subcategory || undefined,
           description: formData.description || undefined,
+          branch_code: formData.branch_code || null,
         });
       } else {
         await createProduct({
@@ -132,6 +168,7 @@ export default function ProductCatalogManager() {
           main_category: formData.main_category,
           subcategory: formData.subcategory || undefined,
           description: formData.description || undefined,
+          branch_code: formData.branch_code || null,
           aliases: formData.aliases,
         });
       }
@@ -139,6 +176,11 @@ export default function ProductCatalogManager() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleValidatePending = async (product: InsuranceProductExtended) => {
+    if (product.status !== 'pending') return;
+    await updateProduct(product.id, { status: 'active' });
   };
 
   const handleDelete = async (productId: string) => {
@@ -191,7 +233,8 @@ export default function ProductCatalogManager() {
           <div>
             <h2 className="text-2xl font-bold">Catalogue Produits</h2>
             <p className="text-muted-foreground">
-              {products.length} produits • {companies.length} compagnies
+              {products.length} produits ({products.filter(p => p.tenant_id === null).length} système, {products.filter(p => p.tenant_id !== null).length} cabinet)
+              • {companies.length} compagnies
             </p>
           </div>
         </div>
@@ -240,6 +283,44 @@ export default function ProductCatalogManager() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={filterBranch} onValueChange={(v) => setFilterBranch(v as BranchCode | 'all' | 'none')}>
+              <SelectTrigger className="w-[200px]">
+                <GitBranch className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Branche" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes branches</SelectItem>
+                <SelectItem value="none">⚠️ Sans branche</SelectItem>
+                {BRANCH_CODES.map(b => (
+                  <SelectItem key={b} value={b}>{BRANCH_LABELS[b]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'active' | 'pending' | 'all')}>
+              <SelectTrigger className="w-[160px]">
+                <Clock className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Actifs</SelectItem>
+                <SelectItem value="pending">⏳ Pending</SelectItem>
+                <SelectItem value="all">Tous</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterOrigin} onValueChange={(v) => setFilterOrigin(v as 'all' | 'system' | 'tenant')}>
+              <SelectTrigger className="w-[170px]">
+                <Lock className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Origine" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous (système + cabinet)</SelectItem>
+                <SelectItem value="system">🔒 Système</SelectItem>
+                <SelectItem value="tenant">Mon cabinet</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -259,73 +340,123 @@ export default function ProductCatalogManager() {
                 <TableRow>
                   <TableHead>Produit</TableHead>
                   <TableHead>Compagnie</TableHead>
+                  <TableHead>Branche</TableHead>
                   <TableHead>Catégorie</TableHead>
-                  <TableHead>Sous-catégorie</TableHead>
+                  <TableHead>Origine</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Alias</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map(product => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        {product.description && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                            {product.description}
-                          </p>
+                {filteredProducts.map(product => {
+                  const editable = canEdit(product);
+                  const isSystem = product.tenant_id === null;
+                  const isPending = product.status === 'pending';
+                  return (
+                    <TableRow key={product.id} className={isPending ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          {product.description && (
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{product.company?.name || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        {product.branch_code ? (
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {product.branch_code}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-700 border-amber-400">
+                            ⚠ Aucune
+                          </Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{product.company?.name || '-'}</span>
-                    </TableCell>
-                    <TableCell>
-                      {getCategoryBadge(product.main_category)}
-                    </TableCell>
-                    <TableCell>
-                      {product.subcategory ? (
-                        <Badge variant="outline">{product.subcategory}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openAliasDialog(product)}
-                        className="gap-1"
-                      >
-                        <Tags className="h-3 w-3" />
-                        {product.aliases?.length || 0}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
+                      </TableCell>
+                      <TableCell>
+                        {getCategoryBadge(product.main_category)}
+                      </TableCell>
+                      <TableCell>
+                        {isSystem ? (
+                          <Badge variant="secondary" className="gap-1">
+                            <Lock className="h-3 w-3" />
+                            Système
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            Mon cabinet
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isPending ? (
+                          <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                            Pending
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-green-700 border-green-300">
+                            Actif
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Button
                           variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(product)}
+                          size="sm"
+                          onClick={() => openAliasDialog(product)}
+                          className="gap-1"
+                          disabled={!editable}
+                          title={!editable ? 'Produit système — verrouillé' : undefined}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Tags className="h-3 w-3" />
+                          {product.aliases?.length || 0}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(product.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {isPending && editable && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleValidatePending(product)}
+                              className="text-green-700 hover:text-green-800"
+                              title="Valider ce produit pending"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(product)}
+                            title={editable ? 'Modifier' : 'Voir (lecture seule — produit système)'}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(product.id)}
+                            className="text-destructive hover:text-destructive"
+                            disabled={!editable}
+                            title={!editable ? 'Produit système — non supprimable' : 'Supprimer'}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {filteredProducts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       Aucun produit trouvé
                     </TableCell>
                   </TableRow>
@@ -359,15 +490,27 @@ export default function ProductCatalogManager() {
                 value={formData.name}
                 onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
                 placeholder="Ex: LAMal FAVORIT MEDPHARM"
+                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
               />
             </div>
+
+            {editingProduct && editingProduct.tenant_id === null && !isKing && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+                <div className="flex items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
+                  <Lock className="h-4 w-4" /> Produit système — lecture seule
+                </div>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                  Ce produit fait partie du catalogue partagé entre tous les tenants. Tu ne peux pas le modifier. Pour proposer une correction, contacte le support.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Compagnie *</Label>
               <Select
                 value={formData.company_id}
                 onValueChange={(v) => setFormData(f => ({ ...f, company_id: v }))}
-                disabled={!!editingProduct}
+                disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner une compagnie" />
@@ -385,11 +528,13 @@ export default function ProductCatalogManager() {
                 <Label>Catégorie principale *</Label>
                 <Select
                   value={formData.main_category}
-                  onValueChange={(v) => setFormData(f => ({ 
-                    ...f, 
+                  onValueChange={(v) => setFormData(f => ({
+                    ...f,
                     main_category: v as ProductMainCategory,
                     subcategory: '',
+                    branch_code: BRANCHES_FOR_MAIN[v as ProductMainCategory].includes(f.branch_code as BranchCode) ? f.branch_code : '',
                   }))}
+                  disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -403,22 +548,44 @@ export default function ProductCatalogManager() {
               </div>
 
               <div className="space-y-2">
-                <Label>Sous-catégorie</Label>
+                <Label>Branche *</Label>
                 <Select
-                  value={formData.subcategory || "none"}
-                  onValueChange={(v) => setFormData(f => ({ ...f, subcategory: v === "none" ? "" : v }))}
+                  value={formData.branch_code || 'none'}
+                  onValueChange={(v) => setFormData(f => ({ ...f, branch_code: v === 'none' ? '' : (v as BranchCode) }))}
+                  disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Optionnel" />
+                    <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Aucune</SelectItem>
-                    {SUBCATEGORIES[formData.main_category]?.map(sub => (
-                      <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                    {BRANCHES_FOR_MAIN[formData.main_category].map(b => (
+                      <SelectItem key={b} value={b}>
+                        <span className="font-mono mr-2">{b}</span> {BRANCH_LABELS[b]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sous-catégorie</Label>
+              <Select
+                value={formData.subcategory || "none"}
+                onValueChange={(v) => setFormData(f => ({ ...f, subcategory: v === "none" ? "" : v }))}
+                disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Optionnel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {SUBCATEGORIES[formData.main_category]?.map(sub => (
+                    <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -427,6 +594,7 @@ export default function ProductCatalogManager() {
                 value={formData.category}
                 onChange={(e) => setFormData(f => ({ ...f, category: e.target.value }))}
                 placeholder="Ex: health, life, auto..."
+                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
               />
             </div>
 
@@ -437,6 +605,7 @@ export default function ProductCatalogManager() {
                 onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
                 placeholder="Description optionnelle..."
                 rows={2}
+                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
               />
             </div>
 
@@ -493,11 +662,13 @@ export default function ProductCatalogManager() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Annuler
+              {editingProduct && editingProduct.tenant_id === null && !isKing ? 'Fermer' : 'Annuler'}
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting || !formData.name || !formData.company_id}>
-              {isSubmitting ? 'Enregistrement...' : (editingProduct ? 'Modifier' : 'Créer')}
-            </Button>
+            {!(editingProduct && editingProduct.tenant_id === null && !isKing) && (
+              <Button onClick={handleSubmit} disabled={isSubmitting || !formData.name || !formData.company_id}>
+                {isSubmitting ? 'Enregistrement...' : (editingProduct ? 'Modifier' : 'Créer')}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

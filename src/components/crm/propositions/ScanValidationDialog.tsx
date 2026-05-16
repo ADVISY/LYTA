@@ -419,14 +419,25 @@ export default function ScanValidationDialog({
       const lastName = getField(["nom", "last_name"]) || primary.last_name || null;
       const firstName = getField(["prenom", "prénom", "first_name"]) || primary.first_name || null;
 
-      // 1. Resolve an EXISTING client (no insert)
+      // 1. Resolve an EXISTING client (no insert).
+      // Strict-match guard: an email match is only trusted if first_name +
+      // last_name of the stored row also match the scan. Past buggy scans
+      // (field_name/extracted_value misread) wrote one person's email onto
+      // another's card; without this guard, the next scan reuses that
+      // card and the two identities get merged ("fiches confondues").
+      const nameMatches = (row: { first_name?: string | null; last_name?: string | null }) => {
+        if (!firstName || !lastName) return true; // can't disprove → trust email
+        const norm = (s: string | null | undefined) =>
+          (s ?? "").toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        return norm(row.first_name) === norm(firstName) && norm(row.last_name) === norm(lastName);
+      };
       let existingClientId: string | null = null;
       if (email) {
         const { data } = await supabase
-          .from("clients").select("id")
+          .from("clients").select("id, first_name, last_name")
           .eq("tenant_id", tenantIdFromHook).ilike("email", email)
           .limit(1).maybeSingle();
-        if (data?.id) existingClientId = data.id;
+        if (data?.id && nameMatches(data)) existingClientId = data.id;
       }
       if (!existingClientId && lastName && firstName) {
         const { data } = await supabase
@@ -439,11 +450,11 @@ export default function ScanValidationDialog({
       if (!existingClientId && phone) {
         const phoneClean = phone.replace(/\s+/g, "");
         const { data } = await supabase
-          .from("clients").select("id")
+          .from("clients").select("id, first_name, last_name")
           .eq("tenant_id", tenantIdFromHook)
           .ilike("phone", `%${phoneClean.slice(-8)}%`)
           .limit(1).maybeSingle();
-        if (data?.id) existingClientId = data.id;
+        if (data?.id && nameMatches(data)) existingClientId = data.id;
       }
 
       // 2. Build the primary client payload (no insert yet)

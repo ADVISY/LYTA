@@ -48,14 +48,21 @@ import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
+type CommissionOverride = {
+  commission_type: string | null;
+  commission_value: number | null;
+  commission_description: string | null;
+};
+
 type Product = {
   id: string;
   name: string;
   category: string;
   description: string | null;
-  commission_type: string | null;
+  commission_type: string | null;       // valeur système / défaut produit
   commission_value: number | null;
   commission_description: string | null;
+  tenant_id: string | null;              // NULL = produit système (verrouillé sauf commission)
   tenant_branch_id: string | null;
   tenant_branch?: {
     id: string;
@@ -64,7 +71,15 @@ type Product = {
     icon: string | null;
     color: string | null;
   } | null;
+  override?: CommissionOverride | null;  // override commission du tenant courant
 };
+
+// Helpers : commission effective (override si présent sinon défaut produit)
+const effectiveCommission = (p: Product): CommissionOverride => ({
+  commission_type: p.override?.commission_type ?? p.commission_type,
+  commission_value: p.override?.commission_value ?? p.commission_value,
+  commission_description: p.override?.commission_description ?? p.commission_description,
+});
 
 type Company = {
   id: string;
@@ -170,14 +185,33 @@ export default function CRMCompagnies() {
           )
         `)
         .order('name');
-      
+
       if (productsError) throw productsError;
 
-      // Filter out "Dépôt contrat" products - they are only for email submissions
-      const visibleProducts = (productsData || []).filter(p => 
-        !p.name?.toLowerCase().includes('dépôt contrat') && 
-        !p.name?.toLowerCase().includes('depot contrat')
+      // Récupérer les overrides du tenant courant (1 row max par produit)
+      // RLS limite déjà aux overrides de mon tenant, donc pas besoin de filtrer
+      // explicitement par tenant_id côté front.
+      const { data: overridesData } = await supabase
+        .from('tenant_product_commission_overrides')
+        .select('product_id, commission_type, commission_value, commission_description');
+      const overridesByProduct: Record<string, CommissionOverride> = Object.fromEntries(
+        (overridesData || []).map(o => [o.product_id as string, {
+          commission_type: o.commission_type,
+          commission_value: o.commission_value,
+          commission_description: o.commission_description,
+        }])
       );
+
+      // Filter out "Dépôt contrat" products - they are only for email submissions
+      const visibleProducts: Product[] = (productsData || [])
+        .filter(p =>
+          !p.name?.toLowerCase().includes('dépôt contrat') &&
+          !p.name?.toLowerCase().includes('depot contrat')
+        )
+        .map(p => ({
+          ...(p as Product),
+          override: overridesByProduct[p.id] ?? null,
+        }));
 
       const companiesWithProducts = (companiesData || []).map(company => ({
         ...company,
@@ -202,13 +236,14 @@ export default function CRMCompagnies() {
     setOpenCompanies(newOpen);
   };
 
-  // Commission inline edit
+  // Commission inline edit — utilise la commission EFFECTIVE (override si présent)
   const startEditCommission = (product: Product) => {
+    const eff = effectiveCommission(product);
     setEditingProduct(product.id);
     setEditForm({
-      type: product.commission_type || 'multiplier',
-      value: product.commission_value?.toString() || '',
-      description: product.commission_description || ''
+      type: eff.commission_type || 'multiplier',
+      value: eff.commission_value?.toString() || '',
+      description: eff.commission_description || ''
     });
   };
 
@@ -220,7 +255,7 @@ export default function CRMCompagnies() {
   const saveProductCommission = async (productId: string) => {
     try {
       setSaving(true);
-      
+
       let description = editForm.description;
       if (!description) {
         switch (editForm.type) {
@@ -236,18 +271,61 @@ export default function CRMCompagnies() {
         }
       }
 
+      // Trouver le produit pour savoir s'il est système ou tenant
+      const allProducts = companies.flatMap(c => c.products);
+      const product = allProducts.find(p => p.id === productId);
+      const isSystem = product?.tenant_id === null;
+
+      const commissionPayload = {
+        commission_type: editForm.type,
+        commission_value: parseFloat(editForm.value) || 0,
+        commission_description: description,
+      };
+
+      if (isSystem) {
+        // Produit système → on enregistre un OVERRIDE privé au tenant courant.
+        // La RLS empêche déjà un tenant de modifier un produit système directement.
+        if (!tenantId) throw new Error('Tenant non identifié');
+        const { error } = await supabase
+          .from('tenant_product_commission_overrides')
+          .upsert({
+            tenant_id: tenantId,
+            product_id: productId,
+            ...commissionPayload,
+          }, { onConflict: 'tenant_id,product_id' });
+        if (error) throw error;
+        toast({ title: "Succès", description: "Commission personnalisée pour ton cabinet" });
+      } else {
+        // Produit tenant → édition directe sur insurance_products
+        const { error } = await supabase
+          .from('insurance_products')
+          .update(commissionPayload)
+          .eq('id', productId);
+        if (error) throw error;
+        toast({ title: "Succès", description: "Commission mise à jour" });
+      }
+
+      setEditingProduct(null);
+      fetchCompanies();
+    } catch (error: any) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Réinitialise la commission au défaut système (supprime l'override du tenant)
+  const resetCommissionOverride = async (productId: string) => {
+    try {
+      setSaving(true);
+      if (!tenantId) throw new Error('Tenant non identifié');
       const { error } = await supabase
-        .from('insurance_products')
-        .update({
-          commission_type: editForm.type,
-          commission_value: parseFloat(editForm.value) || 0,
-          commission_description: description
-        })
-        .eq('id', productId);
-
+        .from('tenant_product_commission_overrides')
+        .delete()
+        .eq('product_id', productId)
+        .eq('tenant_id', tenantId);
       if (error) throw error;
-
-      toast({ title: "Succès", description: "Commission mise à jour" });
+      toast({ title: "Réinitialisé", description: "Commission ramenée au défaut système" });
       setEditingProduct(null);
       fetchCompanies();
     } catch (error: any) {
@@ -290,15 +368,19 @@ export default function CRMCompagnies() {
         if (error) throw error;
         toast({ title: "Succès", description: "Compagnie modifiée" });
       } else {
+        // Tenant scoping : on crée la compagnie POUR le tenant courant
+        // (sinon la RLS bloque pour les non-king et la compagnie est créée
+        // en "système" partagé, ce qui pollue le master catalog).
         const { error } = await supabase
           .from('insurance_companies')
-          .insert({ 
-            name: companyForm.name, 
+          .insert({
+            name: companyForm.name,
             logo_url: companyForm.logo_url || null,
-            website: companyForm.website || null
+            website: companyForm.website || null,
+            tenant_id: tenantId ?? null,
           });
         if (error) throw error;
-        toast({ title: "Succès", description: "Compagnie créée" });
+        toast({ title: "Succès", description: "Compagnie créée pour ton cabinet" });
       }
       
       setCompanyDialogOpen(false);
@@ -739,7 +821,7 @@ export default function CRMCompagnies() {
                                       onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                                       className="h-8 text-xs"
                                     />
-                                    <div className="flex gap-1">
+                                    <div className="flex gap-1 flex-wrap">
                                       <Button
                                         size="sm"
                                         className="h-7 text-xs flex-1"
@@ -758,22 +840,42 @@ export default function CRMCompagnies() {
                                       >
                                         <X className="h-3 w-3" />
                                       </Button>
+                                      {product.tenant_id === null && product.override && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 text-xs text-muted-foreground"
+                                          onClick={() => resetCommissionOverride(product.id)}
+                                          disabled={saving}
+                                          title="Supprimer ma personnalisation et revenir au défaut système"
+                                        >
+                                          Réinitialiser
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 ) : (
                                   <div className="mt-2">
-                                    {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description) ? (
-                                      <div className="flex items-center gap-1.5 text-xs">
-                                        <DollarSign className="h-3 w-3 text-primary" />
-                                        <span className="font-medium text-primary">
-                                          {formatCommissionDisplay(product.commission_type, product.commission_value, product.commission_description)}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-muted-foreground italic">
-                                        {t('companyForm.noCommissionDefined')}
-                                      </p>
-                                    )}
+                                    {(() => {
+                                      const eff = effectiveCommission(product);
+                                      const display = formatCommissionDisplay(eff.commission_type, eff.commission_value, eff.commission_description);
+                                      const isCustom = product.tenant_id === null && !!product.override;
+                                      return display ? (
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                          <DollarSign className="h-3 w-3 text-primary" />
+                                          <span className="font-medium text-primary">{display}</span>
+                                          {isCustom && (
+                                            <Badge variant="secondary" className="ml-1 h-5 text-[10px] px-1.5">
+                                              Personnalisé
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground italic">
+                                          {t('companyForm.noCommissionDefined')}
+                                        </p>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>

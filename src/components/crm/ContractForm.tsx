@@ -128,6 +128,11 @@ const getCategoryLabels = (t: (key: string) => string): Record<string, string> =
   legal: t("forms.contract.categories.legal"),
   property: t("forms.contract.categories.property"),
   other: t("forms.contract.categories.other"),
+  // Map legacy enum values to user-facing labels so 'multirisque',
+  // 'rcpro' and 'third_pillar' never appear raw in the UI.
+  multirisque: t("forms.contract.categories.other"),
+  rcpro: t("forms.contract.categories.other"),
+  third_pillar: t("forms.contract.categories.life"),
 });
 
 // Helper to generate unique IDs safely

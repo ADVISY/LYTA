@@ -12,29 +12,64 @@ export interface ProductAlias {
   created_at: string;
 }
 
+export type BranchCode =
+  | 'AUTO' | 'LAMAL' | 'LCA' | 'PGM' | 'ACCIDENT'
+  | 'VIE' | 'LPP' | 'HYPO_CREDIT'
+  | 'MENAGE_RC' | 'JURIDIQUE' | 'VOYAGE' | 'ENTREPRISE';
+
+export const BRANCH_CODES: BranchCode[] = [
+  'AUTO','LAMAL','LCA','PGM','ACCIDENT',
+  'VIE','LPP','HYPO_CREDIT',
+  'MENAGE_RC','JURIDIQUE','VOYAGE','ENTREPRISE',
+];
+
+export const BRANCH_LABELS: Record<BranchCode, string> = {
+  AUTO: 'Auto / Moto',
+  LAMAL: 'LAMal',
+  LCA: 'Complémentaire',
+  PGM: 'Perte de gain',
+  ACCIDENT: 'Accident',
+  VIE: 'Vie / Prévoyance',
+  LPP: '2e pilier (LPP)',
+  HYPO_CREDIT: 'Hypothèque / Crédit',
+  MENAGE_RC: 'Ménage / RC',
+  JURIDIQUE: 'Juridique',
+  VOYAGE: 'Voyage',
+  ENTREPRISE: 'Entreprise',
+};
+
 export interface InsuranceProductExtended {
   id: string;
   name: string;
   category: string;
   main_category: ProductMainCategory;
   subcategory: string | null;
+  branch_code: BranchCode | null;
   company_id: string;
   description: string | null;
   is_active: boolean;
+  status: string;          // 'active' | 'pending'
+  tenant_id: string | null; // NULL = système / verrouillé pour les tenants
   created_at: string;
   company?: {
     id: string;
     name: string;
     logo_url: string | null;
+    tenant_id: string | null;
   };
   aliases?: ProductAlias[];
 }
 
-export function useProductCatalog(companyId?: string) {
+export interface ProductCatalogFilters {
+  statusFilter?: 'active' | 'pending' | 'all';
+}
+
+export function useProductCatalog(companyId?: string, filters?: ProductCatalogFilters) {
   const { toast } = useToast();
+  const statusFilter = filters?.statusFilter ?? 'active';
 
   const { data: products, page, totalCount, totalPages, goToPage, nextPage, prevPage, isLoading: loading, isError, refetch } = usePaginatedQuery<InsuranceProductExtended>({
-    queryKey: ['product_catalog', companyId ?? ''],
+    queryKey: ['product_catalog', companyId ?? '', statusFilter],
     buildQuery: (client) => {
       let query = client.from('insurance_products')
         .select(`
@@ -42,7 +77,8 @@ export function useProductCatalog(companyId?: string) {
           company:insurance_companies!company_id (
             id,
             name,
-            logo_url
+            logo_url,
+            tenant_id
           ),
           aliases:product_aliases (
             id,
@@ -51,8 +87,11 @@ export function useProductCatalog(companyId?: string) {
             created_at
           )
         `)
-        .eq('status', 'active')
         .order('name', { ascending: true });
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
 
       if (companyId) {
         query = query.eq('company_id', companyId);
@@ -73,6 +112,7 @@ export function useProductCatalog(companyId?: string) {
     subcategory?: string;
     description?: string;
     aliases?: string[];
+    branch_code?: BranchCode | null;
   }): Promise<string | null> => {
     try {
       const { data, error } = await supabase
@@ -84,6 +124,7 @@ export function useProductCatalog(companyId?: string) {
           main_category: product.main_category,
           subcategory: product.subcategory || null,
           description: product.description || null,
+          branch_code: product.branch_code ?? null,
           is_active: true,
         })
         .select()
@@ -133,6 +174,9 @@ export function useProductCatalog(companyId?: string) {
       subcategory: string;
       description: string;
       is_active: boolean;
+      branch_code: BranchCode | null;
+      status: 'active' | 'pending';
+      company_id: string;
     }>
   ): Promise<boolean> => {
     try {

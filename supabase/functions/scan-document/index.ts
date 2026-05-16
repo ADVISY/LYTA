@@ -1360,9 +1360,12 @@ serve(async (req) => {
 
     const productMatchResults = await mapWithConcurrency(productsToMatch, getProductMatchConcurrency(), async (product) => {
       try {
-        // Resolve branch up-front so it's available for both match and candidate paths
-        const resolvedBranchCode = resolveBranchCode(product);
-        const resolvedBranchId = tenantBranchByCode[resolvedBranchCode] || null;
+        // Resolve branch up-front (fallback). If we later get a match from the
+        // catalog with its own branch_code, we override with the catalog value
+        // (source of truth since the 20260515120000 migration : 390/390 produits
+        // classés).
+        let resolvedBranchCode = resolveBranchCode(product);
+        let resolvedBranchId = tenantBranchByCode[resolvedBranchCode] || null;
         product.resolved_branch_code = resolvedBranchCode;
         product.resolved_branch_id = resolvedBranchId;
 
@@ -1385,7 +1388,20 @@ serve(async (req) => {
           product.match_score = parseFloat(bestMatch.match_score);
           product.is_candidate = false;
 
-          log.info(`Matched "${product.product_name}" → "${bestMatch.product_name}" (${bestMatch.match_type}, score: ${bestMatch.match_score}, branch: ${resolvedBranchCode})`);
+          // CATALOG IS THE SOURCE OF TRUTH for the branch.
+          // If the matched product has its own branch_code (now true for 100%
+          // of the catalog after the 20260515120000 migration), we use that
+          // value and override the upfront heuristic. This eliminates the
+          // LAMal-vs-LCA / Hospita-vs-Multirisque misclassification.
+          const catalogBranchCode = (bestMatch.branch_code || '').toString().toUpperCase().trim();
+          if (catalogBranchCode) {
+            resolvedBranchCode = catalogBranchCode;
+            resolvedBranchId = tenantBranchByCode[catalogBranchCode] || resolvedBranchId;
+            product.resolved_branch_code = resolvedBranchCode;
+            product.resolved_branch_id = resolvedBranchId;
+          }
+
+          log.info(`Matched "${product.product_name}" → "${bestMatch.product_name}" (${bestMatch.match_type}, score: ${bestMatch.match_score}, branch: ${resolvedBranchCode}${catalogBranchCode ? ' [from catalog]' : ' [heuristic fallback]'})`);
 
           // If matched product has no tenant_branch_id yet, backfill it now.
           if (resolvedBranchId) {
