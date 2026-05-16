@@ -204,14 +204,13 @@ export function useClients(typeFilter?: string) {
       return { rows: [] as Client[], count: 0 };
     }
 
-    // count: "exact" pour avoir le vrai nombre de pages (planned sous-estime
-    // après gros imports → des rows deviennent invisibles depuis la pagination).
-    // Avec les indexes composés ajoutés sur user_tenant_assignments(user_id,
-    // tenant_id) + user_tenant_roles(user_id, role_id, tenant_id), le RLS est
-    // assez rapide pour que count exact tienne en < 1s sur 1000+ rows.
+    // SELECT data (sans count — le count exact RLS dépasse le statement_timeout
+    // Postgres 8s sur gros tenants 1000+ rows). On fait le count en parallèle
+    // via la RPC count_clients_for_tenant (SECURITY DEFINER → bypass RLS, count
+    // instantané).
     let query = supabase
       .from("clients")
-      .select("*", { count: "exact" })
+      .select("*")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
@@ -219,21 +218,32 @@ export function useClients(typeFilter?: string) {
       query = query.eq("type_adresse", typeFilter);
     }
 
-    const result = await withTimeout(
-      query.range(from, to),
-      CLIENTS_QUERY_TIMEOUT_MS,
-      "Le chargement des adresses a expiré."
-    );
+    const [dataResult, countResult] = await Promise.all([
+      withTimeout(
+        query.range(from, to),
+        CLIENTS_QUERY_TIMEOUT_MS,
+        "Le chargement des adresses a expiré."
+      ),
+      supabase.rpc("count_clients_for_tenant", {
+        p_tenant_id: tenantId,
+        p_type_adresse: typeFilter ?? null,
+      }),
+    ]);
 
-    if (result.error) {
-      throw result.error;
+    if (dataResult.error) {
+      throw dataResult.error;
     }
 
-    const rows = await withAssignedAgents((result.data ?? []) as Client[], tenantId);
+    const rows = await withAssignedAgents((dataResult.data ?? []) as Client[], tenantId);
+
+    // Si la RPC count échoue (très rare), on tombe sur rows.length comme fallback
+    const totalCount = (typeof countResult?.data === "number")
+      ? countResult.data
+      : (rows.length === CLIENTS_PAGE_SIZE ? from + rows.length + 1 : from + rows.length);
 
     return {
       rows,
-      count: result.count ?? 0,
+      count: totalCount,
     };
   }, [from, tenantId, to, typeFilter]);
 
