@@ -7,7 +7,10 @@ import { useUserTenant } from "@/hooks/useUserTenant";
 import { translateError } from "@/lib/errorTranslations";
 
 const CLIENTS_PAGE_SIZE = 50;
-const CLIENTS_QUERY_TIMEOUT_MS = 12_000;
+// Bumpé de 12s → 45s : avec 1000+ clients + RLS lourdes (3 EXISTS croisés),
+// le count + select peuvent dépasser 12s. 45s laisse de la marge sans bloquer
+// l'UI éternellement.
+const CLIENTS_QUERY_TIMEOUT_MS = 45_000;
 
 type AssignedAgent = {
   id: string;
@@ -201,9 +204,13 @@ export function useClients(typeFilter?: string) {
       return { rows: [] as Client[], count: 0 };
     }
 
+    // count: "planned" → Postgres lit pg_class.reltuples (instantané)
+    // au lieu de scanner toutes les rows. Sur une table avec 1000+ rows
+    // et des RLS lourdes, "exact" peut prendre >12s. "planned" reste assez
+    // précis pour la pagination (refresh régulier via VACUUM ANALYZE).
     let query = supabase
       .from("clients")
-      .select("*", { count: "exact" })
+      .select("*", { count: "planned" })
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
