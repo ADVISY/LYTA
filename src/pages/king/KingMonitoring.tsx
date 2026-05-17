@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Activity, Loader2, AlertTriangle, ExternalLink, Users, FileText, Search, Server } from "lucide-react";
+import { Activity, Loader2, AlertTriangle, ExternalLink, Users, FileText, Search, Server, History } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -300,6 +300,83 @@ function CrossTenantPoliciesTab() {
   );
 }
 
+function AuditLogTab() {
+  const [actionFilter, setActionFilter] = useState<string>("all");
+
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ["king-audit-log", actionFilter],
+    queryFn: async () => {
+      let q = supabase
+        .from("king_audit_log")
+        .select("id, action_type, actor_email, actor_role, target_type, target_id, target_label, changes, metadata, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (actionFilter !== "all") q = q.eq("action_type", actionFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  // Distinct action types pour le filtre
+  const actionTypes = Array.from(new Set(logs.map((l: any) => l.action_type)));
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base flex items-center gap-2">
+          <History className="h-4 w-4 text-primary" />
+          Audit log (200 derniers événements)
+        </CardTitle>
+        <select
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          className="px-3 py-1.5 rounded-md border bg-background text-sm"
+        >
+          <option value="all">Tous les types</option>
+          {actionTypes.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="py-8 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : logs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">Aucun événement loggé.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Quand</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Acteur</TableHead>
+                <TableHead>Cible</TableHead>
+                <TableHead>Détail</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logs.map((l: any) => (
+                <TableRow key={l.id}>
+                  <TableCell className="text-xs whitespace-nowrap">{formatDistanceToNow(new Date(l.created_at), { locale: fr, addSuffix: true })}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs font-mono">{l.action_type}</Badge></TableCell>
+                  <TableCell className="text-sm">{l.actor_email || "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {l.target_label || "—"}
+                    {l.target_type && <span className="text-xs text-muted-foreground ml-1">({l.target_type})</span>}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
+                    {l.metadata ? JSON.stringify(l.metadata).slice(0, 100) : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function KingMonitoring() {
   return (
     <div className="space-y-6">
@@ -314,11 +391,13 @@ export default function KingMonitoring() {
       <Tabs defaultValue="health">
         <TabsList>
           <TabsTrigger value="health" className="gap-2"><Activity className="h-4 w-4" />Santé</TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2"><History className="h-4 w-4" />Audit log</TabsTrigger>
           <TabsTrigger value="clients" className="gap-2"><Users className="h-4 w-4" />Tous les clients</TabsTrigger>
           <TabsTrigger value="policies" className="gap-2"><FileText className="h-4 w-4" />Tous les contrats</TabsTrigger>
         </TabsList>
 
         <TabsContent value="health" className="mt-6"><HealthTab /></TabsContent>
+        <TabsContent value="audit" className="mt-6"><AuditLogTab /></TabsContent>
         <TabsContent value="clients" className="mt-6"><CrossTenantClientsTab /></TabsContent>
         <TabsContent value="policies" className="mt-6"><CrossTenantPoliciesTab /></TabsContent>
       </Tabs>

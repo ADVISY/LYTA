@@ -31,7 +31,8 @@ import {
   FileDown,
   CheckCircle2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  KeyRound
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -400,6 +401,31 @@ export default function KingTenantDetail() {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Sync Stripe
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!confirm("Générer un lien d'impersonation pour ce tenant ? (à ouvrir en fenêtre privée)")) return;
+              try {
+                const { data, error } = await supabase.functions.invoke('king-impersonate-tenant', {
+                  body: { tenant_id: tenantId },
+                });
+                if (error) throw error;
+                // Copie l'URL dans le presse-papier
+                await navigator.clipboard.writeText(data.impersonate_url);
+                toast({
+                  title: 'Lien d\'impersonation copié',
+                  description: `Connexion auto comme ${data.target_email}. Ouvre en fenêtre privée. Loggé dans audit.`,
+                });
+              } catch (e: any) {
+                toast({ title: 'Erreur impersonation', description: e?.message || String(e), variant: 'destructive' });
+              }
+            }}
+            className="text-amber-700 border-amber-300 hover:bg-amber-50"
+            title="Génère un magic link pour te connecter comme un user admin du tenant (loggé dans audit)"
+          >
+            <KeyRound className="h-4 w-4 mr-2" />
+            Impersonate
           </Button>
           <Button
             variant="outline"
