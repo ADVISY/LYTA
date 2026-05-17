@@ -22,8 +22,11 @@ import {
   DollarSign,
   Inbox,
   Activity,
+  ChevronDown,
+  UserCog,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
+import { useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -32,22 +35,42 @@ import lytaLogo from "@/assets/lyta-logo-full.svg";
 
 import { supabase } from "@/integrations/supabase/client";
 
-const menuItems = [
+// Structure menu hiérarchique : sections avec children pour sous-menus
+// Items au top niveau : Dashboard, Onboarding (groupe), Support tickets,
+// Référentiels, LYTA Tools, Paramètres (groupe)
+type MenuItem = { to: string; icon: any; label: string; end?: boolean };
+type MenuGroup = { label: string; icon: any; children: MenuItem[] };
+type MenuEntry = MenuItem | MenuGroup;
+
+const isGroup = (e: MenuEntry): e is MenuGroup => "children" in e;
+
+const menuItems: MenuEntry[] = [
   { to: "/king", icon: LayoutDashboard, label: "Dashboard", end: true },
-  { to: "/king/tenants", icon: Building2, label: "Clients SaaS" },
-  { to: "/king/wizard", icon: Wand2, label: "Nouveau Client" },
-  { to: "/king/affiliates", icon: Handshake, label: "Affiliation" },
+  {
+    label: "Onboarding",
+    icon: UserCog,
+    children: [
+      { to: "/king/tenants", icon: Building2, label: "Clients SaaS" },
+      { to: "/king/wizard", icon: Wand2, label: "Nouveau Client" },
+      { to: "/king/affiliates", icon: Handshake, label: "Affiliation" },
+      { to: "/king/users", icon: Users, label: "Utilisateurs" },
+    ],
+  },
+  { to: "/king/support", icon: Inbox, label: "Support tickets" },
   { to: "/king/catalog", icon: Package, label: "Référentiels" },
   { to: "/king/apps", icon: AppWindow, label: "LYTA Tools" },
-  // { to: "/king/onboarding", icon: BookOpen, label: "Guide Onboarding" },
-  { to: "/king/users", icon: Users, label: "Utilisateurs" },
-  { to: "/king/plans", icon: Package, label: "Offres & Plans" },
-  { to: "/king/costs", icon: DollarSign, label: "Coûts plateforme" },
-  { to: "/king/support", icon: Inbox, label: "Support tickets" },
-  { to: "/king/monitoring", icon: Activity, label: "Monitoring" },
-  { to: "/king/security", icon: Shield, label: "Sécurité" },
-  { to: "/king/compliance", icon: FileCheck, label: "Conformité RGPD" },
-  { to: "/king/settings", icon: Settings, label: "Paramètres" },
+  {
+    label: "Paramètres",
+    icon: Settings,
+    children: [
+      { to: "/king/plans", icon: Package, label: "Offres & Plans" },
+      { to: "/king/costs", icon: DollarSign, label: "Coûts plateforme" },
+      { to: "/king/monitoring", icon: Activity, label: "Monitoring" },
+      { to: "/king/security", icon: Shield, label: "Sécurité" },
+      { to: "/king/compliance", icon: FileCheck, label: "Conformité RGPD" },
+      { to: "/king/settings", icon: Settings, label: "Paramètres généraux" },
+    ],
+  },
 ];
 
 export default function KingLayout() {
@@ -106,48 +129,99 @@ export default function KingLayout() {
     return null;
   }
 
+  const location = useLocation();
+  // Auto-ouvrir le groupe contenant la route active
+  const initialOpenGroups = () => {
+    const set: Record<string, boolean> = {};
+    menuItems.forEach(entry => {
+      if (isGroup(entry)) {
+        if (entry.children.some(c => location.pathname.startsWith(c.to))) {
+          set[entry.label] = true;
+        }
+      }
+    });
+    return set;
+  };
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpenGroups);
+
+  const renderLink = (item: MenuItem, opts: { onItemClick?: () => void; collapsed: boolean; indent?: boolean }) => {
+    const linkContent = (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        onClick={opts.onItemClick}
+        className={({ isActive }) =>
+          cn(
+            "flex items-center gap-3 rounded-lg transition-colors",
+            opts.collapsed ? "px-3 py-2.5 justify-center" : "px-3 py-2.5",
+            opts.indent && !opts.collapsed ? "ml-3 pl-5 border-l border-border/50" : "",
+            isActive
+              ? "bg-amber-500 text-white"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )
+        }
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {!opts.collapsed && <span className="text-sm font-medium">{item.label}</span>}
+      </NavLink>
+    );
+    if (opts.collapsed) {
+      return (
+        <Tooltip key={item.to} delayDuration={0}>
+          <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">{item.label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return <Fragment key={item.to}>{linkContent}</Fragment>;
+  };
+
   const NavItems = ({ onItemClick, collapsed = false }: { onItemClick?: () => void; collapsed?: boolean }) => (
     <div className="flex flex-col gap-1">
-      {menuItems.map((item) => {
-        const linkContent = (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onItemClick}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg transition-colors",
-                collapsed ? "px-3 py-2.5 justify-center" : "px-3 py-2.5",
-                isActive
-                  ? "bg-amber-500 text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
-                )}
-              </>
-            )}
-          </NavLink>
-        );
+      {menuItems.map((entry, idx) => {
+        if (!isGroup(entry)) {
+          return renderLink(entry, { onItemClick, collapsed });
+        }
+        // Group avec sous-menu
+        const isOpen = openGroups[entry.label] ?? false;
+        const groupActive = entry.children.some(c => location.pathname.startsWith(c.to));
 
         if (collapsed) {
+          // En mode collapsed : afficher chaque child séparément avec tooltip
           return (
-            <Tooltip key={item.to} delayDuration={0}>
-              <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-              <TooltipContent side="right" className="font-medium">
-                {item.label}
-              </TooltipContent>
-            </Tooltip>
+            <Fragment key={entry.label}>
+              <div className="px-3 py-1 mt-2 mb-0.5 text-center">
+                <entry.icon className="h-3 w-3 mx-auto text-muted-foreground/50" />
+              </div>
+              {entry.children.map(c => renderLink(c, { onItemClick, collapsed: true }))}
+            </Fragment>
           );
         }
 
-        return linkContent;
+        return (
+          <Fragment key={entry.label}>
+            <button
+              type="button"
+              onClick={() => setOpenGroups(o => ({ ...o, [entry.label]: !isOpen }))}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors w-full",
+                groupActive
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <entry.icon className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-medium flex-1 text-left">{entry.label}</span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+            </button>
+            {isOpen && (
+              <div className="flex flex-col gap-1 mt-0.5 mb-1">
+                {entry.children.map(c => renderLink(c, { onItemClick, collapsed: false, indent: true }))}
+              </div>
+            )}
+          </Fragment>
+        );
       })}
     </div>
   );
