@@ -29,6 +29,41 @@ const RESOURCE_LABELS: Record<string, string> = {
   email: "Emails marketing",
 };
 
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+async function notifyTenantOverage(tenant: { name: string; email?: string | null; admin_email?: string | null }, items: Array<{ resource: string; units: number; total_chf: number }>) {
+  const to = tenant.email || tenant.admin_email;
+  if (!to || !RESEND_API_KEY) return;
+  const total = items.reduce((s, i) => s + i.total_chf, 0);
+  const rows = items.map(i =>
+    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${RESOURCE_LABELS[i.resource]}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${i.units}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${i.total_chf.toFixed(2)} CHF</td></tr>`
+  ).join("");
+  const html = `<!doctype html><html><body style="font-family:-apple-system,sans-serif;padding:24px;background:#f5f5f5">
+    <div style="max-width:560px;margin:auto;background:white;border-radius:12px;padding:32px">
+      <h2>Récap consommation hors quota — ${tenant.name}</h2>
+      <p>Voici le récap du mois écoulé. Le montant sera ajouté à ta prochaine facture mensuelle Stripe automatiquement.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0"><thead>
+        <tr style="background:#f9f9f9"><th style="padding:8px;text-align:left">Ressource</th><th style="text-align:right;padding:8px">Unités</th><th style="text-align:right;padding:8px">Montant</th></tr>
+      </thead><tbody>${rows}
+        <tr><td style="padding:12px;font-weight:bold">Total overage</td><td></td><td style="padding:12px;text-align:right;font-weight:bold;color:#1800AD">${total.toFixed(2)} CHF</td></tr>
+      </tbody></table>
+      <p style="font-size:12px;color:#666">Pour éviter l'overage, upgrade ton plan dans Paramètres → Abonnement.</p>
+    </div></body></html>`;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "LYTA <support@lyta.ch>", to: [to],
+        subject: `Récap overage — ${total.toFixed(2)} CHF facturés ce mois`,
+        html,
+      }),
+    });
+  } catch (e) {
+    console.warn("[apply-monthly-overage] email notification failed:", (e as any)?.message);
+  }
+}
+
 serve(async (req) => {
   const cors = getCorsHeaders(req);
   const corsResp = handleCors(req);
@@ -98,10 +133,12 @@ serve(async (req) => {
 
     // Pour chaque tenant, créer les invoice items Stripe
     const results: any[] = [];
+    // Pour grouper les emails par tenant (1 seul mail récap)
+    const emailItemsByTenant = new Map<string, { tenant: any; items: any[] }>();
     for (const agg of aggMap.values()) {
       const { data: tenant } = await supabase
         .from("tenants")
-        .select("id, name, stripe_customer_id, auto_overage_enabled")
+        .select("id, name, email, admin_email, stripe_customer_id, auto_overage_enabled")
         .eq("id", agg.tenant_id)
         .maybeSingle();
 
@@ -172,10 +209,20 @@ serve(async (req) => {
           units: agg.total_units, amount_chf: totalCents / 100,
           stripe_invoice_item_id: item.id,
         });
+
+        // Accumule pour l'email récap
+        const bucket = emailItemsByTenant.get(agg.tenant_id) || { tenant, items: [] };
+        bucket.items.push({ resource: agg.resource_type, units: agg.total_units, total_chf: totalCents / 100 });
+        emailItemsByTenant.set(agg.tenant_id, bucket);
       } catch (e) {
         log.error("Stripe invoiceItems.create failed", { err: (e as any)?.message, tenant_id: agg.tenant_id });
         results.push({ tenant_id: agg.tenant_id, status: "error", reason: (e as any)?.message });
       }
+    }
+
+    // Envoie 1 email récap par tenant (fire-and-forget)
+    for (const bucket of emailItemsByTenant.values()) {
+      notifyTenantOverage(bucket.tenant, bucket.items);
     }
 
     return new Response(JSON.stringify({
@@ -185,6 +232,7 @@ serve(async (req) => {
       invoiced: results.filter(r => r.status === "invoiced").length,
       skipped: results.filter(r => r.status === "skipped" || r.status === "no_charge").length,
       errors: results.filter(r => r.status === "error").length,
+      tenants_notified: emailItemsByTenant.size,
       results,
     }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err) {

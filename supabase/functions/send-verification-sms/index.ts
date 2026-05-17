@@ -71,11 +71,10 @@ serve(async (req: Request): Promise<Response> => {
 
     const tenantId = assignment?.tenant_id ?? null;
 
-    if (tenantId) {
-      await reserveTenantQuota(supabase, tenantId, "sms", 1);
-      reservedTenantId = tenantId;
-      quotaReserved = true;
-    }
+    // NE PAS consommer le quota SMS du tenant : c'est un SMS de vérification
+    // (OTP login / signature). Event système → toujours gratuit, sinon un tenant
+    // Start (0 SMS) ne pourrait jamais se connecter.
+    // On track quand même côté coûts via trackTwilioSms (sync-external-billing).
 
     // Delete any existing pending verifications for this user/type
     await supabase

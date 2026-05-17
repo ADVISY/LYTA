@@ -29,6 +29,7 @@ import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RolesManager } from "@/components/crm/settings/RolesManager";
 import { TenantSupportTickets } from "@/components/support/TenantSupportTickets";
+import { TenantQuotaWidget } from "@/components/quotas/TenantQuotaWidget";
 import { UserRolesManager } from "@/components/crm/settings/UserRolesManager";
 import { EmailAutomationSettings } from "@/components/crm/settings/EmailAutomationSettings";
 import { AddUserSeatDialog } from "@/components/crm/settings/AddUserSeatDialog";
@@ -1092,6 +1093,7 @@ export default function CRMParametres() {
         {/* ABONNEMENT - Admin only */}
         {canManageAdminSettings && (
           <TabsContent value="abonnement" className="space-y-6 mt-6">
+            <TenantQuotaWidget />
             <CRMAbonnement />
           </TabsContent>
         )}
