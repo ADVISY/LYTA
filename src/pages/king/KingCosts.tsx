@@ -159,6 +159,27 @@ export default function KingCosts() {
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Sync…" : "Sync Resend + Twilio"}
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!confirm("Facturer maintenant l'overage du mois écoulé sur Stripe ? Crée 1 invoice item par tenant en dépassement.")) return;
+              try {
+                const { data, error } = await supabase.functions.invoke("apply-monthly-overage", { body: {} });
+                if (error) throw error;
+                toast({
+                  title: "Overage facturé",
+                  description: `${data.invoiced}/${data.total_events} events facturés · ${data.skipped} skip · ${data.errors} erreurs`,
+                });
+              } catch (e: any) {
+                toast({ title: "Erreur facturation overage", description: e?.message || String(e), variant: "destructive" });
+              }
+            }}
+            className="text-amber-700 border-amber-300 hover:bg-amber-50"
+            title="Crée les invoice items Stripe pour les overages pending du mois écoulé"
+          >
+            <DollarSign className="h-4 w-4 mr-2" />
+            Facturer overage mois écoulé
+          </Button>
           {[
             { v: "month", l: "Ce mois" },
             { v: "30d", l: "30 j" },

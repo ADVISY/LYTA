@@ -894,6 +894,41 @@ export default function KingTenantDetail() {
                 </div>
               </div>
 
+              {/* Overage auto */}
+              <div className="space-y-3 pt-4 border-t">
+                <Label className="text-base font-semibold">Overage automatique</Label>
+                <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {(tenant as any).auto_overage_enabled
+                        ? "✅ Activé : la consommation au-delà du quota est autorisée et facturée auto via Stripe"
+                        : "⛔ Désactivé : bloqué dès que le quota est atteint"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Le dépassement est facturé en fin de mois (1 invoice item Stripe par resource).
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const next = !(tenant as any).auto_overage_enabled;
+                      const { error } = await supabase.from('tenants')
+                        .update({ auto_overage_enabled: next })
+                        .eq('id', tenantId);
+                      if (error) {
+                        toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+                      } else {
+                        toast({ title: next ? 'Overage activé' : 'Overage désactivé' });
+                        queryClient.invalidateQueries({ queryKey: ['king-tenant', tenantId] });
+                      }
+                    }}
+                  >
+                    {(tenant as any).auto_overage_enabled ? "Désactiver" : "Activer"}
+                  </Button>
+                </div>
+              </div>
+
               {/* Stripe IDs */}
               <div className="space-y-4 pt-4 border-t">
                 <Label className="text-base font-semibold">Identifiants Stripe</Label>
