@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useTenantSeats } from '@/hooks/useTenantSeats';
@@ -8,16 +8,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  Check, 
-  X, 
-  Users, 
-  CreditCard, 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Check,
+  X,
+  Users,
+  CreditCard,
   AlertTriangle,
   ArrowUpRight,
   Crown,
   Zap,
-  Star
+  Star,
+  Ban,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,6 +52,13 @@ export default function CRMAbonnement() {
   
   const { activeUsers, loading: seatsLoading } = useTenantSeats();
   const { can, isAdmin, isLoading: permissionsLoading } = usePermissions();
+  const { toast } = useToast();
+
+  // État annulation abonnement
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancellationResult, setCancellationResult] = useState<{ period_end: string | null; message: string } | null>(null);
 
   const loading = planLoading || seatsLoading || permissionsLoading;
   const extraUsers = Math.max(0, activeUsers - seatsIncluded);
@@ -52,6 +67,44 @@ export default function CRMAbonnement() {
 
   const scrollToPlans = () => {
     plansRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleCancelSubscription = async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cancel-tenant-subscription', {
+        body: { reason: cancelReason.trim() || undefined },
+      });
+      if (error) {
+        let detail = error.message || 'Annulation échouée.';
+        try {
+          const ctx = (error as any).context;
+          if (ctx?.json) {
+            const body = await ctx.json();
+            detail = body?.error || body?.message || detail;
+          }
+        } catch { /* keep generic */ }
+        throw new Error(detail);
+      }
+      if (!data?.ok) throw new Error(data?.error || data?.message || 'Annulation échouée.');
+      setCancellationResult({
+        period_end: data.period_end || null,
+        message: data.message || 'Annulation enregistrée.',
+      });
+      toast({
+        title: 'Annulation enregistrée',
+        description: data.message || 'Ton abonnement sera annulé à la fin de la période payée.',
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Erreur annulation',
+        description: e?.message || 'Erreur inattendue.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const allModules: PlanModule[] = [
@@ -167,13 +220,21 @@ export default function CRMAbonnement() {
                 {getBillingStatusLabel()}
               </Badge>
             </div>
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t space-y-2">
               <p className="text-sm text-muted-foreground mb-2">
                 {PLAN_CONFIGS[plan]?.description}
               </p>
               <Button variant="outline" className="w-full gap-2" onClick={scrollToPlans}>
                 <ArrowUpRight className="h-4 w-4" />
                 {t('subscription.viewOtherPlans')}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => { setCancellationResult(null); setCancelReason(''); setCancelDialogOpen(true); }}
+              >
+                <Ban className="h-4 w-4" />
+                Annuler mon abonnement
               </Button>
             </div>
           </CardContent>
@@ -325,6 +386,82 @@ export default function CRMAbonnement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cancellation dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={(open) => { if (!cancelling) setCancelDialogOpen(open); }}>
+        <DialogContent>
+          {cancellationResult ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-emerald-700">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Annulation enregistrée
+                </DialogTitle>
+                <DialogDescription>{cancellationResult.message}</DialogDescription>
+              </DialogHeader>
+              <Alert>
+                <AlertDescription>
+                  Tu gardes l'accès complet à LYTA jusqu'à la fin de la période payée
+                  {cancellationResult.period_end && (
+                    <> (<strong>{new Date(cancellationResult.period_end).toLocaleDateString('fr-CH')}</strong>)</>
+                  )}.
+                  Si tu changes d'avis, contacte <a className="underline" href="mailto:support@lyta.ch">support@lyta.ch</a> avant cette date.
+                </AlertDescription>
+              </Alert>
+              <DialogFooter>
+                <Button onClick={() => setCancelDialogOpen(false)}>Fermer</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Annuler ton abonnement LYTA ?
+                </DialogTitle>
+                <DialogDescription>
+                  Tu gardes l'accès jusqu'à la fin de la période déjà payée (pas de remboursement
+                  pro-rata). Aucun prélèvement supplémentaire ne sera fait.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Conséquences de l'annulation</AlertTitle>
+                  <AlertDescription className="text-sm">
+                    À la fin de la période payée, ton cabinet sera désactivé : collaborateurs ne pourront plus se connecter,
+                    données conservées 30 jours puis purgées. Tes clients (espace-client) garderont leurs comptes.
+                  </AlertDescription>
+                </Alert>
+                <div>
+                  <Label htmlFor="cancel-reason">Raison de l'annulation (optionnel)</Label>
+                  <Textarea
+                    id="cancel-reason"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value.slice(0, 1000))}
+                    placeholder="Aide-nous à comprendre — ça nous permettra de progresser."
+                    rows={3}
+                    disabled={cancelling}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{cancelReason.length}/1000</p>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+                  Garder mon abonnement
+                </Button>
+                <Button variant="destructive" onClick={handleCancelSubscription} disabled={cancelling}>
+                  {cancelling ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Annulation…</>
+                  ) : (
+                    <><Ban className="h-4 w-4 mr-2" /> Confirmer l'annulation</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
