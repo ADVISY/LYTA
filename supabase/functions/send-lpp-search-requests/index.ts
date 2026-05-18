@@ -128,13 +128,15 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as ReqBody;
     if (!body.policy_id) throw new AuthError("policy_id requis", 400);
 
-    // Récupère le contrat + client + tenant
+    // Récupère le contrat + client + tenant (incluant les emails du tenant
+    // pour pouvoir mettre reply_to = email cabinet, et utiliser le sender
+    // custom s'il est vérifié sur Resend)
     const { data: policy, error: pErr } = await supabase
       .from("policies")
       .select(`
         id, tenant_id, client_id, product_type, notes,
         clients:client_id (id, first_name, last_name, email, birthdate),
-        tenants:tenant_id (id, name, tenant_branding(display_name, email_sender_name))
+        tenants:tenant_id (id, name, email, admin_email, tenant_branding(display_name, email_sender_name, email_sender_address))
       `)
       .eq("id", body.policy_id)
       .maybeSingle();
@@ -163,6 +165,23 @@ serve(async (req) => {
     const tenant = Array.isArray(policy.tenants) ? policy.tenants[0] : policy.tenants;
     const branding = tenant?.tenant_branding && (Array.isArray(tenant.tenant_branding) ? tenant.tenant_branding[0] : tenant.tenant_branding);
     const cabinetName = branding?.display_name || branding?.email_sender_name || tenant?.name || "Cabinet de conseil";
+
+    // Email du tenant → utilisé comme reply_to pour que les réponses des
+    // institutions arrivent directement chez le cabinet (pas chez LYTA support)
+    const tenantReplyTo = (
+      branding?.email_sender_address
+      || tenant?.admin_email
+      || tenant?.email
+      || ""
+    ).trim();
+
+    // Sender : on essaie d'utiliser l'adresse custom du tenant si elle est sur
+    // un domaine déjà vérifié sur Resend (lyta.ch / e-advisy.ch — la whitelist
+    // matche email-sender.ts du codebase). Sinon fallback support@lyta.ch.
+    const verifiedDomains = /@(lyta\.ch|e-advisy\.ch)$/i;
+    const senderAddress = branding?.email_sender_address && verifiedDomains.test(branding.email_sender_address)
+      ? branding.email_sender_address
+      : "support@lyta.ch";
 
     // Récupère le n° AVS depuis policy.notes (jsonb formData stocké au dépôt LPP)
     let numeroAvs = "";
@@ -236,8 +255,8 @@ serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${cabinetName} <support@lyta.ch>`,
-          reply_to: branding?.email_sender_address || undefined,
+          from: `${cabinetName} <${senderAddress}>`,
+          reply_to: tenantReplyTo || undefined,
           to: [CENTRALE_EMAIL],
           subject: centraleSubject,
           html: centraleHtml,
@@ -280,8 +299,8 @@ serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${cabinetName} <support@lyta.ch>`,
-          reply_to: branding?.email_sender_address || undefined,
+          from: `${cabinetName} <${senderAddress}>`,
+          reply_to: tenantReplyTo || undefined,
           to: [SUPPLETIVE_EMAIL],
           subject: suppletiveSubject,
           html: suppletiveHtml,
