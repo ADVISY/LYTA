@@ -167,13 +167,15 @@ serve(async (req) => {
     // Postgres : `to_char(birthdate, 'MM-DD') = todayMD` impossible via PostgREST.
     // Alternative : pull tous les clients du tenant avec birthdate non null +
     // email, et filter en mémoire (acceptable < 10k clients/tenant).
+    // Filtre business : seulement les clients ACTIFS (pas prospect, ni dormant,
+    // ni résilié). Pas de mail anniversaire à un prospect qu'on n'a pas signé.
     const { data: clients, error: cErr } = await supabase
       .from("clients")
       .select("id, first_name, last_name, email, birthdate, type_adresse, status")
       .eq("tenant_id", tenantId)
+      .eq("status", "actif")
       .not("birthdate", "is", null)
-      .not("email", "is", null)
-      .neq("status", "résilié");
+      .not("email", "is", null);
     if (cErr) {
       log.warn("Failed to fetch clients", { tenantId, err: cErr.message });
       totalErrors += 1;
