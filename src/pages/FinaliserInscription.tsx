@@ -135,7 +135,23 @@ export default function FinaliserInscription() {
           language,
         },
       });
-      if (invokeErr) throw invokeErr;
+      if (invokeErr) {
+        // supabase.functions.invoke masque le body d'erreur — on le récupère
+        // via .context (Response) pour montrer le vrai message au user
+        let detail = invokeErr.message || "Création échouée.";
+        try {
+          const ctx = (invokeErr as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            detail = body?.message || body?.error || body?.details || JSON.stringify(body);
+          } else if (ctx && typeof ctx.text === "function") {
+            detail = await ctx.text();
+          }
+        } catch {
+          // garde le message générique
+        }
+        throw new Error(detail);
+      }
       if (!data?.ok) throw new Error(data?.message || data?.error || "Création échouée.");
       setSuccess(data as ProvisionResult);
     } catch (e: any) {
