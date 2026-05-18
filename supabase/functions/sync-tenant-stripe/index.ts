@@ -96,22 +96,48 @@ async function syncOneTenant(
     status: 'no_change',
   };
 
-  const email = (tenant.email || tenant.admin_email || "").trim().toLowerCase();
-  if (!email) {
-    return { ...result, status: 'error', message: 'Pas d\'email sur le tenant' };
-  }
-
-  // Cherche tous les customers Stripe avec cet email
+  // Stratégie de lookup : 1) stripe_customer_id explicite, 2) recherche par email
   let customers: any[] = [];
-  try {
-    const list = await stripe.customers.list({ email, limit: 10 });
-    customers = list.data;
-  } catch (e) {
-    return { ...result, status: 'error', message: `Stripe customers.list failed: ${(e as any)?.message}` };
+
+  // 1. Si le tenant a déjà un stripe_customer_id, on l'utilise direct
+  if (tenant.stripe_customer_id) {
+    try {
+      const cust = await stripe.customers.retrieve(tenant.stripe_customer_id);
+      if (cust && !(cust as any).deleted) {
+        customers = [cust];
+      }
+    } catch (e) {
+      log.warn('customers.retrieve failed for stripe_customer_id', {
+        id: tenant.stripe_customer_id,
+        err: (e as any)?.message,
+      });
+      // On continue vers la recherche par email comme fallback
+    }
   }
 
+  // 2. Fallback : recherche par email
   if (customers.length === 0) {
-    return { ...result, status: 'no_stripe_match', message: 'Aucun customer Stripe avec cet email' };
+    const email = (tenant.email || tenant.admin_email || "").trim().toLowerCase();
+    if (!email) {
+      return {
+        ...result,
+        status: 'error',
+        message: 'Pas de stripe_customer_id ni d\'email sur le tenant — impossible de matcher avec Stripe',
+      };
+    }
+    try {
+      const list = await stripe.customers.list({ email, limit: 10 });
+      customers = list.data;
+    } catch (e) {
+      return { ...result, status: 'error', message: `Stripe customers.list failed: ${(e as any)?.message}` };
+    }
+    if (customers.length === 0) {
+      return {
+        ...result,
+        status: 'no_stripe_match',
+        message: `Aucun customer Stripe avec l'email "${email}". Si JCG paye avec un autre email, modifie tenant.email OU saisis directement son stripe_customer_id (cus_xxx) dans la card Abonnement Stripe.`,
+      };
+    }
   }
 
   // Liste toutes les subs actives sur tous les customers trouvés
