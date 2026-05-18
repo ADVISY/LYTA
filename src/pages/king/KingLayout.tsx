@@ -81,6 +81,20 @@ export default function KingLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
+  const location = useLocation();
+  // Auto-ouvrir le groupe contenant la route active
+  const initialOpenGroups = () => {
+    const set: Record<string, boolean> = {};
+    menuItems.forEach(entry => {
+      if (isGroup(entry)) {
+        if (entry.children.some(c => location.pathname.startsWith(c.to))) {
+          set[entry.label] = true;
+        }
+      }
+    });
+    return set;
+  };
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpenGroups);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -128,21 +142,6 @@ export default function KingLayout() {
   if (!isKing) {
     return null;
   }
-
-  const location = useLocation();
-  // Auto-ouvrir le groupe contenant la route active
-  const initialOpenGroups = () => {
-    const set: Record<string, boolean> = {};
-    menuItems.forEach(entry => {
-      if (isGroup(entry)) {
-        if (entry.children.some(c => location.pathname.startsWith(c.to))) {
-          set[entry.label] = true;
-        }
-      }
-    });
-    return set;
-  };
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpenGroups);
 
   const renderLink = (item: MenuItem, opts: { onItemClick?: () => void; collapsed: boolean; indent?: boolean }) => {
     const linkContent = (

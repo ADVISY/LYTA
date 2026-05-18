@@ -19,7 +19,10 @@ const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-09-30.acacia" });
 
 const SITE_BASE = Deno.env.get("PUBLIC_SITE_URL") || "https://lyta.ch";
-const DEFAULT_SUCCESS_URL = `${SITE_BASE}/access?session_id={CHECKOUT_SESSION_ID}`;
+// La page de finalisation post-paiement vit dans app.lyta.ch (ce repo),
+// pas sur lyta.ch (Lovable). On contrôle 100% du flow critique.
+const APP_BASE  = Deno.env.get("PUBLIC_APP_URL")  || "https://app.lyta.ch";
+const DEFAULT_SUCCESS_URL = `${APP_BASE}/finalize?session_id={CHECKOUT_SESSION_ID}`;
 const DEFAULT_CANCEL_URL  = `${SITE_BASE}/inscription/echec`;
 
 const TRIAL_DAYS = 7;

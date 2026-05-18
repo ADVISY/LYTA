@@ -12,6 +12,7 @@ import Connexion from "./pages/Connexion";
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const DeposerContrat = lazy(() => import("./pages/DeposerContrat"));
 const Signer = lazy(() => import("./pages/Signer"));
+const FinaliserInscription = lazy(() => import("./pages/FinaliserInscription"));
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -105,6 +106,9 @@ const App = () => (
               <Route path="/deposer-contrat" element={<DeposerContrat />} />
               <Route path="/signer/:token" element={<Signer />} />
               <Route path="/font-preview" element={<FontPreview />} />
+              {/* Post-paiement Stripe : page publique de finalisation du tenant */}
+              <Route path="/finalize" element={<FinaliserInscription />} />
+              <Route path="/access" element={<FinaliserInscription />} />
               
               {/* CRM Routes */}
               <Route path="/crm" element={<ProtectedRoute><ErrorBoundary space="CRM"><CRMLayout /></ErrorBoundary></ProtectedRoute>}>

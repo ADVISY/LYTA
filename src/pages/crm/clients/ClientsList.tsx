@@ -157,7 +157,7 @@ export default function ClientsList() {
           <div>
             <h1 className="text-3xl font-bold">{t('clients.addresses')}</h1>
             <p className="text-muted-foreground">
-              {filteredClients.length} {currentType.label.toLowerCase()}
+              {totalCount} {currentType.label.toLowerCase()}
             </p>
           </div>
         </div>

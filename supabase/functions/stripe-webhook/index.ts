@@ -44,6 +44,65 @@ const FALLBACK_PRICING: PlanPricing = {
   extraSeatPrices: { start: 20, pro: 20, prime: 20, founder: 20 },
 };
 
+// URL de base de l'app (app.lyta.ch). Override via PUBLIC_APP_URL si besoin.
+const APP_BASE_URL = Deno.env.get("PUBLIC_APP_URL") || "https://app.lyta.ch";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+/**
+ * Envoie un email post-paiement avec le lien /finalize. Filet de secours :
+ * même si Stripe ne redirige pas correctement (ou si l'utilisateur ferme
+ * l'onglet), il a un email actionnable dans sa boîte.
+ *
+ * Fire-and-forget : on log les erreurs mais on ne fait pas crasher le webhook.
+ */
+async function sendFinalizeEmail(args: {
+  email: string;
+  sessionId: string;
+  planLabel?: string | null;
+}): Promise<void> {
+  if (!RESEND_API_KEY) {
+    log.warn("RESEND_API_KEY not configured — skipping finalize email");
+    return;
+  }
+  const finalizeUrl = `${APP_BASE_URL}/finalize?session_id=${encodeURIComponent(args.sessionId)}`;
+  const planLine = args.planLabel
+    ? `<p style="margin:0 0 16px;color:#444">Plan choisi : <strong>${args.planLabel}</strong></p>`
+    : "";
+  const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;padding:24px;margin:0">
+    <div style="max-width:560px;margin:auto;background:white;border-radius:12px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+      <h2 style="margin:0 0 8px;color:#1800AD">Paiement reçu ✅</h2>
+      <p style="margin:0 0 16px;color:#444">Merci pour ton inscription à LYTA. Il reste une dernière étape : nous donner le nom de ton cabinet pour activer ton espace.</p>
+      ${planLine}
+      <p style="margin:24px 0">
+        <a href="${finalizeUrl}" style="display:inline-block;background:#1800AD;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600">Finaliser mon inscription</a>
+      </p>
+      <p style="margin:16px 0 0;font-size:12px;color:#888">Le lien expire avec ta session Stripe (24h). Si tu rencontres un souci, écris-nous à <a href="mailto:support@lyta.ch">support@lyta.ch</a>.</p>
+    </div></body></html>`;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "LYTA <support@lyta.ch>",
+        to: [args.email],
+        subject: "Active ton cabinet LYTA — dernière étape (2 min)",
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      log.warn("Resend finalize email non-OK", { status: res.status, body: txt.slice(0, 200) });
+    } else {
+      log.info("Finalize email sent", { email: args.email, sessionId: args.sessionId });
+    }
+  } catch (e) {
+    log.warn("Resend finalize email failed", { err: (e as any)?.message });
+  }
+}
+
 async function getPlanPricing(supabaseAdmin: ReturnType<typeof createClient>): Promise<PlanPricing> {
   const { data, error } = await supabaseAdmin
     .from('platform_plans')
@@ -133,7 +192,9 @@ serve(async (req) => {
         const customerEmail = session.customer_email || session.customer_details?.email;
 
         // Self-signup flow : on enregistre dans pending_signups pour suivi
-        // king (paiement OK mais form /access pas encore finalisé).
+        // king (paiement OK mais form /finalize pas encore complété), ET on
+        // envoie un email avec le lien /finalize comme filet de secours
+        // (au cas où le redirect Stripe rate ou l'utilisateur ferme l'onglet).
         if (session.metadata?.signup_flow === 'true') {
           await supabaseAdmin
             .from('pending_signups')
@@ -147,6 +208,25 @@ serve(async (req) => {
               status: 'pending',
             }, { onConflict: 'stripe_session_id' });
           log.info('pending_signups upserted', { sessionId: session.id });
+
+          // Email finalize (fire-and-forget — n'empêche pas le webhook)
+          if (customerEmail) {
+            let planLabel: string | null = null;
+            const planId = session.metadata?.plan_id;
+            if (planId) {
+              const { data: plan } = await supabaseAdmin
+                .from('platform_plans')
+                .select('display_name')
+                .eq('id', planId)
+                .maybeSingle();
+              planLabel = (plan as any)?.display_name || planId;
+            }
+            sendFinalizeEmail({
+              email: customerEmail,
+              sessionId: session.id,
+              planLabel,
+            });
+          }
         }
         
         if (customerEmail) {
