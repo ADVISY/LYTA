@@ -167,11 +167,14 @@ serve(async (req) => {
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+      // IMPORTANT : utiliser constructEventAsync (et non constructEvent
+      // synchrone) car l'Edge Runtime Deno n'a pas le crypto Node — seule
+      // la version async passe par WebCrypto et fonctionne correctement.
+      event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret);
     } catch (err) {
       log.error("Signature verification failed", { error: err.message });
       return new Response(
-        JSON.stringify({ error: "Invalid signature" }),
+        JSON.stringify({ error: "Invalid signature", details: err.message }),
         { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
       );
     }
@@ -181,21 +184,50 @@ serve(async (req) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
+        const customerEmail = session.customer_email || session.customer_details?.email;
         log.info("Checkout completed", {
           customerId: session.customer,
-          email: session.customer_email,
+          email: customerEmail,
           subscriptionId: session.subscription,
           signupFlow: session.metadata?.signup_flow === 'true',
+          hasMetadata: !!session.metadata?.signup_flow,
         });
 
-        // Get customer email
-        const customerEmail = session.customer_email || session.customer_details?.email;
+        if (!customerEmail) {
+          log.warn("checkout.session.completed sans customer_email — skip", { sessionId: session.id });
+          break;
+        }
 
-        // Self-signup flow : on enregistre dans pending_signups pour suivi
-        // king (paiement OK mais form /finalize pas encore complété), ET on
-        // envoie un email avec le lien /finalize comme filet de secours
-        // (au cas où le redirect Stripe rate ou l'utilisateur ferme l'onglet).
-        if (session.metadata?.signup_flow === 'true') {
+        // Existing tenant ? (paiement renouvellement ou changement de plan)
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name, email, admin_email')
+          .or(`email.eq.${customerEmail},admin_email.eq.${customerEmail}`)
+          .maybeSingle();
+
+        // Pas de tenant → c'est un self-signup (paiement initial), peu importe
+        // que les metadata signup_flow soient présentes (Stripe Payment Link
+        // sur lyta.ch n'a pas forcément les metadata car il ne passe pas par
+        // notre fonction create-checkout-session).
+        const isSelfSignup = !tenant;
+
+        if (isSelfSignup) {
+          // Dérive plan_id : d'abord depuis metadata, sinon depuis line items
+          // (cas Payment Link Lovable → on retrouve le plan via product_id)
+          let planId: string | null = session.metadata?.plan_id || null;
+          if (!planId) {
+            try {
+              const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+              const productId = lineItems.data[0]?.price?.product;
+              if (typeof productId === 'string' && PRODUCT_TO_PLAN[productId]) {
+                planId = PRODUCT_TO_PLAN[productId];
+                log.info("plan_id derived from product_id", { productId, planId });
+              }
+            } catch (e) {
+              log.warn("Failed to derive plan_id from line items", { err: (e as any)?.message });
+            }
+          }
+
           await supabaseAdmin
             .from('pending_signups')
             .upsert({
@@ -203,75 +235,55 @@ serve(async (req) => {
               stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
               stripe_subscription_id: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
               customer_email: customerEmail,
-              plan_id: session.metadata?.plan_id || null,
+              plan_id: planId,
               amount_chf: (session.amount_total ?? 0) / 100,
               status: 'pending',
             }, { onConflict: 'stripe_session_id' });
-          log.info('pending_signups upserted', { sessionId: session.id });
+          log.info('pending_signups upserted (self-signup)', { sessionId: session.id, planId });
 
-          // Email finalize (fire-and-forget — n'empêche pas le webhook)
-          if (customerEmail) {
-            let planLabel: string | null = null;
-            const planId = session.metadata?.plan_id;
-            if (planId) {
-              const { data: plan } = await supabaseAdmin
-                .from('platform_plans')
-                .select('display_name')
-                .eq('id', planId)
-                .maybeSingle();
-              planLabel = (plan as any)?.display_name || planId;
-            }
-            sendFinalizeEmail({
-              email: customerEmail,
-              sessionId: session.id,
-              planLabel,
-            });
+          // Email finalize (fire-and-forget)
+          let planLabel: string | null = null;
+          if (planId) {
+            const { data: plan } = await supabaseAdmin
+              .from('platform_plans').select('display_name').eq('id', planId).maybeSingle();
+            planLabel = (plan as any)?.display_name || planId;
           }
-        }
-        
-        if (customerEmail) {
-          // Find tenant by email
-          const { data: tenant } = await supabaseAdmin
-            .from('tenants')
-            .select('id, name, email, admin_email')
-            .or(`email.eq.${customerEmail},admin_email.eq.${customerEmail}`)
-            .single();
-
-          if (tenant) {
-            // Update tenant with Stripe info
-            await supabaseAdmin
-              .from('tenants')
-              .update({
-                stripe_customer_id: session.customer,
-                stripe_subscription_id: session.subscription,
-                payment_status: 'paid',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', tenant.id);
-
-            log.info("Tenant updated with Stripe info", { tenantId: tenant.id });
-          }
-
-          // Create KING notification
+          sendFinalizeEmail({ email: customerEmail, sessionId: session.id, planLabel });
+        } else {
+          // Existing tenant — update Stripe info
           await supabaseAdmin
-            .from('king_notifications')
-            .insert({
-              title: '💳 Paiement reçu',
-              message: `Paiement de ${customerEmail} traité avec succès`,
-              kind: 'payment_received',
-              priority: 'normal',
-              tenant_id: tenant?.id,
-              tenant_name: tenant?.name,
-              action_url: tenant ? `/king/tenants/${tenant.id}` : '/king/tenants',
-              action_label: 'Voir le tenant',
-              metadata: {
-                customer_id: session.customer,
-                subscription_id: session.subscription,
-                amount: session.amount_total,
-                customer_email: customerEmail,
-              }
-            });
+            .from('tenants')
+            .update({
+              stripe_customer_id: session.customer,
+              stripe_subscription_id: session.subscription,
+              payment_status: 'paid',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tenant.id);
+          log.info("Existing tenant updated with Stripe info", { tenantId: tenant.id });
         }
+
+        // KING notification (toujours)
+        await supabaseAdmin
+          .from('king_notifications')
+          .insert({
+            title: isSelfSignup ? '🆕 Nouveau paiement self-signup' : '💳 Paiement reçu',
+            message: `${customerEmail} — ${(session.amount_total ?? 0) / 100} CHF ${isSelfSignup ? '(en attente de finalisation)' : ''}`,
+            kind: isSelfSignup ? 'self_signup_paid' : 'payment_received',
+            priority: 'normal',
+            tenant_id: tenant?.id,
+            tenant_name: tenant?.name,
+            action_url: isSelfSignup ? '/king/tenants' : `/king/tenants/${tenant?.id}`,
+            action_label: isSelfSignup ? 'Voir inscriptions en attente' : 'Voir le tenant',
+            metadata: {
+              customer_id: session.customer,
+              subscription_id: session.subscription,
+              amount: session.amount_total,
+              customer_email: customerEmail,
+              stripe_session_id: session.id,
+              is_self_signup: isSelfSignup,
+            }
+          });
         break;
       }
 

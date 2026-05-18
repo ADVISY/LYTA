@@ -18,7 +18,8 @@ const log = createLogger("resend-signup-finalization");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const SITE_BASE = Deno.env.get("PUBLIC_SITE_URL") || "https://lyta.ch";
+// La page /finalize vit sur app.lyta.ch (ce repo), plus sur lyta.ch (Lovable)
+const APP_BASE = Deno.env.get("PUBLIC_APP_URL") || "https://app.lyta.ch";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -68,7 +69,7 @@ serve(async (req) => {
       });
     }
 
-    const finalizeUrl = `${SITE_BASE.replace(/\/$/, "")}/access?session_id=${encodeURIComponent(pending.stripe_session_id)}`;
+    const finalizeUrl = `${APP_BASE.replace(/\/$/, "")}/finalize?session_id=${encodeURIComponent(pending.stripe_session_id)}`;
 
     const html = `
 <!DOCTYPE html>

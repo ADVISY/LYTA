@@ -31,6 +31,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { KingNotificationBell } from "@/components/king/KingNotificationsInbox";
 import lytaLogo from "@/assets/lyta-logo-full.svg";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -317,6 +318,7 @@ export default function KingLayout() {
                       <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
                       <p className="text-xs text-amber-600 font-semibold">KING LYTA</p>
                     </div>
+                    <KingNotificationBell />
                     <ThemeToggle />
                   </div>
                   <Button
@@ -344,12 +346,14 @@ export default function KingLayout() {
               <span className="text-xs font-bold text-amber-500">KING</span>
             </div>
           </div>
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
+          <div className="flex items-center gap-1">
+            <KingNotificationBell />
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0">
               <div className="p-6 border-b border-border flex flex-col items-center">
                 <img src={lytaLogo} alt="LYTA" className="h-14 object-contain" />
@@ -374,6 +378,7 @@ export default function KingLayout() {
               </div>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </div>
 
