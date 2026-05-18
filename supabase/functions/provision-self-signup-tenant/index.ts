@@ -359,22 +359,58 @@ serve(async (req) => {
       log.error("create-tenant-admin invocation failed", { adminCreationError });
     }
 
-    // ============ Onboarding DNS / Vercel / Resend (fire-and-forget) ============
-    // Ne bloque pas la réponse au broker (peut prendre 30-90s)
-    fetch(`${SUPABASE_URL}/functions/v1/tenant-onboarding`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SERVICE_KEY}`,
-        "apikey": SERVICE_KEY,
-      },
-      body: JSON.stringify({
-        tenant_id: tenantId,
-        slug,
-        tenant_name: tenantName,
-        step: "full",
-      }),
-    }).catch(e => log.error("tenant-onboarding invocation failed (background)", { err: e?.message }));
+    // ============ Onboarding DNS / Vercel / Resend (SYNCHRONE avec timeout) ============
+    // ZERO TOLERANCE : on attend le résultat avec 25s max pour pouvoir notifier
+    // le user immédiatement. Si timeout/erreur, un pg_cron retry prend le relais.
+    let onboardingOk = false;
+    let onboardingError: string | null = null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25_000);
+      const obRes = await fetch(`${SUPABASE_URL}/functions/v1/tenant-onboarding`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SERVICE_KEY}`,
+          "apikey": SERVICE_KEY,
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          slug,
+          tenant_name: tenantName,
+          step: "full",
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
+      const obJson = await obRes.json().catch(() => ({} as any));
+      if (!obRes.ok) {
+        onboardingError = obJson?.error || `HTTP ${obRes.status}`;
+      } else {
+        onboardingOk = obJson?.success !== false;
+        if (!onboardingOk) onboardingError = obJson?.message || "Onboarding non confirmé";
+      }
+    } catch (e) {
+      const msg = (e as any)?.name === "AbortError"
+        ? "Timeout 25s (DNS sera retenté par le cron)"
+        : (e as any)?.message || String(e);
+      onboardingError = msg;
+      log.warn("tenant-onboarding sync call failed", { err: msg });
+    }
+
+    // Notif King obligatoire (succès ou échec)
+    await supabase.from("king_notifications").insert({
+      title: onboardingOk ? "✅ DNS configuré" : "❌ DNS échoué (retry auto)",
+      message: onboardingOk
+        ? `${slug}.lyta.ch est actif sur Cloudflare + Vercel.`
+        : `${slug}.lyta.ch : ${onboardingError}. pg_cron retentera dans 5 min.`,
+      kind: onboardingOk ? "tenant_onboarding_ok" : "tenant_onboarding_failed",
+      priority: onboardingOk ? "low" : "high",
+      tenant_id: tenantId,
+      tenant_name: tenantName,
+      action_url: `/king/tenants/${tenantId}`,
+      action_label: onboardingOk ? "Voir le tenant" : "Diagnostiquer",
+      metadata: { onboarding_error: onboardingError, slug },
+    }).catch(() => null);
 
     // ============ Notification king ============
     await supabase.from("king_notifications").insert({
@@ -411,6 +447,13 @@ serve(async (req) => {
       })
       .eq("stripe_session_id", sessionId);
 
+    const dnsMessage = onboardingOk
+      ? "Le DNS est configuré, ton sous-domaine est actif."
+      : "Le DNS n'a pas pu être configuré tout de suite, un retry automatique tourne toutes les 5 min (sinon contacte le support).";
+    const emailMessage = adminCreationOk
+      ? "Vérifie ta boîte mail pour le lien de connexion."
+      : "L'email d'accès n'a pas pu être envoyé — contacte le support.";
+
     return new Response(JSON.stringify({
       ok: true,
       tenant_id: tenantId,
@@ -422,10 +465,9 @@ serve(async (req) => {
       trial_ends_at: trialEndsAt,
       admin_email_sent: adminCreationOk,
       admin_email_error: adminCreationError,
-      dns_in_progress: true,
-      message: adminCreationOk
-        ? "Ton cabinet est créé. Vérifie ta boîte mail (ouvre le lien pour définir ton mot de passe). Le DNS est en cours de configuration (2-5 min)."
-        : "Ton cabinet est créé mais l'email d'accès n'a pas pu être envoyé. Contacte le support.",
+      dns_ready: onboardingOk,
+      dns_error: onboardingError,
+      message: `Cabinet créé. ${emailMessage} ${dnsMessage}`,
     }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err) {
     log.error("Unexpected error", { err: (err as any)?.message });

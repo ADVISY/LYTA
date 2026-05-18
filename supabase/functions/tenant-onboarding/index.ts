@@ -997,6 +997,12 @@ serve(async (req) => {
       await supabase
         .from("tenants")
         .update({
+          onboarding_completed: allSuccess,
+          onboarding_last_error: allSuccess ? null : JSON.stringify({
+            dns: (results.dns as any)?.message,
+            vercel: (results.vercel as any)?.message,
+            resend: (results.resend as any)?.message,
+          }),
           metadata: {
             onboarding_completed: allSuccess,
             onboarding_date: new Date().toISOString(),
