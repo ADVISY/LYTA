@@ -494,6 +494,42 @@ export default function KingTenantDetail() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Re-run onboarding
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const target = window.prompt(
+                `Envoyer un email TEST de chaque template (welcome, account_created, contract_signed, mandat_signed, relation_client, offre_speciale, password_reset, finalize_signup) avec le branding de ${tenant.name}.\n\nÀ quelle adresse email ?`,
+                'agharbi.habib@gmail.com'
+              );
+              if (!target) return;
+              toast({ title: 'Envoi en cours…', description: `Tests envoyés à ${target}` });
+              try {
+                const { data, error } = await supabase.functions.invoke('send-test-tenant-emails', {
+                  body: { target_email: target, tenant_id: tenantId },
+                });
+                if (error) throw error;
+                const failed = (data?.results || []).filter((r: any) => !r.ok);
+                if (failed.length === 0) {
+                  toast({
+                    title: `✅ ${data?.sent || 0} emails envoyés`,
+                    description: `Tous les templates sont arrivés sur ${target}`,
+                  });
+                } else {
+                  toast({
+                    title: `${data?.sent || 0} OK / ${failed.length} échec`,
+                    description: failed.map((f: any) => `${f.type}: ${f.error}`).join(' | ').slice(0, 200),
+                    variant: 'destructive',
+                  });
+                }
+              } catch (e: any) {
+                toast({ title: 'Erreur test emails', description: e?.message || String(e), variant: 'destructive' });
+              }
+            }}
+            title="Envoie 1 email de TEST par template à l'adresse de ton choix (branding du tenant courant)"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Tester emails
+          </Button>
           <Button variant="outline" asChild>
             <a 
               href={`https://${tenant.slug}.lyta.ch`} 
