@@ -40,13 +40,25 @@ const RESERVED_SLUGS = new Set([
 interface ReqBody {
   stripe_session_id?: string;
   tenant_name?: string;
+  /** Raison sociale (si différente du nom commercial) */
+  legal_name?: string;
   slug?: string;
   admin_first_name?: string;
   admin_last_name?: string;
   admin_phone?: string;
   /** Permet d'overrider l'email payé sur Stripe (rare, par défaut on prend celui du paiement) */
   admin_email?: string;
+  /** Email back-office optionnel (pour notifications contrats) */
+  backoffice_email?: string;
   language?: "fr" | "de" | "it" | "en";
+  /** Branding visuel — stockés dans tenant_branding */
+  primary_color?: string;
+  secondary_color?: string;
+  /** Logo PNG/JPEG/WebP/SVG en base64 (data:image/...;base64,xxxx). Max 2 Mo. */
+  logo_base64?: string;
+  logo_filename?: string;
+  /** Sièges supplémentaires (CHF 20/mois chacun) */
+  extra_users?: number;
 }
 
 function sluggify(input: string): string {
@@ -81,11 +93,18 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as ReqBody;
     const sessionId = body.stripe_session_id?.trim();
     const tenantName = body.tenant_name?.trim();
+    const legalName = body.legal_name?.trim() || null;
     const slugRaw = body.slug?.trim();
     const firstName = body.admin_first_name?.trim();
     const lastName  = body.admin_last_name?.trim();
     const phone     = body.admin_phone?.trim() || null;
+    const backofficeEmail = body.backoffice_email?.trim().toLowerCase() || null;
     const language  = body.language || "fr";
+    const primaryColor   = body.primary_color?.trim() || "#3B82F6";
+    const secondaryColor = body.secondary_color?.trim() || "#10B981";
+    const extraUsers     = Math.max(0, Math.min(50, body.extra_users ?? 0));
+    const logoBase64     = body.logo_base64?.trim() || null;
+    const logoFilename   = body.logo_filename?.trim() || null;
 
     // ============ Validation ============
     if (!sessionId) {
@@ -219,6 +238,7 @@ serve(async (req) => {
       .from("tenants")
       .insert({
         name: tenantName,
+        legal_name: legalName,
         slug,
         email: adminEmail,
         admin_email: adminEmail,
@@ -227,6 +247,8 @@ serve(async (req) => {
         tenant_status: "pending_setup",
         payment_status: "trialing",
         plan: planId || null,
+        extra_users: extraUsers,
+        contract_notification_emails: backofficeEmail ? [backofficeEmail] : [],
         stripe_customer_id: stripeCustomerId,
         stripe_subscription_id: stripeSubscriptionId,
         signup_source: "self_signup",
@@ -248,6 +270,62 @@ serve(async (req) => {
       });
     }
     const tenantId = tenant.id;
+
+    // ============ Upload logo (si fourni) + tenant_branding ============
+    let uploadedLogoUrl: string | null = null;
+    if (logoBase64) {
+      try {
+        // Parse data URL : "data:image/png;base64,iVBORw0KG..."
+        const match = logoBase64.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+        if (!match) {
+          log.warn("logo_base64 format invalide — skip upload");
+        } else {
+          const mimeType = match[1];
+          const b64data  = match[2];
+          // Decode base64 → Uint8Array
+          const binary = atob(b64data);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          // Limite 2 Mo serveur (au cas où le client a triché)
+          if (bytes.length > 2 * 1024 * 1024) {
+            log.warn("logo dépasse 2Mo — skip upload");
+          } else {
+            const ext = (logoFilename?.split('.').pop()?.toLowerCase())
+              || (mimeType.split('/')[1] || 'png').replace('+xml', '');
+            const path = `${tenantId}/logo-${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from('tenant-logos')
+              .upload(path, bytes, {
+                contentType: mimeType,
+                upsert: true,
+                cacheControl: '3600',
+              });
+            if (upErr) {
+              log.warn("logo upload failed", { err: upErr.message });
+            } else {
+              const { data: pub } = supabase.storage.from('tenant-logos').getPublicUrl(path);
+              uploadedLogoUrl = pub?.publicUrl || null;
+              log.info("logo uploaded", { url: uploadedLogoUrl });
+            }
+          }
+        }
+      } catch (e) {
+        log.warn("logo processing exception", { err: (e as any)?.message });
+      }
+    }
+
+    // tenant_branding upsert (logo + couleurs, même si pas de logo on stocke les couleurs)
+    try {
+      await supabase.from('tenant_branding').upsert({
+        tenant_id: tenantId,
+        logo_url: uploadedLogoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        display_name: tenantName,
+      }, { onConflict: 'tenant_id' });
+    } catch (e) {
+      log.warn("tenant_branding upsert failed", { err: (e as any)?.message });
+    }
 
     // ============ Création admin user (envoie email avec magic link) ============
     let adminCreationOk = false;
