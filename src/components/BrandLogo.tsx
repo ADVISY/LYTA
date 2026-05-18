@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Building2 } from "lucide-react";
 
 interface BrandLogoProps {
@@ -9,19 +9,10 @@ interface BrandLogoProps {
   imgClassName?: string;
 }
 
-function isSafariBrowser() {
-  if (typeof navigator === "undefined") return false;
-
-  const ua = navigator.userAgent;
-  return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR|Android/i.test(ua);
-}
-
-function isSvgSource(src?: string | null) {
-  if (!src) return false;
-
-  const normalized = src.split("?")[0].split("#")[0].toLowerCase();
-  return normalized.endsWith(".svg") || normalized.startsWith("data:image/svg+xml");
-}
+// NOTE : on essaie d'abord d'afficher le SVG sur tous les navigateurs (Safari
+// inclus). Si le rendu plante vraiment, onError natif déclenche le fallback.
+// L'ancien guard "Safari + SVG → fallback systématique" cassait l'UX sur
+// macOS/iOS pour rien (le filter du logo est une matrice identité = no-op).
 
 function PlatformLogoFallback({ className = "" }: { className?: string }) {
   return (
@@ -55,9 +46,8 @@ export function BrandLogo({
   imgClassName = "h-24 sm:h-32 mx-auto",
 }: BrandLogoProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const shouldAvoidSvg = useMemo(() => isSafariBrowser() && isSvgSource(src), [src]);
 
-  if (src && !imageFailed && !shouldAvoidSvg) {
+  if (src && !imageFailed) {
     return (
       <img
         src={src}
