@@ -37,6 +37,7 @@ docs/
 *.md
 !README.md
 !CLAUDE.md
+!Documentation/**.md
 audit-details/
 
 .vercel
