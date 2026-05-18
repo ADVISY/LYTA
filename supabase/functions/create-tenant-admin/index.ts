@@ -715,6 +715,11 @@ serve(async (req) => {
         email,
         password: tempPassword,
         email_confirm: true,
+        // Top-level phone : indispensable pour que Supabase Auth puisse
+        // envoyer un OTP SMS via Twilio (vs user_metadata.phone qui n'est
+        // qu'un champ libre)
+        phone: phone || undefined,
+        phone_confirm: !!phone,
         user_metadata: {
           first_name,
           last_name,

@@ -327,6 +327,23 @@ serve(async (req) => {
       log.warn("tenant_branding upsert failed", { err: (e as any)?.message });
     }
 
+    // tenant_security_settings : 2FA SMS activée par défaut (cabinets d'assurance
+    // = données sensibles → on protège par défaut, le tenant peut désactiver
+    // ensuite dans CRM → Paramètres → Sécurité s'il le souhaite)
+    try {
+      await supabase.from('tenant_security_settings').upsert({
+        tenant_id: tenantId,
+        enable_2fa_login: true,
+        enable_2fa_contract: false, // 2FA sur dépôt contrat reste opt-in
+        password_min_length: 8,
+        password_require_uppercase: true,
+        password_require_number: true,
+        password_require_special: true,
+      }, { onConflict: 'tenant_id' });
+    } catch (e) {
+      log.warn("tenant_security_settings upsert failed", { err: (e as any)?.message });
+    }
+
     // ============ Création admin user (envoie email avec magic link) ============
     let adminCreationOk = false;
     let adminCreationError: string | null = null;
