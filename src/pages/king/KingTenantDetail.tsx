@@ -463,6 +463,33 @@ export default function KingTenantDetail() {
             <Upload className="h-4 w-4 mr-2" />
             Importer des données
           </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!confirm(`Re-lancer l'onboarding (DNS Cloudflare + Vercel + Resend) pour ${tenant.slug}.lyta.ch ?`)) return;
+              try {
+                const { data, error } = await supabase.functions.invoke('tenant-onboarding', {
+                  body: {
+                    tenant_id: tenantId,
+                    slug: tenant.slug,
+                    tenant_name: tenant.name,
+                    step: 'full',
+                  },
+                });
+                if (error) throw error;
+                toast({
+                  title: 'Onboarding relancé',
+                  description: 'DNS / Vercel / Resend en cours. Vérifie les notifs King + accède au sous-domaine dans 1-2 min.',
+                });
+              } catch (e: any) {
+                toast({ title: 'Erreur onboarding', description: e?.message || String(e), variant: 'destructive' });
+              }
+            }}
+            title="Recrée le CNAME Cloudflare + rattache le domaine Vercel. Utile si l'onboarding initial a échoué."
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Re-run onboarding
+          </Button>
           <Button variant="outline" asChild>
             <a 
               href={`https://${tenant.slug}.lyta.ch`} 
