@@ -636,7 +636,7 @@ export default function KingWizard() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="extra_users">Utilisateurs supplémentaires</Label>
+                    <Label htmlFor="extra_users">Collaborateurs CRM supplémentaires</Label>
                     <Input
                       id="extra_users"
                       type="number"
@@ -646,7 +646,7 @@ export default function KingWizard() {
                       placeholder="0"
                     />
                     <p className="text-xs text-muted-foreground">
-                      +CHF {PLAN_CONFIGS[formData.plan].extraSeatPrice}/mois par utilisateur
+                      +CHF {PLAN_CONFIGS[formData.plan].extraSeatPrice}/mois par collaborateur (agents, manager, back-office). Les clients finaux (espace-client) sont illimités et gratuits.
                     </p>
                   </div>
                 </div>
@@ -663,7 +663,7 @@ export default function KingWizard() {
                   </div>
                   {formData.extra_users > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>{formData.extra_users} utilisateur{formData.extra_users > 1 ? 's' : ''} supp.</span>
+                      <span>{formData.extra_users} collaborateur{formData.extra_users > 1 ? 's' : ''} supp.</span>
                       <span>CHF {formData.extra_users * PLAN_CONFIGS[formData.plan].extraSeatPrice}</span>
                     </div>
                   )}

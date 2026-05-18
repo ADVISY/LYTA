@@ -482,7 +482,7 @@ export default function FinaliserInscription() {
         {/* Section 4 - Options */}
         <Section icon={Settings} title="Options" number={4}>
           <div>
-            <Label htmlFor="extraUsers">Utilisateurs supplémentaires</Label>
+            <Label htmlFor="extraUsers">Collaborateurs supplémentaires</Label>
             <Input
               id="extraUsers"
               type="number"
@@ -491,7 +491,10 @@ export default function FinaliserInscription() {
               value={extraUsers}
               onChange={(e) => setExtraUsers(Math.max(0, parseInt(e.target.value || "0", 10)))}
             />
-            <p className="text-xs text-muted-foreground mt-1">20 CHF/mois par utilisateur supplémentaire</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              20 CHF/mois par collaborateur CRM supplémentaire (agents, manager, back-office).
+              Tes <strong>clients finaux (espace-client)</strong> sont <strong>illimités et gratuits</strong>.
+            </p>
           </div>
         </Section>
 
