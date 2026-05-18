@@ -1008,6 +1008,36 @@ const handler = async (req: Request): Promise<Response> => {
       log.info("Found tenant branding", { displayName: branding?.display_name || tenantName });
     }
 
+    // ============ Respect des toggles tenant_email_automation ============
+    // Si le tenant a désactivé l'envoi auto pour ce type, on skip silencieusement.
+    // Mapping type → toggle column. Les types sans toggle (relation_client,
+    // offre_speciale, partner_welcome) sont toujours envoyés (manuels explicites).
+    const TOGGLE_MAP: Record<string, string> = {
+      welcome: 'auto_welcome_email',
+      contract_signed: 'auto_contract_signed_email',
+      mandat_signed: 'auto_mandat_signed_email',
+      account_created: 'auto_account_created_email',
+    };
+    const toggleColumn = TOGGLE_MAP[type];
+    if (resolvedTenantId && toggleColumn) {
+      const { data: automation } = await supabaseAdmin
+        .from('tenant_email_automation')
+        .select(toggleColumn)
+        .eq('tenant_id', resolvedTenantId)
+        .maybeSingle();
+      // Default = true (envoyer) si pas de ligne ou null — on n'empêche que si
+      // explicitement false. Comme ça les anciens tenants sans config gardent le
+      // comportement d'avant.
+      if (automation && (automation as any)[toggleColumn] === false) {
+        log.info(`Email '${type}' désactivé par le tenant (${toggleColumn}=false) — skip`, { tenantId: resolvedTenantId });
+        return new Response(JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: `Type '${type}' désactivé dans CRM → Paramètres → Emails (${toggleColumn})`,
+        }), { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } });
+      }
+    }
+
     const sensitiveTypes = ['mandat_signed', 'account_created'];
     if (sensitiveTypes.includes(type)) {
       const authorized = await canSendSensitiveEmail(supabaseAdmin, user.id, resolvedTenantId);

@@ -327,6 +327,24 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // ============ Respect du toggle auto_contract_deposit_email ============
+    // Si le tenant a désactivé l'envoi auto, on skip silencieusement.
+    {
+      const { data: automation } = await supabase
+        .from('tenant_email_automation')
+        .select('auto_contract_deposit_email')
+        .eq('tenant_id', access.tenantId)
+        .maybeSingle();
+      if (automation && automation.auto_contract_deposit_email === false) {
+        log.info("Contract deposit email désactivé par le tenant — skip", { tenantId: access.tenantId });
+        return new Response(JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: "auto_contract_deposit_email=false dans CRM → Paramètres → Emails",
+        }), { status: 200, headers: { "Content-Type": "application/json", ...getCorsHeaders(req) } });
+      }
+    }
+
     // Fetch tenant info and branding
     let emails = (notificationEmails || [])
       .map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
