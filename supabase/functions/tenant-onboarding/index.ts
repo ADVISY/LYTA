@@ -807,8 +807,6 @@ serve(async (req) => {
   }
 
   try {
-    const { user } = await requireAuth(req);
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -816,19 +814,32 @@ serve(async (req) => {
       throw new Error("Supabase service credentials are not configured");
     }
 
+    // Système d'auth :
+    // - Si appelé avec le service_role bearer (depuis provision-self-signup-tenant
+    //   ou autre fonction backend), on bypass le check king (caller=system)
+    // - Sinon, on exige un user authentifié avec rôle king
+    const authHeader = req.headers.get("authorization") || "";
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const isSystemCall = bearerToken === supabaseServiceKey;
+
+    if (!isSystemCall) {
+      const { user } = await requireAuth(req);
+      const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: roleData } = await supabaseAuth
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+      if (roleData?.role !== "king") {
+        throw new Error("Unauthorized: Only KING users (or system) can run onboarding");
+      }
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
-
-    if (roleData?.role !== "king") {
-      throw new Error("Unauthorized: Only KING users can run onboarding");
-    }
 
     const { tenant_id, slug, tenant_name, step, email_domain }: OnboardingRequest = await req.json();
 
