@@ -434,26 +434,74 @@ serve(async (req) => {
             }
           }
 
-          const paymentStatus = subscription.status === 'active' ? 'paid' 
+          const paymentStatus = subscription.status === 'active' ? 'paid'
             : subscription.status === 'past_due' ? 'past_due'
             : subscription.status === 'trialing' ? 'trialing'
             : 'unpaid';
 
+          // Auto-transition status visuel : trial → actif quand Stripe confirme
+          // le premier paiement réussi (subscription.status passe de 'trialing'
+          // à 'active'). Le tenant passe automatiquement de 'test'/'pending_setup'
+          // à 'active' → visible en vert dans le dashboard King.
+          const updates: Record<string, any> = {
+            stripe_subscription_id: subscription.id,
+            plan: planName,
+            extra_users: extraUsers,
+            payment_status: paymentStatus,
+            billing_status: paymentStatus,
+            mrr_amount: mrr,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          // Récupère le status actuel pour décider de la transition
+          const { data: currentTenant } = await supabaseAdmin
+            .from('tenants')
+            .select('status, tenant_status')
+            .eq('id', tenant.id)
+            .single();
+
+          let activated = false;
+          if (subscription.status === 'active') {
+            // Trial terminé + paiement OK → on bascule actif (si pas déjà)
+            if (currentTenant?.status !== 'active') {
+              updates.status = 'active';
+              activated = true;
+            }
+            if (currentTenant?.tenant_status !== 'active') {
+              updates.tenant_status = 'active';
+              activated = true;
+            }
+          } else if (['unpaid', 'canceled', 'incomplete_expired'].includes(subscription.status)) {
+            // Échec paiement après trial → suspendre
+            if (currentTenant?.status !== 'suspended') {
+              updates.status = 'suspended';
+              updates.suspended_at = new Date().toISOString();
+              updates.suspension_reason = `Stripe subscription status: ${subscription.status}`;
+            }
+          }
+
           await supabaseAdmin
             .from('tenants')
-            .update({
-              stripe_subscription_id: subscription.id,
-              plan: planName,
-              extra_users: extraUsers,
-              payment_status: paymentStatus,
-              billing_status: paymentStatus,
-              mrr_amount: mrr,
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            .update(updates)
             .eq('id', tenant.id);
 
-          log.info("Tenant subscription updated", { tenantId: tenant.id, plan: planName, mrr });
+          log.info("Tenant subscription updated", { tenantId: tenant.id, plan: planName, mrr, activated });
+
+          // Notification king sur la transition active
+          if (activated) {
+            await supabaseAdmin.from('king_notifications').insert({
+              title: '🎉 Cabinet actif (fin trial)',
+              message: `${tenant.name} a complété son trial et est passé en payant — MRR +${mrr} CHF`,
+              kind: 'tenant_activated',
+              priority: 'normal',
+              tenant_id: tenant.id,
+              tenant_name: tenant.name,
+              action_url: `/king/tenants/${tenant.id}`,
+              action_label: 'Voir le tenant',
+              metadata: { plan: planName, mrr, subscription_id: subscription.id },
+            });
+          }
         }
         break;
       }
