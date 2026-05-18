@@ -214,3 +214,7 @@ Actuellement, **tous les environnements** (Production, Preview, Development) poi
 4. **Refonte UI/UX** complète — prochaine grosse phase
 5. ~~Recommande tes proches~~ ✅ (en attente de déploiement)
 6. **Scan cross-device intelligent** — partiellement existant, à étendre
+7. **LPP — Prévoyance 2e pilier** :
+   - ✅ Tab LPP sur `/deposer-contrat` (recherche / libre passage / rapatriement + Smartflow)
+   - 🟡 **Automation recherche LPP** (en cours) : bouton "Envoyer recherche" à côté du contrat LPP dans CRM → ClientDetail → envoi auto des 2 emails (Centrale du 2e pilier + Fondation Institution Supplétive) avec ID + procuration en pièces jointes. Tracking dans Publicité → onglet Email/Historique (kind='lpp_search')
+   - 📋 Phase 2 : intégration Pingen.com pour envoi postal automatique (~1.50 CHF/lettre, premium service)

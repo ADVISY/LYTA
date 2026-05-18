@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter, Building2, Heart, Activity, Car, Home as HomeIcon, Scale, Shield } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter, Building2, Heart, Activity, Car, Home as HomeIcon, Scale, Shield, PiggyBank, Loader2 } from "lucide-react";
 import { useTenantDocumentTypes } from "@/hooks/useTenantLookups";
 import {
   AlertDialog,
@@ -146,6 +146,8 @@ export default function ClientDetail() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
+  // LPP search en cours (loader sur le bouton "Envoyer recherche LPP" de la policy concernée)
+  const [sendingLppSearchId, setSendingLppSearchId] = useState<string | null>(null);
   const [importSignatureOpen, setImportSignatureOpen] = useState(false);
   const [signatureRefreshTick, setSignatureRefreshTick] = useState(0);
   // Documents tab filters + change-type dialog
@@ -1008,6 +1010,51 @@ export default function ClientDetail() {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {/* Bouton spécifique LPP : envoyer recherche aux 2 institutions */}
+                                  {(policy as any).product_type === 'lpp' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 gap-1.5 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                      disabled={sendingLppSearchId === policy.id}
+                                      onClick={async () => {
+                                        if (!confirm(`Envoyer la recherche LPP pour ce contrat ?\n\nDeux emails partiront :\n• Centrale du 2e pilier (sfbvg.ch)\n• Fondation Institution Supplétive LPP\n\nLes documents (pièce d'identité + procuration) seront joints automatiquement.`)) return;
+                                        setSendingLppSearchId(policy.id);
+                                        try {
+                                          const { data, error } = await supabase.functions.invoke('send-lpp-search-requests', {
+                                            body: { policy_id: policy.id },
+                                          });
+                                          if (error) throw error;
+                                          const sent = (data?.results || []).filter((r: any) => r.status === 'sent').length;
+                                          const failed = (data?.results || []).filter((r: any) => r.status === 'failed');
+                                          if (failed.length === 0) {
+                                            toast({
+                                              title: `✅ ${sent}/2 emails envoyés`,
+                                              description: 'Recherche LPP transmise aux 2 institutions. Suivi dans Publicité → Historique.',
+                                            });
+                                          } else {
+                                            toast({
+                                              title: `${sent}/2 emails — ${failed.length} échec(s)`,
+                                              description: failed.map((f: any) => `${f.institution}: ${f.error}`).join(' | ').slice(0, 250),
+                                              variant: 'destructive',
+                                            });
+                                          }
+                                        } catch (e: any) {
+                                          toast({ title: 'Erreur recherche LPP', description: e?.message || String(e), variant: 'destructive' });
+                                        } finally {
+                                          setSendingLppSearchId(null);
+                                        }
+                                      }}
+                                      title="Envoie automatiquement la recherche LPP aux 2 institutions officielles (Centrale 2P + Suppletive) avec ID + procuration"
+                                    >
+                                      {sendingLppSearchId === policy.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <PiggyBank className="h-4 w-4" />
+                                      )}
+                                      <span className="text-xs">Envoyer recherche</span>
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"

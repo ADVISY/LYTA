@@ -21,6 +21,7 @@ import {
   FileSignature,
   Mail,
   Megaphone,
+  PiggyBank,
   RefreshCw,
   Search,
   UserPlus,
@@ -69,6 +70,7 @@ type KindFilter =
   | "campaign"
   | "quick_email"
   | "crm_email"
+  | "lpp_search"
   | "transactional";
 
 const KIND_META: Record<string, { label: string; color: string; icon: typeof Mail }> = {
@@ -79,6 +81,7 @@ const KIND_META: Record<string, { label: string; color: string; icon: typeof Mai
   campaign:         { label: "Campagne",               color: "bg-amber-100 text-amber-800",       icon: Megaphone },
   quick_email:      { label: "Email rapide",           color: "bg-slate-100 text-slate-700",       icon: Mail },
   crm_email:        { label: "Email CRM",              color: "bg-slate-100 text-slate-700",       icon: Mail },
+  lpp_search:       { label: "Recherche LPP",          color: "bg-amber-100 text-amber-800",       icon: PiggyBank },
   transactional:    { label: "Transactionnel",         color: "bg-slate-100 text-slate-700",       icon: Mail },
 };
 
@@ -225,6 +228,7 @@ export function EmailDeliveryHistory() {
               <SelectItem value="campaign">Campagnes</SelectItem>
               <SelectItem value="quick_email">Emails rapides</SelectItem>
               <SelectItem value="crm_email">Emails CRM</SelectItem>
+              <SelectItem value="lpp_search">Recherches LPP</SelectItem>
               <SelectItem value="transactional">Transactionnel</SelectItem>
             </SelectContent>
           </Select>
