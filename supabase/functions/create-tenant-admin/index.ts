@@ -608,6 +608,8 @@ serve(async (req) => {
 
     let userId: string;
     let isNewUser = false;
+    let emailSent = false;
+    let emailError: string | null = null;
 
     if (existingUser) {
       // User already exists - link them to the tenant
@@ -677,8 +679,8 @@ serve(async (req) => {
       const resetLink = !linkError ? buildRecoveryLink(resetRedirectUrl, linkData) : null;
       if (resetLink && RESEND_API_KEY) {
         const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, resetLink, branding);
-        
-        await fetch("https://api.resend.com/emails", {
+
+        const resendResp = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${RESEND_API_KEY}`,
@@ -691,7 +693,17 @@ serve(async (req) => {
             html,
           }),
         });
-        log.info("Welcome email sent to existing user", { email });
+        if (resendResp.ok) {
+          emailSent = true;
+          log.info("Welcome email sent to existing user", { email });
+        } else {
+          emailError = `Resend ${resendResp.status}: ${(await resendResp.text()).slice(0, 300)}`;
+          log.error("Resend rejected welcome email (existing user)", { error: emailError });
+        }
+      } else if (!RESEND_API_KEY) {
+        emailError = "RESEND_API_KEY non configurée dans Supabase Edge Functions secrets";
+      } else if (!resetLink) {
+        emailError = "Impossible de générer le lien de réinitialisation (Supabase auth.admin.generateLink a échoué)";
       }
 
     } else {
@@ -753,14 +765,18 @@ serve(async (req) => {
       });
 
       if (linkError) {
+        emailError = `Supabase generateLink: ${linkError.message || JSON.stringify(linkError)}`;
         log.error("Error generating password reset link", { error: linkError });
-      } else if (RESEND_API_KEY) {
+      } else if (!RESEND_API_KEY) {
+        emailError = "RESEND_API_KEY non configurée dans Supabase Edge Functions secrets";
+      } else {
         const resetLink = buildRecoveryLink(resetRedirectUrl, linkData);
         if (!resetLink) {
-          log.error("Error generating password reset link", { error: "Missing recovery link" });
+          emailError = "Missing recovery link (action_link et hashed_token absents de la réponse Supabase)";
+          log.error("Error generating password reset link", { error: emailError });
         } else {
           const { subject, html } = generateAdminWelcomeEmail(adminName, tenant.name, tenant.slug, resetLink, branding);
-        
+
           const emailResponse = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -776,9 +792,11 @@ serve(async (req) => {
           });
 
           if (emailResponse.ok) {
+            emailSent = true;
             log.info("Welcome email with password reset link sent", { to: email });
           } else {
-            log.error("Failed to send welcome email", { error: await emailResponse.text() });
+            emailError = `Resend ${emailResponse.status}: ${(await emailResponse.text()).slice(0, 300)}`;
+            log.error("Failed to send welcome email", { error: emailError });
           }
         }
       }
@@ -844,10 +862,13 @@ serve(async (req) => {
         roles_initialized: !existingRoles || existingRoles.length === 0,
         admin_role_assigned: !!adminRoleId,
         subdomain: `${tenant.slug}.lyta.ch`,
-        email_sent: !!RESEND_API_KEY,
-        message: isNewUser 
-          ? `Admin créé avec succès. Un email d'invitation a été envoyé à ${email}. Sous-domaine: ${tenant.slug}.lyta.ch`
-          : `Utilisateur existant lié au tenant ${tenant.name} avec succès. Un email lui a été envoyé.`,
+        email_sent: emailSent,
+        email_error: emailError,
+        message: emailSent
+          ? (isNewUser
+              ? `Admin créé. Email d'invitation envoyé à ${email}. Sous-domaine: ${tenant.slug}.lyta.ch`
+              : `Utilisateur existant lié à ${tenant.name}. Email envoyé à ${email}.`)
+          : `Compte créé mais email NON envoyé : ${emailError || 'raison inconnue'}`,
       }),
       {
         status: 200,

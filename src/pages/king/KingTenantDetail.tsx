@@ -449,7 +449,11 @@ export default function KingTenantDetail() {
                 if (data?.email_sent) {
                   toast({ title: 'Email renvoyé', description: `Email de bienvenue envoyé à ${adminEmail}` });
                 } else {
-                  toast({ title: 'Email non envoyé', description: data?.error || 'Vérifie la config Resend', variant: 'destructive' });
+                  toast({
+                    title: 'Email non envoyé',
+                    description: data?.email_error || data?.error || 'Cause inconnue — check les logs Supabase Functions',
+                    variant: 'destructive',
+                  });
                 }
               } catch (e: any) {
                 toast({ title: 'Erreur', description: e?.message || String(e), variant: 'destructive' });
