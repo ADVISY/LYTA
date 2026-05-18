@@ -184,6 +184,7 @@ serve(async (req) => {
       'vita': 'life',
       'medio': 'home',
       'business': 'rcpro',
+      'lpp': 'life',  // LPP est dans la catégorie vie (prévoyance 2e pilier)
     }
     const productName = (formType || 'sana').charAt(0).toUpperCase() + (formType || 'sana').slice(1)
     const productCategory = categoryMap[formType] || 'health'

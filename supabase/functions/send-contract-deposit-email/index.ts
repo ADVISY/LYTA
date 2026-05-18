@@ -32,7 +32,7 @@ interface TenantBranding {
 type ContractFormData = Record<string, string | number | boolean | null | undefined>;
 
 interface ContractData {
-  formType: 'sana' | 'vita' | 'medio' | 'business';
+  formType: 'sana' | 'vita' | 'medio' | 'business' | 'lpp';
   clientName: string;
   clientPrenom: string;
   clientEmail: string;
@@ -58,6 +58,7 @@ const formTypeLabels: Record<string, string> = {
   vita: 'VITA - Prévoyance (3e pilier)',
   medio: 'MEDIO - RC/Ménage/Auto',
   business: 'BUSINESS - Assurance Entreprise',
+  lpp: 'LPP - Prévoyance 2e pilier (recherche / libre passage / rapatriement)',
 };
 
 const formatFormData = (formType: string, formData: ContractFormData): string => {
@@ -93,6 +94,37 @@ const formatFormData = (formType: string, formData: ContractFormData): string =>
       if (formData.perteGainMaladie) lines.push(`<tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Perte de gain maladie:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">Oui</td></tr>`);
       if (formData.dateEffet) lines.push(`<tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Date effet:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${formData.dateEffet}</td></tr>`);
       break;
+    case 'lpp': {
+      const td = `padding:8px;border-bottom:1px solid #eee`;
+      const demandes: string[] = [];
+      if (formData.rechercheAvoirs) demandes.push('Recherche d\'avoirs LPP');
+      if (formData.creationLibrePassage) demandes.push('Compte de libre passage');
+      if (formData.rapatriementLPP) demandes.push('Rapatriement LPP');
+      if (demandes.length) lines.push(`<tr><td style="${td}"><strong>Type de demande:</strong></td><td style="${td}">${demandes.join(' + ')}</td></tr>`);
+      if (formData.dateNaissance) lines.push(`<tr><td style="${td}"><strong>Date de naissance:</strong></td><td style="${td}">${formData.dateNaissance}</td></tr>`);
+      if (formData.numeroAvs) lines.push(`<tr><td style="${td}"><strong>N° AVS:</strong></td><td style="${td}">${formData.numeroAvs}</td></tr>`);
+      if (formData.nationalite) lines.push(`<tr><td style="${td}"><strong>Nationalité:</strong></td><td style="${td}">${formData.nationalite}</td></tr>`);
+      if (formData.adresse || formData.npa || formData.localite) {
+        const adr = `${formData.adresse || ''}, ${formData.npa || ''} ${formData.localite || ''}`.trim();
+        lines.push(`<tr><td style="${td}"><strong>Adresse:</strong></td><td style="${td}">${adr}</td></tr>`);
+      }
+      // Anciens employeurs (recherche)
+      if (formData.rechercheAvoirs && Array.isArray(formData.anciensEmployeurs) && formData.anciensEmployeurs.length > 0) {
+        const empList = formData.anciensEmployeurs
+          .filter((e: any) => e.nom)
+          .map((e: any) => `• ${e.nom}${e.dateDebut || e.dateFin ? ` (${e.dateDebut || '?'} → ${e.dateFin || '?'})` : ''}${e.caissePension ? ` — caisse: ${e.caissePension}` : ''}`)
+          .join('<br>');
+        if (empList) lines.push(`<tr><td style="${td};vertical-align:top"><strong>Anciens employeurs:</strong></td><td style="${td}">${empList}</td></tr>`);
+      }
+      if (formData.creationLibrePassage) {
+        if (formData.institutionLibrePassage) lines.push(`<tr><td style="${td}"><strong>Institution libre passage:</strong></td><td style="${td}">${formData.institutionLibrePassage} (${formData.modaliteLibrePassage || 'compte'})</td></tr>`);
+        if (formData.montantApproximatif) lines.push(`<tr><td style="${td}"><strong>Montant approximatif:</strong></td><td style="${td}">${formData.montantApproximatif} CHF</td></tr>`);
+      }
+      if (formData.rapatriementLPP && formData.caissePensionActuelle) {
+        lines.push(`<tr><td style="${td}"><strong>Caisse pension actuelle:</strong></td><td style="${td}">${formData.caissePensionActuelle}</td></tr>`);
+      }
+      break;
+    }
   }
   
   if (formData.commentaires) {

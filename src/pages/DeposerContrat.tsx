@@ -39,7 +39,11 @@ import {
   FileText,
   Car,
   Home,
-  Factory
+  Factory,
+  PiggyBank,
+  Search as SearchIcon,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import SingleDocumentUpload from "@/components/crm/SingleDocumentUpload";
@@ -62,7 +66,7 @@ type VerifiedPartner = {
   lastName: string | null;
 };
 
-type FormType = 'sana' | 'vita' | 'medio' | 'business' | null;
+type FormType = 'sana' | 'vita' | 'medio' | 'business' | 'lpp' | null;
 
 type InsuranceCompanyOption = {
   id: string;
@@ -145,6 +149,44 @@ type MedioFormData = {
   plaqueVehicule: string;
   // Dates
   dateEffet: string;
+  agentName: string;
+  commentaires: string;
+  confirmDocuments: boolean;
+};
+
+// LPP Form - Prévoyance 2e pilier (recherche/rapatriement avoirs + libre passage)
+type AncienEmployeur = {
+  nom: string;
+  dateDebut: string;
+  dateFin: string;
+  caissePension: string;
+};
+type LppFormData = {
+  // Client
+  clientCivilite: string;
+  clientNom: string;
+  clientPrenom: string;
+  clientEmail: string;
+  clientTel: string;
+  dateNaissance: string;
+  numeroAvs: string;       // format 756.XXXX.XXXX.XX
+  nationalite: string;
+  adresse: string;
+  npa: string;
+  localite: string;
+  // Type de demande (3 options non-exclusives)
+  rechercheAvoirs: boolean;        // recherche d'avoirs LPP "orphelins"
+  creationLibrePassage: boolean;   // ouvrir un compte de libre passage
+  rapatriementLPP: boolean;        // rapatrier les avoirs vers la caisse actuelle
+  // Recherche LPP
+  anciensEmployeurs: AncienEmployeur[];
+  // Libre passage
+  institutionLibrePassage: string; // ex: UBS, Liberty, Tellco, etc.
+  modaliteLibrePassage: string;    // compte / portefeuille titres
+  montantApproximatif: string;
+  // Caisse actuelle (pour rapatriement)
+  caissePensionActuelle: string;
+  // Notes
   agentName: string;
   commentaires: string;
   confirmDocuments: boolean;
@@ -234,6 +276,19 @@ const businessSchema = z.object({
   emailRetour: z.string().min(1, "Email requis").email("Email invalide"),
 });
 
+const lppSchema = z.object({
+  clientNom: z.string().min(1, "Nom requis"),
+  clientPrenom: z.string().min(1, "Prénom requis"),
+  clientEmail: z.string().min(1, "Email requis").email("Email invalide"),
+  clientTel: z.string().min(1, "Téléphone requis"),
+  dateNaissance: z.string().min(1, "Date de naissance requise"),
+  numeroAvs: z.string().min(1, "Numéro AVS requis"),
+  confirmDocuments: z.literal(true, { errorMap: () => ({ message: "Veuillez confirmer les documents" }) }),
+}).refine(
+  (data) => (data as any).rechercheAvoirs || (data as any).creationLibrePassage || (data as any).rapatriementLPP,
+  { message: "Choisis au moins un type de demande (recherche, libre passage ou rapatriement)" }
+);
+
 type FormErrors = Record<string, string>;
 
 const getFormTypes = (t: (key: string) => string) => [
@@ -268,6 +323,14 @@ const getFormTypes = (t: (key: string) => string) => [
     description: t('depositContract.formTypes.business.description'),
     icon: Factory,
     color: 'from-purple-500 to-purple-600',
+  },
+  {
+    id: 'lpp' as FormType,
+    title: 'LPP',
+    subtitle: 'Prévoyance 2e pilier',
+    description: 'Recherche d\'avoirs, rapatriement et compte de libre passage',
+    icon: PiggyBank,
+    color: 'from-amber-500 to-amber-600',
   },
 ];
 
@@ -337,17 +400,30 @@ export default function DeposerContrat() {
     compagnies: [], dateEffet: "", dateRdv: "", emailRetour: "", langue: "fr", agentName: "", commentaires: "",
   });
 
+  // LPP Form State
+  const [lppForm, setLppForm] = useState<LppFormData>({
+    clientCivilite: "", clientNom: "", clientPrenom: "", clientEmail: "", clientTel: "",
+    dateNaissance: "", numeroAvs: "", nationalite: "", adresse: "", npa: "", localite: "",
+    rechercheAvoirs: true, creationLibrePassage: false, rapatriementLPP: false,
+    anciensEmployeurs: [{ nom: "", dateDebut: "", dateFin: "", caissePension: "" }],
+    institutionLibrePassage: "", modaliteLibrePassage: "compte", montantApproximatif: "",
+    caissePensionActuelle: "",
+    agentName: "", commentaires: "", confirmDocuments: false,
+  });
+
   // Documents state
   const [sanaDocuments, setSanaDocuments] = useState<UploadedDocument[]>([]);
   const [vitaDocuments, setVitaDocuments] = useState<UploadedDocument[]>([]);
   const [medioDocuments, setMedioDocuments] = useState<UploadedDocument[]>([]);
   const [businessDocuments, setBusinessDocuments] = useState<UploadedDocument[]>([]);
+  const [lppDocuments, setLppDocuments] = useState<UploadedDocument[]>([]);
 
   // IA Scan state
   const [sanaScanResults, setSanaScanResults] = useState<ScanResults | null>(null);
   const [vitaScanResults, setVitaScanResults] = useState<ScanResults | null>(null);
   const [medioScanResults, setMedioScanResults] = useState<ScanResults | null>(null);
   const [businessScanResults, setBusinessScanResults] = useState<ScanResults | null>(null);
+  const [lppScanResults, setLppScanResults] = useState<ScanResults | null>(null);
 
   // Required documents per form
   const sanaRequiredDocs = [
@@ -377,6 +453,14 @@ export default function DeposerContrat() {
     t('depositContract.business.docs.ceoIdentity'),
     t('depositContract.business.docs.staffList'),
     t('depositContract.common.additionalDocs'),
+  ];
+
+  const lppRequiredDocs = [
+    "Pièce d'identité (recto-verso)",
+    "Facture QR (pour identification créancier)",
+    "Contrat + procuration signés",
+    "Justificatif domicile (optionnel)",
+    "Documents complémentaires (anciens certificats LPP, fiches de salaire, etc.)",
   ];
 
   const formTypes = getFormTypes(t);
@@ -673,6 +757,45 @@ export default function DeposerContrat() {
     toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire" });
   };
 
+  const handleLppScanValidate = (validatedFields: Record<string, string>) => {
+    setLppForm(prev => ({
+      ...prev,
+      clientNom: validatedFields.nom || prev.clientNom,
+      clientPrenom: validatedFields.prenom || prev.clientPrenom,
+      clientEmail: validatedFields.email || prev.clientEmail,
+      clientTel: validatedFields.telephone || prev.clientTel,
+      dateNaissance: validatedFields.date_naissance || prev.dateNaissance,
+      numeroAvs: validatedFields.numero_avs || validatedFields.avs || prev.numeroAvs,
+      nationalite: validatedFields.nationalite || prev.nationalite,
+      adresse: validatedFields.adresse || prev.adresse,
+      npa: validatedFields.npa || prev.npa,
+      localite: validatedFields.localite || prev.localite,
+      caissePensionActuelle: validatedFields.caisse_pension || validatedFields.institution || prev.caissePensionActuelle,
+    }));
+    setLppScanResults(null);
+    toast({ title: "Formulaire pré-rempli", description: "Les données ont été appliquées au formulaire LPP" });
+  };
+
+  // Helpers pour la liste d'anciens employeurs (LPP recherche)
+  const addAncienEmployeur = () => {
+    setLppForm(prev => ({
+      ...prev,
+      anciensEmployeurs: [...prev.anciensEmployeurs, { nom: "", dateDebut: "", dateFin: "", caissePension: "" }],
+    }));
+  };
+  const removeAncienEmployeur = (idx: number) => {
+    setLppForm(prev => ({
+      ...prev,
+      anciensEmployeurs: prev.anciensEmployeurs.filter((_, i) => i !== idx),
+    }));
+  };
+  const updateAncienEmployeur = (idx: number, field: keyof AncienEmployeur, value: string) => {
+    setLppForm(prev => ({
+      ...prev,
+      anciensEmployeurs: prev.anciensEmployeurs.map((e, i) => i === idx ? { ...e, [field]: value } : e),
+    }));
+  };
+
   const handleVerifyEmail = async () => {
     if (!partnerEmail.trim()) {
       toast({ title: t('depositContract.emailRequired'), description: t('depositContract.enterEmail'), variant: "destructive" });
@@ -926,6 +1049,64 @@ export default function DeposerContrat() {
       toast({ title: t('depositContract.formSent', { type: 'BUSINESS' }), description: t('depositContract.requestSubmitted') });
       setBusinessForm({ entrepriseNom: "", entrepriseActivite: "", formeSociete: "", nouvelleCreation: "", entrepriseAdresse: "", chefCivilite: "", chefPrenom: "", chefNom: "", chefDateNaissance: "", chefAdresse: "", chefNationalite: "", chefPermis: "", rcEntreprise: false, rcAssureurPrecedent: "", rcTypeContrat: "", rcChiffreAffaire: "", rcSommeAssurance: "3000000", rcFranchise: "500", assuranceChoses: false, chosesIncendie: false, chosesIncendieMontant: "", chosesVol: false, chosesVolMontant: "", chosesDegatsEau: false, chosesDegatsEauMontant: "", laaObligatoire: false, laaComplementaire: false, nombreFemmes: "", ageMoyenFemmes: "", salairesFemmes: "", nombreHommes: "", ageMoyenHommes: "", salairesHommes: "", perteGainMaladie: false, compagnies: [], dateEffet: "", dateRdv: "", emailRetour: "", langue: "fr", commentaires: "" });
       setBusinessDocuments([]);
+      handleBackToSelection();
+    } catch (error: any) {
+      toast({ title: t('common.error'), description: error.message || t('depositContract.cannotSubmit'), variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitLpp = async () => {
+    setFormErrors({});
+    // Manual check: at least one type of demand selected
+    if (!lppForm.rechercheAvoirs && !lppForm.creationLibrePassage && !lppForm.rapatriementLPP) {
+      toast({
+        title: "Type de demande requis",
+        description: "Coche au moins une option : recherche, libre passage ou rapatriement.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const validation = lppSchema.safeParse({
+      ...lppForm,
+      rechercheAvoirs: lppForm.rechercheAvoirs,
+      creationLibrePassage: lppForm.creationLibrePassage,
+      rapatriementLPP: lppForm.rapatriementLPP,
+    });
+    if (!validation.success) {
+      const errors = extractZodErrors(validation);
+      setFormErrors(errors);
+      toast({ title: t('common.error'), description: t('depositContract.fillRequired'), variant: "destructive" });
+      return;
+    }
+    // LPP n'a pas besoin de catalogue compagnies/produits (c'est un service)
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('deposit-contract', {
+        body: {
+          partnerEmail: normalizedPartnerEmail,
+          formType: 'lpp',
+          formData: lppForm,
+          startDate: new Date().toISOString().split("T")[0],
+          productType: 'lpp',
+        }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await sendContractDepositEmail('lpp', lppForm, lppDocuments);
+      celebrate("contract_added");
+      toast({ title: "Demande LPP envoyée", description: "Le cabinet va prendre en charge ta demande sous peu." });
+      setLppForm({
+        clientCivilite: "", clientNom: "", clientPrenom: "", clientEmail: "", clientTel: "",
+        dateNaissance: "", numeroAvs: "", nationalite: "", adresse: "", npa: "", localite: "",
+        rechercheAvoirs: true, creationLibrePassage: false, rapatriementLPP: false,
+        anciensEmployeurs: [{ nom: "", dateDebut: "", dateFin: "", caissePension: "" }],
+        institutionLibrePassage: "", modaliteLibrePassage: "compte", montantApproximatif: "",
+        caissePensionActuelle: "",
+        agentName: verifiedPartner?.name || "", commentaires: "", confirmDocuments: false,
+      });
+      setLppDocuments([]);
       handleBackToSelection();
     } catch (error: any) {
       toast({ title: t('common.error'), description: error.message || t('depositContract.cannotSubmit'), variant: "destructive" });
@@ -1869,6 +2050,294 @@ export default function DeposerContrat() {
 
               <Button className="w-full" size="lg" onClick={handleSubmitBusiness} disabled={submitting} style={tenantPrimaryColor ? { backgroundColor: tenantPrimaryColor } : undefined}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('depositContract.common.sending')}</> : <><Upload className="mr-2 h-4 w-4" />{t('depositContract.common.submitForm', { type: 'BUSINESS' })}</>}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ============================ LPP FORM ============================ */}
+        {selectedFormType === 'lpp' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600">
+                  <PiggyBank className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <span className="block">Prévoyance 2e pilier (LPP)</span>
+                  <span className="text-sm font-normal text-muted-foreground">Recherche d'avoirs orphelins, rapatriement et compte de libre passage</span>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* IA SCAN Section (Smartflow) — scan ID / certificat LPP / fiche salaire / etc. */}
+              {lppScanResults ? (
+                <IAScanValidation
+                  results={lppScanResults}
+                  onValidate={handleLppScanValidate}
+                  onCancel={() => setLppScanResults(null)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                />
+              ) : (
+                <IAScanUpload
+                  formType="lpp"
+                  tenantId={tenant?.id}
+                  tenantPlan={tenant?.plan}
+                  onScanComplete={(results) => setLppScanResults(results)}
+                  primaryColor={tenantPrimaryColor || undefined}
+                  verifiedPartnerEmail={normalizedPartnerEmail}
+                  verifiedPartnerId={verifiedPartner?.id}
+                />
+              )}
+
+              {/* Section 1 : Type de demande */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2">
+                  <SearchIcon className="h-5 w-5" /> Type de demande
+                </h3>
+                <p className="text-sm text-muted-foreground">Coche tout ce qui s'applique (au moins une option).</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                    <Checkbox
+                      checked={lppForm.rechercheAvoirs}
+                      onCheckedChange={(v) => setLppForm(prev => ({ ...prev, rechercheAvoirs: !!v }))}
+                    />
+                    <div>
+                      <div className="font-medium">Recherche d'avoirs LPP</div>
+                      <div className="text-xs text-muted-foreground">Retrouver les avoirs LPP "orphelins" auprès des anciens employeurs.</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                    <Checkbox
+                      checked={lppForm.creationLibrePassage}
+                      onCheckedChange={(v) => setLppForm(prev => ({ ...prev, creationLibrePassage: !!v }))}
+                    />
+                    <div>
+                      <div className="font-medium">Compte de libre passage</div>
+                      <div className="text-xs text-muted-foreground">Ouvrir un compte de libre passage pour parquer les avoirs.</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                    <Checkbox
+                      checked={lppForm.rapatriementLPP}
+                      onCheckedChange={(v) => setLppForm(prev => ({ ...prev, rapatriementLPP: !!v }))}
+                    />
+                    <div>
+                      <div className="font-medium">Rapatriement LPP</div>
+                      <div className="text-xs text-muted-foreground">Transférer les avoirs vers la caisse de pension actuelle.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Section 2 : Client */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2"><User className="h-5 w-5" /> Informations client</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Civilité</Label>
+                    <Select value={lppForm.clientCivilite} onValueChange={(v) => setLppForm(prev => ({ ...prev, clientCivilite: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M.">M.</SelectItem>
+                        <SelectItem value="Mme">Mme</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prénom *</Label>
+                    <Input value={lppForm.clientPrenom} onChange={(e) => { setLppForm(prev => ({ ...prev, clientPrenom: e.target.value })); setFormErrors(prev => ({ ...prev, clientPrenom: undefined })); }} className={formErrors.clientPrenom ? 'border-destructive' : ''} />
+                    {formErrors.clientPrenom && <p className="text-sm text-destructive">{formErrors.clientPrenom}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nom *</Label>
+                    <Input value={lppForm.clientNom} onChange={(e) => { setLppForm(prev => ({ ...prev, clientNom: e.target.value })); setFormErrors(prev => ({ ...prev, clientNom: undefined })); }} className={formErrors.clientNom ? 'border-destructive' : ''} />
+                    {formErrors.clientNom && <p className="text-sm text-destructive">{formErrors.clientNom}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input type="email" value={lppForm.clientEmail} onChange={(e) => { setLppForm(prev => ({ ...prev, clientEmail: e.target.value })); setFormErrors(prev => ({ ...prev, clientEmail: undefined })); }} className={formErrors.clientEmail ? 'border-destructive' : ''} />
+                    {formErrors.clientEmail && <p className="text-sm text-destructive">{formErrors.clientEmail}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Téléphone *</Label>
+                    <Input value={lppForm.clientTel} onChange={(e) => { setLppForm(prev => ({ ...prev, clientTel: e.target.value })); setFormErrors(prev => ({ ...prev, clientTel: undefined })); }} placeholder="+41 79 ..." className={formErrors.clientTel ? 'border-destructive' : ''} />
+                    {formErrors.clientTel && <p className="text-sm text-destructive">{formErrors.clientTel}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date de naissance *</Label>
+                    <Input type="date" value={lppForm.dateNaissance} onChange={(e) => { setLppForm(prev => ({ ...prev, dateNaissance: e.target.value })); setFormErrors(prev => ({ ...prev, dateNaissance: undefined })); }} className={formErrors.dateNaissance ? 'border-destructive' : ''} />
+                    {formErrors.dateNaissance && <p className="text-sm text-destructive">{formErrors.dateNaissance}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Numéro AVS * (format 756.XXXX.XXXX.XX)</Label>
+                    <Input value={lppForm.numeroAvs} onChange={(e) => { setLppForm(prev => ({ ...prev, numeroAvs: e.target.value })); setFormErrors(prev => ({ ...prev, numeroAvs: undefined })); }} placeholder="756.1234.5678.90" className={formErrors.numeroAvs ? 'border-destructive' : ''} />
+                    {formErrors.numeroAvs && <p className="text-sm text-destructive">{formErrors.numeroAvs}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nationalité</Label>
+                    <Input value={lppForm.nationalite} onChange={(e) => setLppForm(prev => ({ ...prev, nationalite: e.target.value }))} placeholder="Suisse, Italienne, ..." />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Adresse</Label>
+                    <Input value={lppForm.adresse} onChange={(e) => setLppForm(prev => ({ ...prev, adresse: e.target.value }))} placeholder="Rue + numéro" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label>NPA</Label>
+                      <Input value={lppForm.npa} onChange={(e) => setLppForm(prev => ({ ...prev, npa: e.target.value }))} placeholder="1000" />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label>Localité</Label>
+                      <Input value={lppForm.localite} onChange={(e) => setLppForm(prev => ({ ...prev, localite: e.target.value }))} placeholder="Lausanne" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3 : Anciens employeurs (si recherche d'avoirs) */}
+              {lppForm.rechercheAvoirs && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="font-semibold text-lg flex items-center gap-2"><SearchIcon className="h-5 w-5" /> Anciens employeurs</h3>
+                    <Button type="button" variant="outline" size="sm" onClick={addAncienEmployeur}>
+                      <Plus className="h-4 w-4 mr-1" /> Ajouter
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Liste les anciens employeurs pour qu'on retrouve les caisses de pension correspondantes (CdC envoie un courrier pour identifier les avoirs).</p>
+                  {lppForm.anciensEmployeurs.map((emp, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-end p-3 border rounded-lg bg-muted/30">
+                      <div className="col-span-12 md:col-span-4 space-y-1">
+                        <Label className="text-xs">Nom de l'employeur</Label>
+                        <Input value={emp.nom} onChange={(e) => updateAncienEmployeur(i, 'nom', e.target.value)} placeholder="Nestlé SA" />
+                      </div>
+                      <div className="col-span-6 md:col-span-2 space-y-1">
+                        <Label className="text-xs">Début</Label>
+                        <Input type="date" value={emp.dateDebut} onChange={(e) => updateAncienEmployeur(i, 'dateDebut', e.target.value)} />
+                      </div>
+                      <div className="col-span-6 md:col-span-2 space-y-1">
+                        <Label className="text-xs">Fin</Label>
+                        <Input type="date" value={emp.dateFin} onChange={(e) => updateAncienEmployeur(i, 'dateFin', e.target.value)} />
+                      </div>
+                      <div className="col-span-10 md:col-span-3 space-y-1">
+                        <Label className="text-xs">Caisse pension (si connue)</Label>
+                        <Input value={emp.caissePension} onChange={(e) => updateAncienEmployeur(i, 'caissePension', e.target.value)} placeholder="ex: PUBLICA" />
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                        {lppForm.anciensEmployeurs.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeAncienEmployeur(i)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Section 4 : Libre passage */}
+              {lppForm.creationLibrePassage && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2"><PiggyBank className="h-5 w-5" /> Compte de libre passage</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Institution souhaitée</Label>
+                      <Input value={lppForm.institutionLibrePassage} onChange={(e) => setLppForm(prev => ({ ...prev, institutionLibrePassage: e.target.value }))} placeholder="UBS, Liberty, Tellco, ..." />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Modalité</Label>
+                      <Select value={lppForm.modaliteLibrePassage} onValueChange={(v) => setLppForm(prev => ({ ...prev, modaliteLibrePassage: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="compte">Compte bancaire</SelectItem>
+                          <SelectItem value="titres">Portefeuille titres</SelectItem>
+                          <SelectItem value="mixte">Mixte</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Montant approximatif (CHF, si connu)</Label>
+                    <Input value={lppForm.montantApproximatif} onChange={(e) => setLppForm(prev => ({ ...prev, montantApproximatif: e.target.value }))} placeholder="ex: 45000" />
+                  </div>
+                </div>
+              )}
+
+              {/* Section 5 : Caisse actuelle (rapatriement) */}
+              {lppForm.rapatriementLPP && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg border-b pb-2 flex items-center gap-2"><Briefcase className="h-5 w-5" /> Caisse de pension actuelle</h3>
+                  <div className="space-y-2">
+                    <Label>Nom de la caisse de pension actuelle (employeur actuel)</Label>
+                    <Input value={lppForm.caissePensionActuelle} onChange={(e) => setLppForm(prev => ({ ...prev, caissePensionActuelle: e.target.value }))} placeholder="ex: PUBLICA, ASGA, ..." />
+                  </div>
+                </div>
+              )}
+
+              {/* Section 6 : Documents */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border-b pb-2">
+                  <FileText className="h-5 w-5" />
+                  <h3 className="font-semibold">Documents à fournir</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">Upload des documents requis pour traiter ta demande LPP.</p>
+                <div className="space-y-3">
+                  {lppRequiredDocs.map((doc, i) => (
+                    <SingleDocumentUpload
+                      key={i}
+                      label={doc}
+                      docKind={`lpp_doc_${i}`}
+                      onUpload={(d) => setLppDocuments(prev => { const n = [...prev]; n[i] = d; return n; })}
+                      onRemove={() => setLppDocuments(prev => prev.filter((_, idx) => idx !== i))}
+                      uploadedDocument={lppDocuments[i] || null}
+                      required={i < 3}
+                      primaryColor={tenantPrimaryColor || undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 7 : Commentaires + submit */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nom de l'agent / apporteur</Label>
+                  <Input value={lppForm.agentName} onChange={(e) => setLppForm(prev => ({ ...prev, agentName: e.target.value }))} placeholder={verifiedPartner?.name || ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Commentaires</Label>
+                  <Textarea value={lppForm.commentaires} onChange={(e) => setLppForm(prev => ({ ...prev, commentaires: e.target.value }))} placeholder="Informations utiles pour le traitement de la demande" rows={3} />
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="lpp-confirm"
+                    checked={lppForm.confirmDocuments}
+                    onCheckedChange={(v) => { setLppForm(prev => ({ ...prev, confirmDocuments: !!v })); setFormErrors(prev => ({ ...prev, confirmDocuments: undefined })); }}
+                  />
+                  <Label htmlFor="lpp-confirm" className="cursor-pointer text-sm leading-normal">
+                    Je confirme avoir uploadé les documents nécessaires (pièce d'identité, contrat + procuration signés) et autoriser le cabinet à effectuer les démarches LPP en mon nom.
+                  </Label>
+                </div>
+                {formErrors.confirmDocuments && <p className="text-sm text-destructive">{formErrors.confirmDocuments}</p>}
+              </div>
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleSubmitLpp}
+                disabled={submitting}
+                style={tenantPrimaryColor ? { backgroundColor: tenantPrimaryColor } : undefined}
+              >
+                {submitting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi en cours...</>
+                ) : (
+                  <><Upload className="mr-2 h-4 w-4" /> Envoyer la demande LPP</>
+                )}
               </Button>
             </CardContent>
           </Card>
