@@ -268,6 +268,43 @@ serve(async (req) => {
       revenue_prev_year: monthlyRevenuePrevYear[month] || 0,
     }));
 
+    // ============ FALLBACK DB ============
+    // Si Stripe retourne 0 subs (ex: clé test/live mismatch, ou réseau),
+    // on calcule MRR/plan à partir de la DB tenants (mrr_amount + plan).
+    // C'est la SOURCE DE VÉRITÉ pour le dashboard : ce qu'on facture
+    // réellement aux tenants vivants chez nous, indépendamment de Stripe.
+    if (totalMRR === 0 || allSubscriptions.length === 0) {
+      log.info("Stripe returned 0 subs — falling back to DB tenants");
+      const { data: dbTenants } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, plan, mrr_amount, payment_status, tenant_status, status')
+        .not('mrr_amount', 'is', null)
+        .gt('mrr_amount', 0)
+        .neq('tenant_status', 'cancelled');
+
+      if (dbTenants && dbTenants.length > 0) {
+        let dbMRR = 0;
+        const dbPlanCounts: Record<string, { count: number; mrr: number }> = {
+          start: { count: 0, mrr: 0 },
+          pro: { count: 0, mrr: 0 },
+          prime: { count: 0, mrr: 0 },
+          founder: { count: 0, mrr: 0 },
+        };
+        for (const t of dbTenants as any[]) {
+          const mrr = Number(t.mrr_amount) || 0;
+          dbMRR += mrr;
+          const plan = (t.plan || 'start').toLowerCase();
+          if (dbPlanCounts[plan]) {
+            dbPlanCounts[plan].count += 1;
+            dbPlanCounts[plan].mrr += mrr;
+          }
+        }
+        totalMRR = dbMRR;
+        Object.assign(planCounts, dbPlanCounts);
+        log.info("DB fallback applied", { dbMRR, tenants: dbTenants.length });
+      }
+    }
+
     return new Response(JSON.stringify({
       mrr: totalMRR,
       arr: totalMRR * 12,
@@ -280,6 +317,7 @@ serve(async (req) => {
       totalTrialingSubscriptions: trialingSubscriptions.length,
       tenantSubscriptions,
       customerEmails,
+      source: allSubscriptions.length > 0 ? 'stripe' : (totalMRR > 0 ? 'db_fallback' : 'empty'),
     }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 200,
