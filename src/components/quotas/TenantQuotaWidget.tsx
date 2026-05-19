@@ -46,14 +46,6 @@ export function TenantQuotaWidget() {
     );
   }
 
-  // Si TOUS les quotas sont effectivement illimités (>= 100k = limite arbitraire
-  // pour Advisy & autres cabinets internes), on masque le widget — pas besoin
-  // d'afficher des barres de progression à 0.001% qui ne disent rien d'utile.
-  const allUnlimited = quotas.length > 0 && quotas.every(q => (q.monthly_limit || 0) >= 100_000);
-  if (allUnlimited) {
-    return null;
-  }
-
   const overageAny = quotas.some(q => q.overage_units > 0);
   const autoOverage = quotas[0]?.auto_overage_enabled ?? false;
 
