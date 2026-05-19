@@ -379,6 +379,20 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editMode, policyId]);
 
+  // Listen for catalog changes from Partenaires page (CRMCompagnies dispatches
+  // a custom event when a product is created/updated). Re-fetch the products
+  // list immédiatement pour refléter les changements sans devoir fermer/rouvrir
+  // le ContractForm.
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => {
+      fetchCompaniesAndProducts();
+    };
+    window.addEventListener('lyta:product-catalog-changed', handler);
+    return () => window.removeEventListener('lyta:product-catalog-changed', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Apply prefill ONCE the company/product catalogs are loaded so that
   // company resolution from a free-text name + product matching by name
   // can work. This decouples the network round-trip from the prefill
@@ -478,7 +492,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
               resolvedProductId = matchedProduct.id;
             }
           }
-          
+
+          // Lookup LIVE de la branche depuis le catalog — sinon le snapshot
+          // figé dans products_data ne reflète pas les changements faits dans
+          // Partenaires (ex: changement de sous-branche d'un produit Lemania).
+          let liveBranchCode: string | undefined = undefined;
+          if (resolvedProductId) {
+            const { data: liveProduct } = await supabase
+              .from('insurance_products')
+              .select('tenant_branch:tenant_branches(code)')
+              .eq('id', resolvedProductId)
+              .maybeSingle();
+            const tb = liveProduct?.tenant_branch as any;
+            const code = Array.isArray(tb) ? tb[0]?.code : tb?.code;
+            if (code) liveBranchCode = code;
+          }
+
           return {
             id: generateId(),
             productId: resolvedProductId,
@@ -487,6 +516,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             premium: String(prod.premium || ''),
             deductible: String(prod.deductible || ''),
             durationYears: String(prod.durationYears || ''),
+            // Branche LIVE depuis le catalog (override le snapshot figé du contrat)
+            branchCode: liveBranchCode,
             // LPP : restore avoir_total si présent (champ ajouté pour LPP libre passage)
             avoirTotal: prod.avoirTotal != null ? String(prod.avoirTotal) : undefined,
           };

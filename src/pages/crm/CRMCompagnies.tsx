@@ -502,6 +502,12 @@ export default function CRMCompagnies() {
       // Invalidate the policies cache so contract cards on client pages
       // immediately reflect the new branch/category for this product.
       await queryClient.invalidateQueries({ queryKey: ['policies'] });
+      await queryClient.invalidateQueries({ queryKey: ['insurance_products'] });
+      // Custom event : signal au ContractForm (qui utilise un useState local
+      // pour la liste produits) de re-fetch immédiatement. Sinon une session
+      // ouverte sur le ContractForm verrait des données stale après un
+      // changement de sous-branche d'un produit dans Partenaires.
+      window.dispatchEvent(new CustomEvent('lyta:product-catalog-changed'));
     } catch (error: any) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } finally {
