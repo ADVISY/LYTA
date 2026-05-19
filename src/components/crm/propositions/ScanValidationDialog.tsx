@@ -844,19 +844,44 @@ export default function ScanValidationDialog({
 
     // Refresh every list that may now show the new client / family /
     // documents / suivis so the broker sees them right away (without a
-    // page reload).
+    // page reload). + pending_scans pour que le scan validé disparaisse
+    // immédiatement de l'onglet 'Scans individuels' (CRMPropositions).
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["clients"] }),
       queryClient.invalidateQueries({ queryKey: ["family_members"] }),
       queryClient.invalidateQueries({ queryKey: ["documents"] }),
       queryClient.invalidateQueries({ queryKey: ["suivis"] }),
+      queryClient.invalidateQueries({ queryKey: ["pending_scans"] }),
     ]);
 
     return { clientId, familyMap };
   };
 
-  const handleBetaWizardDone = (createdPolicyIds: string[]) => {
+  const handleBetaWizardDone = async (createdPolicyIds: string[]) => {
     setBetaWizardOpen(false);
+
+    // Marque le scan comme validé en DB pour qu'il disparaisse de l'onglet
+    // 'Scans individuels' (CRMPropositions filtre validated_at IS NULL).
+    // Avant ce fix : le wizard finissait sans toucher document_scans → le scan
+    // restait visible comme "à traiter" malgré sa matérialisation complète.
+    if (scan?.id && user?.id) {
+      try {
+        await supabase
+          .from('document_scans')
+          .update({
+            validated_at: new Date().toISOString(),
+            validated_by: user.id,
+            status: 'validated',
+          })
+          .eq('id', scan.id);
+      } catch (e) {
+        console.warn('[scan] mark validated after wizard failed', e);
+      }
+    }
+
+    // Invalide la cache pour rafraîchir l'onglet Scans individuels
+    await queryClient.invalidateQueries({ queryKey: ["pending_scans"] });
+
     toast({
       title: "Contrats créés",
       description: `${createdPolicyIds.length} contrat${createdPolicyIds.length > 1 ? "s" : ""} créé${createdPolicyIds.length > 1 ? "s" : ""} via le formulaire pré-rempli.`,
