@@ -204,6 +204,9 @@ export default function ScanValidationDialog({
   const [pendingCreates, setPendingCreates] = useState<{
     existingClientId: string | null;
     primaryPayload: Record<string, unknown> | null;
+    /** Payload pour enrichir un client existant : on remplit uniquement les
+     *  champs vides en DB (ne touche pas ce qui est déjà rempli). */
+    enrichmentPayload: Record<string, unknown> | null;
     familyPayloads: Array<{ payload: Record<string, unknown>; relation: string; fullNameLower: string }>;
     primaryFullNameLower: string;
   } | null>(null);
@@ -526,8 +529,9 @@ export default function ScanValidationDialog({
       const permitRaw = fieldOrPrimary(["permis", "permit_type"], "permit_type");
       const permitType = normPermit(permitRaw);
 
-      const primaryPayload = existingClientId ? null : {
-        tenant_id: tenantIdFromHook,
+      // Payload commun (utilisé pour INSERT si client nouveau, OU pour
+      // ENRICH si client existant — voir enrichmentPayload plus bas).
+      const scanClientData = {
         last_name: lastName,
         first_name: firstName,
         email,
@@ -544,8 +548,24 @@ export default function ScanValidationDialog({
         permit_type: permitType,
         gender: normalizedGender,
         birthdate: birthIso,
+      };
+
+      const primaryPayload = existingClientId ? null : {
+        tenant_id: tenantIdFromHook,
+        ...scanClientData,
         status: willHaveActiveContract ? "actif" : "prospect",
       };
+
+      // Si le client existe déjà, on prépare un payload d'enrichissement :
+      // - Tous les champs détectés par l'IA dans le scan
+      // - Filtre les nulls/undefined pour éviter d'écraser des données utiles
+      // - L'UPDATE final ne touchera que les colonnes vides en DB (voir
+      //   materialiseBetaPendingCreates → COALESCE-based merge)
+      const enrichmentPayload = existingClientId
+        ? Object.fromEntries(
+            Object.entries(scanClientData).filter(([, v]) => v !== null && v !== undefined && v !== "")
+          )
+        : null;
 
       // 3. Build family member payloads (no insert) with strict dedup
       const canonName = (first?: string | null, last?: string | null) => {
@@ -626,6 +646,7 @@ export default function ScanValidationDialog({
       setPendingCreates({
         existingClientId,
         primaryPayload,
+        enrichmentPayload,
         familyPayloads,
         primaryFullNameLower,
       });
@@ -642,12 +663,13 @@ export default function ScanValidationDialog({
     if (!pendingCreates || !tenantIdFromHook) {
       return { clientId: betaWizardClientId, familyMap: betaFamilyClientMap };
     }
-    const { existingClientId, primaryPayload, familyPayloads, primaryFullNameLower } = pendingCreates;
+    const { existingClientId, primaryPayload, enrichmentPayload, familyPayloads, primaryFullNameLower } = pendingCreates;
     let clientId = existingClientId;
 
     // Already materialised?
     if (!primaryPayload && existingClientId && Object.keys(betaFamilyClientMap).length >= (familyPayloads.length + (primaryFullNameLower ? 1 : 0))) {
-      return { clientId: existingClientId, familyMap: betaFamilyClientMap };
+      // Note : on continue quand même pour faire l'enrichissement (UPDATE)
+      // si enrichmentPayload est non-null. Donc on ne return PAS ici.
     }
 
     if (!clientId && primaryPayload) {
@@ -659,6 +681,48 @@ export default function ScanValidationDialog({
       clientId = created.id;
       await logAudit(tenantIdFromHook, "create", "client", clientId, { source: "ia_scan_wizard", scan_id: scan!.id });
       toast({ title: "Fiche client créée", description: `${primaryPayload.first_name ?? ""} ${primaryPayload.last_name ?? ""}`.trim() });
+    } else if (clientId && enrichmentPayload && Object.keys(enrichmentPayload).length > 0) {
+      // Client existant : enrichir UNIQUEMENT les champs vides en DB.
+      // 1. Lire les valeurs actuelles
+      const { data: existing } = await supabase
+        .from("clients")
+        .select("phone, mobile, email, address, postal_code, city, canton, nationality, civil_status, profession, employer, permit_type, gender, birthdate")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (existing) {
+        // 2. Construire un UPDATE payload qui ne touche que les colonnes
+        //    null/vides en DB. Conserve les valeurs déjà saisies par le broker.
+        const updatePayload: Record<string, unknown> = {};
+        for (const [key, scanValue] of Object.entries(enrichmentPayload)) {
+          const dbValue = (existing as any)[key];
+          if ((dbValue === null || dbValue === undefined || dbValue === "") && scanValue) {
+            updatePayload[key] = scanValue;
+          }
+        }
+        if (Object.keys(updatePayload).length > 0) {
+          const { error: upErr } = await supabase.from("clients").update(updatePayload).eq("id", clientId);
+          if (!upErr) {
+            const filled = Object.keys(updatePayload).join(", ");
+            toast({
+              title: "Fiche client enrichie",
+              description: `Données ajoutées par le scan : ${filled}`,
+            });
+            await logAudit(tenantIdFromHook, "update", "client", clientId, {
+              source: "ia_scan_wizard_enrich",
+              scan_id: scan!.id,
+              fields_enriched: Object.keys(updatePayload),
+            });
+          } else {
+            console.warn("[scan] enrichment update failed", upErr);
+          }
+        }
+      }
+    }
+
+    // Si déjà tout matérialisé (re-entrée du wizard), on stop ici
+    if (!primaryPayload && existingClientId && Object.keys(betaFamilyClientMap).length >= (familyPayloads.length + (primaryFullNameLower ? 1 : 0))) {
+      return { clientId: existingClientId, familyMap: betaFamilyClientMap };
     }
 
     const familyMap: Record<string, string> = {};
