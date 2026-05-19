@@ -138,6 +138,8 @@ const getCategoryLabels = (t: (key: string) => string): Record<string, string> =
   multirisque: t("forms.contract.categories.other"),
   rcpro: t("forms.contract.categories.other"),
   third_pillar: t("forms.contract.categories.life"),
+  // Bucket virtuel LPP (libre passage / rapatriement avoirs)
+  lpp: "Compte de Libre passage",
 });
 
 // Helper to generate unique IDs safely
@@ -157,6 +159,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   legal: <Scale className="h-4 w-4" />,
   property: <Home className="h-4 w-4" />,
   other: <Shield className="h-4 w-4" />,
+  lpp: <span className="text-base leading-none">🐷</span>,
 };
 
 const categoryColors: Record<string, string> = {
@@ -167,6 +170,7 @@ const categoryColors: Record<string, string> = {
   legal: "bg-amber-50 text-amber-800 border-amber-200",
   property: "bg-blue-50 text-blue-800 border-blue-200",
   other: "bg-gray-50 text-gray-800 border-gray-200",
+  lpp: "bg-amber-50 text-amber-800 border-amber-200",
 };
 
 // Helper to detect if a health product is LAMal or LCA based on its name.
@@ -1181,7 +1185,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
 
   const groupedProducts = useMemo(() => {
     if (!selectedCompanyId || !allProducts.length) return {};
-    
+
     const filtered = allProducts.filter(p => {
       if (!p || p.company_id !== selectedCompanyId) return false;
       if (!productSearch) return true;
@@ -1190,12 +1194,21 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const categoryMatch = (categoryLabels[p.category] || p.category || '').toLowerCase().includes(search);
       return nameMatch || categoryMatch;
     });
-    
+
+    // Détecte produit LPP via branchCode catalog OU nom — pour grouper
+    // sous "Compte de Libre passage" même si catalog.category='health' à tort.
+    const isLppProduct = (p: any): boolean => {
+      const branchCode = p.tenant_branch?.code || p.tenant_branch?.[0]?.code;
+      if (branchCode === 'LPP') return true;
+      return !!(p.name && /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(p.name));
+    };
+
     const grouped: Record<string, Product[]> = {};
     for (const p of filtered) {
-      const category = p.category || 'other';
-      if (!grouped[category]) grouped[category] = [];
-      grouped[category].push(p);
+      // PRIORITÉ : produit LPP → bucket dédié 'lpp' (override catalog.category)
+      const groupKey = isLppProduct(p) ? 'lpp' : (p.category || 'other');
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+      grouped[groupKey].push(p);
     }
     return grouped;
   }, [selectedCompanyId, allProducts, productSearch]);
