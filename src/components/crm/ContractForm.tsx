@@ -1615,18 +1615,30 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                         // ─── LPP : Montant d'avoirs (pas de prime mensuelle, pas de franchise)
                                         <div className="grid grid-cols-1 gap-2">
                                           <div>
-                                            <Label className="text-xs">Montant d'avoirs (CHF)</Label>
+                                            <Label className="text-xs">Montant d'avoirs (CHF) — entre 1 et 1'000'000</Label>
                                             <Input
                                               type="number"
-                                              step="0.01"
-                                              min="0"
-                                              placeholder="ex: 45000.00"
+                                              step="1"
+                                              min="1"
+                                              max="1000000"
+                                              placeholder="ex: 45000"
                                               value={product.avoirTotal || ""}
-                                              onChange={(e) => updateSelectedProduct(product.id, { avoirTotal: e.target.value })}
+                                              onChange={(e) => {
+                                                const v = e.target.value;
+                                                // Clamp 1 ≤ v ≤ 1'000'000 si une valeur numérique est saisie
+                                                if (v === "") {
+                                                  updateSelectedProduct(product.id, { avoirTotal: "" });
+                                                  return;
+                                                }
+                                                const n = parseFloat(v);
+                                                if (isNaN(n)) return;
+                                                const clamped = Math.min(1000000, Math.max(1, n));
+                                                updateSelectedProduct(product.id, { avoirTotal: String(clamped) });
+                                              }}
                                               className="h-8 text-sm"
                                             />
                                             <p className="text-[10px] text-muted-foreground mt-1">
-                                              Capital LPP retrouvé / transféré. La commission est calculée selon le taux du partenaire (Paramètres → Partenaires → compagnie).
+                                              Capital LPP retrouvé / transféré (1 à 1'000'000 CHF). La commission est calculée selon le taux du partenaire (Paramètres → Partenaires → compagnie).
                                             </p>
                                           </div>
                                         </div>
