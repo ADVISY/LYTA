@@ -62,6 +62,11 @@ type SelectedProduct = {
   /** Branch code from the catalog (LAMAL / LCA / VIE / …). When set,
    *  it takes precedence over the name-regex isLamalProduct() check. */
   branchCode?: string;
+  /** Pour les contrats LPP "compte de libre passage" : pas de prime
+   *  récurrente, mais un MONTANT D'AVOIRS retrouvé/transféré (en CHF).
+   *  La commission (3% par défaut, configurée dans Partenaires) est
+   *  calculée sur ce montant. */
+  avoirTotal?: string;
 };
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
@@ -482,6 +487,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             premium: String(prod.premium || ''),
             deductible: String(prod.deductible || ''),
             durationYears: String(prod.durationYears || ''),
+            // LPP : restore avoir_total si présent (champ ajouté pour LPP libre passage)
+            avoirTotal: prod.avoirTotal != null ? String(prod.avoirTotal) : undefined,
           };
         }));
         
@@ -952,6 +959,13 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           deductible = parseFloat(product.deductible) || null;
         }
 
+        // LPP : si c'est un libre passage ou autre LPP, on persiste le
+        // montant d'avoirs en plus du reste (la prime mensuelle est laissée
+        // à 0 par défaut puisqu'il n'y a pas de versement récurrent).
+        const isLpp = product.branchCode === 'LPP'
+          || /libre[\s_-]?passage|lpp|2e?\s*pilier|prévoyance prof/i.test(product.name || '');
+        const avoirTotal = isLpp && product.avoirTotal ? parseFloat(product.avoirTotal) : null;
+
         return {
           productId: product.productId,
           name: product.name,
@@ -962,6 +976,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           // Non-LAMal lines: emit `null` so the column stays present but
           // semantically "n/a". LAMal lines carry the toggle value.
           accidentIncluded: isLamalLine ? lamalAccidentIncluded : null,
+          // LPP : montant d'avoirs (capital) — base de calcul commission
+          // qui s'applique selon le taux du partenaire (typiquement 3%).
+          avoirTotal,
         };
       });
 
@@ -1569,6 +1586,11 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                 {categorizedSelection.other.map((product) => {
                                   if (!product || !product.id) return null;
                                   const category = product.category || 'other';
+                                  // LPP détection : produit est un compte libre passage ou autre LPP
+                                  // → pas de prime mensuelle mais montant d'avoirs (capital sur lequel
+                                  // la commission Partenaires sera calculée, typiquement 3%).
+                                  const isLpp = product.branchCode === 'LPP'
+                                    || /libre[\s_-]?passage|lpp|2e?\s*pilier|prévoyance prof/i.test(product.name || '');
                                   return (
                                     <div key={product.id} className="p-3 bg-white rounded-lg border">
                                       <div className="flex items-center justify-between mb-2">
@@ -1577,6 +1599,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                             {categoryLabels[category] || category}
                                           </span>
                                           <p className="font-medium text-sm">{product.name || t("forms.contract.fallbackProductName")}</p>
+                                          {isLpp && <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">LPP</span>}
                                         </div>
                                         <Button
                                           type="button"
@@ -1588,32 +1611,54 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                           <X className="h-4 w-4" />
                                         </Button>
                                       </div>
-                                      <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                          <Label className="text-xs">{t("forms.contract.premium")}</Label>
-                                          <Input
-                                            type="number"
-                                            step="0.05"
-                                            min="0"
-                                            placeholder="50.00"
-                                            value={product.premium || ""}
-                                            onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
-                                            className="h-8 text-sm"
-                                          />
+                                      {isLpp ? (
+                                        // ─── LPP : Montant d'avoirs (pas de prime mensuelle, pas de franchise)
+                                        <div className="grid grid-cols-1 gap-2">
+                                          <div>
+                                            <Label className="text-xs">Montant d'avoirs (CHF)</Label>
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              min="0"
+                                              placeholder="ex: 45000.00"
+                                              value={product.avoirTotal || ""}
+                                              onChange={(e) => updateSelectedProduct(product.id, { avoirTotal: e.target.value })}
+                                              className="h-8 text-sm"
+                                            />
+                                            <p className="text-[10px] text-muted-foreground mt-1">
+                                              Capital LPP retrouvé / transféré. La commission est calculée selon le taux du partenaire (Paramètres → Partenaires → compagnie).
+                                            </p>
+                                          </div>
                                         </div>
-                                        <div>
-                                          <Label className="text-xs">{t("forms.contract.deductible")}</Label>
-                                          <Input
-                                            type="number"
-                                            step="100"
-                                            min="0"
-                                            placeholder="200"
-                                            value={product.deductible || ""}
-                                            onChange={(e) => updateSelectedProduct(product.id, { deductible: e.target.value })}
-                                            className="h-8 text-sm"
-                                          />
+                                      ) : (
+                                        // ─── Standard : Prime + Franchise
+                                        <div className="grid grid-cols-2 gap-3">
+                                          <div>
+                                            <Label className="text-xs">{t("forms.contract.premium")}</Label>
+                                            <Input
+                                              type="number"
+                                              step="0.05"
+                                              min="0"
+                                              placeholder="50.00"
+                                              value={product.premium || ""}
+                                              onChange={(e) => updateSelectedProduct(product.id, { premium: e.target.value })}
+                                              className="h-8 text-sm"
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label className="text-xs">{t("forms.contract.deductible")}</Label>
+                                            <Input
+                                              type="number"
+                                              step="100"
+                                              min="0"
+                                              placeholder="200"
+                                              value={product.deductible || ""}
+                                              onChange={(e) => updateSelectedProduct(product.id, { deductible: e.target.value })}
+                                              className="h-8 text-sm"
+                                            />
+                                          </div>
                                         </div>
-                                      </div>
+                                      )}
                                     </div>
                                   );
                                 })}
