@@ -841,7 +841,18 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const categorizedSelection = useMemo(() => {
     const safeProducts = (selectedProducts || []).filter((p) => p?.id);
 
+    // Détecte un produit LPP par son nom (fallback quand le catalog n'a pas
+    // encore le branch_code='LPP' configuré). Couvre les noms typiques :
+    // "Compte de libre passage", "LPP", "2e pilier", "Prévoyance professionnelle".
+    const isLppRow = (p: SelectedProduct): boolean => {
+      if (p.branchCode === 'LPP') return true;
+      return !!(p.name && /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(p.name));
+    };
+
     const bucketOf = (p: SelectedProduct): 'health' | 'life' | 'other' => {
+      // PRIORITÉ : un produit LPP est toujours dans 'life', peu importe sa
+      // catégorie storée (parfois 'health' à tort dans le catalog).
+      if (isLppRow(p)) return 'life';
       const branch = p.branchCode;
       if (branch === 'LAMAL' || branch === 'LCA' || branch === 'PGM' || branch === 'ACCIDENT') return 'health';
       if (branch === 'VIE' || branch === 'LPP') return 'life';
@@ -866,7 +877,12 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     const healthLamal = health.filter(isLamalRow);
     const healthLca = health.filter((p) => !isLamalRow(p));
 
-    return { healthLamal, healthLca, life, other, health };
+    // LPP vs Vie classique dans le bucket life — pour rendre la sous-section
+    // "Compte de Libre passage / Rapatriement avoir LPP / Avoir total"
+    const lifeLpp = life.filter(isLppRow);
+    const lifeVie = life.filter((p) => !isLppRow(p));
+
+    return { healthLamal, healthLca, life, lifeLpp, lifeVie, other, health };
   }, [selectedProducts]);
 
   // Calculate totals safely
@@ -1505,15 +1521,82 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                             </div>
                           )}
 
-                          {/* LIFE INSURANCE SECTION */}
-                          {categorizedSelection.life.length > 0 && (
+                          {/* LPP LIBRE PASSAGE SECTION (séparée de Vie classique : pas
+                              de prime mensuelle, mais montant d'avoirs/capital. Commission
+                              calculée selon le taux du partenaire — typiquement 3% — dans
+                              le module Partenaires.) */}
+                          {categorizedSelection.lifeLpp && categorizedSelection.lifeLpp.length > 0 && (
+                            <div className="p-4 rounded-xl border-2 border-amber-300 bg-amber-50">
+                              <div className="flex items-center gap-2 mb-4">
+                                <span className="text-2xl">🐷</span>
+                                <h3 className="font-bold text-amber-900">Compte de Libre passage</h3>
+                              </div>
+                              <div className="p-3 bg-white/70 rounded-lg">
+                                <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-amber-600 text-white rounded text-xs">LPP</span>
+                                  Rapatriement avoir LPP ({categorizedSelection.lifeLpp.length})
+                                </h4>
+                                <div className="space-y-3">
+                                  {categorizedSelection.lifeLpp.map((product) => {
+                                    if (!product || !product.id) return null;
+                                    return (
+                                      <div key={product.id} className="flex items-center gap-3 p-2 bg-white rounded border">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium truncate">{product.name || t("forms.contract.fallbackProductName")}</p>
+                                        </div>
+                                        <div className="w-44">
+                                          <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Avoir total (CHF)</Label>
+                                          <Input
+                                            type="number"
+                                            step="1"
+                                            min="1"
+                                            max="1000000"
+                                            placeholder="ex: 45000"
+                                            value={product.avoirTotal || ""}
+                                            onChange={(e) => {
+                                              const v = e.target.value;
+                                              if (v === "") {
+                                                updateSelectedProduct(product.id, { avoirTotal: "" });
+                                                return;
+                                              }
+                                              const n = parseFloat(v);
+                                              if (isNaN(n)) return;
+                                              const clamped = Math.min(1000000, Math.max(1, n));
+                                              updateSelectedProduct(product.id, { avoirTotal: String(clamped) });
+                                            }}
+                                            className="h-8 text-sm"
+                                          />
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeSelectedProduct(product.id)}
+                                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-2">
+                                  Capital LPP retrouvé / transféré (1 à 1'000'000 CHF). La commission est calculée selon le taux du partenaire (Paramètres → Partenaires → compagnie).
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* LIFE INSURANCE SECTION (Vie classique : 3e pilier A/B,
+                              vie risque, vie mixte, rente viagère — pas LPP libre passage) */}
+                          {categorizedSelection.lifeVie && categorizedSelection.lifeVie.length > 0 && (
                             <div className={`p-4 rounded-xl border-2 ${categoryColors.life}`}>
                               <div className="flex items-center gap-2 mb-4">
                                 {categoryIcons.life}
                                 <h3 className="font-bold">{t("forms.contract.lifeInsurance")}</h3>
                               </div>
                               <div className="space-y-3">
-                                {categorizedSelection.life.map((product) => {
+                                {categorizedSelection.lifeVie.map((product) => {
                                   if (!product || !product.id) return null;
                                   return (
                                     <div key={product.id} className="p-3 bg-white/60 rounded-lg">
