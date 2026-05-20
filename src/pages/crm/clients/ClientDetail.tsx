@@ -148,6 +148,8 @@ export default function ClientDetail() {
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
   // LPP search en cours (loader sur le bouton "Envoyer recherche LPP" de la policy concernée)
   const [sendingLppSearchId, setSendingLppSearchId] = useState<string | null>(null);
+  // Contrat actuellement déplié pour voir le détail (clic sur la carte = toggle)
+  const [expandedPolicyId, setExpandedPolicyId] = useState<string | null>(null);
   const [importSignatureOpen, setImportSignatureOpen] = useState(false);
   const [signatureRefreshTick, setSignatureRefreshTick] = useState(0);
   // Documents tab filters + change-type dialog
@@ -939,13 +941,16 @@ export default function ClientDetail() {
                           || (policy.product as any)?.tenant_branch
                           || null;
 
+                        const isExpanded = expandedPolicyId === policy.id;
+                        const productsDataList = Array.isArray(productsData) ? productsData : [];
                         return (
                           <div
                             key={policy.id}
-                            className="border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                            className={`border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer ${isExpanded ? 'bg-muted/20 border-primary/30' : ''}`}
                             onClick={() => {
-                              setEditPolicyId(policy.id);
-                              setEditContractOpen(true);
+                              // Click = toggle expand pour voir le détail
+                              // Le bouton Edit dédié ouvre la modification.
+                              setExpandedPolicyId((prev) => (prev === policy.id ? null : policy.id));
                             }}
                           >
                             <div className="flex items-start gap-4">
@@ -1010,6 +1015,19 @@ export default function ClientDetail() {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {/* Chevron : indicateur d'état déplié/replié */}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground"
+                                    title={isExpanded ? "Replier" : "Voir le détail"}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedPolicyId((prev) => (prev === policy.id ? null : policy.id));
+                                    }}
+                                  >
+                                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                  </Button>
                                   {/* Bouton spécifique LPP : envoyer recherche aux 2 institutions */}
                                   {(policy as any).product_type === 'lpp' && (
                                     <Button
@@ -1080,6 +1098,85 @@ export default function ClientDetail() {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Détail du contrat — visible quand expanded */}
+                            {isExpanded && (
+                              <div
+                                className="mt-4 pt-4 border-t border-border/50 space-y-3 text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">N° police</p>
+                                    <p className="font-medium">{policy.policy_number || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Date début</p>
+                                    <p className="font-medium">
+                                      {policy.start_date ? format(new Date(policy.start_date), "dd.MM.yyyy") : '—'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Date fin</p>
+                                    <p className="font-medium">
+                                      {policy.end_date ? format(new Date(policy.end_date), "dd.MM.yyyy") : '—'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Prime annuelle</p>
+                                    <p className="font-medium">
+                                      {policy.premium_yearly ? `${Number(policy.premium_yearly).toFixed(2)} CHF` : '—'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {productsDataList.length > 0 && (
+                                  <div>
+                                    <p className="text-xs text-muted-foreground mb-2">Produits ({productsDataList.length})</p>
+                                    <div className="space-y-1.5">
+                                      {productsDataList.map((prod: any, idx: number) => {
+                                        const isLppProd = prod?.avoirTotal != null || /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(prod?.name || '');
+                                        return (
+                                          <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded text-xs">
+                                            <div className="flex-1 min-w-0 truncate">
+                                              <span className="font-medium">{prod?.name || 'Produit'}</span>
+                                              {isLppProd && (
+                                                <Badge variant="outline" className="ml-2 text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                                                  LPP
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <div className="flex-shrink-0 text-right">
+                                              {isLppProd && prod?.avoirTotal != null ? (
+                                                <span className="font-semibold text-amber-700">
+                                                  Avoir total : {Number(prod.avoirTotal).toLocaleString('fr-CH')} CHF
+                                                </span>
+                                              ) : (
+                                                <>
+                                                  {prod?.premium != null && Number(prod.premium) > 0 && (
+                                                    <span className="font-medium">{Number(prod.premium).toFixed(2)} CHF/mois</span>
+                                                  )}
+                                                  {prod?.deductible != null && Number(prod.deductible) > 0 && (
+                                                    <span className="ml-2 text-muted-foreground">Fr. {prod.deductible} CHF</span>
+                                                  )}
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {policy.notes && (
+                                  <div>
+                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                                    <p className="whitespace-pre-wrap text-xs bg-muted/30 p-2 rounded">{policy.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
