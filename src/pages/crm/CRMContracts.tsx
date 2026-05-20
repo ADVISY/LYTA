@@ -18,7 +18,7 @@ import {
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, FileCheck, ChevronRight, Building2, Calendar, Search, Check, User, Loader2 } from "lucide-react";
+import { Plus, FileCheck, ChevronRight, ChevronDown, Building2, Calendar, Search, Check, User, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,8 @@ export default function CRMContracts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
+  // Contrat actuellement déplié (click = expand pour voir le détail)
+  const [expandedPolicyId, setExpandedPolicyId] = useState<string | null>(null);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [clientOptions, setClientOptions] = useState<ContractClientOption[]>([]);
 
@@ -232,18 +234,24 @@ export default function CRMContracts() {
           ) : (
             <div className="divide-y divide-border/50">
               {filteredPolicies.map((policy, index) => {
-                const clientName = policy.client?.company_name || 
-                  `${policy.client?.first_name || ''} ${policy.client?.last_name || ''}`.trim() || 
+                const clientName = policy.client?.company_name ||
+                  `${policy.client?.first_name || ''} ${policy.client?.last_name || ''}`.trim() ||
                   'Client inconnu';
                 const status = statusConfig[policy.status] || statusConfig.pending;
-                
+                const isExpanded = expandedPolicyId === policy.id;
+                const productsDataList = Array.isArray((policy as any).products_data) ? (policy as any).products_data : [];
+
                 return (
                   <div
                     key={policy.id}
-                    className="group flex items-center justify-between p-5 hover:bg-muted/50 transition-all duration-300 cursor-pointer"
-                    onClick={() => navigate(`/crm/clients/${policy.client_id}?tab=contracts`)}
+                    className={cn(
+                      "group hover:bg-muted/50 transition-all duration-300 cursor-pointer",
+                      isExpanded && "bg-muted/30 border-l-4 border-l-primary"
+                    )}
+                    onClick={() => setExpandedPolicyId((prev) => (prev === policy.id ? null : policy.id))}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
+                  <div className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-4">
                       {/* Company Logo or Icon */}
                       {policy.product?.company?.name ? (
@@ -283,19 +291,127 @@ export default function CRMContracts() {
                       <Badge className={cn("font-medium", status.bgColor, status.color)}>
                         {status.label}
                       </Badge>
-                      
-                      <Button 
-                        variant="ghost" 
+
+                      {/* Chevron : toggle expand/collapse */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground"
+                        title={isExpanded ? "Replier" : "Voir le détail"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedPolicyId((prev) => (prev === policy.id ? null : policy.id));
+                        }}
+                      >
+                        {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                      </Button>
+
+                      {/* Ouvrir le client (icône secondaire, visible au hover) */}
+                      <Button
+                        variant="ghost"
                         size="icon"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Ouvrir la fiche client"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/crm/clients/${policy.client_id}?tab=contracts`);
                         }}
                       >
-                        <ChevronRight className="h-5 w-5" />
+                        <User className="h-5 w-5" />
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Détail du contrat — visible quand expanded */}
+                  {isExpanded && (
+                    <div
+                      className="px-5 pb-5 pt-2 border-t border-border/30 space-y-3 text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">N° police</p>
+                          <p className="font-medium">{(policy as any).policy_number || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Date début</p>
+                          <p className="font-medium">
+                            {policy.start_date ? new Date(policy.start_date).toLocaleDateString('fr-CH') : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Date fin</p>
+                          <p className="font-medium">
+                            {(policy as any).end_date ? new Date((policy as any).end_date).toLocaleDateString('fr-CH') : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Prime annuelle</p>
+                          <p className="font-medium">
+                            {(policy as any).premium_yearly ? `${Number((policy as any).premium_yearly).toFixed(2)} CHF` : '—'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {productsDataList.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Produits ({productsDataList.length})</p>
+                          <div className="space-y-1.5">
+                            {productsDataList.map((prod: any, idx: number) => {
+                              const isLppProd = prod?.avoirTotal != null || /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(prod?.name || '');
+                              return (
+                                <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded text-xs">
+                                  <div className="flex-1 min-w-0 truncate">
+                                    <span className="font-medium">{prod?.name || 'Produit'}</span>
+                                    {isLppProd && (
+                                      <Badge variant="outline" className="ml-2 text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                                        LPP
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex-shrink-0 text-right">
+                                    {isLppProd && prod?.avoirTotal != null ? (
+                                      <span className="font-semibold text-amber-700">
+                                        Avoir total : {Number(prod.avoirTotal).toLocaleString('fr-CH')} CHF
+                                      </span>
+                                    ) : (
+                                      <>
+                                        {prod?.premium != null && Number(prod.premium) > 0 && (
+                                          <span className="font-medium">{Number(prod.premium).toFixed(2)} CHF/mois</span>
+                                        )}
+                                        {prod?.deductible != null && Number(prod.deductible) > 0 && (
+                                          <span className="ml-2 text-muted-foreground">Fr. {prod.deductible} CHF</span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {(policy as any).notes && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                          <p className="whitespace-pre-wrap text-xs bg-muted/30 p-2 rounded">{(policy as any).notes}</p>
+                        </div>
+                      )}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/crm/clients/${policy.client_id}?tab=contracts`);
+                        }}
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Ouvrir la fiche client
+                      </Button>
+                    </div>
+                  )}
                   </div>
                 );
               })}
