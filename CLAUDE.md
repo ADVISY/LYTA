@@ -218,7 +218,88 @@ Actuellement, **tous les environnements** (Production, Preview, Development) poi
    - ✅ Tab LPP sur `/deposer-contrat` (recherche / libre passage / rapatriement + Smartflow)
    - ✅ **Automation recherche LPP** : bouton "Envoyer recherche" à côté du contrat LPP dans CRM → ClientDetail → envoi auto des 2 emails (Centrale du 2e pilier + Fondation Institution Supplétive) avec ID + procuration en pièces jointes. Tracking dans Publicité → onglet Email/Historique (kind='lpp_search')
    - 📋 Phase 2 : intégration Pingen.com pour envoi postal automatique (~1.50 CHF/lettre, premium service)
-8. **Module Rapports** — à améliorer 📋
-   - Actuel : `CRMRapports.tsx` existe, mais à étoffer
-   - Besoins : rapports activité agent (volumes contrats, conversion, commissions), rapports tenant (MRR évolution, churn clients, performances par compagnie), exports PDF/Excel, planification rapports auto (mensuel/trimestriel envoyé par email), drill-down par broker/produit/compagnie
-   - Doit être visuel (charts Recharts déjà dispo) et exportable
+8. **Module Rapports** — refonte majeure 📋 (PRIORITÉ HAUTE)
+
+   ### 8.1 — ⭐ Rapport FINMA Annuel (KILLER FEATURE)
+   Obligation réglementaire annuelle pour tout broker FINMA en CH. Aujourd'hui les
+   cabinets le font à la main en 2-3 jours. En 1 clic dans LYTA = raison à elle
+   seule de payer l'abonnement.
+
+   **Contenu — une ligne par client signé dans l'année** :
+   - Identité : nom, prénom, **n° AVS** (format 756.XXXX.XXXX.XX), date naissance
+   - **Date de signature** (1er contrat signé dans l'année — pas start_date)
+   - **Méthode de signature** : en personne / e-signature OTP / postal
+   - **Agent signataire** (qui a réellement signé le contrat)
+   - **Manager superviseur** (qui a validé)
+   - **Source du client** : lead acheté / reco client / organique / partenaire / import
+   - **Produits signés** (LAMal, LCA, LPP, VIE, RC, Auto, etc.) + compagnies
+   - **Prime annuelle**
+   - **Commission gagnée** (cumul mensuel × 12 ou annuel direct)
+   - **Preuves de conseil** : PV signé oui/non + date + lien doc
+   - **Mandat de gestion** : signé oui/non + date + lien doc
+
+   **Format de livraison** :
+   - PDF propre, professionnel, avec en-tête tenant (logo, raison sociale, FINMA #)
+   - Excel multi-feuilles (synthèse + détail clients + commissions + audit)
+
+   **Gaps DB à combler avant build** (audit du 21 mai 2026) :
+   - ❌ `clients.acquisition_source` (lead / reco / organique / partenaire / import) → MIGRATION
+   - ❌ `clients.numero_avs` (existe uniquement dans `lpp_search_requests`) → MIGRATION pour propager dans `clients`
+   - ❌ `clients.referred_by_client_id` (tracking recommandation client→client) → MIGRATION
+   - ❌ `policies.signature_date` (distinct du `start_date`) → MIGRATION
+   - ❌ `policies.signature_method` (en_personne / e_signature / postal) → MIGRATION
+   - ❌ `policies.signed_by_user_id` (l'agent réel signataire, distinct de assigned_agent) → MIGRATION
+   - ❌ `policies.validated_by_manager_id` + `validated_at` → MIGRATION
+   - ❌ `policies.pv_conseil_doc_id` (FK vers documents) → MIGRATION
+   - ❌ `policies.mandate_doc_id` (FK vers documents) → MIGRATION
+   - ❌ `documents.doc_kind` enum strict avec valeurs `pv_conseil`, `mandat_gestion`, etc. → MIGRATION
+   - ✅ `signature_requests` existe avec full audit trail (IP, UA, hash) — réutilisable
+   - ✅ `retrocommissions` existe avec proration → décommissions ok
+   - ✅ `decomptes.validated_by/at` existe pour audit manager
+
+   ### 8.2 — Rapport par Agent
+   Performance + qualité du portefeuille de chaque agent.
+   - Volume signé (par mois, trimestre, année)
+   - Conversion prospects → actifs (%)
+   - Commissions gagnées + **décommissions/ristournes** (3 ans clawback typique
+     selon compagnies) + Net
+   - Qualité dossiers : % PV de conseil complets, % mandats signés
+   - Clients dormants à relancer (sans activité X jours)
+   - Drill-down : click ligne agent → fiche détaillée
+
+   ### 8.3 — Rapport Portefeuille complet
+   Extract Excel multi-feuilles pour audit ou cession :
+   - Feuille 1 : Clients (tous champs)
+   - Feuille 2 : Contrats
+   - Feuille 3 : Commissions
+   - Feuille 4 : Décommissions
+   - Feuille 5 : Suivis
+   - Filtres : statut, compagnie, branche, agent, période
+
+   ### 8.4 — Rapport Commissions / Décommissions
+   - Par agent + période (mois / trimestre / année)
+   - Commission par contrat avec statut payé/en attente
+   - **Détection auto décommissions** : contrats résiliés < window clawback (3 ans
+     typique, configurable par compagnie via `retrocommissions.months_active`)
+   - Net par agent + total cabinet
+   - Module `commissions` + `decomptes` + `retrocommissions` déjà en DB ✅
+
+   ### 8.5 — Rapports personnalisés (builder ad-hoc)
+   Garder le `CRMRapports.tsx` actuel comme builder custom, mais améliorer :
+   - Migration `report_definitions` Supabase (au lieu de localStorage mono-device)
+   - 4e source de données : `decomptes`
+   - Excel via `xlsx` (déjà installé) au lieu de CSV moche
+   - Pagination server-side (lever le cap 100 lignes)
+   - Drill-down (click ligne → fiche entité)
+
+   ### 8.6 — Bonus
+   - **Rapports programmés** : cron + email auto mensuel/trimestriel (config par tenant)
+   - **PDF auto-sauvegardé** dans bucket documents (audit trail)
+   - **Charts Recharts** intégrés sur tous les rapports (bar/line/pie)
+
+   ### Plan d'implémentation
+   - **Phase 1 — Préparation DB (1-2h)** : migration combler tous les gaps (acquisition_source, numero_avs, signature_date, signature_method, pv_conseil_doc_id, mandate_doc_id, etc.)
+   - **Phase 2 — Rapport FINMA (4-6h)** : RPC d'agrégation `get_finma_annual_report` + page dédiée + PDF + Excel
+   - **Phase 3 — Rapports Agent + Portefeuille + Commissions (4-5h)** : 3 templates en cards visuelles
+   - **Phase 4 — Améliorations builder (2-3h)** : migration Supabase + decomptes + xlsx + drill-down
+   - **Phase 5 — Rapports programmés (3-4h)** : cron + email + PDF audit
