@@ -557,22 +557,49 @@ export default function CRMParametres() {
 
   const handleUpdateProfile = async () => {
     if (!user) return;
-    
-    const { error } = await supabase
+
+    // .select() après update pour vérifier qu'une ligne a réellement été touchée.
+    // Sans ça, un RLS qui bloque silencieusement retourne error=null + 0 lignes
+    // → on affichait à tort "Profil mis à jour" alors que rien ne changeait.
+    const { data, error } = await supabase
       .from("profiles")
       .update({
         first_name: profile.firstName,
         last_name: profile.lastName,
         phone: profile.phone,
       })
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("id");
 
     if (error) {
+      console.error("[Profile update] Supabase error:", error);
       toast.error(t('settings.profileUpdateError'));
-    } else {
-      toast.success(t('settings.profileUpdated'));
-      setIsEditingProfile(false);
+      return;
     }
+    if (!data || data.length === 0) {
+      // Aucune ligne mise à jour : soit la ligne profiles n'existe pas pour
+      // cet utilisateur, soit RLS bloque. On tente un upsert défensif.
+      const { error: upsertError } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            first_name: profile.firstName,
+            last_name: profile.lastName,
+            phone: profile.phone,
+            email: profile.email,
+          },
+          { onConflict: "id" }
+        );
+      if (upsertError) {
+        console.error("[Profile upsert fallback] Supabase error:", upsertError);
+        toast.error(t('settings.profileUpdateError'));
+        return;
+      }
+    }
+    toast.success(t('settings.profileUpdated'));
+    setIsEditingProfile(false);
+    await loadProfile();
   };
 
   const handleChangePassword = async () => {
