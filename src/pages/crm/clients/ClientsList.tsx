@@ -31,7 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw, Upload } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw, Upload, MessageCircle, Phone } from "lucide-react";
+import { QuickContactDialog, type QuickContactMode } from "@/components/crm/clients/QuickContactDialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
@@ -87,6 +88,10 @@ export default function ClientsList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // Quick contact (WhatsApp / 3CX) dialog
+  const [quickContactOpen, setQuickContactOpen] = useState(false);
+  const [quickContactMode, setQuickContactMode] = useState<QuickContactMode>("whatsapp");
+  const [quickContactClient, setQuickContactClient] = useState<any>(null);
 
   const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
     prospect: { label: t('clients.prospect'), color: "text-blue-700", bgColor: "bg-blue-100" },
@@ -401,6 +406,36 @@ export default function ClientsList() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          {/* WhatsApp quick contact */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30"
+                            disabled={!client.phone && !client.mobile}
+                            title={(!client.phone && !client.mobile) ? "Aucun numéro renseigné" : "WhatsApp"}
+                            onClick={() => {
+                              setQuickContactClient(client);
+                              setQuickContactMode("whatsapp");
+                              setQuickContactOpen(true);
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          {/* 3CX appel */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-30"
+                            disabled={!client.phone && !client.mobile}
+                            title={(!client.phone && !client.mobile) ? "Aucun numéro renseigné" : "Appel 3CX"}
+                            onClick={() => {
+                              setQuickContactClient(client);
+                              setQuickContactMode("3cx");
+                              setQuickContactOpen(true);
+                            }}
+                          >
+                            <Phone className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -450,6 +485,13 @@ export default function ClientsList() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImported={() => fetchClients()}
+      />
+
+      <QuickContactDialog
+        open={quickContactOpen}
+        onOpenChange={setQuickContactOpen}
+        mode={quickContactMode}
+        client={quickContactClient}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
