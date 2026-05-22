@@ -114,7 +114,13 @@ const HEADER_ALIASES: Record<FieldKey, string[]> = {
   profession: ["profession", "job", "metier", "métier", "occupation"],
   civil_status: ["etat civil", "état civil", "civil status", "marital", "marital status"],
   nationality: ["nationalite", "nationalité", "nationality"],
-  company_name: ["societe", "société", "entreprise", "company", "company name", "raison sociale"],
+  company_name: [
+    "societe", "société", "entreprise", "company", "company name",
+    "raison sociale", "raisonsociale", "raison social", "nom societe",
+    "nom société", "nom entreprise", "denomination", "dénomination",
+    "denomination sociale", "dénomination sociale", "business name",
+    "company_name", "organization", "organisation", "firma"
+  ],
   notes: ["notes", "note", "commentaire", "comment", "remarques", "source"],
 };
 
@@ -326,6 +332,7 @@ function downloadTemplate() {
   const headers = [
     "Prénom",
     "Nom",
+    "Raison sociale",
     "Email",
     "Téléphone",
     "Mobile",
@@ -337,9 +344,11 @@ function downloadTemplate() {
     "Profession",
     "Notes",
   ];
-  const sample = [
+  // Ligne 1 : prospect privé (B2C)
+  const samplePrive = [
     "Jean",
     "Dupont",
+    "",
     "jean.dupont@exemple.ch",
     "+41 22 123 45 67",
     "+41 79 123 45 67",
@@ -351,7 +360,23 @@ function downloadTemplate() {
     "Ingénieur",
     "Recommandation - événement Q1",
   ];
-  const csv = [headers, sample]
+  // Ligne 2 : prospect pro (B2B) — raison sociale renseignée
+  const samplePro = [
+    "Marie",
+    "Martin",
+    "Boulangerie du Lac SA",
+    "contact@boulangerie-lac.ch",
+    "+41 22 555 12 34",
+    "+41 78 555 12 34",
+    "Av. de la Gare 5",
+    "1003",
+    "Lausanne",
+    "Suisse",
+    "",
+    "Directrice",
+    "Apporteur : LinkedIn",
+  ];
+  const csv = [headers, samplePrive, samplePro]
     .map((row) => row.map((c) => `"${c.replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
@@ -592,8 +617,14 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
         }
       });
 
+      // Tag automatique selon le type de prospect détecté :
+      //   - Pro (B2B)   = raison sociale renseignée → is_company = true
+      //   - Privé (B2C) = aucune raison sociale, juste personne physique
+      const typeTag = payload.is_company ? "Pro" : "Privé";
+
       payload.tags = [
         ...(payload.tags ?? []),
+        typeTag,
         `Importé le ${new Date().toLocaleDateString("fr-CH")}`,
       ];
 
@@ -822,9 +853,19 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
             </div>
           )}
 
-          {step === "preview" && (
+          {step === "preview" && (() => {
+            // Compteur Pro / Privé sur l'ensemble du fichier (pas seulement les 10 visibles)
+            let proCount = 0;
+            let priveCount = 0;
+            for (let i = 0; i < rows.length; i++) {
+              const { payload, errors } = buildPayload(i);
+              if (errors.length > 0) continue;
+              if (payload.is_company) proCount++;
+              else priveCount++;
+            }
+            return (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-xs text-muted-foreground">Lignes à importer</p>
@@ -833,14 +874,20 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground">Doublons détectés</p>
-                    <p className="text-2xl font-bold text-amber-600">{duplicates.size}</p>
+                    <p className="text-xs text-muted-foreground">Prospects Pro</p>
+                    <p className="text-2xl font-bold text-indigo-600">{proCount}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground">Total lignes</p>
-                    <p className="text-2xl font-bold">{rows.length}</p>
+                    <p className="text-xs text-muted-foreground">Prospects Privés</p>
+                    <p className="text-2xl font-bold text-slate-700">{priveCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">Doublons détectés</p>
+                    <p className="text-2xl font-bold text-amber-600">{duplicates.size}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -879,18 +926,32 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
                     <TableBody>
                       {previewRows.map((row, i) => {
                         const dup = duplicates.get(i);
-                        const { errors } = buildPayload(i);
+                        const { payload, errors } = buildPayload(i);
+                        const isPro = !!payload.is_company;
                         return (
                           <TableRow key={i}>
                             <TableCell className="text-muted-foreground">{i + 2}</TableCell>
                             <TableCell>
-                              {errors.length > 0 ? (
-                                <Badge variant="destructive" className="text-xs">Erreur</Badge>
-                              ) : dup ? (
-                                <Badge className="text-xs bg-amber-100 text-amber-700">Doublon</Badge>
-                              ) : (
-                                <Badge className="text-xs bg-emerald-100 text-emerald-700">Nouveau</Badge>
-                              )}
+                              <div className="flex flex-col gap-1">
+                                {errors.length > 0 ? (
+                                  <Badge variant="destructive" className="text-xs">Erreur</Badge>
+                                ) : dup ? (
+                                  <Badge className="text-xs bg-amber-100 text-amber-700">Doublon</Badge>
+                                ) : (
+                                  <Badge className="text-xs bg-emerald-100 text-emerald-700">Nouveau</Badge>
+                                )}
+                                {errors.length === 0 && (
+                                  isPro ? (
+                                    <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                      Pro
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 border-slate-200">
+                                      Privé
+                                    </Badge>
+                                  )
+                                )}
+                              </div>
                             </TableCell>
                             {headers.map((h, idx) => {
                               const field = mapping[h];
@@ -916,7 +977,8 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {step === "result" && (
             <div className="space-y-4">
