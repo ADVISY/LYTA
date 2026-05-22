@@ -29,11 +29,14 @@ const categoryLabels: Record<string, string> = {
   all: 'Toutes',
   communication: 'Communication',
   stockage: 'Stockage',
+  storage: 'Stockage',
   productivite: 'Productivité',
   finance: 'Finance',
+  comptabilite: 'Comptabilité',
   signature: 'Signature',
   ia: 'IA / Automatisation',
   telephonie: 'Téléphonie',
+  marketing: 'Marketing',
 };
 
 export default function CRMLytaTools() {
