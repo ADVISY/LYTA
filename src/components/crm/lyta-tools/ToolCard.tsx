@@ -1,19 +1,46 @@
+import { useState } from 'react';
 import { AppWithConnection } from '@/hooks/useLytaTools';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  ExternalLink, 
-  Link2, 
-  Unlink, 
-  Zap, 
-  Crown, 
-  FlaskConical, 
+import {
+  ExternalLink,
+  Link2,
+  Unlink,
+  Zap,
+  Crown,
+  FlaskConical,
   Monitor,
   Globe,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+/**
+ * Génère une couleur de fond stable à partir du slug de l'app.
+ * Utilisé pour le fallback quand le logo ne charge pas.
+ */
+const FALLBACK_COLORS = [
+  'bg-blue-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-amber-500',
+  'bg-pink-500',
+  'bg-cyan-500',
+  'bg-orange-500',
+  'bg-red-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+];
+
+function colorForSlug(slug: string): string {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) {
+    hash = (hash << 5) - hash + slug.charCodeAt(i);
+    hash |= 0;
+  }
+  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+}
 
 interface ToolCardProps {
   app: AppWithConnection;
@@ -49,6 +76,9 @@ const categoryColors: Record<string, string> = {
 
 export function ToolCard({ app, onConnect, onDisconnect, onOpen, onViewDetails }: ToolCardProps) {
   const isConnected = app.connection?.connection_status === 'connected';
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = app.logo_url && !logoFailed;
+  const initial = (app.name || app.slug || '?').trim().charAt(0).toUpperCase();
 
   return (
     <Card className={cn(
@@ -65,16 +95,24 @@ export function ToolCard({ app, onConnect, onDisconnect, onOpen, onViewDetails }
       <CardContent className="p-5">
         {/* Header: Logo + Name */}
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {app.logo_url ? (
-              <img 
-                src={app.logo_url} 
-                alt={app.name} 
+          <div
+            className={cn(
+              "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden",
+              showLogo ? "bg-white border" : cn(colorForSlug(app.slug || app.name), "text-white")
+            )}
+          >
+            {showLogo ? (
+              <img
+                src={app.logo_url!}
+                alt={app.name}
                 className="w-8 h-8 object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                loading="lazy"
+                onError={() => setLogoFailed(true)}
               />
+            ) : app.logo_url ? (
+              <span className="text-lg font-semibold">{initial}</span>
             ) : (
-              <Globe className="w-6 h-6 text-muted-foreground" />
+              <Globe className="w-6 h-6 text-white/90" />
             )}
           </div>
           <div className="flex-1 min-w-0">
