@@ -181,25 +181,46 @@ async function withAssignedAgents(rows: Client[], tenantId?: string | null): Pro
   }));
 }
 
-export function useClients(typeFilter?: string, searchTerm?: string) {
+export interface ClientsFilters {
+  city?: string | null;
+  canton?: string | null;
+  status?: string | null;
+  postalCode?: string | null;
+}
+
+export function useClients(typeFilter?: string, searchTerm?: string, filters?: ClientsFilters) {
   const { toast } = useToast();
   const { user } = useAuth();
   const { tenantId, loading: tenantLoading } = useUserTenant();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
-  // Reset page quand filtre type ou recherche change
+  const cityFilter = (filters?.city ?? "").trim();
+  const cantonFilter = (filters?.canton ?? "").trim();
+  const statusFilter = (filters?.status ?? "").trim();
+  const postalCodeFilter = (filters?.postalCode ?? "").trim();
+
+  // Reset page quand filtre type, recherche ou filtres géographiques changent
   useEffect(() => {
     setPage(1);
-  }, [tenantId, typeFilter, searchTerm]);
+  }, [tenantId, typeFilter, searchTerm, cityFilter, cantonFilter, statusFilter, postalCodeFilter]);
 
   const trimmedSearch = (searchTerm ?? "").trim();
 
   const from = (page - 1) * CLIENTS_PAGE_SIZE;
   const to = from + CLIENTS_PAGE_SIZE - 1;
   const baseQueryKey = useMemo(
-    () => ["clients", tenantId ?? "", typeFilter ?? "", trimmedSearch],
-    [tenantId, typeFilter, trimmedSearch]
+    () => [
+      "clients",
+      tenantId ?? "",
+      typeFilter ?? "",
+      trimmedSearch,
+      cityFilter,
+      cantonFilter,
+      statusFilter,
+      postalCodeFilter,
+    ],
+    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -218,6 +239,18 @@ export function useClients(typeFilter?: string, searchTerm?: string) {
 
     if (typeFilter) {
       query = query.eq("type_adresse", typeFilter);
+    }
+    if (statusFilter) {
+      query = query.eq("status", statusFilter);
+    }
+    if (cantonFilter) {
+      query = query.ilike("canton", cantonFilter);
+    }
+    if (cityFilter) {
+      query = query.ilike("city", `%${cityFilter}%`);
+    }
+    if (postalCodeFilter) {
+      query = query.ilike("postal_code", `${postalCodeFilter}%`);
     }
 
     if (trimmedSearch) {
@@ -239,6 +272,10 @@ export function useClients(typeFilter?: string, searchTerm?: string) {
         p_tenant_id: tenantId,
         p_type_adresse: typeFilter ?? null,
         p_search: trimmedSearch || null,
+        p_city: cityFilter || null,
+        p_canton: cantonFilter || null,
+        p_status: statusFilter || null,
+        p_postal_code: postalCodeFilter || null,
       }),
     ]);
 
@@ -257,7 +294,7 @@ export function useClients(typeFilter?: string, searchTerm?: string) {
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter, trimmedSearch]);
+  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter]);
 
   const {
     data,

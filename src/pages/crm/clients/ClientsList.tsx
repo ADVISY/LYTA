@@ -46,12 +46,26 @@ export default function ClientsList() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("client");
+  // Filtres géographiques (Romandie + tous cantons CH)
+  const [cantonFilter, setCantonFilter] = useState<string>("all");
+  const [cityFilter, setCityFilter] = useState<string>("");
+  const [debouncedCity, setDebouncedCity] = useState<string>("");
+  const [postalCodeFilter, setPostalCodeFilter] = useState<string>("");
+  const [debouncedPostalCode, setDebouncedPostalCode] = useState<string>("");
 
   // Debounce 300ms : évite de spammer Supabase à chaque frappe clavier
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCity(cityFilter.trim()), 300);
+    return () => clearTimeout(t);
+  }, [cityFilter]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPostalCode(postalCodeFilter.trim()), 300);
+    return () => clearTimeout(t);
+  }, [postalCodeFilter]);
 
   const {
     clients,
@@ -64,7 +78,12 @@ export default function ClientsList() {
     totalCount,
     totalPages,
     goToPage,
-  } = useClients(typeFilter, debouncedSearch);
+  } = useClients(typeFilter, debouncedSearch, {
+    city: debouncedCity || null,
+    canton: cantonFilter !== "all" ? cantonFilter : null,
+    status: statusFilter !== "all" ? statusFilter : null,
+    postalCode: debouncedPostalCode || null,
+  });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -85,13 +104,17 @@ export default function ClientsList() {
     { value: "ia-scan", label: t('propositions.smartflow', 'Smartflow'), icon: Sparkles, color: "from-cyan-500 to-blue-600", badge: pendingScanCount },
   ];
 
-  // Recherche serveur (déjà filtrée par useClients via Supabase ilike)
-  // → on garde uniquement le filtre statut local (3-4 valeurs, pas besoin
-  // d'aller-retour serveur).
-  const filteredClients = clients.filter((client) => {
-    if (statusFilter === "all") return true;
-    return client.status === statusFilter;
-  });
+  // Recherche + tous les filtres (statut, canton, ville, NPA) sont maintenant
+  // gérés côté serveur dans useClients via les paramètres RPC. Pas de filtre
+  // local — sinon la pagination casse (le serveur renvoie 50 lignes filtrées,
+  // un filtre local au-dessus retirerait des lignes et "perdrait" des résultats).
+  const filteredClients = clients;
+  const hasActiveFilters =
+    statusFilter !== "all"
+    || cantonFilter !== "all"
+    || debouncedCity.length > 0
+    || debouncedPostalCode.length > 0
+    || debouncedSearch.length > 0;
 
   const handleDelete = async () => {
     if (clientToDelete) {
@@ -218,8 +241,9 @@ export default function ClientsList() {
 
       {/* Search & Filters */}
       <Card className="border-0 shadow-lg bg-card/80 backdrop-blur">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Ligne 1 : Recherche libre + Statut */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -230,7 +254,7 @@ export default function ClientsList() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[200px] h-11 bg-muted/50 border-0">
+              <SelectTrigger className="w-full sm:w-[180px] h-11 bg-muted/50 border-0">
                 <SelectValue placeholder={t('common.status')} />
               </SelectTrigger>
               <SelectContent>
@@ -241,6 +265,72 @@ export default function ClientsList() {
                 <SelectItem value="dormant">{t('clients.dormant')}</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Ligne 2 : Filtres géographiques (canton + ville + NPA) */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={cantonFilter} onValueChange={setCantonFilter}>
+              <SelectTrigger className="w-full sm:w-[180px] h-11 bg-muted/50 border-0">
+                <SelectValue placeholder="Canton" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les cantons</SelectItem>
+                {/* 26 cantons suisses + abréviations */}
+                <SelectItem value="VD">Vaud (VD)</SelectItem>
+                <SelectItem value="GE">Genève (GE)</SelectItem>
+                <SelectItem value="VS">Valais (VS)</SelectItem>
+                <SelectItem value="FR">Fribourg (FR)</SelectItem>
+                <SelectItem value="NE">Neuchâtel (NE)</SelectItem>
+                <SelectItem value="JU">Jura (JU)</SelectItem>
+                <SelectItem value="BE">Berne (BE)</SelectItem>
+                <SelectItem value="ZH">Zürich (ZH)</SelectItem>
+                <SelectItem value="LU">Lucerne (LU)</SelectItem>
+                <SelectItem value="UR">Uri (UR)</SelectItem>
+                <SelectItem value="SZ">Schwyz (SZ)</SelectItem>
+                <SelectItem value="OW">Obwald (OW)</SelectItem>
+                <SelectItem value="NW">Nidwald (NW)</SelectItem>
+                <SelectItem value="GL">Glaris (GL)</SelectItem>
+                <SelectItem value="ZG">Zoug (ZG)</SelectItem>
+                <SelectItem value="SO">Soleure (SO)</SelectItem>
+                <SelectItem value="BS">Bâle-Ville (BS)</SelectItem>
+                <SelectItem value="BL">Bâle-Campagne (BL)</SelectItem>
+                <SelectItem value="SH">Schaffhouse (SH)</SelectItem>
+                <SelectItem value="AR">Appenzell Rhodes-Extérieures (AR)</SelectItem>
+                <SelectItem value="AI">Appenzell Rhodes-Intérieures (AI)</SelectItem>
+                <SelectItem value="SG">Saint-Gall (SG)</SelectItem>
+                <SelectItem value="GR">Grisons (GR)</SelectItem>
+                <SelectItem value="AG">Argovie (AG)</SelectItem>
+                <SelectItem value="TG">Thurgovie (TG)</SelectItem>
+                <SelectItem value="TI">Tessin (TI)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Ville (ex: Lausanne, Genève...)"
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="flex-1 h-11 bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
+            <Input
+              placeholder="NPA (ex: 1000, 12...)"
+              value={postalCodeFilter}
+              onChange={(e) => setPostalCodeFilter(e.target.value)}
+              className="w-full sm:w-[160px] h-11 bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setCantonFilter("all");
+                  setCityFilter("");
+                  setPostalCodeFilter("");
+                }}
+                className="h-11"
+              >
+                Réinitialiser
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

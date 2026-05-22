@@ -89,7 +89,16 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   notes: "Notes",
 };
 
-const REQUIRED_FIELDS: FieldKey[] = ["first_name", "last_name"];
+// Champs "fortement recommandés" mais NON bloquants — on accepte une ligne
+// tant qu'au moins UN identifiant est présent (voir IDENTIFIER_FIELDS). Pratique
+// pour les exports CRM externes où certaines colonnes ne sont pas mappées par
+// le fournisseur de leads.
+const REQUIRED_FIELDS: FieldKey[] = [];
+
+// Au moins UN de ces champs doit être présent pour qu'on crée la fiche
+// (sinon c'est une ligne complètement vide → on saute). Permet d'importer
+// des leads où on a juste un email ou juste un téléphone.
+const IDENTIFIER_FIELDS: FieldKey[] = ["first_name", "last_name", "company_name", "email", "phone", "mobile"];
 
 const HEADER_ALIASES: Record<FieldKey, string[]> = {
   first_name: ["prenom", "prénom", "firstname", "first_name", "first name"],
@@ -588,9 +597,30 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
         `Importé le ${new Date().toLocaleDateString("fr-CH")}`,
       ];
 
-      const missing = REQUIRED_FIELDS.filter((f) => !payload[f]);
-      if (missing.length > 0) {
-        errors.push(`Champ(s) requis manquant(s): ${missing.map((f) => FIELD_LABELS[f]).join(", ")}`);
+      // Validation : au moins UN identifiant doit être présent (nom, prénom,
+      // société, email, tel ou mobile). Sinon ligne complètement vide = skip.
+      // Pas bloquant si juste le prénom OU juste le nom manque — on importe
+      // quand même la fiche, le broker la complètera plus tard.
+      const hasIdentifier = IDENTIFIER_FIELDS.some((f) => payload[f] && String(payload[f]).trim().length > 0);
+      if (!hasIdentifier) {
+        errors.push("Ligne ignorée : aucun identifiant (nom, prénom, société, email, téléphone) renseigné.");
+      } else {
+        // Si pas de nom/prénom, on génère un placeholder pour respecter la
+        // contrainte d'affichage (la fiche reste éditable par le broker).
+        if (!payload.first_name && !payload.last_name && !payload.company_name) {
+          // On a au moins email/phone → on crée avec email comme nom temporaire
+          const fallback = payload.email || payload.phone || payload.mobile || "Prospect à compléter";
+          payload.last_name = String(fallback);
+          payload.tags = [...(payload.tags ?? []), "À compléter"];
+        }
+      }
+
+      // Validation optionnelle : signaler (sans bloquer) les champs recommandés
+      // manquants pour qu'au moins une fiche minimale ne crée pas de doublon
+      // d'orphelins.
+      const missingRequired = REQUIRED_FIELDS.filter((f) => !payload[f]);
+      if (missingRequired.length > 0) {
+        errors.push(`Champ(s) requis manquant(s): ${missingRequired.map((f) => FIELD_LABELS[f]).join(", ")}`);
       }
 
       return { payload, errors };
