@@ -390,7 +390,22 @@ export default function ClientsList() {
                         {client.email || "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {client.city || "—"}
+                        {(() => {
+                          // Adresse complète : rue + NPA + ville. Affichée
+                          // sur 2 lignes pour rester lisible. Fallback "—"
+                          // si tout est vide.
+                          const street = (client as any).address as string | null;
+                          const npa = ((client as any).postal_code || (client as any).zip_code) as string | null;
+                          const city = client.city;
+                          const line2 = [npa, city].filter(Boolean).join(" ");
+                          if (!street && !line2) return "—";
+                          return (
+                            <div className="leading-tight">
+                              {street && <div className="text-foreground/90 text-sm">{street}</div>}
+                              {line2 && <div className="text-xs">{line2}</div>}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {client.status && (
