@@ -106,7 +106,13 @@ const HEADER_ALIASES: Record<FieldKey, string[]> = {
   email: ["email", "e-mail", "mail", "courriel", "adresse email"],
   phone: ["telephone", "téléphone", "phone", "tel", "fixe", "telephone fixe"],
   mobile: ["mobile", "portable", "gsm", "cellulaire", "natel"],
-  address: ["adresse", "address", "rue", "street"],
+  address: [
+    "adresse", "address", "rue", "street", "voie", "avenue", "chemin",
+    "nom de rue", "nom rue", "street name", "rue et numero", "rue numero",
+    "rue numéro", "rue + numero", "adresse complete", "adresse complète",
+    "adresse 1", "adresse1", "addr", "addr1", "address line 1",
+    "address1", "domicile", "lieu de residence", "lieu de résidence"
+  ],
   postal_code: ["code postal", "cp", "postal", "postal code", "zip", "zipcode", "npa"],
   city: ["ville", "city", "localite", "localité"],
   country: ["pays", "country"],
@@ -584,6 +590,28 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
       };
       const errors: string[] = [];
 
+      // ─────────────────────────────────────────────────────────────────
+      // BUG GUARDRAIL #1 : détecter une colonne "Numéro de rue" séparée
+      // qui ne serait PAS mappée par l'utilisateur. Si elle existe, on
+      // la concatènera à l'adresse pour éviter d'enregistrer juste "12"
+      // sans le nom de la rue. Cas typique : Excel avec colonnes
+      // "Rue" + "Numéro" séparées.
+      // ─────────────────────────────────────────────────────────────────
+      const NUMERO_ALIASES = [
+        "numero", "numéro", "no", "n", "n°", "num", "no rue", "n° rue",
+        "numero rue", "numéro rue", "numero de rue", "numéro de rue",
+        "street number", "number", "house number", "no de rue",
+      ];
+      let numeroValue: string | null = null;
+      for (const h of headers) {
+        if (mapping[h] && mapping[h] !== "ignore") continue;  // déjà mappé ailleurs
+        if (NUMERO_ALIASES.includes(normalizeHeader(h))) {
+          const idx = headers.indexOf(h);
+          const v = row[idx]?.trim();
+          if (v) { numeroValue = v; break; }
+        }
+      }
+
       headers.forEach((h, idx) => {
         const field = mapping[h];
         if (!field || field === "ignore") return;
@@ -616,6 +644,17 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
           payload[field] = raw;
         }
       });
+
+      // Auto-fusion Rue + Numéro si on a détecté un numéro séparé.
+      // Si payload.address contient déjà un chiffre, on ne touche pas
+      // (probablement déjà complet). Sinon on append le numéro.
+      if (numeroValue) {
+        if (payload.address && !/\d/.test(payload.address)) {
+          payload.address = `${payload.address} ${numeroValue}`.trim();
+        } else if (!payload.address) {
+          payload.address = numeroValue;
+        }
+      }
 
       // Tag automatique selon le type de prospect détecté :
       //   - Pro (B2B)   = raison sociale renseignée → is_company = true
@@ -854,6 +893,32 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
           )}
 
           {step === "preview" && (() => {
+            // ─── BUG GUARDRAIL #2 : adresse suspecte ────────────────
+            // On scanne la colonne mappée vers 'address' et on alerte
+            // si plus de 30% des valeurs sont purement numériques (ex:
+            // "12", "15A", "3"). Symptôme d'un mauvais mapping où on
+            // a importé le numéro de rue au lieu de la rue complète.
+            const addressHeader = headers.find((h) => mapping[h] === "address");
+            let suspiciousAddressCount = 0;
+            let totalAddressFilled = 0;
+            if (addressHeader) {
+              const idx = headers.indexOf(addressHeader);
+              for (const row of rows) {
+                const val = (row[idx] || "").trim();
+                if (!val) continue;
+                totalAddressFilled++;
+                // Considéré suspect si : chiffres uniquement, ou chiffres+1
+                // lettre (ex: "12A"), ou très court (≤3 chars sans espace).
+                if (/^\d+[A-Za-z]?$/.test(val) || (val.length <= 3 && !/\s/.test(val))) {
+                  suspiciousAddressCount++;
+                }
+              }
+            }
+            const suspiciousAddressPct = totalAddressFilled > 0
+              ? (suspiciousAddressCount / totalAddressFilled) * 100
+              : 0;
+            const showAddressWarning = suspiciousAddressPct >= 30;
+
             // Compteur Pro / Privé sur l'ensemble du fichier (pas seulement les 10 visibles)
             let proCount = 0;
             let priveCount = 0;
@@ -865,6 +930,22 @@ export function ProspectImportDialog({ open, onOpenChange, onImported }: Props) 
             }
             return (
             <div className="space-y-4">
+              {/* Warning visible si l'adresse semble incomplète (mauvais mapping) */}
+              {showAddressWarning && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg dark:bg-amber-950/30 dark:border-amber-800">
+                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">
+                      ⚠️ Adresse probablement incomplète — vérifie ton mapping
+                    </p>
+                    <p className="text-amber-800 dark:text-amber-300 mt-1">
+                      La colonne <strong>« {addressHeader} »</strong> que tu as mappée vers <strong>Adresse</strong> contient
+                      majoritairement des valeurs très courtes ou purement numériques (<strong>{Math.round(suspiciousAddressPct)} %</strong> des lignes).
+                      Le nom de la rue est peut-être dans une autre colonne de ton fichier. Reviens à l'étape <strong>Colonnes</strong> pour vérifier le mapping.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-4 gap-3">
                 <Card>
                   <CardContent className="p-4">
