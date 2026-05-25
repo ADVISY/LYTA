@@ -37,9 +37,14 @@ export function useKingNotifications() {
 
       return (data || []) as KingNotification[];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 10000, // Avoid unnecessary re-fetches within 10s
-    retry: 2,
+    // Avant : refetchInterval 30s + staleTime 10s → polling permanent sur
+    // toutes les pages où le hook est monté (Dashboard King + inbox). Lent.
+    // Maintenant : polling 2 min seulement quand le tab est visible. Pas de
+    // poll en arrière-plan (le user revient = refetch sur focus retour).
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 120_000 : false),
+    staleTime: 60_000,
+    refetchIntervalInBackground: false,
+    retry: 1,
   });
 
   const unreadCount = notifications?.filter(n => !n.read_at).length || 0;
@@ -131,9 +136,10 @@ export function useKingAuditLogs() {
 
       return data || [];
     },
-    refetchInterval: 60000,
-    staleTime: 30000,
-    retry: 2,
+    // Pas de polling — les logs ne changent pas si l'utilisateur ne fait rien.
+    // L'utilisateur fera refetch manuellement ou via mutation.
+    staleTime: 5 * 60_000,
+    retry: 1,
   });
 
   return { logs: logs || [], isLoading };

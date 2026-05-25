@@ -65,6 +65,9 @@ export function usePaginatedQuery<T = any>(
     queryFn: async () => fetchQueryCount(buildQuery(supabase)),
     enabled,
     refetchOnWindowFocus: false,
+    // Le count change rarement à l'échelle d'une session — 2 min de fraîcheur
+    // évite des HEAD requests à chaque retour de page.
+    staleTime: 2 * 60_000,
   });
 
   const totalCount = countData ?? 0;

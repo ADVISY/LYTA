@@ -80,7 +80,38 @@ if (typeof document !== 'undefined' && !document.getElementById('suspense-spinne
   document.head.appendChild(style);
 }
 
-const queryClient = new QueryClient();
+/**
+ * QueryClient global : defaults optimisés pour LYTA.
+ *
+ * Avant : `new QueryClient()` sans options → staleTime=0, refetchOnWindowFocus=true,
+ * retry=3 → chaque navigation/focus/reconnect déclenchait un re-fetch complet sur
+ * tous les hooks (useClients, useTenantQuota, useLytaTools, etc.). Causait des
+ * chargements perçus comme très lents même quand la donnée était fraîche.
+ *
+ * Defaults sains :
+ * - staleTime 60s : on considère la donnée fraîche 1 min (pas de refetch parasite)
+ * - gcTime 5min   : on garde 5 min en cache même après unmount (retour rapide aux pages)
+ * - refetchOnWindowFocus false : pas de refetch quand on revient sur l'onglet
+ * - retry 1       : si la première requête échoue, on retente UNE fois (au lieu de 3)
+ *                   → erreurs visibles plus vite, moins de roundtrips inutiles
+ *
+ * Les hooks qui ont besoin de fraîcheur (live polling, real-time) peuvent override
+ * via leurs propres { staleTime: 0, refetchInterval: X } locaux.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: "always",
+      retry: 1,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
