@@ -68,8 +68,11 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-// Auto-refresh interval in milliseconds (60 seconds)
-const AUTO_REFRESH_INTERVAL = 60000;
+// Auto-refresh interval (10 min). Avant : 60s → 3 requêtes lourdes
+// (clients + policies + commissions) toutes les 60s en permanence, MÊME
+// quand l'onglet n'était pas visible. C'était une grosse cause de
+// lenteur perçue. 10 min suffit largement pour un dashboard de courtier.
+const AUTO_REFRESH_INTERVAL = 10 * 60 * 1000;
 
 export default function CRMDashboard() {
   const { t } = useTranslation();
@@ -129,16 +132,19 @@ export default function CRMDashboard() {
     fetchPartsForAgentRef.current = fetchPartsForAgent;
   });
   
-  // Setup auto-refresh with stable interval
+  // Setup auto-refresh : 10 min ET seulement si l'onglet est visible.
+  // Avant : poll 60s même en background → 3 requêtes lourdes en permanence.
   useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => {
-      // Silent background refresh (no loading indicator)
+    const tick = () => {
+      // Skip si l'onglet n'est pas affiché (économise batterie + réseau)
+      if (typeof document !== "undefined" && document.hidden) return;
       Promise.all([
         fetchClientsRef.current(),
         fetchPoliciesRef.current(),
         fetchCommissionsRef.current(),
       ]).catch(console.error);
-    }, AUTO_REFRESH_INTERVAL);
+    };
+    refreshIntervalRef.current = setInterval(tick, AUTO_REFRESH_INTERVAL);
 
     return () => {
       if (refreshIntervalRef.current) {

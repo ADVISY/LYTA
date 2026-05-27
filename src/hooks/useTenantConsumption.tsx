@@ -60,7 +60,11 @@ export function useTenantConsumptionSummary() {
       if (error) throw error;
       return (data || []) as TenantConsumptionData[];
     },
-    refetchInterval: 60000, // Refresh every minute
+    // Avant : 60s permanent même en background. Maintenant : 5 min ET
+    // seulement quand l'onglet est visible.
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 5 * 60_000 : false),
+    refetchIntervalInBackground: false,
+    staleTime: 60_000,
   });
 }
 

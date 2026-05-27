@@ -64,7 +64,9 @@ export function useStripeStats() {
         return null;
       }
     },
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000,
+    // Avant : 60s permanent. Maintenant : 5 min ET seulement onglet visible.
+    refetchInterval: () => (typeof document !== "undefined" && !document.hidden ? 5 * 60_000 : false),
+    refetchIntervalInBackground: false,
+    staleTime: 2 * 60_000,
   });
 }
