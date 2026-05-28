@@ -641,7 +641,7 @@ function generatePasswordSetupEmail(
         </a>
       </div>
       <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
-        Ce lien est valable 60 minutes. S'il expire, demandez un nouvel email d'invitation depuis votre cabinet.
+        Ce lien est valable 24 heures. S'il expire, demandez un nouvel email d'invitation depuis votre cabinet.
       </p>
       <p style="color: #6b7280; font-size: 13px; line-height: 1.6;">
         Après création du mot de passe, vous pourrez aussi vous connecter ici:

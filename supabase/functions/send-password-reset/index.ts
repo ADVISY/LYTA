@@ -485,8 +485,8 @@ const handler = async (req: Request): Promise<Response> => {
         </div>
         
         <div class="warning-box">
-          <strong>⏰ Ce lien expire dans 1 heure</strong><br>
-          Pour des raisons de sécurité, ce lien de réinitialisation n'est valable que pendant 60 minutes.
+          <strong>⏰ Ce lien expire dans 24 heures</strong><br>
+          Pour des raisons de sécurité, ce lien de réinitialisation n'est valable que pendant 24 heures.
         </div>
         
         <div class="info-box">

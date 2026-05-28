@@ -13,7 +13,10 @@ enable_confirmations = true
 secure_password_change = false
 max_frequency = "1m0s"
 otp_length = 8
-otp_expiry = 3600
+# 86400s = 24h : les liens d'invitation collaborateur/client doivent durer
+# 1 journée complète (avant : 3600s = 1h, trop court — les users ne cliquaient
+# pas dans l'heure et le lien expirait, "erreur de connexion" garantie).
+otp_expiry = 86400
 
 [auth.mfa]
 max_enrolled_factors = 10
