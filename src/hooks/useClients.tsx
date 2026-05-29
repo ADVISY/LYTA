@@ -212,6 +212,13 @@ export interface ClientsFilters {
   canton?: string | null;
   status?: string | null;
   postalCode?: string | null;
+  /**
+   * Filtre Pro / Privé :
+   *   - true  : uniquement les fiches où is_company = true (B2B / société)
+   *   - false : uniquement les fiches où is_company = false OU IS NULL (B2C / particulier)
+   *   - null/undefined : pas de filtre, on prend les deux
+   */
+  isCompany?: boolean | null;
 }
 
 export function useClients(typeFilter?: string, searchTerm?: string, filters?: ClientsFilters) {
@@ -225,11 +232,12 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   const cantonFilter = (filters?.canton ?? "").trim();
   const statusFilter = (filters?.status ?? "").trim();
   const postalCodeFilter = (filters?.postalCode ?? "").trim();
+  const isCompanyFilter = filters?.isCompany ?? null;
 
   // Reset page quand filtre type, recherche ou filtres géographiques changent
   useEffect(() => {
     setPage(1);
-  }, [tenantId, typeFilter, searchTerm, cityFilter, cantonFilter, statusFilter, postalCodeFilter]);
+  }, [tenantId, typeFilter, searchTerm, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]);
 
   const trimmedSearch = (searchTerm ?? "").trim();
 
@@ -245,8 +253,9 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       cantonFilter,
       statusFilter,
       postalCodeFilter,
+      isCompanyFilter,
     ],
-    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter]
+    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -278,6 +287,14 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
     if (postalCodeFilter) {
       query = query.ilike("postal_code", `${postalCodeFilter}%`);
     }
+    if (isCompanyFilter === true) {
+      // Filtre Pro : uniquement les fiches B2B (raison sociale)
+      query = query.eq("is_company", true);
+    } else if (isCompanyFilter === false) {
+      // Filtre Privé : on inclut aussi les fiches legacy où is_company est NULL
+      // (avant l'ajout de la colonne, toutes les fiches étaient des particuliers).
+      query = query.or("is_company.eq.false,is_company.is.null");
+    }
 
     if (trimmedSearch) {
       // Échappe les caractères PostgREST spéciaux (% , ()) dans la valeur user
@@ -302,6 +319,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         p_canton: cantonFilter || null,
         p_status: statusFilter || null,
         p_postal_code: postalCodeFilter || null,
+        p_is_company: isCompanyFilter,
       }),
     ]);
 
@@ -320,7 +338,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter]);
+  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]);
 
   const {
     data,

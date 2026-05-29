@@ -53,6 +53,8 @@ export default function ClientsList() {
   const [debouncedCity, setDebouncedCity] = useState<string>("");
   const [postalCodeFilter, setPostalCodeFilter] = useState<string>("");
   const [debouncedPostalCode, setDebouncedPostalCode] = useState<string>("");
+  // Filtre Pro / Privé : "all" = pas de filtre, "pro" = is_company=true, "prive" = is_company=false/null
+  const [companyTypeFilter, setCompanyTypeFilter] = useState<"all" | "pro" | "prive">("all");
 
   // Debounce 300ms : évite de spammer Supabase à chaque frappe clavier
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function ClientsList() {
     canton: cantonFilter !== "all" ? cantonFilter : null,
     status: statusFilter !== "all" ? statusFilter : null,
     postalCode: debouncedPostalCode || null,
+    isCompany: companyTypeFilter === "pro" ? true : companyTypeFilter === "prive" ? false : null,
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
@@ -117,6 +120,7 @@ export default function ClientsList() {
   const hasActiveFilters =
     statusFilter !== "all"
     || cantonFilter !== "all"
+    || companyTypeFilter !== "all"
     || debouncedCity.length > 0
     || debouncedPostalCode.length > 0
     || debouncedSearch.length > 0;
@@ -330,12 +334,42 @@ export default function ClientsList() {
                   setCantonFilter("all");
                   setCityFilter("");
                   setPostalCodeFilter("");
+                  setCompanyTypeFilter("all");
                 }}
                 className="h-11"
               >
                 Réinitialiser
               </Button>
             )}
+          </div>
+
+          {/* Ligne 3 : Toggle Pro / Privé / Tous */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Type :</span>
+            {(
+              [
+                { value: "all", label: "Tous", color: "bg-muted text-foreground" },
+                { value: "prive", label: "Privés", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200" },
+                { value: "pro", label: "Pro", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" },
+              ] as const
+            ).map((opt) => {
+              const isActive = companyTypeFilter === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setCompanyTypeFilter(opt.value)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : `${opt.color} border-transparent hover:border-border`
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
