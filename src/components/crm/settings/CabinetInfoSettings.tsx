@@ -24,7 +24,11 @@ import { toast } from "sonner";
 
 interface CabinetInfo {
   display_name: string;
+  /** Rue + numéro uniquement (ex: "Route de Denges 28D"). NPA et localité sont
+   *  séparés ci-dessous pour permettre un QR-bill propre et un filtrage propre. */
   company_address: string;
+  company_postal_code: string;
+  company_city: string;
   company_phone: string;
   company_email: string;
   company_website: string;
@@ -46,6 +50,8 @@ export function CabinetInfoSettings() {
   const [cabinetInfo, setCabinetInfo] = useState<CabinetInfo>({
     display_name: "",
     company_address: "",
+    company_postal_code: "",
+    company_city: "",
     company_phone: "",
     company_email: "",
     company_website: "",
@@ -80,6 +86,8 @@ export function CabinetInfoSettings() {
         const info: CabinetInfo = {
           display_name: data.display_name || "",
           company_address: data.company_address || "",
+          company_postal_code: (data as any).company_postal_code || "",
+          company_city: (data as any).company_city || "",
           company_phone: data.company_phone || "",
           company_email: data.company_email || "",
           company_website: data.company_website || "",
@@ -120,6 +128,8 @@ export function CabinetInfoSettings() {
             tenant_id: tenantId,
             display_name: cabinetInfo.display_name,
             company_address: cabinetInfo.company_address,
+            company_postal_code: cabinetInfo.company_postal_code,
+            company_city: cabinetInfo.company_city,
             company_phone: cabinetInfo.company_phone,
             company_email: cabinetInfo.company_email,
             company_website: cabinetInfo.company_website,
@@ -129,7 +139,7 @@ export function CabinetInfoSettings() {
             qr_iban: cabinetInfo.qr_iban,
             vat_number: cabinetInfo.vat_number,
             updated_at: new Date().toISOString(),
-          },
+          } as any,
           { onConflict: "tenant_id" }
         )
         .select()
@@ -195,15 +205,36 @@ export function CabinetInfoSettings() {
             </div>
           </div>
 
+          {/* Adresse découpée en 3 champs (rue / NPA / localité) pour QR-bill propre */}
           <div className="space-y-2">
-            <Label>{t("settings.cabinetAddress")}</Label>
+            <Label>Rue et numéro</Label>
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 value={cabinetInfo.company_address}
                 onChange={(e) => handleChange("company_address", e.target.value)}
-                placeholder={t("settings.cabinetAddressPlaceholder")}
+                placeholder="Ex : Route de Denges 28D"
                 className="pl-10"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+            <div className="space-y-2">
+              <Label>NPA</Label>
+              <Input
+                value={cabinetInfo.company_postal_code}
+                onChange={(e) => handleChange("company_postal_code", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="1027"
+                inputMode="numeric"
+                maxLength={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Localité</Label>
+              <Input
+                value={cabinetInfo.company_city}
+                onChange={(e) => handleChange("company_city", e.target.value)}
+                placeholder="Ex : Lonay"
               />
             </div>
           </div>

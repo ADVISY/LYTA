@@ -186,14 +186,45 @@ export function QRInvoicePreview({
   // Generate Swiss QR Bill payload according to SIX specs
   const qrData = useMemo(() => {
     if (!invoice || !tenantIBAN) return '';
-    
-    // Parse address components
-    const addressParts = tenantAddress.split(',').map(s => s.trim());
-    const streetAndNumber = addressParts[0] || '';
-    const postalCity = addressParts[1] || '';
-    const postalMatch = postalCity.match(/^(\d{4})\s*(.*)$/);
-    const postalCode = postalMatch ? postalMatch[1] : '';
-    const city = postalMatch ? postalMatch[2] : postalCity;
+
+    // 1) Préférence : utilise les nouveaux champs structurés (saisis séparément
+    //    dans Paramètres > Cabinet depuis la migration tenant_branding split).
+    // 2) Fallback : ancien parsing de company_address pour compat tenants qui
+    //    n'ont pas encore re-saisi.
+    const structuredPostal = (tenantBranding as any)?.company_postal_code as string | undefined;
+    const structuredCity = (tenantBranding as any)?.company_city as string | undefined;
+
+    let streetAndNumber: string;
+    let postalCode: string;
+    let city: string;
+
+    if (structuredPostal && structuredCity) {
+      streetAndNumber = tenantAddress; // company_address contient désormais juste la rue
+      postalCode = structuredPostal;
+      city = structuredCity;
+    } else {
+      // Legacy : tout-en-un dans tenantAddress, on essaie virgule puis regex sur 4 chiffres
+      const addressParts = tenantAddress.split(',').map(s => s.trim());
+      if (addressParts.length >= 2) {
+        streetAndNumber = addressParts[0] || '';
+        const postalCity = addressParts[1] || '';
+        const postalMatch = postalCity.match(/^(\d{4})\s*(.*)$/);
+        postalCode = postalMatch ? postalMatch[1] : '';
+        city = postalMatch ? postalMatch[2] : postalCity;
+      } else {
+        // Pas de virgule : on cherche un NPA 4 chiffres n'importe où dans la chaîne
+        const m = tenantAddress.match(/^(.*?)\s+(\d{4})\s+(.+)$/);
+        if (m) {
+          streetAndNumber = m[1].trim();
+          postalCode = m[2];
+          city = m[3].trim();
+        } else {
+          streetAndNumber = tenantAddress;
+          postalCode = '';
+          city = '';
+        }
+      }
+    }
     
     // Determine reference based on IBAN type
     // QR-IBAN requires QRR, regular IBAN uses NON (or SCOR if creditor reference available)
