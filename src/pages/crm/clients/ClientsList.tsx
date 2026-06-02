@@ -436,29 +436,45 @@ export default function ClientsList() {
             })}
 
             <span className="text-xs uppercase tracking-wide text-muted-foreground ml-4 mr-1">Agent :</span>
-            {(
-              [
-                { value: "all", label: "Tous", color: "bg-muted text-foreground" },
-                { value: "unassigned", label: "Sans agent", color: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" },
-              ] as const
-            ).map((opt) => {
-              const isActive = agentFilter === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setAgentFilter(opt.value)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : `${opt.color} border-transparent hover:border-border`
-                  )}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+              <SelectTrigger
+                className={cn(
+                  "h-8 min-w-[180px] max-w-[260px] rounded-full px-3 py-0 text-xs font-medium border",
+                  agentFilter === "all"
+                    ? "bg-muted text-foreground border-transparent"
+                    : agentFilter === "unassigned"
+                    ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/60"
+                    : "bg-primary text-primary-foreground border-primary shadow-sm"
+                )}
+              >
+                <SelectValue placeholder="Tous" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[320px]">
+                <SelectItem value="all">Tous les prospects/clients</SelectItem>
+                <SelectItem value="unassigned">Sans agent (à répartir)</SelectItem>
+                {agents.length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Par agent assigné
+                  </div>
+                )}
+                {agents
+                  .filter((a) => a.first_name || a.last_name || a.email)
+                  .map((a) => {
+                    const label =
+                      `${a.first_name || ""} ${a.last_name || ""}`.trim() ||
+                      a.email ||
+                      "Agent";
+                    return (
+                      <SelectItem key={a.id} value={a.id}>
+                        {label}
+                        {a.profession && (
+                          <span className="text-muted-foreground ml-1 text-xs">— {a.profession}</span>
+                        )}
+                      </SelectItem>
+                    );
+                  })}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
