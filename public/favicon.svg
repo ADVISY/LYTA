@@ -1,4 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#1a1a2e"/>
-  <text x="50" y="67" font-size="50" font-family="Arial,sans-serif" font-weight="bold" fill="white" text-anchor="middle">L</text>
+  <!-- ============================================================
+       LYTA favicon — fond bleu nuit + "L" dégradé vert→or
+       Cohérent avec la charte officielle (logo LYTA full)
+       Lisible en 16×16, 32×32, 180×180 (apple-touch), 512×512.
+       ============================================================ -->
+  <defs>
+    <linearGradient id="lytaGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE94A"/>
+      <stop offset="50%" stop-color="#F6D900"/>
+      <stop offset="100%" stop-color="#C9A800"/>
+    </linearGradient>
+    <linearGradient id="lytaBarGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#008B2F"/>
+      <stop offset="100%" stop-color="#F6D900"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="#1a1a2e"/>
+  <!-- Barre verticale dégradée (signature du logo LYTA full) -->
+  <rect x="20" y="22" width="9" height="56" rx="2" fill="url(#lytaBarGreen)"/>
+  <!-- L doré -->
+  <text x="60" y="74" font-size="58" font-family="'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-weight="900" fill="url(#lytaGold)" text-anchor="middle">L</text>
 </svg>
