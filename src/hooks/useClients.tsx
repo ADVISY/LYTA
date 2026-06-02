@@ -408,13 +408,33 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
+      const payload = { ...clientData, tenant_id: tenantId };
+      // Log explicite avant l'envoi pour pouvoir diagnostiquer en console
+      // les erreurs RLS / 403 sans lire la trace Supabase brute.
+      console.info("[createClient] payload →", {
+        tenant_id: payload.tenant_id,
+        type_adresse: payload.type_adresse,
+        status: payload.status,
+        is_company: payload.is_company,
+        has_email: !!payload.email,
+        has_assigned_agent: !!payload.assigned_agent_id,
+      });
+
       const { data: createdClient, error: createError } = await supabase
         .from("clients")
-        .insert([{ ...clientData, tenant_id: tenantId }])
+        .insert([payload])
         .select("*")
         .single();
 
       if (createError) {
+        // Log structuré pour comprendre l'origine exacte du rejet RLS.
+        console.error("[createClient] Supabase rejected the INSERT", {
+          code: createError.code,
+          message: createError.message,
+          details: (createError as any).details,
+          hint: (createError as any).hint,
+          tenant_id_envoyé: payload.tenant_id,
+        });
         throw createError;
       }
 
@@ -423,12 +443,18 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         description: "Le client a été créé avec succès",
       });
 
-      await refreshClients();
+      void queryClient.invalidateQueries({ queryKey: baseQueryKey });
       return { data: createdClient, error: null };
     } catch (caughtError: any) {
+      // Toast plus parlant si erreur RLS : on inclut le tenant_id pour
+      // que l'utilisateur (et nous) puissions voir si le tenant est bon.
+      const isRlsError = caughtError?.code === "42501"
+        || /row-level security/i.test(caughtError?.message ?? "");
       toast({
         title: "Erreur",
-        description: translateError(caughtError.message),
+        description: isRlsError
+          ? `Accès refusé (tenant ${String(tenantId).slice(0, 8)}…). Code ${caughtError?.code ?? "?"} — ouvre la console pour les détails.`
+          : translateError(caughtError.message),
         variant: "destructive",
       });
       return { data: null, error: caughtError };
