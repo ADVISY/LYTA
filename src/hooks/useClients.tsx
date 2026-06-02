@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { translateError } from "@/lib/errorTranslations";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 const CLIENTS_PAGE_SIZE = 50;
 // Bumpé de 12s → 45s : avec 1000+ clients + RLS lourdes (3 EXISTS croisés),
@@ -409,50 +410,30 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       }
 
       // ┌─────────────────────────────────────────────────────────────┐
-      // │  Pourquoi générer l'UUID côté front et ne pas faire .select() │
-      // │  Cause confirmée du bug Matthieu (Admin Cabinet JCG) :       │
-      // │  .insert([...]).select("*").single() en PostgREST = INSERT  │
-      // │  PUIS SELECT sur la row fraîche. Le SELECT est soumis à la  │
-      // │  policy 'Tenant users can view scoped clients' qui appelle  │
-      // │  can_access_client(id) → user_has_global_client_scope(...).  │
-      // │  Sur certains contextes auth (visiblement Admin Cabinet JCG │
-      // │  via PostgREST), cette chaîne de SECURITY DEFINER + sous-   │
-      // │  EXISTS retourne FALSE même quand toutes les conditions     │
-      // │  semblent vraies en SELECT manuel. Résultat : INSERT passe  │
-      // │  en DB mais le SELECT échoue → PostgREST renvoie 42501.     │
-      // │  Workaround : on évite tout SELECT post-INSERT en passant   │
-      // │  l'UUID dans le payload — le front a déjà l'ID complet pour │
-      // │  la navigation, pas besoin de RETURNING.                    │
+      // │  Route principale : edge function create-client.              │
+      // │  Pourquoi : INSERT direct via supabase.from('clients') a        │
+      // │  remonté un 403 / code 42501 sur PLUSIEURS tenants (Advisy,   │
+      // │  JCG). Mismatch SQL CLI vs PostgREST runtime : impossible    │
+      // │  de cibler la cause exacte des policies RLS. La fonction    │
+      // │  contourne tout ça via service_role en backend, après        │
+      // │  vérif explicite que le caller est bien membre du tenant.   │
       // └─────────────────────────────────────────────────────────────┘
-      const newId = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
-        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 14)}`;
+      const payload = { ...clientData, tenant_id: tenantId };
 
-      const payload = { ...clientData, id: newId, tenant_id: tenantId };
-
-      console.info("[createClient] payload →", {
-        id: newId,
+      console.info("[createClient] calling edge function create-client", {
         tenant_id: payload.tenant_id,
         type_adresse: payload.type_adresse,
         status: payload.status,
         is_company: payload.is_company,
       });
 
-      // INSERT sans .select() : on évite le SELECT post-INSERT qui
-      // déclenche la policy SELECT et fait remonter le 42501.
-      const { error: createError } = await supabase
-        .from("clients")
-        .insert([payload]);
+      const result = await invokeSupabaseFunction<{ success: boolean; id: string; data: any }>(
+        "create-client",
+        { body: payload },
+      );
 
-      if (createError) {
-        console.error("[createClient] Supabase rejected the INSERT", {
-          code: createError.code,
-          message: createError.message,
-          details: (createError as any).details,
-          hint: (createError as any).hint,
-          tenant_id_envoyé: payload.tenant_id,
-        });
-        throw createError;
+      if (!result?.success || !result?.id) {
+        throw new Error("Réponse inattendue de l'edge function create-client");
       }
 
       toast({
@@ -461,10 +442,15 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       });
 
       void queryClient.invalidateQueries({ queryKey: baseQueryKey });
-      // On retourne la row reconstituée localement (sans relire la DB),
-      // suffisant pour le navigate(`/crm/clients/${newClient.id}`) côté caller.
-      return { data: { ...payload }, error: null };
+      // La row reconstituée par l'edge function contient l'UUID généré
+      // côté serveur — suffisant pour navigate(`/crm/clients/${id}`).
+      return { data: result.data, error: null };
     } catch (caughtError: any) {
+      console.error("[createClient] failed", {
+        message: caughtError?.message,
+        code: caughtError?.code,
+        details: caughtError?.details,
+      });
       const isRlsError = caughtError?.code === "42501"
         || /row-level security/i.test(caughtError?.message ?? "");
       toast({
