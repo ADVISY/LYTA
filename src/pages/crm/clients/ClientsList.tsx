@@ -43,18 +43,55 @@ import { ProspectImportDialog } from "@/components/crm/clients/ProspectImportDia
 export default function ClientsList() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("client");
-  // Filtres géographiques (Romandie + tous cantons CH)
-  const [cantonFilter, setCantonFilter] = useState<string>("all");
-  const [cityFilter, setCityFilter] = useState<string>("");
-  const [debouncedCity, setDebouncedCity] = useState<string>("");
-  const [postalCodeFilter, setPostalCodeFilter] = useState<string>("");
-  const [debouncedPostalCode, setDebouncedPostalCode] = useState<string>("");
-  // Filtre Pro / Privé : "all" = pas de filtre, "pro" = is_company=true, "prive" = is_company=false/null
-  const [companyTypeFilter, setCompanyTypeFilter] = useState<"all" | "pro" | "prive">("all");
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Persistance des filtres en sessionStorage : avant, naviguer vers
+  // une fiche puis revenir effaçait tout (statusFilter='all', cityFilter=''…).
+  // Frustrant sur un gros portefeuille où on a affiné sa recherche
+  // (canton VD + ville Lausanne + statut prospect) → tu cliques une fiche,
+  // tu reviens, tout est reset.
+  // Maintenant on rehydrate depuis sessionStorage au mount + on persiste
+  // à chaque changement. Reset propre via le bouton "Réinitialiser".
+  // ─────────────────────────────────────────────────────────────────────
+  const FILTERS_STORAGE_KEY = "lyta_clientslist_filters_v1";
+  const initialFilters = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const [searchTerm, setSearchTerm] = useState(initialFilters?.searchTerm ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters?.searchTerm ?? "");
+  const [statusFilter, setStatusFilter] = useState<string>(initialFilters?.statusFilter ?? "all");
+  const [typeFilter, setTypeFilter] = useState<string>(initialFilters?.typeFilter ?? "client");
+  const [cantonFilter, setCantonFilter] = useState<string>(initialFilters?.cantonFilter ?? "all");
+  const [cityFilter, setCityFilter] = useState<string>(initialFilters?.cityFilter ?? "");
+  const [debouncedCity, setDebouncedCity] = useState<string>(initialFilters?.cityFilter ?? "");
+  const [postalCodeFilter, setPostalCodeFilter] = useState<string>(initialFilters?.postalCodeFilter ?? "");
+  const [debouncedPostalCode, setDebouncedPostalCode] = useState<string>(initialFilters?.postalCodeFilter ?? "");
+  const [companyTypeFilter, setCompanyTypeFilter] = useState<"all" | "pro" | "prive">(
+    initialFilters?.companyTypeFilter ?? "all"
+  );
+
+  // Persiste à chaque changement (cheap, sessionStorage est synchro et rapide).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          searchTerm, statusFilter, typeFilter, cantonFilter,
+          cityFilter, postalCodeFilter, companyTypeFilter,
+        })
+      );
+    } catch {
+      /* quota dépassé : on ignore silencieusement */
+    }
+  }, [searchTerm, statusFilter, typeFilter, cantonFilter, cityFilter, postalCodeFilter, companyTypeFilter]);
 
   // Debounce 300ms : évite de spammer Supabase à chaque frappe clavier
   useEffect(() => {
@@ -335,6 +372,9 @@ export default function ClientsList() {
                   setCityFilter("");
                   setPostalCodeFilter("");
                   setCompanyTypeFilter("all");
+                  // Purge aussi le snapshot sessionStorage pour ne pas
+                  // re-rehydrater au prochain mount.
+                  try { sessionStorage.removeItem(FILTERS_STORAGE_KEY); } catch { /* ignore */ }
                 }}
                 className="h-11"
               >

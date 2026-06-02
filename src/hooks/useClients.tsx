@@ -436,7 +436,11 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         description: "Les modifications ont été enregistrées",
       });
 
-      await refreshClients();
+      // Invalidation NON-bloquante : sur les gros tenants (3000+ fiches),
+      // l'await refreshClients re-SELECT * + repasse can_access_client(id)
+      // pour chaque ligne → 2-3 secondes perçues comme un freeze. On laisse
+      // le refetch tourner en arrière-plan, l'UI se met à jour quand prêt.
+      void queryClient.invalidateQueries({ queryKey: baseQueryKey });
       return { error: null };
     } catch (caughtError: any) {
       toast({
