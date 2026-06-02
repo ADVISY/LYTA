@@ -31,13 +31,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw, Upload, MessageCircle, Phone } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Users, Building2, Briefcase, UserCircle, Sparkles, AlertTriangle, RefreshCw, Upload, MessageCircle, Phone, UserCheck, X } from "lucide-react";
 import { QuickContactDialog, type QuickContactMode } from "@/components/crm/clients/QuickContactDialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/crm/UserAvatar";
 import { useTranslation } from "react-i18next";
 import { ProspectImportDialog } from "@/components/crm/clients/ProspectImportDialog";
+import { BulkAssignDialog, type BulkAssignAgent } from "@/components/crm/clients/BulkAssignDialog";
+import { useAgents } from "@/hooks/useAgents";
 
 
 export default function ClientsList() {
@@ -76,6 +79,14 @@ export default function ClientsList() {
   const [companyTypeFilter, setCompanyTypeFilter] = useState<"all" | "pro" | "prive">(
     initialFilters?.companyTypeFilter ?? "all"
   );
+  // Filtre Agent : "all" | "unassigned" (sans agent) | "<UUID>" (agent spécifique)
+  const [agentFilter, setAgentFilter] = useState<string>(initialFilters?.agentFilter ?? "all");
+
+  // Sélection multiple : un Set d'IDs sélectionnés sur la page courante.
+  // On reset la sélection à chaque changement de page / filtre / recherche
+  // pour éviter d'opérer sur des fiches que l'utilisateur ne voit plus.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
   // Persiste à chaque changement (cheap, sessionStorage est synchro et rapide).
   useEffect(() => {
@@ -85,13 +96,13 @@ export default function ClientsList() {
         FILTERS_STORAGE_KEY,
         JSON.stringify({
           searchTerm, statusFilter, typeFilter, cantonFilter,
-          cityFilter, postalCodeFilter, companyTypeFilter,
+          cityFilter, postalCodeFilter, companyTypeFilter, agentFilter,
         })
       );
     } catch {
       /* quota dépassé : on ignore silencieusement */
     }
-  }, [searchTerm, statusFilter, typeFilter, cantonFilter, cityFilter, postalCodeFilter, companyTypeFilter]);
+  }, [searchTerm, statusFilter, typeFilter, cantonFilter, cityFilter, postalCodeFilter, companyTypeFilter, agentFilter]);
 
   // Debounce 300ms : évite de spammer Supabase à chaque frappe clavier
   useEffect(() => {
@@ -114,6 +125,7 @@ export default function ClientsList() {
     error,
     fetchClients,
     deleteClient,
+    bulkAssignClients,
     page,
     totalCount,
     totalPages,
@@ -124,7 +136,17 @@ export default function ClientsList() {
     status: statusFilter !== "all" ? statusFilter : null,
     postalCode: debouncedPostalCode || null,
     isCompany: companyTypeFilter === "pro" ? true : companyTypeFilter === "prive" ? false : null,
+    assignedAgent: agentFilter === "all" ? null : agentFilter,
   });
+
+  // Liste des agents du tenant pour le dialog d'assignation en masse.
+  const { agents } = useAgents();
+
+  // Reset sélection à chaque changement de page / filtre / recherche, sinon
+  // on risque d'opérer sur des fiches qui ne sont plus visibles.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch, statusFilter, cantonFilter, debouncedCity, debouncedPostalCode, companyTypeFilter, agentFilter, typeFilter]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -158,6 +180,7 @@ export default function ClientsList() {
     statusFilter !== "all"
     || cantonFilter !== "all"
     || companyTypeFilter !== "all"
+    || agentFilter !== "all"
     || debouncedCity.length > 0
     || debouncedPostalCode.length > 0
     || debouncedSearch.length > 0;
@@ -372,6 +395,7 @@ export default function ClientsList() {
                   setCityFilter("");
                   setPostalCodeFilter("");
                   setCompanyTypeFilter("all");
+                  setAgentFilter("all");
                   // Purge aussi le snapshot sessionStorage pour ne pas
                   // re-rehydrater au prochain mount.
                   try { sessionStorage.removeItem(FILTERS_STORAGE_KEY); } catch { /* ignore */ }
@@ -383,7 +407,7 @@ export default function ClientsList() {
             )}
           </div>
 
-          {/* Ligne 3 : Toggle Pro / Privé / Tous */}
+          {/* Ligne 3 : Toggle Pro / Privé / Tous + Filtre Agent */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">Type :</span>
             {(
@@ -410,6 +434,31 @@ export default function ClientsList() {
                 </button>
               );
             })}
+
+            <span className="text-xs uppercase tracking-wide text-muted-foreground ml-4 mr-1">Agent :</span>
+            {(
+              [
+                { value: "all", label: "Tous", color: "bg-muted text-foreground" },
+                { value: "unassigned", label: "Sans agent", color: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" },
+              ] as const
+            ).map((opt) => {
+              const isActive = agentFilter === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAgentFilter(opt.value)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : `${opt.color} border-transparent hover:border-border`
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -420,6 +469,34 @@ export default function ClientsList() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="w-10">
+                  {filteredClients.length > 0 && (
+                    <Checkbox
+                      checked={
+                        filteredClients.length > 0 &&
+                        filteredClients.every((c) => selectedIds.has(c.id))
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          // Coche toutes les fiches de la page courante (limit 50)
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            filteredClients.forEach((c) => next.add(c.id));
+                            return next;
+                          });
+                        } else {
+                          // Décoche uniquement les fiches de la page courante
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            filteredClients.forEach((c) => next.delete(c.id));
+                            return next;
+                          });
+                        }
+                      }}
+                      aria-label="Tout sélectionner sur cette page"
+                    />
+                  )}
+                </TableHead>
                 <TableHead className="font-semibold">{t('clients.nameCompany')}</TableHead>
                 <TableHead className="font-semibold">{t('common.email')}</TableHead>
                 <TableHead className="font-semibold">{t('clients.city')}</TableHead>
@@ -431,7 +508,7 @@ export default function ClientsList() {
             <TableBody>
               {filteredClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16">
+                  <TableCell colSpan={7} className="text-center py-16">
                     <UserCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/20" />
                     <p className="text-lg font-medium text-muted-foreground">{t('common.noResults')}</p>
                     <p className="text-sm text-muted-foreground">{t('common.tryFilters')}</p>
@@ -443,10 +520,30 @@ export default function ClientsList() {
                   return (
                     <TableRow
                       key={client.id}
-                      className="group cursor-pointer hover:bg-muted/50 transition-all duration-200"
+                      className={cn(
+                        "group cursor-pointer hover:bg-muted/50 transition-all duration-200",
+                        selectedIds.has(client.id) && "bg-primary/5 hover:bg-primary/10"
+                      )}
                       onClick={() => navigate(`/crm/clients/${client.id}`)}
                       style={{ animationDelay: `${index * 30}ms` }}
                     >
+                      <TableCell
+                        className="w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selectedIds.has(client.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(client.id);
+                              else next.delete(client.id);
+                              return next;
+                            });
+                          }}
+                          aria-label={`Sélectionner ${getClientName(client)}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <UserAvatar
@@ -581,6 +678,50 @@ export default function ClientsList() {
         onOpenChange={setQuickContactOpen}
         mode={quickContactMode}
         client={quickContactClient}
+      />
+
+      {/* Barre flottante d'actions en masse (sticky bottom) */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom duration-200">
+          <div className="bg-foreground text-background rounded-2xl shadow-2xl border border-foreground/10 px-5 py-3 flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              <span className="font-medium text-sm">
+                {selectedIds.size} fiche{selectedIds.size > 1 ? "s" : ""} sélectionnée{selectedIds.size > 1 ? "s" : ""}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="ml-2 gap-2"
+              onClick={() => setBulkAssignOpen(true)}
+            >
+              <UserCheck className="h-4 w-4" />
+              Assigner à un agent
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-background/70 hover:text-background hover:bg-background/10"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Désélectionner
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <BulkAssignDialog
+        open={bulkAssignOpen}
+        onOpenChange={setBulkAssignOpen}
+        selectedCount={selectedIds.size}
+        agents={agents as BulkAssignAgent[]}
+        onConfirm={async (agentId) => {
+          const ids = Array.from(selectedIds);
+          const { error } = await bulkAssignClients(ids, agentId);
+          if (!error) setSelectedIds(new Set());
+        }}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

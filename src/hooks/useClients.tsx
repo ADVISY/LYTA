@@ -219,6 +219,13 @@ export interface ClientsFilters {
    *   - null/undefined : pas de filtre, on prend les deux
    */
   isCompany?: boolean | null;
+  /**
+   * Filtre par agent assigné :
+   *   - 'unassigned' : fiches sans agent (assigned_agent_id IS NULL) → à répartir
+   *   - UUID         : assignées à cet agent spécifique
+   *   - null/undefined : pas de filtre
+   */
+  assignedAgent?: string | null;
 }
 
 export function useClients(typeFilter?: string, searchTerm?: string, filters?: ClientsFilters) {
@@ -233,11 +240,12 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   const statusFilter = (filters?.status ?? "").trim();
   const postalCodeFilter = (filters?.postalCode ?? "").trim();
   const isCompanyFilter = filters?.isCompany ?? null;
+  const assignedAgentFilter = filters?.assignedAgent ?? null;
 
   // Reset page quand filtre type, recherche ou filtres géographiques changent
   useEffect(() => {
     setPage(1);
-  }, [tenantId, typeFilter, searchTerm, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]);
+  }, [tenantId, typeFilter, searchTerm, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]);
 
   const trimmedSearch = (searchTerm ?? "").trim();
 
@@ -254,8 +262,9 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       statusFilter,
       postalCodeFilter,
       isCompanyFilter,
+      assignedAgentFilter,
     ],
-    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]
+    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -295,6 +304,11 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       // (avant l'ajout de la colonne, toutes les fiches étaient des particuliers).
       query = query.or("is_company.eq.false,is_company.is.null");
     }
+    if (assignedAgentFilter === "unassigned") {
+      query = query.is("assigned_agent_id", null);
+    } else if (assignedAgentFilter) {
+      query = query.eq("assigned_agent_id", assignedAgentFilter);
+    }
 
     if (trimmedSearch) {
       // Échappe les caractères PostgREST spéciaux (% , ()) dans la valeur user
@@ -320,6 +334,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         p_status: statusFilter || null,
         p_postal_code: postalCodeFilter || null,
         p_is_company: isCompanyFilter,
+        p_assigned_agent: assignedAgentFilter,
       }),
     ]);
 
@@ -338,7 +353,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter]);
+  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]);
 
   const {
     data,
@@ -452,6 +467,45 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
     }
   };
 
+  /**
+   * Bulk-assigne ou libère N fiches en un seul UPDATE.
+   * @param ids        IDs des fiches clients à modifier
+   * @param agentId    ID du collaborateur (fiche clients) à assigner, ou null pour libérer
+   * @returns          { error: null | Error, count: number }
+   */
+  const bulkAssignClients = async (
+    ids: string[],
+    agentId: string | null
+  ): Promise<{ error: Error | null; count: number }> => {
+    if (ids.length === 0) return { error: null, count: 0 };
+    try {
+      const { error: updateError, count } = await supabase
+        .from("clients")
+        .update({ assigned_agent_id: agentId }, { count: "exact" })
+        .in("id", ids);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: agentId ? "Fiches assignées" : "Fiches libérées",
+        description:
+          agentId
+            ? `${count ?? ids.length} fiche(s) assignée(s) avec succès.`
+            : `${count ?? ids.length} fiche(s) libérée(s) (sans agent).`,
+      });
+
+      void queryClient.invalidateQueries({ queryKey: baseQueryKey });
+      return { error: null, count: count ?? ids.length };
+    } catch (caughtError: any) {
+      toast({
+        title: "Erreur",
+        description: caughtError.message,
+        variant: "destructive",
+      });
+      return { error: caughtError, count: 0 };
+    }
+  };
+
   const deleteClient = async (id: string) => {
     try {
       const { error: deleteError } = await supabase
@@ -524,6 +578,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
     fetchClients: refreshClients,
     createClient,
     updateClient,
+    bulkAssignClients,
     deleteClient,
     getClientById,
   };
