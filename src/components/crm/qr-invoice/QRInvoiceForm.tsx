@@ -71,11 +71,24 @@ interface QRInvoiceFormProps {
 export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoiceFormProps) {
   const { t } = useTranslation();
   const { tenant } = useTenant();
-  const { clients, loading: loadingClients } = useClients("client");
   const [submitting, setSubmitting] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
+  const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
   const [items, setItems] = useState<InvoiceItemDraft[]>([]);
+
+  // Debounce 250 ms : pour ne pas spammer Supabase à chaque touche, et
+  // surtout pour éviter le bug "certains clients introuvables" : avant,
+  // useClients("client") ramenait juste la 1ère page de 50 fiches et on
+  // filtrait en local — un client hors des 50 premières (par ordre de
+  // création) était invisible. Maintenant on délègue la recherche au
+  // serveur (indexes trigram → quasi instantané).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedClientSearch(clientSearch.trim()), 250);
+    return () => clearTimeout(t);
+  }, [clientSearch]);
+
+  const { clients, loading: loadingClients } = useClients("client", debouncedClientSearch);
 
   const defaultLocation = tenant?.branding?.company_address?.split(',')[0] || '';
 
@@ -112,17 +125,11 @@ export function QRInvoiceForm({ open, onClose, onSubmit, initialData }: QRInvoic
     }
   }, [items, watchVatRate, watchIsVatIncluded]);
 
-  // Filter clients
-  const filteredClients = useMemo(() => {
-    if (!clientSearch) return clients.slice(0, 50);
-    const search = clientSearch.toLowerCase();
-    return clients.filter(c => 
-      c.first_name?.toLowerCase().includes(search) ||
-      c.last_name?.toLowerCase().includes(search) ||
-      c.company_name?.toLowerCase().includes(search) ||
-      c.email?.toLowerCase().includes(search)
-    ).slice(0, 50);
-  }, [clients, clientSearch]);
+  // La recherche est déléguée au serveur via useClients ci-dessus. Plus
+  // besoin de re-filtrer localement — on affiche tel quel ce que la query
+  // remonte (max 50 par page, suffisant pour un picker). Si le user a >50
+  // matches, il affine sa recherche.
+  const filteredClients = clients;
 
   // Auto-fill the "object" field with the first item's description (gives a
   // sensible default that the user can still override).

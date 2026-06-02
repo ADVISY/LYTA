@@ -38,8 +38,12 @@ const clientSchema = z.object({
   assigned_agent_id: z.string().optional().nullable(),
   manager_id: z.string().optional().nullable(),
   is_company: z.boolean().optional().default(false),
-  first_name: z.string().min(1, "Prénom requis").max(100),
-  last_name: z.string().min(1, "Nom requis").max(100),
+  // first_name / last_name sont optionnels au niveau Zod. La validation
+  // conditionnelle est faite via 2 refine() en dessous :
+  //   - si is_company = false (particulier) → first_name + last_name requis
+  //   - si is_company = true (société) → company_name requis, prénom/nom optionnels
+  first_name: z.string().max(100).optional().nullable(),
+  last_name: z.string().max(100).optional().nullable(),
   company_name: z.string().max(200).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
   zip_code: z.string().max(20).optional().nullable(),
@@ -60,11 +64,26 @@ const clientSchema = z.object({
   bank_name: z.string().max(200).optional().nullable(),
   gender: z.enum(["homme", "femme", "enfant"]).optional().nullable(),
 }).refine(
+  // Société = raison sociale obligatoire
   (data) =>
     !data.is_company || (data.company_name != null && data.company_name.trim().length > 0),
   {
     message: "La raison sociale est requise pour un client professionnel",
     path: ["company_name"],
+  }
+).refine(
+  // Particulier (non-société) = prénom obligatoire
+  (data) => data.is_company || (data.first_name != null && data.first_name.trim().length > 0),
+  {
+    message: "Prénom requis",
+    path: ["first_name"],
+  }
+).refine(
+  // Particulier (non-société) = nom obligatoire
+  (data) => data.is_company || (data.last_name != null && data.last_name.trim().length > 0),
+  {
+    message: "Nom requis",
+    path: ["last_name"],
   }
 );
 
@@ -470,9 +489,16 @@ export default function ClientForm() {
                     name="first_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('clientForm.firstName')} *</FormLabel>
+                        <FormLabel>
+                          {t('clientForm.firstName')}
+                          {form.watch("is_company") ? (
+                            <span className="text-xs text-muted-foreground ml-1">(optionnel pour société)</span>
+                          ) : (
+                            <span> *</span>
+                          )}
+                        </FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -484,9 +510,16 @@ export default function ClientForm() {
                     name="last_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('clientForm.lastName')} *</FormLabel>
+                        <FormLabel>
+                          {t('clientForm.lastName')}
+                          {form.watch("is_company") ? (
+                            <span className="text-xs text-muted-foreground ml-1">(optionnel pour société)</span>
+                          ) : (
+                            <span> *</span>
+                          )}
+                        </FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <Input {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
