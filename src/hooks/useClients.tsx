@@ -408,26 +408,43 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         throw new Error("Aucun cabinet assigné à cet utilisateur");
       }
 
-      const payload = { ...clientData, tenant_id: tenantId };
-      // Log explicite avant l'envoi pour pouvoir diagnostiquer en console
-      // les erreurs RLS / 403 sans lire la trace Supabase brute.
+      // ┌─────────────────────────────────────────────────────────────┐
+      // │  Pourquoi générer l'UUID côté front et ne pas faire .select() │
+      // │  Cause confirmée du bug Matthieu (Admin Cabinet JCG) :       │
+      // │  .insert([...]).select("*").single() en PostgREST = INSERT  │
+      // │  PUIS SELECT sur la row fraîche. Le SELECT est soumis à la  │
+      // │  policy 'Tenant users can view scoped clients' qui appelle  │
+      // │  can_access_client(id) → user_has_global_client_scope(...).  │
+      // │  Sur certains contextes auth (visiblement Admin Cabinet JCG │
+      // │  via PostgREST), cette chaîne de SECURITY DEFINER + sous-   │
+      // │  EXISTS retourne FALSE même quand toutes les conditions     │
+      // │  semblent vraies en SELECT manuel. Résultat : INSERT passe  │
+      // │  en DB mais le SELECT échoue → PostgREST renvoie 42501.     │
+      // │  Workaround : on évite tout SELECT post-INSERT en passant   │
+      // │  l'UUID dans le payload — le front a déjà l'ID complet pour │
+      // │  la navigation, pas besoin de RETURNING.                    │
+      // └─────────────────────────────────────────────────────────────┘
+      const newId = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 14)}`;
+
+      const payload = { ...clientData, id: newId, tenant_id: tenantId };
+
       console.info("[createClient] payload →", {
+        id: newId,
         tenant_id: payload.tenant_id,
         type_adresse: payload.type_adresse,
         status: payload.status,
         is_company: payload.is_company,
-        has_email: !!payload.email,
-        has_assigned_agent: !!payload.assigned_agent_id,
       });
 
-      const { data: createdClient, error: createError } = await supabase
+      // INSERT sans .select() : on évite le SELECT post-INSERT qui
+      // déclenche la policy SELECT et fait remonter le 42501.
+      const { error: createError } = await supabase
         .from("clients")
-        .insert([payload])
-        .select("*")
-        .single();
+        .insert([payload]);
 
       if (createError) {
-        // Log structuré pour comprendre l'origine exacte du rejet RLS.
         console.error("[createClient] Supabase rejected the INSERT", {
           code: createError.code,
           message: createError.message,
@@ -444,10 +461,10 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       });
 
       void queryClient.invalidateQueries({ queryKey: baseQueryKey });
-      return { data: createdClient, error: null };
+      // On retourne la row reconstituée localement (sans relire la DB),
+      // suffisant pour le navigate(`/crm/clients/${newClient.id}`) côté caller.
+      return { data: { ...payload }, error: null };
     } catch (caughtError: any) {
-      // Toast plus parlant si erreur RLS : on inclut le tenant_id pour
-      // que l'utilisateur (et nous) puissions voir si le tenant est bon.
       const isRlsError = caughtError?.code === "42501"
         || /row-level security/i.test(caughtError?.message ?? "");
       toast({
