@@ -361,32 +361,52 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (action === "create") {
-      const { data, error } = await supabaseAdmin
+      // Génère l'UUID côté backend pour éviter de dépendre d'un SELECT
+      // post-INSERT (le même pattern a causé le bug 42501 sur clients chez
+      // Advisy/JCG — par cohérence et défensivement, on l'évite ici aussi).
+      const newPolicyId = crypto.randomUUID();
+      const { error } = await supabaseAdmin
         .from("policies")
-        .insert(payload)
-        .select("id")
-        .single();
+        .insert({ ...payload, id: newPolicyId });
 
-      if (error) throw error;
+      if (error) {
+        log.error("Failed to insert policy", {
+          code: (error as any).code,
+          message: error.message,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          tenantId,
+          userId: user.id,
+        });
+        throw error;
+      }
 
       return new Response(
-        JSON.stringify({ success: true, policy: data }),
+        JSON.stringify({ success: true, policy: { id: newPolicyId } }),
         { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("policies")
       .update(payload)
       .eq("id", policyId!)
-      .eq("tenant_id", tenantId)
-      .select("id")
-      .single();
+      .eq("tenant_id", tenantId);
 
-    if (error) throw error;
+    if (error) {
+      log.error("Failed to update policy", {
+        code: (error as any).code,
+        message: error.message,
+        details: (error as any).details,
+        hint: (error as any).hint,
+        policyId,
+        tenantId,
+      });
+      throw error;
+    }
 
     return new Response(
-      JSON.stringify({ success: true, policy: data }),
+      JSON.stringify({ success: true, policy: { id: policyId! } }),
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     );
   } catch (error: unknown) {
