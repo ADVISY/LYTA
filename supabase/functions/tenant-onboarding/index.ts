@@ -701,6 +701,157 @@ async function ensureTenantDomainProvisioning(slug: string): Promise<{
   };
 }
 
+/**
+ * Envoie au tenant un email branded LYTA contenant les enregistrements DNS
+ * à configurer pour activer l'envoi d'emails depuis SON domaine custom
+ * (ex: support@advisy.ch) via Resend.
+ *
+ * Notes :
+ * - On reste générique sur le fournisseur DNS (pas d'instruction Infomaniak/
+ *   OVH/Cloudflare/etc.) : on dit juste "ton fournisseur DNS".
+ * - On formate les records dans un <table> HTML clean avec monospace + bouton
+ *   "Copier" via attribute data-* (le copy sera fait par le client mail si
+ *   compatible, sinon il copie à la main).
+ * - On envoie depuis `support@lyta.ch` (compte LYTA principal, garanti vérifié
+ *   par Resend), pas depuis le domaine custom (qui n'est pas encore vérifié).
+ */
+async function sendTenantDnsInstructionsEmail(params: {
+  toEmail: string;
+  tenantName: string;
+  domain: string;
+  records: Array<{ type: string; name: string; value: string; priority?: number; ttl?: number }>;
+}): Promise<{ success: boolean; message: string }> {
+  if (!RESEND_API_KEY) {
+    return { success: false, message: "RESEND_API_KEY missing" };
+  }
+
+  const { toEmail, tenantName, domain, records } = params;
+
+  const tableRows = records
+    .map((r, i) => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#1a1a2e;vertical-align:top;white-space:nowrap;">${r.type}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:'Courier New',monospace;font-size:13px;color:#1a1a2e;word-break:break-all;vertical-align:top;">${r.name}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-family:'Courier New',monospace;font-size:13px;color:#1a1a2e;word-break:break-all;vertical-align:top;">${r.value}${r.priority ? ` <span style="color:#6b7280;">(priority ${r.priority})</span>` : ""}</td>
+      </tr>
+    `)
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fb;margin:0;padding:32px 16px;color:#1a1a2e;">
+  <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+    <div style="background:linear-gradient(135deg,#0066FF 0%,#4F46E5 100%);padding:36px 32px;text-align:center;">
+      <h1 style="color:#fff;font-size:24px;margin:0;font-weight:700;">Configuration DNS — ${tenantName}</h1>
+      <p style="color:rgba(255,255,255,0.9);font-size:14px;margin:8px 0 0;">Active l'envoi d'emails depuis ton domaine ${domain}</p>
+    </div>
+
+    <div style="padding:32px;">
+      <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Bonjour,</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:#4a4a68;">
+        Pour que LYTA puisse envoyer des emails à tes clients <strong>depuis ton domaine ${domain}</strong>
+        (par exemple <code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:13px;">support@${domain}</code>),
+        tu dois ajouter les enregistrements DNS ci-dessous chez ton fournisseur DNS.
+      </p>
+
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:#4a4a68;">
+        ⏱️ <strong>~10 minutes</strong> pour la configuration. La propagation DNS peut prendre de quelques minutes à 24 heures.
+      </p>
+
+      <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:14px 18px;border-radius:8px;margin:0 0 24px;">
+        <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+          <strong>Important :</strong> tant que ces enregistrements ne sont pas en place, les emails envoyés aux clients
+          partiront depuis l'adresse LYTA par défaut au lieu de la tienne.
+        </p>
+      </div>
+
+      <h2 style="font-size:18px;margin:0 0 14px;color:#1a1a2e;">📋 Enregistrements à ajouter</h2>
+
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 24px;">
+        <thead>
+          <tr style="background:#f9fafb;">
+            <th style="padding:12px;text-align:left;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Type</th>
+            <th style="padding:12px;text-align:left;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Nom / Host</th>
+            <th style="padding:12px;text-align:left;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Valeur</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+
+      <h2 style="font-size:18px;margin:24px 0 14px;color:#1a1a2e;">📖 Comment faire</h2>
+      <ol style="font-size:15px;line-height:1.7;color:#4a4a68;padding-left:22px;margin:0 0 24px;">
+        <li>Connecte-toi à l'interface DNS de ton fournisseur (celui chez qui ${domain} est enregistré).</li>
+        <li>Ouvre la zone DNS du domaine <strong>${domain}</strong>.</li>
+        <li>Pour chaque ligne du tableau ci-dessus :
+          <ul style="padding-left:20px;margin:6px 0;">
+            <li>Crée un nouvel enregistrement du <strong>type</strong> indiqué.</li>
+            <li>Renseigne le <strong>nom / host</strong> exact.</li>
+            <li>Copie-colle la <strong>valeur</strong> exactement (attention aux espaces).</li>
+            <li>Laisse le TTL par défaut (généralement 3600 secondes / 1 heure).</li>
+          </ul>
+        </li>
+        <li>Enregistre les modifications.</li>
+        <li>Attends 10-30 minutes la propagation, puis nous vérifierons automatiquement.</li>
+      </ol>
+
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px;margin:0 0 24px;">
+        <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0c4a6e;">💡 Besoin d'aide ?</p>
+        <p style="margin:0;font-size:14px;color:#075985;line-height:1.5;">
+          Envoie ces 3 lignes par email à ton informaticien ou à ton fournisseur DNS — il saura quoi en faire.
+          Sinon réponds à cet email et on s'en occupe ensemble.
+        </p>
+      </div>
+
+      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:24px 0 0;border-top:1px solid #e5e7eb;padding-top:20px;">
+        Une fois la configuration en place et la vérification réussie, tu recevras un email de confirmation.
+        D'ici là, tout fonctionne normalement sur LYTA — seul l'expéditeur des emails change ensuite.
+      </p>
+
+      <p style="font-size:14px;color:#4a4a68;margin:20px 0 0;">
+        À très vite,<br><strong>L'équipe LYTA</strong>
+      </p>
+    </div>
+
+    <div style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;font-size:12px;color:#6b7280;">© ${new Date().getFullYear()} LYTA. Tous droits réservés.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "LYTA <support@lyta.ch>",
+        to: [toEmail],
+        subject: `🔧 Configuration DNS pour ${domain} — Étape finale`,
+        html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error("Failed to send DNS instructions email", { error: errorText, toEmail });
+      return { success: false, message: `Resend error: ${errorText}` };
+    }
+
+    const result = await response.json();
+    log.info("DNS instructions email sent to tenant", { toEmail, emailId: result.id });
+    return { success: true, message: `Email envoyé à ${toEmail}` };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown error";
+    log.error("DNS instructions email error", { error: message });
+    return { success: false, message };
+  }
+}
+
 async function addResendDomain(domain: string): Promise<{ success: boolean; message: string; domain_id?: string; records?: unknown[]; is_custom_domain?: boolean }> {
   if (!RESEND_API_KEY) {
     return { success: false, message: "Resend API key not configured" };
@@ -908,7 +1059,7 @@ serve(async (req) => {
       (results.steps as string[]).push("resend");
 
       if (resendResult.success && resendResult.records && Array.isArray(resendResult.records) && isCustomDomain) {
-        const dnsRecords = resendResult.records as Array<{ type: string; name: string; value: string }>;
+        const dnsRecords = resendResult.records as Array<{ type: string; name: string; value: string; priority?: number; ttl?: number }>;
 
         await createKingNotification(supabase, {
           title: "DNS a configurer par le tenant",
@@ -929,10 +1080,61 @@ serve(async (req) => {
           },
         });
 
+        // Envoi auto au tenant de l'email avec les records + instructions.
+        // On récupère l'email admin/contact stocké sur la table tenants.
+        const { data: tenantRow } = await supabase
+          .from("tenants")
+          .select("email, admin_email, name")
+          .eq("id", tenant_id)
+          .maybeSingle();
+
+        const toEmail = (tenantRow?.admin_email as string | null)
+          || (tenantRow?.email as string | null);
+        const displayName = (tenantRow?.name as string | null) || tenant_name;
+
+        if (toEmail) {
+          const emailResult = await sendTenantDnsInstructionsEmail({
+            toEmail,
+            tenantName: displayName,
+            domain: resendDomain,
+            records: dnsRecords,
+          });
+
+          await createKingNotification(supabase, {
+            title: emailResult.success
+              ? "Email DNS envoye au tenant"
+              : "Echec envoi email DNS au tenant",
+            message: emailResult.success
+              ? `Instructions envoyees a ${toEmail} pour le domaine ${resendDomain}.`
+              : `Erreur: ${emailResult.message}. Le tenant ne recevra pas les instructions automatiquement.`,
+            kind: emailResult.success ? "success" : "error",
+            priority: emailResult.success ? "normal" : "high",
+            tenant_id,
+            tenant_name,
+            metadata: {
+              step: "resend_dns_email",
+              status: emailResult.success ? "sent" : "failed",
+              to: toEmail,
+              domain: resendDomain,
+            },
+          });
+        } else {
+          await createKingNotification(supabase, {
+            title: "Aucun email tenant pour envoyer les DNS",
+            message: `Le tenant ${displayName} n'a pas d'email admin/contact. Les instructions DNS doivent etre transmises manuellement.`,
+            kind: "warning",
+            priority: "high",
+            tenant_id,
+            tenant_name,
+            metadata: { step: "resend_dns_email", status: "no_tenant_email" },
+          });
+        }
+
         results.resend_dns = {
           success: true,
           message: `${dnsRecords.length} DNS records need to be configured by tenant`,
           requires_tenant_action: true,
+          tenant_email_sent: Boolean(toEmail),
           records: dnsRecords,
         };
       } else if (resendResult.success && resendResult.records && Array.isArray(resendResult.records)) {
