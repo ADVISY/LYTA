@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordAuditLog } from "@/lib/audit";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 import { savePolicy } from "@/lib/policiesApi";
 import { ProductBranchEditor } from "@/components/crm/ia-scan/ProductBranchEditor";
 import { IAScanContractsWizard } from "@/components/crm/ia-scan/IAScanContractsWizard";
@@ -673,12 +674,27 @@ export default function ScanValidationDialog({
     }
 
     if (!clientId && primaryPayload) {
-      const { data: created, error } = await supabase.from("clients").insert(primaryPayload).select("id").single();
-      if (error || !created?.id) {
-        toast({ title: "Échec de création du client", description: error?.message || "", variant: "destructive" });
+      // Passe par l'edge function create-client (service_role, bypass RLS).
+      // L'INSERT direct via supabase.from('clients').insert().select() avait
+      // remonté 'echec de création du client / new row violates row-level
+      // security policy' sur plusieurs tenants — cf. commits 742fb37 + 48f7822.
+      try {
+        const result = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+          "create-client",
+          { body: primaryPayload },
+        );
+        if (!result?.success || !result?.id) {
+          throw new Error("Réponse inattendue de create-client");
+        }
+        clientId = result.id;
+      } catch (createError: any) {
+        toast({
+          title: "Échec de création du client",
+          description: createError?.message || "Erreur inconnue",
+          variant: "destructive",
+        });
         return { clientId: null, familyMap: {} };
       }
-      clientId = created.id;
       await logAudit(tenantIdFromHook, "create", "client", clientId, { source: "ia_scan_wizard", scan_id: scan!.id });
       toast({ title: "Fiche client créée", description: `${primaryPayload.first_name ?? ""} ${primaryPayload.last_name ?? ""}`.trim() });
     } else if (clientId && enrichmentPayload && Object.keys(enrichmentPayload).length > 0) {
@@ -731,11 +747,22 @@ export default function ScanValidationDialog({
     for (const fp of familyPayloads) {
       const { payload, relation, fullNameLower } = fp;
       const { __fmBirthIso, ...cleanPayload } = payload as any;
-      const { data: fmClient, error: fmErr } = await supabase.from("clients").insert(cleanPayload).select("id").single();
-      if (fmErr || !fmClient?.id) {
+      // Idem que ci-dessus : on passe par l'edge function pour éviter le
+      // 42501 sur l'INSERT direct.
+      let fmClientId: string | null = null;
+      try {
+        const fmResult = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+          "create-client",
+          { body: cleanPayload },
+        );
+        if (fmResult?.success && fmResult?.id) fmClientId = fmResult.id;
+      } catch (fmErr) {
         console.warn("[scan] family member client create failed", fmErr);
+      }
+      if (!fmClientId) {
         continue;
       }
+      const fmClient = { id: fmClientId };
       await supabase.from("family_members").insert({
         client_id: clientId,
         linked_client_id: fmClient.id,
