@@ -13,6 +13,7 @@ import { Loader2, UserPlus, SkipForward } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 export type QuickCreateLine = {
   id: string;
@@ -72,20 +73,25 @@ export default function QuickCreateClientFromStatementLine({
     }
     setSaving(true);
     try {
-      // 1. Création du client
-      const { data: created, error: createErr } = await supabase
-        .from("clients")
-        .insert({
-          tenant_id: tenant.id,
-          first_name: firstName.trim() || null,
-          last_name: lastName.trim() || null,
-          email: email.trim() || null,
-          phone: phone.trim() || null,
-          status: "active",
-        })
-        .select("id")
-        .single();
-      if (createErr || !created) throw createErr || new Error("Création client échouée");
+      // 1. Création du client via edge function create-client (bypass RLS).
+      //    Cf. bug systémique 42501 sur INSERT direct rest/v1/clients.
+      const createResult = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+        "create-client",
+        {
+          body: {
+            tenant_id: tenant.id,
+            first_name: firstName.trim() || null,
+            last_name: lastName.trim() || null,
+            email: email.trim() || null,
+            phone: phone.trim() || null,
+            status: "active",
+          },
+        },
+      );
+      if (!createResult?.success || !createResult?.id) {
+        throw new Error("Création client échouée");
+      }
+      const created = { id: createResult.id };
 
       // 2. Re-link de la ligne de décompte
       await supabase

@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { recordAuditLog } from "@/lib/audit";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
 
 const getSchema = (t: (key: string) => string) => z.object({
   first_name: z.string().min(1, t("forms.familyMember.errors.firstNameRequired")),
@@ -127,13 +128,22 @@ export default function FamilyMemberForm({
         country: parentClient?.country || 'Suisse',
       };
 
-      const { data: newClient, error: clientError } = await supabase
-        .from('clients')
-        .insert([newClientData])
-        .select('id')
-        .single();
-
-      if (clientError) {
+      // Edge function create-client (service_role + vérif tenant membership).
+      // L'INSERT direct via PostgREST renvoyait 403/42501 — c'est CE chemin
+      // qui plantait quand Habib finalisait un pré-contrat Smartflow et que
+      // le système devait créer une fiche family member (cf. capture du
+      // POST /rest/v1/clients?select=id en 403 dans la session).
+      let newClient: { id: string } | null = null;
+      try {
+        const result = await invokeSupabaseFunction<{ success: boolean; id: string; data: any }>(
+          "create-client",
+          { body: newClientData },
+        );
+        if (!result?.success || !result?.id) {
+          throw new Error("Réponse inattendue de create-client");
+        }
+        newClient = { id: result.id, ...result.data };
+      } catch (clientError: any) {
         console.error('Error creating client for family member:', clientError);
         toast({
           title: t("common.error"),
