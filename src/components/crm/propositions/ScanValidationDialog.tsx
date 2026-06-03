@@ -763,15 +763,26 @@ export default function ScanValidationDialog({
         continue;
       }
       const fmClient = { id: fmClientId };
-      await supabase.from("family_members").insert({
-        client_id: clientId,
-        linked_client_id: fmClient.id,
-        first_name: cleanPayload.first_name,
-        last_name: cleanPayload.last_name,
-        birth_date: __fmBirthIso ?? null,
-        relation_type: relation,
-        nationality: cleanPayload.nationality ?? null,
-      });
+      // Edge function bypass-insert (service_role) plutôt qu'INSERT direct
+      // qui plante 42501 sur certains tenants — cf. bug Smartflow Habib.
+      try {
+        await invokeSupabaseFunction("bypass-insert", {
+          body: {
+            table: "family_members",
+            payload: {
+              client_id: clientId,
+              linked_client_id: fmClient.id,
+              first_name: cleanPayload.first_name,
+              last_name: cleanPayload.last_name,
+              birth_date: __fmBirthIso ?? null,
+              relation_type: relation,
+              nationality: cleanPayload.nationality ?? null,
+            },
+          },
+        });
+      } catch (fmLinkErr) {
+        console.warn("[scan] family_members link failed", fmLinkErr);
+      }
       familyMap[fullNameLower] = fmClient.id;
     }
 
@@ -812,8 +823,18 @@ export default function ScanValidationDialog({
         }));
 
       if (docRows.length > 0) {
-        const { error: docErr } = await supabase.from("documents").insert(docRows);
-        if (docErr) console.warn("[scan] docs attach failed", docErr);
+        // Edge function bypass-insert ligne par ligne (l'edge function
+        // n'accepte qu'un payload à la fois — c'est une trade-off acceptable
+        // car on n'a en général que 1-5 documents par scan).
+        for (const docRow of docRows) {
+          try {
+            await invokeSupabaseFunction("bypass-insert", {
+              body: { table: "documents", payload: docRow },
+            });
+          } catch (docErr) {
+            console.warn("[scan] doc attach failed", docErr, docRow.file_name);
+          }
+        }
       }
     }
 
@@ -1317,15 +1338,29 @@ export default function ScanValidationDialog({
             relation_type: relationType,
           });
 
-          const { data: directRelation } = await supabase.from('family_members').insert({
-            client_id: newClient.id,
-            linked_client_id: familyClient.id,
-            first_name: firstName,
-            last_name: lastName,
-            birth_date: birthdate,
-            relation_type: relationType,
-            nationality: getValue('nationalite') || null,
-          } as any).select('id').single();
+          let directRelation: { id?: string } | null = null;
+          try {
+            const dr = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+              "bypass-insert",
+              {
+                body: {
+                  table: "family_members",
+                  payload: {
+                    client_id: newClient.id,
+                    linked_client_id: familyClient.id,
+                    first_name: firstName,
+                    last_name: lastName,
+                    birth_date: birthdate,
+                    relation_type: relationType,
+                    nationality: getValue('nationalite') || null,
+                  },
+                },
+              },
+            );
+            if (dr?.success && dr?.id) directRelation = { id: dr.id };
+          } catch (err) {
+            console.warn("[scan] family_members direct relation failed", err);
+          }
 
           if (directRelation?.id) {
             await logAudit(tenantId, 'create', 'family_member', directRelation.id, {
@@ -1335,15 +1370,27 @@ export default function ScanValidationDialog({
             });
           }
 
-          const { data: reverseRelation } = await supabase.from('family_members').insert({
-            client_id: familyClient.id,
-            linked_client_id: newClient.id,
-            first_name: getClientValue('prenom', 'first_name') || '',
-            last_name: getClientValue('nom', 'last_name') || '',
-            birth_date: parseDate(getClientValue('date_naissance', 'birthdate')),
-            relation_type: inverseRelationship(relationType),
-            nationality: getValue('nationalite') || null,
-          } as any).select('id').single();
+          let reverseRelation: { id?: string } | null = null;
+          try {
+            const rr = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+              "bypass-insert",
+              {
+                body: {
+                  table: "family_members",
+                  payload: {
+                    client_id: familyClient.id,
+                    linked_client_id: newClient.id,
+                    first_name: getClientValue('prenom', 'first_name') || '',
+                    last_name: getClientValue('nom', 'last_name') || '',
+                    nationality: getValue('nationalite') || null,
+                  },
+                },
+              },
+            );
+            if (rr?.success && rr?.id) reverseRelation = { id: rr.id };
+          } catch (err) {
+            console.warn("[scan] family_members reverse relation failed", err);
+          }
 
           if (reverseRelation?.id) {
             await logAudit(tenantId, 'create', 'family_member', reverseRelation.id, {
@@ -1871,7 +1918,16 @@ export default function ScanValidationDialog({
               },
             };
 
-            const { data: insertedDoc } = await supabase.from('documents').insert([documentData]).select('id').single();
+            let insertedDoc: { id?: string } | null = null;
+            try {
+              const r = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+                "bypass-insert",
+                { body: { table: "documents", payload: documentData } },
+              );
+              if (r?.success && r?.id) insertedDoc = { id: r.id };
+            } catch (e) {
+              console.warn("[scan] document INSERT failed", e);
+            }
             if (insertedDoc?.id) {
               await logAudit(tenantId, 'import', 'document', insertedDoc.id, {
                 client_id: newClient.id,
