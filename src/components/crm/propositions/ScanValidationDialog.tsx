@@ -1076,18 +1076,25 @@ export default function ScanValidationDialog({
 
       console.log('[ScanValidation] Creating client with data:', clientData);
 
-      const { data: newClient, error: clientError } = await supabase
-        .from('clients')
-        .insert(clientData)
-        .select()
-        .single();
-
-      console.log('[ScanValidation] Client creation result:', { newClient, clientError });
-
-      if (clientError) {
-        console.error('[ScanValidation] Client creation failed:', clientError);
-        throw clientError;
+      // Edge function create-client (service_role + vérif tenant membership).
+      // L'INSERT direct via PostgREST plantait 42501 en runtime malgré toutes
+      // les conditions WITH CHECK satisfaites — cf. commit 742fb37.
+      let newClient: { id: string; first_name?: string; last_name?: string; status?: string } | null = null;
+      try {
+        const result = await invokeSupabaseFunction<{ success: boolean; id: string; data: any }>(
+          "create-client",
+          { body: clientData },
+        );
+        if (!result?.success || !result?.id) {
+          throw new Error("Réponse inattendue de create-client");
+        }
+        newClient = { id: result.id, ...result.data };
+      } catch (createErr: any) {
+        console.error('[ScanValidation] Client creation failed:', createErr);
+        throw createErr;
       }
+
+      console.log('[ScanValidation] Client created via edge function:', newClient);
 
       if (!newClient || !newClient.id) {
         throw new Error("Le client n'a pas pu être créé. Veuillez réessayer.");
@@ -1315,16 +1322,20 @@ export default function ScanValidationDialog({
             status: member.has_own_policy ? 'actif' : 'prospect',
           };
 
-          const { data: familyClient, error: familyError } = await supabase
-            .from('clients')
-            .insert(familyClientData)
-            .select()
-            .single();
-
-          if (familyError || !familyClient) {
+          let familyClient: { id: string } | null = null;
+          try {
+            const fcResult = await invokeSupabaseFunction<{ success: boolean; id: string; data: any }>(
+              "create-client",
+              { body: familyClientData },
+            );
+            if (fcResult?.success && fcResult?.id) {
+              familyClient = { id: fcResult.id, ...fcResult.data };
+            }
+          } catch (familyError: any) {
             console.error('[ScanValidation] Failed to create family client:', familyError);
             continue;
           }
+          if (!familyClient) continue;
 
           createdFamilyMembers.push({
             id: familyClient.id,
