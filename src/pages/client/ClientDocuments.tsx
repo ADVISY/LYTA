@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,20 +6,40 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  Download, 
-  Eye, 
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  FileText,
+  Download,
+  Eye,
   Search,
   File,
   FileImage,
   Upload,
   FolderOpen,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Loader2,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
+
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+const ACCEPTED_MIME_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/heic",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 const getDocKindLabels = (t: (key: string) => string): Record<string, string> => ({
   mandat_gestion: t('clientDocuments.kinds.managementMandate'),
@@ -41,12 +61,137 @@ const getFileIcon = (mimeType: string | null) => {
 export default function ClientDocuments() {
   const { t } = useTranslation();
   const { clientData } = useOutletContext<{ user: any; clientData: any }>();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
+  // ─── Upload dialog state ─────────────────────────────────────────────
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [docKind, setDocKind] = useState<string>("other");
+  const [docDescription, setDocDescription] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const docKindLabels = getDocKindLabels(t);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: `La taille max est de 25 Mo. Ton fichier fait ${(file.size / 1024 / 1024).toFixed(1)} Mo.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.type && !ACCEPTED_MIME_TYPES.includes(file.type)) {
+      toast({
+        title: "Format non supporté",
+        description: "Formats acceptés : PDF, image (JPG/PNG/WebP), Word.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInputRef.current.files = dt.files;
+    }
+    handleFileChange({ target: { files: e.dataTransfer.files } } as any);
+  };
+
+  const resetUploadForm = () => {
+    setSelectedFile(null);
+    setDocKind("other");
+    setDocDescription("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !clientData?.id || !clientData?.tenant_id) return;
+    setUploading(true);
+    try {
+      // 1. Upload fichier vers storage bucket 'documents'
+      // Path : <tenant_id>/client_uploads/<client_id>/<uuid>_<filename>
+      const safeFileName = selectedFile.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+      const fileKey = `${clientData.tenant_id}/client_uploads/${clientData.id}/${crypto.randomUUID()}_${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(fileKey, selectedFile, {
+          contentType: selectedFile.type || "application/octet-stream",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("[upload] storage error", uploadError);
+        toast({
+          title: "Échec de l'envoi du fichier",
+          description: uploadError.message,
+          variant: "destructive",
+        });
+        setUploading(false);
+        return;
+      }
+
+      // 2. INSERT row documents via edge function bypass-insert (RLS-safe)
+      const payload = {
+        tenant_id: clientData.tenant_id,
+        owner_type: "client",
+        owner_id: clientData.id,
+        file_key: fileKey,
+        file_name: selectedFile.name,
+        mime_type: selectedFile.type || "application/octet-stream",
+        size_bytes: selectedFile.size,
+        doc_kind: docKind,
+        category: "Espace client",
+        description: docDescription.trim() || null,
+        created_by: user?.id ?? null,
+        metadata: {
+          source: "client_portal_upload",
+          uploaded_at: new Date().toISOString(),
+        },
+      };
+
+      const result = await invokeSupabaseFunction<{ success: boolean; id: string }>(
+        "bypass-insert",
+        { body: { table: "documents", payload } },
+      );
+
+      if (!result?.success) {
+        throw new Error("La fiche document n'a pas pu être créée");
+      }
+
+      toast({
+        title: "Document ajouté",
+        description: `${selectedFile.name} est maintenant disponible dans ton espace.`,
+      });
+
+      resetUploadForm();
+      setUploadOpen(false);
+      await fetchDocuments();
+    } catch (err: any) {
+      console.error("[upload] error", err);
+      toast({
+        title: "Erreur",
+        description: err?.message || "Une erreur est survenue lors de l'envoi.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!clientData?.id) {
@@ -184,6 +329,13 @@ export default function ClientDocuments() {
           <h1 className="text-2xl font-bold">{t('clientDocuments.title')}</h1>
           <p className="text-muted-foreground">{t('clientDocuments.subtitle')}</p>
         </div>
+        <Button
+          onClick={() => setUploadOpen(true)}
+          className="gap-2 self-start sm:self-auto"
+        >
+          <Plus className="h-4 w-4" />
+          Ajouter un document
+        </Button>
       </div>
 
       {/* Search */}
@@ -263,6 +415,124 @@ export default function ClientDocuments() {
           })}
         </div>
       )}
+
+      {/* Dialog : Ajouter un document */}
+      <Dialog open={uploadOpen} onOpenChange={(open) => {
+        if (uploading) return;
+        setUploadOpen(open);
+        if (!open) resetUploadForm();
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" />
+              Ajouter un document
+            </DialogTitle>
+            <DialogDescription>
+              Le document sera ajouté à ton dossier et visible par ton courtier.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Zone de dépôt */}
+            {!selectedFile ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+              >
+                <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="font-medium text-sm">Clique ou dépose un fichier ici</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, image (JPG/PNG/WebP), Word — max 25 Mo
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPTED_MIME_TYPES.join(",")}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+                <FileText className="h-8 w-8 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} Mo
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={resetUploadForm}
+                  disabled={uploading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Type de document */}
+            <div className="space-y-2">
+              <Label>Type de document</Label>
+              <Select value={docKind} onValueChange={setDocKind} disabled={uploading}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(docKindLabels).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description (optionnelle) */}
+            <div className="space-y-2">
+              <Label htmlFor="doc-desc">Note pour ton courtier <span className="text-xs text-muted-foreground">(optionnel)</span></Label>
+              <Textarea
+                id="doc-desc"
+                value={docDescription}
+                onChange={(e) => setDocDescription(e.target.value)}
+                placeholder="Ex : Nouveau permis de conduire, suite à ton message du..."
+                rows={3}
+                disabled={uploading}
+                maxLength={500}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setUploadOpen(false); resetUploadForm(); }}
+              disabled={uploading}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Envoi…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Envoyer le document
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
