@@ -236,6 +236,67 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
+  // ──────────────────────────────────────────────────────────────────────
+  // Scope-aware filter front (perf + sécurité)
+  // ──────────────────────────────────────────────────────────────────────
+  // La policy RLS SELECT clients est scopée (Stéphane Agent ne voit que ses
+  // clients assignés) mais elle est lente à évaluer row par row sur gros
+  // tenants (~28 sec sur JCG). Pour combiner sécurité ET perf, on ajoute
+  // un filter explicit côté query si l'user est Agent/Manager :
+  //   - assigned_agent_id = mon_collab_id  → utilise idx_clients_assigned_agent
+  //   - OR id = mon_collab_id              → utilise pk
+  // Postgres applique le filter AVANT la RLS check → instantané (46 ms vs 28s).
+  // ──────────────────────────────────────────────────────────────────────
+  const [myScope, setMyScope] = useState<"global" | "team" | "personal" | null>(null);
+  const [myCollabId, setMyCollabId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!tenantId || !user?.id) {
+      setMyScope(null);
+      setMyCollabId(null);
+      return;
+    }
+    let aborted = false;
+    (async () => {
+      try {
+        // 1) Récupère le dashboard_scope agrégé (highest privilege wins)
+        const { data: roleRows } = await supabase
+          .from("user_tenant_roles")
+          .select("tenant_roles(dashboard_scope, is_active)")
+          .eq("user_id", user.id)
+          .eq("tenant_id", tenantId);
+
+        const scopes = (roleRows ?? [])
+          .map((r: any) => r.tenant_roles)
+          .filter((tr: any) => tr?.is_active)
+          .map((tr: any) => tr.dashboard_scope as string);
+
+        let scope: "global" | "team" | "personal" = "personal";
+        if (scopes.includes("global")) scope = "global";
+        else if (scopes.includes("team")) scope = "team";
+
+        // 2) Récupère le collab_id via RPC (déjà SECURITY DEFINER en DB)
+        let collabId: string | null = null;
+        if (scope !== "global") {
+          const { data: collabIdData } = await supabase.rpc("my_collab_id_v2");
+          collabId = (collabIdData as string | null) ?? null;
+        }
+
+        if (!aborted) {
+          setMyScope(scope);
+          setMyCollabId(collabId);
+        }
+      } catch (err) {
+        if (!aborted) {
+          console.warn("[useClients] failed to resolve scope/collab_id", err);
+          setMyScope("global"); // fallback safe : pas de filter ajouté
+          setMyCollabId(null);
+        }
+      }
+    })();
+    return () => { aborted = true; };
+  }, [tenantId, user?.id]);
+
   const cityFilter = (filters?.city ?? "").trim();
   const cantonFilter = (filters?.canton ?? "").trim();
   const statusFilter = (filters?.status ?? "").trim();
@@ -264,8 +325,10 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       postalCodeFilter,
       isCompanyFilter,
       assignedAgentFilter,
+      myScope ?? "",
+      myCollabId ?? "",
     ],
-    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]
+    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter, myScope, myCollabId]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -311,6 +374,17 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       query = query.eq("assigned_agent_id", assignedAgentFilter);
     }
 
+    // ─── Filter scope-aware (Agent/Manager) ─────────────────────────
+    // Si le user est Agent (personal) ou Manager (team), on filtre côté
+    // query pour ne charger QUE ses fiches accessibles. Postgres utilise
+    // idx_clients_assigned_agent + pk → instantané, et la policy RLS
+    // (scopée) valide en plus chaque row pour défense en profondeur.
+    // Pour Manager (team), on simplifie en personal — la team subordinate
+    // logic est gardée par la RLS qui filtrera les rows en plus.
+    if (myCollabId && (myScope === "personal" || myScope === "team")) {
+      query = query.or(`assigned_agent_id.eq.${myCollabId},id.eq.${myCollabId}`);
+    }
+
     if (trimmedSearch) {
       // Échappe les caractères PostgREST spéciaux (% , ()) dans la valeur user
       const safe = trimmedSearch.replace(/[%,()]/g, " ");
@@ -354,7 +428,7 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]);
+  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter, myScope, myCollabId]);
 
   const {
     data,
@@ -365,7 +439,14 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   } = useQuery({
     queryKey: [...baseQueryKey, page, CLIENTS_PAGE_SIZE],
     queryFn: fetchClientsPage,
-    enabled: !tenantLoading && !!tenantId && !!user,
+    // Crucial : on attend que myScope soit résolu (= les rôles tenant sont
+    // chargés). Sans ça, un Agent lance une query non-scopée qui timeout
+    // sur la policy RLS scopée (28 sec). myScope === 'global' = pas de filter
+    // côté front nécessaire (l'user voit tout) → on peut activer dès qu'on
+    // sait qu'il est global. myScope === 'personal' || 'team' nécessite
+    // aussi le collabId pour appliquer le filter.
+    enabled: !tenantLoading && !!tenantId && !!user
+            && (myScope === "global" || (myScope !== null && !!myCollabId)),
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
     retry: 1,
