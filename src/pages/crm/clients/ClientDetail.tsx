@@ -35,6 +35,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import FamilyMemberForm from "@/components/crm/FamilyMemberForm";
+import { ImportFamilyMemberDialog } from "@/components/crm/clients/ImportFamilyMemberDialog";
 import ContractForm from "@/components/crm/ContractForm";
 import { BranchChip } from "@/components/crm/BranchSelector";
 import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
@@ -122,7 +123,7 @@ export default function ClientDetail() {
   const { toast } = useToast();
   const { getClientById } = useClients();
   const { can, isLoading: permissionsLoading } = usePermissions();
-  const { familyMembers, loading: familyLoading } = useFamilyMembers(id);
+  const { familyMembers, loading: familyLoading, fetchFamilyMembers } = useFamilyMembers(id);
   const { policies, loading: policiesLoading, fetchPolicies, deletePolicy } = usePolicies();
   const { createDocument, deleteDocument } = useDocuments();
   const { suivis, loading: suivisLoading, stats: suiviStats, page: suivisPage, totalCount: suivisTotalCount, totalPages: suivisTotalPages, goToPage: suivisGoToPage, fetchSuivis, closeSuivi, reopenSuivi, deleteSuivi } = useSuivis(id);
@@ -139,6 +140,7 @@ export default function ClientDetail() {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
+  const [importFamilyOpen, setImportFamilyOpen] = useState(false);
   const [contractFormOpen, setContractFormOpen] = useState(false);
   const [editContractOpen, setEditContractOpen] = useState(false);
   const [editPolicyId, setEditPolicyId] = useState<string | null>(null);
@@ -772,12 +774,22 @@ export default function ClientDetail() {
 
             <TabsContent value="family">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle>{t('clientDetail.familyMembers')}</CardTitle>
-                  <Button onClick={() => setFamilyFormOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('clientDetail.addFamilyMember')}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setImportFamilyOpen(true)}
+                      title="Lier une fiche existante de ton portefeuille"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Importer une adresse
+                    </Button>
+                    <Button onClick={() => setFamilyFormOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('clientDetail.addFamilyMember')}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {familyLoading ? (
@@ -1884,6 +1896,16 @@ export default function ClientDetail() {
         clientId={id!}
         open={familyFormOpen}
         onOpenChange={setFamilyFormOpen}
+      />
+
+      <ImportFamilyMemberDialog
+        open={importFamilyOpen}
+        onOpenChange={setImportFamilyOpen}
+        currentClientId={id!}
+        onImported={() => {
+          // Refresh de la liste des family members après import OK
+          void fetchFamilyMembers();
+        }}
       />
 
       <ContractForm
