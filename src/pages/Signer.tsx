@@ -724,61 +724,20 @@ export default function Signer() {
             </CardContent>
           </Card>
         ) : request.document_kind === "imported" || request.document_kind === "autre" ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Aperçu du document</CardTitle>
-              {(request.payload as { description?: string })?.description && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  {(request.payload as { description?: string }).description}
-                </p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {importedPdfLoading && !importedPdfUrl ? (
-                <div className="py-8 text-center"><Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" /></div>
-              ) : importedPdfUrl ? (
-                <div className="space-y-3">
-                  {/*
-                    Use <object> rather than <iframe>: browsers (especially
-                    Chrome) frequently render a blank frame for PDFs served
-                    from cross-origin signed URLs because of X-Frame-Options
-                    or PDF-viewer policies. <object> falls back gracefully
-                    to its inner content (the "open in new tab" link below)
-                    when the inline render fails.
-
-                    Si le broker a défini une zone de signature, on superpose
-                    un rectangle vert pulsant pour montrer au client où sa
-                    signature apparaîtra. Coords normalisées 0-1 → CSS %.
-                  */}
-                  <div className="relative">
-                  <object
-                    data={importedPdfUrl}
-                    type="application/pdf"
-                    className="w-full h-[700px] rounded border bg-slate-100"
-                    aria-label="Document à signer"
-                  >
-                    <div className="p-6 bg-amber-50 border border-amber-200 rounded text-sm space-y-3">
-                      <p className="font-semibold text-amber-900">
-                        L'aperçu PDF n'a pas pu s'afficher dans cette fenêtre.
-                      </p>
-                      <p className="text-amber-800">
-                        Cliquez sur le bouton ci-dessous pour ouvrir le document
-                        dans un nouvel onglet, lisez-le attentivement, puis
-                        revenez ici pour signer.
-                      </p>
-                      <a
-                        href={importedPdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-amber-600 text-white text-sm font-medium hover:bg-amber-700"
-                      >
-                        Ouvrir le document dans un nouvel onglet
-                      </a>
-                    </div>
-                  </object>
-                  </div>
-                  {/* Always-visible secondary link in case <object> renders but
-                      the user wants the document larger / printable. */}
+          // Pas de bloc preview séparé : le PdfZonePicker ci-dessous affiche
+          // déjà le document en entier + permet de scroller les pages + de
+          // dessiner directement la zone de signature dessus. Garder uniquement
+          // la description optionnelle + un lien "ouvrir dans un nouvel onglet"
+          // pour les utilisateurs qui veulent une lecture full-size.
+          ((request.payload as { description?: string })?.description || importedPdfUrl) && (
+            <Card>
+              <CardContent className="py-4 space-y-3">
+                {(request.payload as { description?: string })?.description && (
+                  <p className="text-sm text-muted-foreground">
+                    {(request.payload as { description?: string }).description}
+                  </p>
+                )}
+                {importedPdfUrl && (
                   <div className="text-xs text-muted-foreground text-right">
                     <a
                       href={importedPdfUrl}
@@ -786,18 +745,25 @@ export default function Signer() {
                       rel="noopener noreferrer"
                       className="underline hover:text-foreground"
                     >
-                      Ouvrir dans un nouvel onglet ↗
+                      Ouvrir le PDF dans un nouvel onglet ↗
                     </a>
                   </div>
-                </div>
-              ) : (
-                <Alert variant="destructive">
-                  <AlertTitle>Document indisponible</AlertTitle>
-                  <AlertDescription>Impossible de charger le document. Contactez votre conseiller.</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
+                )}
+                {importedPdfLoading && !importedPdfUrl && (
+                  <div className="py-4 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chargement du document…
+                  </div>
+                )}
+                {!importedPdfLoading && !importedPdfUrl && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Document indisponible</AlertTitle>
+                    <AlertDescription>Impossible de charger le document. Contactez votre conseiller.</AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )
         ) : (
           <Card>
             <CardContent className="py-6">
