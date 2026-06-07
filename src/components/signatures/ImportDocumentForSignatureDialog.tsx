@@ -223,7 +223,6 @@ export default function ImportDocumentForSignatureDialog({
               pdfUrl={previewUrl}
               zone={zone}
               onChange={setZone}
-              page={1}
             />
           </div>
         )}

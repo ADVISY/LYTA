@@ -1,33 +1,36 @@
 /**
  * PdfZonePicker
  * =============
- * Affiche un PDF en preview et permet au broker de dessiner UNE zone de
- * signature en draguant la souris. Le rectangle peut être redessiné
- * autant de fois que voulu (chaque drag remplace la zone précédente).
+ * Affiche un PDF en preview (canvas via pdfjs-dist) et permet au broker
+ * de dessiner UNE zone de signature en draguant la souris.
  *
- * Coordonnées retournées : normalisées 0-1 par rapport à la page entière,
- * pour rester responsive et indépendantes de la taille d'affichage.
+ * Pourquoi canvas et pas iframe : le browser bloque souvent l'affichage
+ * des PDFs en blob URLs dans une iframe (X-Frame-Options, CSP, viewer
+ * policy). Le rendu via canvas pdfjs-dist marche partout : Chrome,
+ * Safari, Firefox, mobile.
  *
- * Approche minimaliste : <iframe src={pdfUrl}> pour le rendu PDF natif
- * (navigateur intégré, zéro lib supplémentaire). Overlay <div> par-dessus
- * pour capturer le drag. Pour 1 zone sur 1 page (cas d'usage actuel),
- * c'est suffisant.
+ * Coordonnées retournées : normalisées 0-1 par rapport à la page entière.
  *
  * Limites assumées :
- *   - Une seule page de PDF "visible" par picker (page 1 par défaut)
- *   - Pas de zoom (le navigateur gère l'affichage natif)
- *   - Pour multi-pages, le broker peut scroller dans l'iframe mais la
- *     zone n'est attachée qu'à la page courante au moment du drag
+ *   - 1 zone par doc (la dernière drague remplace la précédente)
+ *   - 1 page visible à la fois (navigation Précédent / Suivant)
+ *   - Page de la zone = page courante au moment du drag
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2, MousePointer2 } from "lucide-react";
+import { Trash2, MousePointer2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as pdfjs from "pdfjs-dist";
+
+// Worker config : on charge le worker depuis le CDN officiel pour éviter
+// les soucis de bundling (le worker doit être servi en .mjs).
+pdfjs.GlobalWorkerOptions.workerSrc =
+  `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface SignatureZone {
-  page: number;       // 1-based, par défaut 1
-  x: number;          // 0-1, gauche du rectangle / largeur du PDF
-  y: number;          // 0-1, haut du rectangle / hauteur du PDF (origine top-left UI)
+  page: number;       // 1-based
+  x: number;          // 0-1
+  y: number;          // 0-1 (origine top-left UI)
   width: number;      // 0-1
   height: number;     // 0-1
 }
@@ -36,8 +39,6 @@ interface PdfZonePickerProps {
   pdfUrl: string;
   zone: SignatureZone | null;
   onChange: (zone: SignatureZone | null) => void;
-  /** Page sur laquelle la zone est ancrée (1-based). Default 1. */
-  page?: number;
 }
 
 interface DragState {
@@ -48,13 +49,70 @@ interface DragState {
   dragging: boolean;
 }
 
-export function PdfZonePicker({ pdfUrl, zone, onChange, page = 1 }: PdfZonePickerProps) {
+export function PdfZonePicker({ pdfUrl, zone, onChange }: PdfZonePickerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [pdf, setPdf] = useState<pdfjs.PDFDocumentProxy | null>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rendering, setRendering] = useState(true);
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  // Normalise des coords pixels du container en coords 0-1
+  // ─── Charge le PDF ──────────────────────────────────────────────
+  useEffect(() => {
+    let aborted = false;
+    setRendering(true);
+    pdfjs.getDocument(pdfUrl).promise
+      .then((doc) => {
+        if (aborted) return;
+        setPdf(doc);
+        setNumPages(doc.numPages);
+        setCurrentPage(1);
+      })
+      .catch((err) => {
+        console.error("[PdfZonePicker] failed to load PDF", err);
+      });
+    return () => { aborted = true; };
+  }, [pdfUrl]);
+
+  // ─── Rend la page courante dans le canvas ──────────────────────
+  useEffect(() => {
+    if (!pdf || !canvasRef.current) return;
+    let aborted = false;
+    setRendering(true);
+    (async () => {
+      try {
+        const page = await pdf.getPage(currentPage);
+        if (aborted) return;
+        const viewport = page.getViewport({ scale: 1 });
+
+        // Calcule la largeur cible pour fit le container (max 800px)
+        const containerWidth = containerRef.current?.clientWidth ?? 800;
+        const scale = Math.min(2, containerWidth / viewport.width);
+        const scaledViewport = page.getViewport({ scale });
+
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext("2d")!;
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        canvas.style.width = "100%";
+        canvas.style.height = "auto";
+
+        await page.render({ canvasContext: ctx, viewport: scaledViewport, canvas }).promise;
+      } catch (err) {
+        console.error("[PdfZonePicker] render error", err);
+      } finally {
+        if (!aborted) setRendering(false);
+      }
+    })();
+    return () => { aborted = true; };
+  }, [pdf, currentPage]);
+
+  // Normalise les coords pixels du canvas en coords 0-1 (par rapport à
+  // la taille affichée, pas à la résolution interne du canvas).
   const toNormalized = (clientX: number, clientY: number) => {
-    const rect = containerRef.current!.getBoundingClientRect();
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
     return {
       x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
       y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
@@ -77,13 +135,12 @@ export function PdfZonePicker({ pdfUrl, zone, onChange, page = 1 }: PdfZonePicke
     if (!drag?.dragging) return;
     const w = Math.abs(drag.endX - drag.startX);
     const h = Math.abs(drag.endY - drag.startY);
-    // Trop petit = on ignore (clic accidentel)
     if (w < 0.02 || h < 0.01) {
       setDrag(null);
       return;
     }
     onChange({
-      page,
+      page: currentPage,
       x: Math.min(drag.startX, drag.endX),
       y: Math.min(drag.startY, drag.endY),
       width: w,
@@ -92,7 +149,9 @@ export function PdfZonePicker({ pdfUrl, zone, onChange, page = 1 }: PdfZonePicke
     setDrag(null);
   };
 
-  // Rectangle d'aperçu (drag en cours OU zone finalisée)
+  // Rectangle d'aperçu — visible uniquement si on est sur la même page
+  // que celle où la zone est ancrée.
+  const zoneOnCurrentPage = zone && zone.page === currentPage ? zone : null;
   const previewRect = drag?.dragging
     ? {
         left: `${Math.min(drag.startX, drag.endX) * 100}%`,
@@ -100,58 +159,84 @@ export function PdfZonePicker({ pdfUrl, zone, onChange, page = 1 }: PdfZonePicke
         width: `${Math.abs(drag.endX - drag.startX) * 100}%`,
         height: `${Math.abs(drag.endY - drag.startY) * 100}%`,
       }
-    : zone
+    : zoneOnCurrentPage
     ? {
-        left: `${zone.x * 100}%`,
-        top: `${zone.y * 100}%`,
-        width: `${zone.width * 100}%`,
-        height: `${zone.height * 100}%`,
+        left: `${zoneOnCurrentPage.x * 100}%`,
+        top: `${zoneOnCurrentPage.y * 100}%`,
+        width: `${zoneOnCurrentPage.width * 100}%`,
+        height: `${zoneOnCurrentPage.height * 100}%`,
       }
     : null;
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
           <MousePointer2 className="h-4 w-4" />
           {zone
-            ? "Zone définie. Tu peux redessiner pour la déplacer."
-            : "Drague la souris sur le document pour dessiner la zone où le client doit signer."}
+            ? `Zone définie page ${zone.page}. Redessine pour la déplacer.`
+            : "Drague la souris sur le document pour dessiner la zone de signature."}
         </p>
-        {zone && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onChange(null)}
-            className="text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Effacer
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {numPages > 1 && (
+            <div className="flex items-center gap-1 text-xs">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-medium px-1">
+                Page {currentPage} / {numPages}
+              </span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                disabled={currentPage === numPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {zone && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(null)}
+              className="text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Effacer
+            </Button>
+          )}
+        </div>
       </div>
 
       <div
         ref={containerRef}
-        className="relative w-full bg-muted/30 border-2 border-dashed border-border rounded-lg overflow-hidden"
-        style={{ height: 600 }}
+        className="relative w-full bg-muted/30 border rounded-lg overflow-hidden"
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        style={{ cursor: rendering ? "wait" : "crosshair" }}
       >
-        {/* PDF preview (native browser viewer) */}
-        <iframe
-          src={`${pdfUrl}#page=${page}&toolbar=0&navpanes=0`}
-          title="Document à signer"
-          className="absolute inset-0 w-full h-full pointer-events-none"
-        />
+        <canvas ref={canvasRef} className="block w-full" />
 
-        {/* Overlay transparent qui capture les events */}
-        <div className="absolute inset-0 cursor-crosshair" />
+        {rendering && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
-        {/* Rectangle de la zone (en cours OU final) */}
         {previewRect && (
           <div
             className={cn(
