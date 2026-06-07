@@ -59,6 +59,12 @@ verify_jwt = false
 [functions.send-client-notification-email]
 verify_jwt = false
 
+[functions.proxy-signature-pdf]
+verify_jwt = false
+
+[functions.get-signature-pdf-url]
+verify_jwt = false
+
 [functions.scan-document]
 verify_jwt = false
 

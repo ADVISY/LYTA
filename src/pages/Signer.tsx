@@ -210,22 +210,18 @@ export default function Signer() {
     const load = async () => {
       setImportedPdfLoading(true);
       try {
-        const resp = await fetch(`${supabaseConfig.url}/functions/v1/get-signature-pdf-url`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": supabaseConfig.publishableKey,
-            "Authorization": `Bearer ${supabaseConfig.publishableKey}`,
-          },
-          body: JSON.stringify({ token }),
-        });
-        if (!resp.ok) throw new Error("Impossible de charger le document");
-        const { url } = await resp.json();
+        // On utilise proxy-signature-pdf au lieu du signed URL Storage direct
+        // pour bypasser le CORS Supabase Storage qui rejette les sous-domaines
+        // tenants (advisy.lyta.ch, jcgconsulting.lyta.ch, etc.). L'edge
+        // function ajoute Access-Control-Allow-Origin: * et stream le PDF.
+        const proxyUrl = `${supabaseConfig.url}/functions/v1/proxy-signature-pdf?token=${encodeURIComponent(token)}`;
         if (cancelled) return;
-        setImportedPdfUrl(url);
+        setImportedPdfUrl(proxyUrl);
 
-        // Fetch and hash the PDF for integrity proof
-        const pdfResp = await fetch(url);
+        // Fetch and hash the PDF for integrity proof.
+        // Pas besoin d'apikey/Authorization : proxy-signature-pdf est marquée
+        // verify_jwt = false (auth via le token de signature dans l'URL).
+        const pdfResp = await fetch(proxyUrl);
         if (!pdfResp.ok) throw new Error("Téléchargement du PDF échoué");
         const buf = await pdfResp.arrayBuffer();
         const hashBuf = await crypto.subtle.digest("SHA-256", buf);
