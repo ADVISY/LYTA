@@ -18,6 +18,14 @@ import { MandatTemplate, MandatTemplateData } from "@/components/signatures/Mand
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseConfig } from "@/integrations/supabase/config";
 
+interface SignatureZone {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface SignatureRequestRow {
   id: string;
   tenant_id: string;
@@ -33,6 +41,8 @@ interface SignatureRequestRow {
   tenant_name: string | null;
   tenant_logo_url: string | null;
   tenant_primary_color: string | null;
+  /** Zone précise définie par le broker. Si null, fallback picker 3×3. */
+  signature_zone: SignatureZone | null;
 }
 
 type ScreenState =
@@ -329,38 +339,58 @@ export default function Signer() {
     const helveticaBold = await origDoc.embedFont(StandardFonts.HelveticaBold);
 
     const pages = origDoc.getPages();
-    // Pick the page the client chose: "first" or "last". We never let
-    // the user pick a middle page from the UI to keep it simple — most
-    // Swiss broker docs only need first or last anyway.
-    const targetPage = pages[signaturePage === "first" ? 0 : pages.length - 1];
-    const { width: pageW, height: pageH } = targetPage.getSize();
 
-    // Compute sig box dimensions: max ~35% of page width, max 60pt
-    // height, natural aspect ratio preserved.
-    const naturalDims = sigImage.scale(1);
-    const targetW = Math.min(pageW * 0.35, 160);
-    const scaleFactor = targetW / naturalDims.width;
-    const drawnW = naturalDims.width * scaleFactor;
-    const drawnH = Math.min(naturalDims.height * scaleFactor, 60);
+    // ─── PRIORITÉ : zone définie par le broker ──────────────────────
+    // Si signature_zone est définie sur la signature_request, on
+    // incruste la signature EXACTEMENT à ces coordonnées (normalisées).
+    // Sinon, fallback sur le picker 3×3 historique (signatureAnchor).
+    const zone = (screen.kind === "ready" || screen.kind === "submitting")
+      ? screen.request.signature_zone
+      : null;
 
-    // Translate the 3×3 anchor into actual page coordinates.
-    // pdf-lib origin is BOTTOM-LEFT, so y increases going up.
-    const margin = 30;
-    const captionSpace = 24; // room below for "Signé par … / date"
-    const [vAnchor, hAnchor] = signatureAnchor.split("-") as [
-      "top" | "middle" | "bottom",
-      "left" | "center" | "right",
-    ];
-
+    let targetPage;
     let baseX: number;
-    if (hAnchor === "left") baseX = margin;
-    else if (hAnchor === "center") baseX = (pageW - drawnW) / 2;
-    else baseX = pageW - drawnW - margin;
-
     let baseY: number;
-    if (vAnchor === "bottom") baseY = margin + captionSpace;
-    else if (vAnchor === "middle") baseY = (pageH - drawnH) / 2;
-    else baseY = pageH - drawnH - margin;
+    let drawnW: number;
+    let drawnH: number;
+
+    if (zone && zone.page && zone.page >= 1 && zone.page <= pages.length) {
+      // ─── Zone précise broker ────────────────────────────────────
+      targetPage = pages[zone.page - 1];
+      const { width: pageW, height: pageH } = targetPage.getSize();
+      // Coords normalisées 0-1 → coords PDF (pdf-lib origin = bottom-left)
+      // L'UI utilise top-left, donc Y est inversé.
+      drawnW = zone.width * pageW;
+      drawnH = zone.height * pageH;
+      baseX = zone.x * pageW;
+      baseY = pageH - (zone.y + zone.height) * pageH;
+    } else {
+      // ─── Fallback : picker 3×3 historique ───────────────────────
+      // Pick the page the client chose: "first" or "last".
+      targetPage = pages[signaturePage === "first" ? 0 : pages.length - 1];
+      const { width: pageW, height: pageH } = targetPage.getSize();
+
+      const naturalDims = sigImage.scale(1);
+      const targetW = Math.min(pageW * 0.35, 160);
+      const scaleFactor = targetW / naturalDims.width;
+      drawnW = naturalDims.width * scaleFactor;
+      drawnH = Math.min(naturalDims.height * scaleFactor, 60);
+
+      const margin = 30;
+      const captionSpace = 24;
+      const [vAnchor, hAnchor] = signatureAnchor.split("-") as [
+        "top" | "middle" | "bottom",
+        "left" | "center" | "right",
+      ];
+      if (hAnchor === "left") baseX = margin;
+      else if (hAnchor === "center") baseX = (pageW - drawnW) / 2;
+      else baseX = pageW - drawnW - margin;
+      if (vAnchor === "bottom") baseY = margin + captionSpace;
+      else if (vAnchor === "middle") baseY = (pageH - drawnH) / 2;
+      else baseY = pageH - drawnH - margin;
+    }
+
+    const { width: pageW, height: pageH } = targetPage.getSize();
 
     targetPage.drawImage(sigImage, {
       x: baseX,
@@ -715,7 +745,12 @@ export default function Signer() {
                     or PDF-viewer policies. <object> falls back gracefully
                     to its inner content (the "open in new tab" link below)
                     when the inline render fails.
+
+                    Si le broker a défini une zone de signature, on superpose
+                    un rectangle vert pulsant pour montrer au client où sa
+                    signature apparaîtra. Coords normalisées 0-1 → CSS %.
                   */}
+                  <div className="relative">
                   <object
                     data={importedPdfUrl}
                     type="application/pdf"
@@ -741,6 +776,24 @@ export default function Signer() {
                       </a>
                     </div>
                   </object>
+                  {/* Overlay : zone de signature surlignée si broker en a défini une */}
+                  {request.signature_zone && (
+                    <div
+                      className="absolute pointer-events-none border-2 border-emerald-500 bg-emerald-500/15 rounded shadow-lg"
+                      style={{
+                        left: `${request.signature_zone.x * 100}%`,
+                        top: `${request.signature_zone.y * 100}%`,
+                        width: `${request.signature_zone.width * 100}%`,
+                        height: `${request.signature_zone.height * 100}%`,
+                        animation: "pulse 2s infinite",
+                      }}
+                    >
+                      <div className="absolute -top-7 left-0 bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded shadow-md whitespace-nowrap">
+                        ✍️ Vous signerez ici
+                      </div>
+                    </div>
+                  )}
+                  </div>
                   {/* Always-visible secondary link in case <object> renders but
                       the user wants the document larger / printable. */}
                   <div className="text-xs text-muted-foreground text-right">
@@ -843,7 +896,27 @@ export default function Signer() {
           9 grid positions the signature image is stamped at, instead
           of always defaulting to bottom-right.
         */}
-        {!refusalMode && (request.document_kind === "imported" || request.document_kind === "autre") && (
+        {/* Si le broker a déjà défini une zone de signature, on affiche un
+            simple indicateur informatif au lieu du picker 3×3 — le signataire
+            n'a plus à choisir, la position est imposée par le document. */}
+        {!refusalMode && request.signature_zone &&
+         (request.document_kind === "imported" || request.document_kind === "autre") && (
+          <Card className="border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-800/50">
+            <CardContent className="py-4 flex items-start gap-3">
+              <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-emerald-900 dark:text-emerald-100">
+                  Emplacement de signature fixé par le document
+                </p>
+                <p className="text-emerald-800/80 dark:text-emerald-200/80 mt-0.5">
+                  Ta signature apparaîtra exactement à l'endroit marqué dans la prévisualisation ci-dessus.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {!refusalMode && !request.signature_zone &&
+         (request.document_kind === "imported" || request.document_kind === "autre") && (
           <Card>
             <CardHeader>
               <CardTitle>Position de votre signature</CardTitle>
