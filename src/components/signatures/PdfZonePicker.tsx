@@ -21,11 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Trash2, MousePointer2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as pdfjs from "pdfjs-dist";
-
-// Worker config : on charge le worker depuis le CDN officiel pour éviter
-// les soucis de bundling (le worker doit être servi en .mjs).
-pdfjs.GlobalWorkerOptions.workerSrc =
-  `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Worker bundlé en local par Vite (`?url` retourne le chemin final servi
+// par le bundler, même origine que l'app). Avant on chargeait depuis
+// cdn.jsdelivr.net mais notre CSP `script-src 'self' 'unsafe-inline'
+// 'unsafe-eval'` bloquait la requête ("Refused to load … pdf.worker.min.mjs
+// because it does not appear in the script-src directive"). Bundler en
+// local = pas besoin d'élargir le CSP ni de dépendance CDN tierce.
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 export interface SignatureZone {
   page: number;       // 1-based

@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.resend.com https://api.pwnedpasswords.com https://verify.twilio.com https://openplz.org; frame-ancestors 'none';" />
+    <!-- worker-src 'self' blob: : pdfjs-dist (PdfZonePicker, signature à distance)
+         spawn son worker via une blob URL même quand le fichier .mjs est bundlé
+         en local. Sans 'blob:', Safari rejette ("Refused to load blob:… because
+         it does not appear in the worker-src directive").
+         Note : frame-ancestors via <meta> est ignoré par les browsers — à
+         déplacer en header HTTP côté Vercel/Supabase plus tard. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.resend.com https://api.pwnedpasswords.com https://verify.twilio.com https://openplz.org; frame-ancestors 'none';" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <!-- Favicon LYTA — chaîne complète :
