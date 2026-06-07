@@ -1,19 +1,18 @@
 // Lets the broker upload a custom PDF (procuration, lettre de résiliation, etc.) and
 // send it to a client for remote signature. The client signs via the same /signer/:token
 // flow; the final PDF is the original document with an appended signature page.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Send, Upload, ChevronLeft } from "lucide-react";
+import { Loader2, Send, Upload } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserTenant } from "@/hooks/useUserTenant";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
-import { PdfZonePicker, type SignatureZone } from "@/components/signatures/PdfZonePicker";
 
 interface ImportDocumentForSignatureDialogProps {
   open: boolean;
@@ -40,31 +39,10 @@ export default function ImportDocumentForSignatureDialog({
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // ─── Sélecteur de zone de signature ────────────────────────────────
-  // step "form" = inputs label/description/file.
-  // step "zone" = preview PDF + drag pour dessiner la zone signature.
-  const [step, setStep] = useState<"form" | "zone">("form");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [zone, setZone] = useState<SignatureZone | null>(null);
-
-  // Génère une URL preview locale du PDF dès qu'un fichier est sélectionné,
-  // pour que le PdfZonePicker puisse l'afficher dans un iframe sans upload.
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-
   const reset = () => {
     setFile(null);
     setLabel("");
     setDescription("");
-    setZone(null);
-    setStep("form");
   };
 
   const handleSubmit = async () => {
@@ -113,8 +91,9 @@ export default function ImportDocumentForSignatureDialog({
             originalFileSize: file.size,
           },
           preview_file_key: fileKey,
-          signature_zone: zone, // null si pas de zone définie (fallback picker 3x3)
-        } as any)
+          // signature_zone : NULL ici. C'est le SIGNATAIRE qui dessinera
+          // sa zone après avoir cliqué sur le lien email.
+        })
         .select("id")
         .single();
       if (insertErr || !sr) throw insertErr || new Error("Création de la demande échouée");
@@ -148,117 +127,70 @@ export default function ImportDocumentForSignatureDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!busy) { if (!o) reset(); onOpenChange(o); } }}>
-      <DialogContent className={step === "zone" ? "sm:max-w-3xl" : "sm:max-w-lg"}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {step === "form" ? "Faire signer un document" : "Choisis l'emplacement de la signature"}
-          </DialogTitle>
+          <DialogTitle>Faire signer un document</DialogTitle>
           <DialogDescription>
-            {step === "form" ? (
-              <>
-                Téléverse un PDF que <strong>{clientLabel}</strong> devra signer (procuration,
-                lettre de résiliation, etc.). Étape suivante : tu placeras la zone de signature.
-              </>
-            ) : (
-              <>
-                Drague la souris sur le document pour dessiner le rectangle où{" "}
-                <strong>{clientLabel}</strong> doit signer.
-                Le client verra ce rectangle surligné et signera dedans.
-              </>
-            )}
+            Téléverse un PDF que <strong>{clientLabel}</strong> devra signer (procuration,
+            lettre de résiliation, etc.). Le client recevra un lien sécurisé par email — il
+            placera lui-même sa signature sur le document à l'ouverture.
           </DialogDescription>
         </DialogHeader>
 
-        {step === "form" && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="sig-doc-label">Intitulé du document *</Label>
-              <Input
-                id="sig-doc-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Ex: Procuration assurance maladie"
-                maxLength={200}
-                disabled={busy}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sig-doc-file">Fichier PDF *</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="sig-doc-file"
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                  disabled={busy}
-                />
-              </div>
-              {file && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Upload className="h-3 w-3" />
-                  {file.name} ({(file.size / 1024 / 1024).toFixed(2)} Mo)
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sig-doc-desc">Note pour le client (facultatif)</Label>
-              <Textarea
-                id="sig-doc-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Quelques mots affichés au client à l'ouverture du lien…"
-                rows={3}
-                maxLength={1000}
-                disabled={busy}
-              />
-            </div>
-          </div>
-        )}
-
-        {step === "zone" && previewUrl && (
-          <div className="py-2">
-            <PdfZonePicker
-              pdfUrl={previewUrl}
-              zone={zone}
-              onChange={setZone}
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="sig-doc-label">Intitulé du document *</Label>
+            <Input
+              id="sig-doc-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Ex: Procuration assurance maladie"
+              maxLength={200}
+              disabled={busy}
             />
           </div>
-        )}
+
+          <div className="space-y-2">
+            <Label htmlFor="sig-doc-file">Fichier PDF *</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="sig-doc-file"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                disabled={busy}
+              />
+            </div>
+            {file && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Upload className="h-3 w-3" />
+                {file.name} ({(file.size / 1024 / 1024).toFixed(2)} Mo)
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sig-doc-desc">Note pour le client (facultatif)</Label>
+            <Textarea
+              id="sig-doc-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Quelques mots affichés au client à l'ouverture du lien…"
+              rows={3}
+              maxLength={1000}
+              disabled={busy}
+            />
+          </div>
+        </div>
 
         <DialogFooter className="gap-2">
-          {step === "form" && (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-                Annuler
-              </Button>
-              <Button
-                onClick={() => setStep("zone")}
-                disabled={busy || !file || !label.trim()}
-                className="gap-2"
-              >
-                Suivant : placer la signature →
-              </Button>
-            </>
-          )}
-          {step === "zone" && (
-            <>
-              <Button
-                variant="ghost"
-                onClick={() => setStep("form")}
-                disabled={busy}
-                className="gap-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Retour
-              </Button>
-              <Button onClick={handleSubmit} disabled={busy || !zone} className="gap-2">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {busy ? "Envoi en cours…" : zone ? "Envoyer pour signature" : "Dessine d'abord la zone"}
-              </Button>
-            </>
-          )}
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            Annuler
+          </Button>
+          <Button onClick={handleSubmit} disabled={busy || !file || !label.trim()} className="gap-2">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {busy ? "Envoi en cours…" : "Envoyer pour signature"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

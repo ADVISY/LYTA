@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, ShieldCheck, FileSignature, Check, AlertCircle, XCircle } from "lucide-react";
 import SignaturePad from "@/components/crm/SignaturePad";
 import { MandatTemplate, MandatTemplateData } from "@/components/signatures/MandatTemplate";
+import { PdfZonePicker, type SignatureZone as PickerZone } from "@/components/signatures/PdfZonePicker";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseConfig } from "@/integrations/supabase/config";
 
@@ -88,6 +89,9 @@ export default function Signer() {
   type SignaturePagePick = "first" | "last";
   const [signaturePage, setSignaturePage] = useState<SignaturePagePick>("last");
   const [signatureAnchor, setSignatureAnchor] = useState<SignatureAnchor>("bottom-right");
+  // Zone dessinée par le signataire lui-même sur le PDF.
+  // Prioritaire sur signaturePage/signatureAnchor si définie.
+  const [signerZone, setSignerZone] = useState<PickerZone | null>(null);
 
   const documentRef = useRef<HTMLDivElement>(null);
   const attestationRef = useRef<HTMLDivElement>(null);
@@ -336,13 +340,13 @@ export default function Signer() {
 
     const pages = origDoc.getPages();
 
-    // ─── PRIORITÉ : zone définie par le broker ──────────────────────
-    // Si signature_zone est définie sur la signature_request, on
-    // incruste la signature EXACTEMENT à ces coordonnées (normalisées).
-    // Sinon, fallback sur le picker 3×3 historique (signatureAnchor).
-    const zone = (screen.kind === "ready" || screen.kind === "submitting")
+    // ─── PRIORITÉ : zone dessinée par le signataire (signerZone) ──────
+    // Sinon zone définie par le broker (signature_zone) — fallback legacy.
+    // Sinon picker 3×3 historique (signatureAnchor + signaturePage).
+    const requestZone = (screen.kind === "ready" || screen.kind === "submitting")
       ? screen.request.signature_zone
       : null;
+    const zone: PickerZone | null = signerZone ?? requestZone;
 
     let targetPage;
     let baseX: number;
@@ -772,23 +776,6 @@ export default function Signer() {
                       </a>
                     </div>
                   </object>
-                  {/* Overlay : zone de signature surlignée si broker en a défini une */}
-                  {request.signature_zone && (
-                    <div
-                      className="absolute pointer-events-none border-2 border-emerald-500 bg-emerald-500/15 rounded shadow-lg"
-                      style={{
-                        left: `${request.signature_zone.x * 100}%`,
-                        top: `${request.signature_zone.y * 100}%`,
-                        width: `${request.signature_zone.width * 100}%`,
-                        height: `${request.signature_zone.height * 100}%`,
-                        animation: "pulse 2s infinite",
-                      }}
-                    >
-                      <div className="absolute -top-7 left-0 bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded shadow-md whitespace-nowrap">
-                        ✍️ Vous signerez ici
-                      </div>
-                    </div>
-                  )}
                   </div>
                   {/* Always-visible secondary link in case <object> renders but
                       the user wants the document larger / printable. */}
@@ -892,26 +879,33 @@ export default function Signer() {
           9 grid positions the signature image is stamped at, instead
           of always defaulting to bottom-right.
         */}
-        {/* Si le broker a déjà défini une zone de signature, on affiche un
-            simple indicateur informatif au lieu du picker 3×3 — le signataire
-            n'a plus à choisir, la position est imposée par le document. */}
-        {!refusalMode && request.signature_zone &&
+        {/* Sélecteur de zone : le signataire dessine son rectangle sur le
+            PDF, à l'emplacement de son choix. Remplace l'ancien picker 3×3.
+            Affiché uniquement pour les docs imported / autre — mandat de
+            gestion a son propre template avec slots prédéfinis. */}
+        {!refusalMode && importedPdfUrl &&
          (request.document_kind === "imported" || request.document_kind === "autre") && (
-          <Card className="border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-800/50">
-            <CardContent className="py-4 flex items-start gap-3">
-              <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-              <div className="flex-1 text-sm">
-                <p className="font-medium text-emerald-900 dark:text-emerald-100">
-                  Emplacement de signature fixé par le document
-                </p>
-                <p className="text-emerald-800/80 dark:text-emerald-200/80 mt-0.5">
-                  Ta signature apparaîtra exactement à l'endroit marqué dans la prévisualisation ci-dessus.
-                </p>
-              </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Place ta signature</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Drague la souris sur le document pour dessiner le rectangle
+                où ta signature apparaîtra. Tu peux le redessiner autant de
+                fois que tu veux avant d'envoyer.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PdfZonePicker
+                pdfUrl={importedPdfUrl}
+                zone={signerZone}
+                onChange={setSignerZone}
+              />
             </CardContent>
           </Card>
         )}
-        {!refusalMode && !request.signature_zone &&
+        {/* Fallback : picker 3×3 historique gardé pour rétrocompatibilité,
+            désactivé par défaut. Aucun affichage. */}
+        {false && !refusalMode &&
          (request.document_kind === "imported" || request.document_kind === "autre") && (
           <Card>
             <CardHeader>
