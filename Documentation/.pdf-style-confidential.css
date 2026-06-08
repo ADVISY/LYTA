@@ -1,0 +1,216 @@
+/* Same as base print stylesheet but with CONFIDENTIAL watermark + red accents */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 22mm 16mm;
+
+  @top-right {
+    content: "🔒 CONFIDENTIEL — LYTA Security Audit";
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
+    font-size: 8pt;
+    color: #b91c1c;
+    font-weight: 700;
+  }
+
+  @top-left {
+    content: "NDA renforcé requis";
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
+    font-size: 8pt;
+    color: #b91c1c;
+  }
+
+  @bottom-right {
+    content: "Page " counter(page) " / " counter(pages);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
+    font-size: 8pt;
+    color: #6b7280;
+  }
+
+  @bottom-left {
+    content: "Optimislink Sàrl — 8 juin 2026 — Diffusion restreinte";
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
+    font-size: 8pt;
+    color: #6b7280;
+  }
+}
+
+@page :first {
+  @top-right { content: "🔒 CONFIDENTIEL"; }
+  @top-left { content: ""; }
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", "Segoe UI", sans-serif;
+  font-size: 10pt;
+  line-height: 1.55;
+  color: #1f2937;
+  background: #fff;
+}
+
+h1 {
+  font-size: 26pt;
+  font-weight: 700;
+  color: #7f1d1d;
+  margin: 0 0 8pt 0;
+  padding-bottom: 6pt;
+  border-bottom: 3px solid #b91c1c;
+  page-break-after: avoid;
+}
+
+h2 {
+  font-size: 18pt;
+  font-weight: 700;
+  color: #7f1d1d;
+  margin: 22pt 0 8pt 0;
+  padding-bottom: 4pt;
+  border-bottom: 1px solid #fca5a5;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 14pt;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 16pt 0 6pt 0;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 11pt;
+  font-weight: 600;
+  color: #334155;
+  margin: 12pt 0 4pt 0;
+  page-break-after: avoid;
+}
+
+h5, h6 {
+  font-size: 10pt;
+  font-weight: 600;
+  color: #475569;
+  margin: 10pt 0 4pt 0;
+  page-break-after: avoid;
+}
+
+p {
+  margin: 0 0 7pt 0;
+  text-align: left;
+  hyphens: auto;
+  orphans: 3;
+  widows: 3;
+}
+
+ul, ol {
+  margin: 4pt 0 8pt 0;
+  padding-left: 18pt;
+}
+
+li {
+  margin-bottom: 3pt;
+}
+
+strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+em {
+  font-style: italic;
+}
+
+a {
+  color: #b91c1c;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+code {
+  font-family: "SF Mono", Menlo, Monaco, "Cascadia Code", Consolas, monospace;
+  font-size: 8.5pt;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 3px;
+  padding: 0.5pt 3pt;
+  color: #7f1d1d;
+}
+
+pre {
+  font-family: "SF Mono", Menlo, Monaco, "Cascadia Code", Consolas, monospace;
+  font-size: 8.5pt;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 8pt 10pt;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 6pt 0 10pt 0;
+  page-break-inside: avoid;
+}
+
+pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #7f1d1d;
+  font-size: inherit;
+}
+
+blockquote {
+  margin: 8pt 0;
+  padding: 6pt 12pt;
+  border-left: 3px solid #b91c1c;
+  background: #fef2f2;
+  color: #1e293b;
+  page-break-inside: avoid;
+}
+
+blockquote p {
+  margin: 0 0 4pt 0;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8pt 0 12pt 0;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+
+th {
+  background: #7f1d1d;
+  color: #fff;
+  text-align: left;
+  padding: 5pt 7pt;
+  font-weight: 600;
+  font-size: 8.5pt;
+  border: 1px solid #7f1d1d;
+}
+
+td {
+  padding: 4pt 7pt;
+  border: 1px solid #fecaca;
+  vertical-align: top;
+  font-size: 9pt;
+}
+
+tr:nth-child(even) td {
+  background: #fef2f2;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid #fca5a5;
+  margin: 14pt 0;
+}
+
+h1:first-of-type {
+  margin-top: 30pt;
+}
+
+h1, h2, h3, h4 {
+  page-break-inside: avoid;
+}
