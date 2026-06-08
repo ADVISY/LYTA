@@ -606,17 +606,324 @@ Leur visibilité : uniquement leurs propres données (dossier, polices, sinistre
 
 ## 6. Modules métier
 
-> 📋 **Cette section sera étoffée module par module dans les prochains points d'étape.**
+> 📋 **Convention de cette section** : chaque module suit la même structure (rôle métier, surface code, edge functions, business rules clés, gotchas, RLS critique). Les **modules 1-6** sont documentés ci-dessous (passe 2). Les modules 7-18 viennent dans les passes suivantes.
+
+---
+
+### 6.1 Module 1 — Auth & Onboarding
+
+#### 6.1.1 Rôle métier
+
+Gérer **trois flows distincts** d'arrivée d'un utilisateur sur LYTA :
+
+1. **Self-signup post-paiement Stripe** : un nouveau cabinet paie via le site marketing (`lyta.ch/access`, hébergé sur Lovable), puis est redirigé sur LYTA pour finaliser → création tenant + admin + DNS + Vercel + Resend en chaîne.
+2. **Connexion existante** : email + password, avec **vérification SMS 2FA optionnelle** (si activée au niveau du tenant) + **check HaveIBeenPwned** sur les nouveaux mots de passe.
+3. **Invitation collaborateur** : un admin/manager invite un collègue → email avec magic link → `FinaliserInscription.tsx`.
+
+#### 6.1.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/hooks/useAuth.tsx` (~700 LOC) | Hook central : signIn, signUp, signOut, resetPassword, MFA SMS challenge, session persistence (sessionStorage), mock SMS client pour la phase challenge |
+| `src/pages/Connexion.tsx` | Formulaire login + intégration `SmsVerificationDialog` |
+| `src/pages/FinaliserInscription.tsx` | Page de finalisation invitation (set password + complete profile) |
+| `src/pages/ResetPassword.tsx` | Reset password via magic link Supabase |
+| `src/components/auth/SmsVerificationDialog.tsx` | UI saisie code SMS Twilio Verify |
+| `src/hooks/usePasswordCheck.tsx` | Validation password (longueur + caractères + HIBP) |
+| `src/hooks/useSessionTimeout.ts` | Auto-logout après inactivité (configurable par tenant via `tenant_security_settings`) |
+| `src/hooks/useForcedLogoutAfter.ts` | Logout forcé après changement critique (rôle modifié, MFA enrollée…) |
+| `src/lib/sessionEnforcerStorage.ts` | Helpers persistence session |
+
+#### 6.1.3 Edge Functions liées
+
+| Function | Rôle | Auth |
+|---|---|---|
+| `provision-self-signup-tenant` | Orchestrateur du flow Stripe → tenant + admin + DNS + Resend | Public (sécurité = secret session Stripe) |
+| `tenant-onboarding` | Provisioning DNS Cloudflare + domaine custom Vercel + setup Resend | `verify_jwt = false` |
+| `create-tenant-admin` | Crée le user admin + envoie magic link bienvenue (Resend) | `verify_jwt = false` |
+| `create-user-account` | Crée un user (utilisé pour invitations collaborateur ou client) | `verify_jwt = false` |
+| `create-collaborator` | Wrapper côté CRM pour création collaborateur + assignment rôle/scope | Authentifié |
+| `send-verification-sms` | Envoie code SMS Twilio Verify | `verify_jwt = false` |
+| `verify-sms-code` | Valide le code SMS et complète l'authentification | `verify_jwt = false` |
+| `send-password-reset` | Reset password (Resend) | `verify_jwt = false` |
+| `resend-signup-finalization` | Réémet l'email de finalisation si l'user n'a pas reçu | Authentifié |
+| `delete-user-account` | Suppression user (RGPD) | KING-only |
+
+#### 6.1.4 Business rules clés
+
+- **Mot de passe** : minimum 8 caractères + **vérification HaveIBeenPwned** via API publique (préfixe SHA-1, k-anonymity). Si le password apparaît dans une fuite connue → refus.
+- **MFA SMS** : configurable par tenant dans `tenant_security_settings`. Si activé, après le `signInWithPassword` réussi, un challenge SMS est lancé sur le numéro stocké dans le profil. Tant que le code n'est pas validé, l'utilisateur reste dans un état "pendingSmsVerification" (stocké en sessionStorage).
+- **Magic link expiry** : 24h (anciennement 1h, augmenté car les users ne cliquaient pas à temps — voir migration `20260603...` et `config.toml` `[auth.email].otp_expiry = 86400`).
+- **OTP length** : 8 caractères (`otp_length = 8` dans `config.toml`).
+- **Session timeout** : configurable par tenant. Auto-logout si l'user est inactif (mouvement souris/clavier surveillés via `useSessionTimeout`).
+- **Self-signup idempotence** : si on relance `provision-self-signup-tenant` avec une `session_id` Stripe déjà traitée → retourne le tenant existant au lieu de le recréer.
+
+#### 6.1.5 Flow self-signup détaillé
+
+```
+1. Marketing site (Lovable) → POST /provision-self-signup-tenant
+   { stripe_session_id, slug, tenant_name, admin_email, admin_first_name, … }
+
+2. Edge function:
+   a. stripe.checkout.sessions.retrieve(stripe_session_id) — vérifie payment_status === 'paid'
+   b. SELECT FROM tenants WHERE stripe_session_id = ? — idempotence
+   c. INSERT INTO tenants (status = 'pending_setup', plan_id, stripe_customer_id, …)
+   d. Appelle create-tenant-admin → INSERT auth.users + INSERT user_tenant_roles + envoie magic link via Resend
+   e. Appelle tenant-onboarding step="full" → crée DNS Cloudflare CNAME + ajoute domaine custom à Vercel + crée audience Resend
+   f. INSERT king_notifications (Habib reçoit alerte "Nouveau tenant {slug}")
+   g. Retourne {tenant_id, slug, url: "https://{slug}.lyta.ch"}
+
+3. User clique le magic link reçu → FinaliserInscription
+   a. Set password (validé HIBP + longueur)
+   b. Optionnel : complète le profil
+   c. Redirige vers https://{slug}.lyta.ch/crm
+```
+
+#### 6.1.6 Gotchas
+
+- **Double `supabase` client** : `useAuth` instancie un **second client** (`smsClient`) avec sa propre storage isolée pour la phase challenge SMS — sinon, après `signInWithPassword`, l'user serait déjà "connecté" du point de vue de Supabase, et un refresh page contournerait le SMS. Le challenge se résout en migrant explicitement la session du `smsClient` vers le `supabase` principal après validation.
+- **Provisioning Vercel** : `tenant-onboarding` peut échouer si le quota Vercel domaines est atteint ou si la zone Cloudflare est mal configurée. Le tenant est laissé en `pending_setup` et Habib reçoit une notif. **Pas de rollback automatique**.
+- **Reset password depuis sous-domaine tenant** : la redirection se fait via `window.location.origin` → atterrit bien sur le sous-domaine, mais l'URL doit être dans `additional_redirect_urls` du `config.toml` (déjà : `https://*.lyta.ch/**`).
+
+#### 6.1.7 RLS critique
+
+Tables impliquées : `profiles`, `user_tenant_roles`, `user_tenant_assignments`, `tenants`, `pending_signups`, `sms_verifications`.
+
+- **`profiles`** : RLS = `id = auth.uid()` (chaque user voit/édite uniquement son propre profil)
+- **`user_tenant_roles`** : SELECT scopé au tenant actif, INSERT/UPDATE réservé aux admins via fonctions dédiées
+- **`tenants`** : SELECT = membre du tenant ; INSERT/UPDATE = KING uniquement (sauf provisioning via service_role)
+
+---
+
+### 6.2 Module 2 — CRM Clients
+
+#### 6.2.1 Rôle métier
+
+Carnet de **personnes physiques** clientes du cabinet. C'est le **module le plus utilisé** de LYTA — point d'entrée de tous les autres modules (polices, commissions, signatures, mandats, sinistres, documents).
+
+Couvre :
+- Création / édition / archivage de clients
+- **Membres de famille** rattachés au foyer (conjoint, enfants — peuvent être eux-mêmes clients)
+- **Assignation** d'un client à un agent (`assigned_agent_id`)
+- **Bulk assign** (réassigner en masse N clients à un autre agent)
+- **Import prospects** (CSV/XLSX)
+- **Documents** liés au dossier client
+- **Suivis** (tasks/reminders sur un client)
+- **QuickContact** : popup compact "appeler / SMS / email" depuis n'importe quelle liste
+
+#### 6.2.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/clients/ClientsList.tsx` | Liste paginée des clients (50/page), filtres, recherche, BulkAssign |
+| `src/pages/crm/clients/` (autres) | Pages détail / création / édition |
+| `src/hooks/useClients.tsx` (~600 LOC) | Query principale + RLS scope-aware filter front + timeout 45s |
+| `src/hooks/useFamilyMembers.tsx` | Gestion membres de famille |
+| `src/hooks/useDocuments.tsx` | Documents par client |
+| `src/components/crm/clients/BulkAssignDialog.tsx` | Dialog réassignation masse |
+| `src/components/crm/clients/QuickContactDialog.tsx` | Popup contact rapide |
+| `src/components/crm/clients/ImportFamilyMemberDialog.tsx` | Ajout membre famille (peut linker un client existant) |
+| `src/components/crm/clients/ProspectImportDialog.tsx` | Import CSV/XLSX prospects |
+
+#### 6.2.3 Edge Functions liées
+
+| Function | Rôle | Pourquoi elle existe |
+|---|---|---|
+| `create-client` | Fallback INSERT client via service_role | **Bypass d'un bug RLS 42501 récurrent** observé en prod sur Advisy et JCG. Le code source explique : "createClient front fait `.insert([...])` direct sur public.clients, PostgREST renvoie 403 / 42501 alors que toutes les conditions semblent vraies en tests SQL manuels" — mismatch SQL CLI vs PostgREST runtime. **À investiguer en priorité par le dev** (voir Dette technique §11). |
+| `bypass-insert` | Fallback générique INSERT pour `family_members` + `documents` | Même raison que `create-client` |
+
+#### 6.2.4 Business rules clés
+
+- **Scope-aware visibility** : un agent ne voit que ses clients (`assigned_agent_id = my_collab_id`) — appliqué **côté frontend** dans `useClients.tsx` parce que les RLS scope-aware côté SQL faisaient timeout (Stéphane JCG : 80s). Code clé :
+  ```typescript
+  if (myCollabId && (myScope === "personal" || myScope === "team")) {
+    query = query.or(`assigned_agent_id.eq.${myCollabId},id.eq.${myCollabId}`);
+  }
+  ```
+- **Timeout query** : `CLIENTS_QUERY_TIMEOUT_MS = 45_000` (bumpé depuis 12s parce que comptage + select sur 1000+ clients avec RLS lourdes prenait >12s).
+- **Création client = peut créer aussi user portal** : si le client a un email, on crée optionnellement un `auth.users` pour qu'il accède à son espace.
+- **Family members ↔ clients** : un `family_members` peut référencer un `clients.id` existant (linkage) ou être autonome (juste prénom/nom dans la table family_members). UX : "Importer un client existant comme membre de famille".
+
+#### 6.2.5 Gotchas
+
+- **Le bug RLS 42501** est **toujours actif** côté Postgres — `create-client` n'est qu'un workaround. Tous les chemins de création client (formulaire CRM, ScanValidationDialog après Smartflow, ImportProspect, etc.) ont été migrés pour passer par `create-client` (commits `f25593f`, `79e2b75`).
+- **`clients_safe`** : vue Postgres listée dans le schéma. Usage actuel **à confirmer** — probablement un legacy d'une époque où on retournait `clients` avec colonnes masquées selon le scope. **À auditer** : si plus utilisée, supprimer.
+- **`assigned_agent_id`** référence un `tenant_users.id` ? Ou un `auth.users.id` ? À auditer dans la table `clients` schema.
+
+#### 6.2.6 RLS critique
+
+- **`clients`** : SELECT = `tenant_id = get_user_tenant_id()` (RLS simple, depuis la révert anti-timeout du 3 juin). Le scoping personal/team est appliqué côté frontend.
+- **`family_members`**, **`documents`** : SELECT via fonction `can_access_client(client_id)`.
+
+---
+
+### 6.3 Module 3 — CRM Polices / Contracts
+
+#### 6.3.1 Rôle métier
+
+Gérer le **portefeuille d'assurances** d'un client : polices souscrites, échéances, primes, sinistres associés. C'est l'entité qui alimente les commissions et les dashboards de production.
+
+#### 6.3.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMContracts.tsx` | Liste portefeuille (toutes polices du tenant) |
+| `src/hooks/usePolicies.tsx` | Query principale paginée + helpers |
+| `src/lib/policiesApi.ts` | Helpers `savePolicy()` (CREATE/UPDATE avec validation), normalisation produits |
+| `src/hooks/usePolicies.tsx` (Policy type) | Type Policy complet (28+ champs) |
+| `src/pages/DeposerContrat.tsx` | Page publique "dépôt de contrat" (clients peuvent déposer une police existante) |
+| `src/pages/crm/CRMPropositions.tsx` | Propositions commerciales avant signature |
+
+#### 6.3.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `save-policy` | INSERT/UPDATE police avec validation server-side (génère UUID, supprime `.select()` post-INSERT pour éviter RLS SELECT immédiat) |
+| `deposit-contract` | Dépôt public d'un contrat par un client (depuis `DeposerContrat.tsx`) |
+| `send-contract-deposit-email` | Notif au broker quand un client dépose un contrat |
+
+#### 6.3.4 Business rules clés
+
+- **`policies` vs `contracts`** : les **deux tables existent** en DB. Code et hooks utilisent **`policies`** (table actuelle). La table `contracts` semble être un **legacy résiduel** — d'ailleurs `save-policy/index.ts:196` fait référence à `module = "contracts"` qui est un **identifiant de module** dans `platform_modules` (le module s'appelle encore "contrats" UI-side, mais stocke ses données dans `policies`). **À auditer / nettoyer**.
+- **Multi-produits par police** : une police peut couvrir plusieurs produits (LAMal + LCA + dentaire) → `products_data: Array<{productId, premium, …}>` JSONB.
+- **`tenant_branch_id`** : override par police de la branche du produit (utile quand le cabinet a plusieurs agences avec des tarifications différentes).
+- **Statuts** : `draft`, `active`, `cancelled`, `expired`, etc. (à confirmer dans le schéma).
+- **`partner_id`** : référence un partenaire externe (apporteur) qui a amené le contrat → utilisé pour les rétrocessions.
+
+#### 6.3.5 Gotchas
+
+- **UUID backend forcé** : `save-policy` génère lui-même l'UUID au lieu de laisser Postgres le faire, pour pouvoir utiliser le même UUID dans des opérations downstream sans relire le row (`.select()` enlevé après INSERT/UPDATE car déclenche RLS SELECT qui peut bloquer — voir commit `d76c0a8`).
+- **DeposerContrat public** : la page `/deposer-contrat` est accessible sans auth. Un client peut y déposer un contrat actuel — ça crée un `pending_signups` ou un dossier à traiter par le broker. Surface d'attaque à auditer.
+
+---
+
+### 6.4 Module 4 — CRM Commissions
+
+#### 6.4.1 Rôle métier
+
+Le **module le plus complexe** de LYTA. Calcule, suit et reverse les commissions des compagnies vers le cabinet, puis du cabinet vers les agents (rétrocessions), avec gestion des **réserves**, **paliers** (tiering volume), **décomptes** mensuels.
+
+Sous-domaines :
+- **Règles tarifaires** par compagnie/produit (taux, plafonds, paliers)
+- **Saisie manuelle** d'une commission ou **import** d'un décompte compagnie
+- **Smartflow Décomptes** : import + OCR + parsing IA du PDF de décompte compagnie (gpt-5) → lignes auto-matchées avec clients/polices → validation manuelle par le broker
+- **Rétrocessions** aux agents/sous-agents avec règles configurables
+- **Décomptes payés aux collaborateurs** (équivalent paie)
+- **Comptes de réserve** : retenue d'un % pour provisionner les retours/annulations futures
+
+#### 6.4.2 Surface code
+
+| Fichier | Rôle | Volume |
+|---|---|---|
+| `src/pages/crm/CRMCommissions.tsx` | Page principale liste + filtres + bannière "X commissions à valider" | 1043 LOC |
+| `src/components/crm/CommissionForm.tsx` | Formulaire commission (saisie manuelle ou pré-rempli depuis Smartflow) | 836 LOC |
+| `src/hooks/useCommissions.tsx` | Query + pagination + helpers |
+| `src/hooks/useCommissionParts.tsx` | Décomposition d'une commission en parts (agent / cabinet / réserve / TVA) |
+| `src/hooks/useCollaborateursCommission.tsx` | Vue par collaborateur (total par agent) |
+
+#### 6.4.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `scan-commission-statement` | Reçoit un `commission_statement_id`, lit le PDF de décompte, l'envoie à gpt-5 avec prompt structuré, parse les lignes, INSERT dans `commission_statement_lines`, et lance la RPC `match_commission_line` pour auto-matcher avec clients/polices existants |
+
+#### 6.4.4 Business rules clés
+
+- **Calcul** : `commission_amount = base_amount × rate / 100` (rate dépend de `commission_rules` ou `commission_tiers` ou `tenant_product_commission_overrides`)
+- **Réserve** : `reserve_amount = commission_amount × reserve_rate / 100`. Le reste (`net`) part vers la rétrocession agent.
+- **Réserves par collaborateur** : `collaborateurs.reserve_rate` (configurable par admin). Voir `CRMCompta.tsx:229-244`.
+- **Matching auto Smartflow** : `match_commission_line` essaie de matcher par numéro de police, puis par nom/prénom client. Si match → la ligne est pré-validée. Sinon → broker valide manuellement.
+- **Validation broker** : chaque ligne d'un décompte doit être validée individuellement avant d'être comptabilisée dans les KPIs. Bannière "X commissions à valider" reste visible jusqu'à clean-up.
+- **Tiering** : `commission_tiers` permet des taux progressifs (ex: 0-50 polices = 10%, 51-100 = 12%, 101+ = 15%).
+
+#### 6.4.5 Gotchas
+
+- **`commission_statement_lines` n'est pas dans les types Supabase auto-générés** : erreur tsc visible `Argument of type '"commission_statement_lines"' is not assignable to parameter of type [list of tables]` dans `CommissionForm.tsx:387`. **Type-gen Supabase à régénérer**.
+- **`scan-commission-statement` utilise `gpt-5`** : modèle confirmé dans le commentaire du fichier. Coût par scan à monitorer (un décompte mensuel = 50-200 lignes).
+- **Match ambigu** : si plusieurs polices du client peuvent matcher la ligne (homonymes, polices multiples), la RPC choisit la plus récente — peut donner des erreurs silencieuses. **À auditer**.
+
+---
+
+### 6.5 Module 5 — CRM Compagnies d'assurance
+
+#### 6.5.1 Rôle métier
+
+Catalogue centralisé des **compagnies** (AXA, Helsana, Swiss Life…) et leurs **produits** (LAMal Basis, LCA, 3a…). Géré principalement par **KING** (catalogue partagé entre tenants) avec possibilité de produits/contacts propres au tenant.
+
+Utilisé pour :
+- Création d'une police (sélection compagnie + produit)
+- Dispatch mandat (envoi du PDF signé aux contacts mandat de chaque compagnie)
+- Calcul commissions (compagnie → règles de commission)
+- Affichage des **logos** des compagnies dans toute l'UI
+
+#### 6.5.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMCompagnies.tsx` | Liste compagnies + produits (1158 LOC) — vue cabinet |
+| `src/components/crm/CompanyContactsPanel.tsx` | Gestion contacts par compagnie (email mandat, email général, téléphone) |
+| `src/hooks/useInsuranceCompanies.tsx` | Query compagnies (du catalogue) |
+| `src/hooks/useInsuranceProducts.tsx` | Query produits |
+| `src/hooks/useCompanyContacts.tsx` | Query contacts |
+| `src/components/crm/InsuranceCompanyLogo.tsx` | Composant logo (CDN local via `insuranceCompanyLogos.ts`) |
+| `src/lib/insuranceCompanyLogos.ts` | Mapping nom compagnie → URL logo local |
+| `src/pages/king/KingCatalog.tsx` | Gestion du catalogue par KING (cross-tenant) |
+| `src/components/king/CompanyCatalogManager.tsx` | UI KING pour CRUD compagnies/produits |
+
+#### 6.5.3 Business rules clés
+
+- **Catalogue cross-tenant** : `insurance_companies` + `insurance_products` sont **partagés** entre tous les tenants (gérés par KING).
+- **Produits tenant-spécifiques** : un tenant peut ajouter des produits qui n'existent pas dans le catalogue global (`insurance_products.tenant_id IS NOT NULL`).
+- **Contacts par compagnie** : `company_contacts` stocke un contact_type (general / mandat / sinistre) + channel (email / phone). Le **dispatch mandat** utilise `contact_type = 'mandat'` en priorité.
+- **Logos** : servis depuis `/public/insurance-logos/` (assets locaux). Fallback : avatar avec initiales.
+
+#### 6.5.4 Gotchas
+
+- **Aucune mention de "mandat" dans `CRMCompagnies.tsx`** (vérifié dans 1158 LOC) → la page **n'affiche pas le statut de dispatch des mandats**. C'est volontaire — le suivi se fait via `tenant_email_log` dans CRM Publicité. **À documenter pour le dev** : ne pas tenter de l'ajouter sans aligner avec Habib.
+
+---
+
+### 6.6 Module 6 — CRM Compta
+
+#### 6.6.1 Rôle métier
+
+Vue **comptable** côté cabinet : décomptes payés aux collaborateurs, comptes de réserve, factures QR suisses émises/reçues, transactions, exports.
+
+#### 6.6.2 Surface code
+
+| Fichier | Rôle | Volume |
+|---|---|---|
+| `src/pages/crm/CRMCompta.tsx` | Page principale (multi-onglets : décomptes, réserves, QR-factures, exports) | 1205 LOC |
+| `src/hooks/useQRInvoices.tsx` | QR-factures suisses |
+| `src/hooks/useCollaborateursCommission.tsx` | Synthèse par collaborateur |
+
+#### 6.6.3 Tables clés
+
+- `decomptes` + `decompte_lines` : décomptes périodiques par collaborateur
+- `qr_invoices` + `qr_invoice_logs` : QR-factures suisses émises (générées via `qrcode` lib)
+- `transactions` : mouvements génériques
+- `reserve_accounts` + `reserve_transactions` : comptes de réserve par collaborateur
+- `payouts` : paiements externes (apporteurs, partenaires)
+
+#### 6.6.4 Business rules clés
+
+- **Réserves** : à chaque commission encaissée, un % (`reserve_rate`) est prélevé pour le compte de réserve du collaborateur. Sert à provisionner les retours / annulations de polices (la compagnie peut reprendre la commission jusqu'à N mois après).
+- **Calcul net agent** : `net = commission_brut - reserve_amount - tva (si applicable)`. Voir `CRMCompta.tsx:241-244`.
+- **QR-facture suisse** : génère le code QR conforme à la norme ISO 20022 (IID, IBAN QR-only, montant CHF). Lib `qrcode` + payload structuré.
+- **Module conditionnel** : `hasQRInvoiceAccess = hasModule('qr_invoice')` — disponible uniquement si le plan du tenant inclut le module QR-facture (`plan_modules`).
+
+#### 6.6.5 Gotchas
+
+- **Précision financière** : tous les montants sont en **NUMERIC(12,2)** côté Postgres. **Ne JAMAIS** utiliser de FLOAT côté JS — toujours `Number(value).toFixed(2)` avant d'afficher, ou utiliser une lib type `dinero.js` pour les calculs sensibles.
+- **Pas d'audit trail systématique** sur `transactions` / `decompte_lines` — un INSERT ou DELETE manuel peut altérer les chiffres sans trace. **À renforcer**.
+
+---
+
+### 6.7 → 6.18 Modules restants
+
+> 📋 **À détailler en passe 3-4** :
 >
-> Modules planifiés (~18) :
->
-> 1. Auth & Onboarding
-> 2. CRM Clients
-> 3. CRM Contracts / Polices
-> 4. CRM Commissions
-> 5. CRM Compagnies d'assurance
-> 6. CRM Compta
-> 7. CRM Smartflow / Propositions / Scan IA
+> 7. CRM Smartflow / Scan IA / Propositions
 > 8. CRM Signatures (mandat + imported + dispatch)
 > 9. CRM Publicité (Emailing transactionnel + campagnes)
 > 10. CRM Suivis (Tasks, Reminders, Birthdays)
