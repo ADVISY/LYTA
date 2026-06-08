@@ -1480,49 +1480,393 @@ Programme d'**affiliation LYTA** : apporteurs externes qui amènent des cabinets
 
 ## 7. Edge Functions catalogue
 
-> 📋 **À détailler** — 59 fonctions à documenter (rôle, auth, payload, dépendances, called by).
+Toutes les 59 edge functions sont listées ci-dessous, groupées par domaine fonctionnel. Pour chacune : rôle, niveau d'auth, et notes critiques.
+
+### 7.1 Convention `verify_jwt`
+
+Dans `supabase/config.toml`, chaque fonction a un flag `verify_jwt = true|false` :
+- `true` (défaut) : Supabase rejette l'appel si pas de JWT valide. Le frontend doit fournir le token user via header `Authorization`.
+- `false` : la fonction reçoit l'appel sans pre-check JWT — c'est à elle de gérer l'auth en interne (via `requireAuth()` du `_shared`, ou par un secret applicatif type Stripe session, ou de manière publique en s'appuyant sur un token UUID).
+
+**Toutes les fonctions LYTA sont actuellement en `verify_jwt = false`** dans `config.toml` (cf. inspection du fichier). La sécurité est donc déléguée à chaque fonction individuellement via :
+- `_shared/auth.ts` → `requireAuth()` qui valide le JWT manuellement, et `requireTenantAccess()` qui vérifie l'appartenance au tenant cible.
+- Tokens publics non-devinables (UUIDs) pour les flows anonymes (signature, deposit-contract).
+- Secrets de session Stripe pour le self-signup.
+- Restriction `service_role` only pour les crons.
+
+> ⚠️ **Implication pour audit** : il faut **lire le code** de chaque fonction pour savoir si elle valide bien l'auth ou si elle est exploitable. Voir Doc 2 confidentiel.
+
+### 7.2 Catalogue annoté
+
+#### Auth & comptes (10 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `create-user-account` | Crée un user (utilisé pour invitations collab ou client) | service_role |
+| `create-collaborator` | Création collab + invitation email | `requireAuth` admin/manager |
+| `create-tenant-admin` | Crée admin du tenant + magic link bienvenue Resend | service_role (appelé par provision) |
+| `delete-user-account` | Suppression user (RGPD) | KING-only |
+| `send-password-reset` | Reset password via Resend | Public (rate-limit IP) |
+| `send-verification-sms` | Envoie code SMS Twilio Verify | Public (rate-limit) |
+| `verify-sms-code` | Valide code SMS et complète l'auth | Public (le code lui-même est le secret) |
+| `resend-signup-finalization` | KING : relance email "Finalise ton inscription" pour pending_signup orphelin | KING-only |
+| `send-sms` | Envoi SMS Twilio générique | service_role |
+| `verify-partner-email` | Validation email partenaire (programme affiliés) | Public via token |
+
+#### Tenants & onboarding (6 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `provision-self-signup-tenant` | Orchestrateur self-signup post-Stripe (vérif paiement → crée tenant → admin → DNS → Resend) | Public (secret = Stripe session_id) |
+| `check-slug-availability` | Vérif live disponibilité slug | Public (rate-limit IP) |
+| `get-checkout-session-info` | Récupère info session Stripe pour pré-remplir form | Public (secret = session_id) |
+| `create-checkout-session` | Crée Stripe Checkout (essai 7j) | Public |
+| `tenant-onboarding` | Setup DNS Cloudflare + Vercel + Resend pour un tenant. Aussi : email DNS records au tenant pour domaine custom | service_role (appelé par provision ou KING) |
+| `activate-tenant` | Active un tenant en attente | KING-only |
+| `delete-tenant` | Suppression complète tenant | KING-only |
+| `reset-tenant-data` | Reset data tenant (test) | KING-only |
+| `export-tenant-data` | Export RGPD/portabilité | KING-only ou admin tenant |
+
+#### Stripe & facturation (8 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `stripe-webhook` | Réception webhooks Stripe (invoice.paid, subscription.*) | Signature Stripe vérifiée |
+| `add-user-seat` | Ajout seat à l'abonnement Stripe | `requireAuth` admin tenant |
+| `cancel-tenant-subscription` | Annulation self-service (cancel_at_period_end) | `requireAuth` admin tenant |
+| `list-tenant-invoices` | List factures Stripe d'un tenant | KING-only |
+| `sync-tenant-stripe` | Sync Stripe customers/subs ↔ tenants par email | KING-only (ou auto pour 1 tenant) |
+| `sync-external-billing` | Pull usages réels Resend + Twilio dans `platform_usage_logs` | KING-only |
+| `apply-monthly-overage` | Cron : crée invoice items Stripe pour overages | service_role / cron |
+| `king-stripe-stats` | Agrégats MRR / churn / expansion | KING-only |
+
+#### Signatures (6 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `send-signature-invite` | Envoie email avec lien `/signer/:token` | `requireAuth` membre tenant |
+| `proxy-signature-pdf` | Re-stream PDF depuis Storage avec CORS `*` | Public (auth = access_token query) |
+| `get-signature-pdf-url` | Signed URL temporaire pour PDF | Public (auth = token) |
+| `complete-signature` | Merge PDF + signature, store, marque `signed` | Public (auth = token) |
+| `dispatch-mandat-to-companies` | Envoi mandat signé aux compagnies par email + log | `requireAuth` membre tenant |
+| `request-signature-link-renewal` | Notifie le broker quand le client demande un nouveau lien (token expiré) | Public (auth = token) — **n'auto-renouvelle PAS** (sinon faille) |
+
+#### Documents & Smartflow (3 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `scan-document` | OCR + classification IA d'un doc unitaire | `requireAuth` + quota |
+| `classify-batch-documents` | Traitement lot avec quotas | `requireAuth` + `reserveTenantQuota` |
+| `scan-commission-statement` | OCR décompte gpt-5 + parsing lignes + match auto | `requireAuth` + quota |
+
+#### Polices & contrats (2 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `save-policy` | INSERT/UPDATE police avec UUID forcé backend | `requireAuth` membre tenant |
+| `deposit-contract` | Dépôt public d'un contrat par un client | Public (form public) |
+| `send-contract-deposit-email` | Notif au broker après dépôt | service_role |
+
+#### Clients & fallbacks RLS (2 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `create-client` | Fallback INSERT client (bypass RLS 42501) | `requireAuth` + check membre tenant + perm `clients.create` |
+| `bypass-insert` | Fallback INSERT générique (family_members + documents) | `requireAuth` + check tenant + whitelist tables |
+
+#### Emails transactionnels & cron (9 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `send-crm-email` | Email custom CRM | `requireAuth` membre tenant |
+| `send-client-message` | Message broker↔client | `requireAuth` |
+| `send-client-notification-email` | Notif email client | service_role |
+| `send-claim-notification` | Notif sinistre | service_role |
+| `send-birthday-emails` | Cron quotidien : anniversaires clients | service_role / cron |
+| `send-renewal-reminders` | Cron quotidien : échéances polices | service_role / cron |
+| `send-follow-up-reminders` | Cron quotidien : relance prospects dormants | service_role / cron |
+| `send-test-tenant-emails` | KING : envoie email test de chaque template | KING-only |
+| `process-scheduled-emails` | Worker cron : `scheduled_emails` due | service_role |
+
+#### LPP & assurance suisse (4 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `send-lpp-search-requests` | Envoi 2 emails aux institutions LPP (Sicherheitsfonds + Auffangeinrichtung) | `requireAuth` membre tenant |
+| `swiss-postal-code-lookup` | Proxy OpenPLZ Suisse | Public (rate-limit) |
+| `swiss-address-lookup` | Proxy swisstopo SearchServer (autocomplete adresses) | Public (rate-limit) |
+| `health-check` | Healthcheck plateforme | Public |
+
+#### IA & assistant (1 fonction)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `ai-chat` | Assistant IA conversationnel (chat) | `requireAuth` + quota |
+
+#### KING admin (1 fonction sensible)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `king-impersonate-tenant` | **Impersonate** : magic link de connexion comme admin d'un tenant. Loggé `king_audit_log action_type='tenant.impersonate'`. | KING-only |
+
+#### Affiliés & onboarding partenaires (2 fonctions)
+
+| Function | Rôle | Auth interne |
+|---|---|---|
+| `submit-referral` | Soumission filleul (depuis Espace Client) | Public via auth client |
+| `receive-tenant-request` | Réception demande tenant (form public) | Public |
 
 ---
 
 ## 8. Auth & Permissions (détail technique)
 
-> 📋 **À détailler** — Supabase Auth flow, JWT, MFA TOTP, sessions, reset password.
+---
+
+## 8. Auth & Permissions (détail technique)
+
+### 8.1 Supabase Auth (GoTrue)
+
+- **Backend** : géré par Supabase (GoTrue). Pas de code custom côté Auth strictement parlant.
+- **Provider** : email + password uniquement (pas de OAuth Google/Microsoft à date).
+- **JWT** :
+  - Algorithme HS256
+  - Secret : `SUPABASE_JWT_SECRET` (côté Supabase)
+  - Expiration : **3600s (1h)** (`jwt_expiry = 3600` dans `config.toml`)
+  - Refresh : automatique côté client supabase-js via refresh_token
+- **Storage des sessions côté client** :
+  - localStorage par défaut (`supabase-js`)
+  - Un second client (`smsClient`) est instancié pour la phase MFA SMS avec sa propre storage isolée (sessionStorage) — voir `useAuth.tsx`
+- **Magic links** : `otp_expiry = 86400` (24h, augmenté depuis 1h), `otp_length = 8`.
+
+### 8.2 MFA
+
+- **TOTP** : `enroll_enabled = true`, `verify_enabled = true` dans `config.toml`. Max 10 facteurs.
+- **SMS** : `enroll_enabled = false`, `verify_enabled = false` côté Supabase Auth standard. **LYTA implémente une MFA SMS custom** via Twilio Verify (`send-verification-sms` + `verify-sms-code`), pas via le mécanisme natif Supabase.
+
+### 8.3 RLS (Row Level Security)
+
+Toutes les tables `public.*` ont RLS activé. Les policies utilisent des **fonctions helper SECURITY DEFINER** pour éviter la récursion et hoister les calculs :
+
+| Fonction | Rôle |
+|---|---|
+| `get_user_tenant_id()` | Retourne le tenant_id actif depuis le JWT ou `user_tenant_roles` |
+| `my_collab_id_for_active_tenant()` | Retourne le collaborator id de l'user courant |
+| `has_role(role_name)` | Check rôle global |
+| `is_crm_member_of_tenant(tenant_id)` | Check appartenance tenant |
+| `can_access_client(client_uuid)` | Compose les checks pour autoriser l'accès à un client |
+| `_client_is_in_team(client_uuid, manager_uuid)` | Pour scope team (sans récursion) |
+
+Détail des policies par table critique → **Doc 2 confidentiel**.
+
+### 8.4 Sessions
+
+- **Timeout d'inactivité** : configurable par tenant via `tenant_security_settings.session_timeout_minutes`. Géré côté client par `useSessionTimeout.ts` qui écoute les events souris/clavier.
+- **Logout forcé** : déclenché par `useForcedLogoutAfter` après des actions critiques (changement de rôle, MFA enrôlée, mot de passe changé).
+- **`statement_timeout`** Postgres : 30s pour le rôle `authenticated` (`ALTER ROLE authenticated SET statement_timeout = '30s'`). Coupe les queries qui partent en runaway.
+
+### 8.5 Permissions granulaires
+
+Au-delà du rôle (`admin`/`manager`/`agent`), `collaborator_permissions` permet d'**override** finement les droits d'un collab :
+- `clients.create`, `clients.delete`
+- `policies.write`, `policies.export`
+- `commissions.see_amounts`, `commissions.validate`
+- etc.
+
+Le hook `usePermissions()` agrège rôle + permissions + flags du plan pour exposer `can(action)`.
 
 ---
 
 ## 9. Déploiement
 
-> 📋 **À détailler** — Vercel CI/CD, Supabase CLI, variables d'env, migrations, secrets, rollback.
+---
+
+## 9. Déploiement
+
+### 9.1 Frontend (Vercel)
+
+- **Auto-deploy** sur push GitHub branche `main` (LYTA-git privé).
+- **Preview deploys** sur PR.
+- **Domaines** :
+  - `app.lyta.ch` (principal)
+  - `*.lyta.ch` (sous-domaines tenants ajoutés dynamiquement via `tenant-onboarding`)
+  - `lyta-xi.vercel.app` (URL Vercel par défaut, backup)
+- **Build** : `npm run build` → `dist/` → CDN Vercel.
+- **Env vars** côté Vercel (à confirmer dans le dashboard) :
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+
+### 9.2 Backend (Supabase CLI manuel)
+
+⚠️ **Pas d'auto-deploy backend.** Toutes les opérations backend sont **manuelles**, lancées depuis le poste de Habib avec `supabase` CLI.
+
+#### Migrations DB
+
+```bash
+# Lister les migrations à appliquer
+supabase db diff --schema public
+
+# Appliquer en remote
+supabase db push --linked
+
+# Reset local (sandbox de dev)
+supabase db reset
+```
+
+Les migrations vivent dans `supabase/migrations/*.sql` (256 à date), nommées avec timestamp croissant `YYYYMMDDHHMMSS_<description>.sql`.
+
+#### Edge Functions
+
+```bash
+# Déployer une function
+supabase functions deploy <name>
+
+# Toutes les functions
+supabase functions deploy
+
+# Set un secret
+supabase secrets set RESEND_API_KEY=re_xxx
+```
+
+#### Storage policies
+
+Configurées via migrations SQL (`storage.objects` policies).
+
+### 9.3 Workflow de déploiement (cf. mémoire Habib)
+
+- **Frontend** : push GitHub → Vercel build auto (~1-2 min) → live.
+- **Backend** : commit local → `supabase db push` ou `supabase functions deploy <name>` manuel.
+- **Règle Habib** : "Never push to GitHub without explicit approval" — toujours commit local d'abord, puis push uniquement après validation.
+
+### 9.4 Rollback
+
+| Type | Procédure |
+|---|---|
+| Frontend | Vercel : "Redeploy" sur un commit précédent depuis le dashboard |
+| Edge function | `supabase functions deploy <name>` en repointant sur le précédent code (Git) |
+| Migration DB | **Pas de rollback automatique** — il faut écrire une nouvelle migration de réversion. Toutes les migrations sont conçues pour être idempotentes / additives. |
+
+### 9.5 Monitoring & logs
+
+- **Vercel** : logs frontend dans le dashboard Vercel.
+- **Supabase** : logs edge functions accessibles via dashboard (panneau "Logs"). Les `createLogger("name")` du `_shared/logger.ts` standardisent les logs JSON structurés.
+- **Healthcheck** : `health-check` edge function.
+- **Errors front** : pas de Sentry à date — uniquement `console.error` (à améliorer).
 
 ---
 
 ## 10. Conventions code
 
-> 📋 **À détailler** — naming, patterns React, hooks, gestion d'erreur, i18n.
+---
+
+## 10. Conventions code
+
+### 10.1 Structure & naming
+
+- **Pages** : `PascalCase.tsx` (`CRMClients.tsx`, `Signer.tsx`)
+- **Composants** : `PascalCase.tsx`
+- **Hooks** : `useXxx.tsx` (`useClients`, `useAuth`)
+- **Lib utilitaires** : `camelCase.ts` (`edgeFunctions.ts`, `tenantUrls.ts`)
+- **Types** : declared inline ou dans `integrations/supabase/types.ts` (auto-généré)
+
+### 10.2 Patterns React
+
+- **Fonctional components only** (pas de class components).
+- **Hooks** : un hook custom par préoccupation métier. Convention : retourner `{ data, loading, error, ...mutations }`.
+- **State serveur** : **TanStack Query** systématique. Pas de `useEffect + fetch` direct.
+- **Forms** : `react-hook-form` + `zod` schema.
+- **Errors** : `translateError(err)` (`src/lib/errorTranslations.ts`) pour convertir les erreurs Supabase en messages FR.
+- **Toasts** : `useToast()` (Radix) ou `sonner` selon le composant.
+
+### 10.3 Conventions Supabase
+
+- **Query** : `supabase.from('table').select(...).eq(...).maybeSingle()` (préfère `maybeSingle` à `single` pour ne pas planter si 0 row).
+- **Edge functions** : invoquées via `invokeSupabaseFunction(name, { body })` (wrapper `src/lib/edgeFunctions.ts`) qui gère uniformément les erreurs et les CORS.
+- **Pagination** : `usePaginatedQuery()` hook custom standardisé pour toutes les listes.
+- **RLS** : ne jamais désactiver, ne jamais bypass front. Si besoin de bypass → passer par edge function service_role (cf. `create-client`).
+
+### 10.4 i18n
+
+- **Lib** : `react-i18next` (vu dans `ClientDashboard.tsx`).
+- **Langues** : FR principalement. EN partiel (à vérifier).
+
+### 10.5 Tests
+
+- **Statut** : pas de framework de tests automatisés à date.
+- **Tests manuels** : documentés dans `Documentation/TESTS_A_REALISER.md`.
+- **Recommandation pour le dev** : introduire **Vitest** pour les hooks + **Playwright** pour les flows critiques (signup, signature, dispatch mandat).
+
+### 10.6 Linting
+
+- **ESLint 9 + typescript-eslint 8**.
+- **Plugins** : `react-hooks`, `react-refresh`.
+- **Pre-commit** : pas de Husky à date — recommandé d'en ajouter pour empêcher les pushs avec erreurs ESLint/tsc.
 
 ---
 
 ## 11. Dette technique & bugs UX connus
 
-> 📋 **À étoffer** au fur et à mesure de l'audit.
+---
 
-### 11.1 Bugs UX corrigés récemment (juin 2026)
+## 11. Dette technique & bugs UX connus
 
-- **RLS clients timeout 80s** (Stéphane JCG) → résolu via RLS simple + filtre côté frontend dans `useClients.tsx`
-- **PDF signature CORS** sur sous-domaines tenants → edge function `proxy-signature-pdf` en CORS `*`
-- **PDF worker pdfjs bloqué par CSP** → worker bundlé local via Vite `?url`
-- **Inversion workflow signature mandat** (zone dessinée par broker au lieu de signataire) → corrigé : zone dessinée par signataire
-- **Storage bucket 10MB → 25MB** + ajout HEIC/HEIF
-- **Type-gen Supabase out-of-sync** : `get_signature_request_by_token`, `mark_signature_request_viewed` non typés → fallback `as any` ponctuel
+### 11.1 Bugs récemment corrigés (juin 2026)
 
-### 11.2 Dette technique identifiée
+| Bug | Fix | Commit |
+|---|---|---|
+| RLS clients timeout 80s (Stéphane JCG) | RLS simple + filtre scope-aware côté frontend dans `useClients.tsx` | revert + `46ms` |
+| PDF signature CORS sur sous-domaines tenants | Edge function `proxy-signature-pdf` en CORS `*` | `e01417e` |
+| PDF worker pdfjs bloqué par CSP `script-src` | Worker bundlé local via Vite `?url` | `93ceef8` |
+| Worker blob: bloqué par CSP `worker-src` | Ajout `worker-src 'self' blob:` dans CSP | `93ceef8` |
+| Inversion workflow signature mandat (broker dessinait zone) | Corrigé : zone dessinée par signataire | `d7f57ac` |
+| Affichage double PDF dans Signer | Un seul PdfZonePicker, suppression `<object>` | `a7bc6ff` |
+| Storage bucket 10MB → 25MB + HEIC/HEIF | Migration `20260603210000` | — |
+| Family member 403 PostgREST | Edge function `bypass-insert` | `61eeb29` |
+| Scan validation client INSERT RLS | Routing via `create-client` | `f25593f`, `79e2b75` |
+| Smartflow Lemania VIE vs LPP confusion | Distinguer selon contenu réel doc | `8853c94` |
+| LPP search emails identité tenant | sender + reply_to du tenant | `46e32fe` |
+| TTL liens invitation/reset 1h → 24h | `otp_expiry = 86400` | `51695a9` |
+| `save-policy` UUID backend + suppr `.select()` post-INSERT | Évite RLS SELECT immédiat | `d76c0a8` |
+| Scan emails enrichissement client existant | Match VIE/LPP amélioré | `ff9425b` |
 
-- **Tables doublonnes** : `audit_log` vs `audit_logs`, `king_audit_log` vs `king_audit_logs` — consolider
-- **`contracts` vs `policies`** : à vérifier si `contracts` est legacy
-- **`clients_safe` vue** : usage actuel à confirmer
-- **Authentification client final** : flow à documenter et auditer
-- **`frame-ancestors` CSP** : délivré via meta donc ignoré, à déplacer en header HTTP Vercel
-- **Worker statement_timeout 30s** : `ALTER ROLE authenticated SET statement_timeout = '30s'` — bon pour éviter les blocages mais peut couper des exports légitimes
+### 11.2 Dette technique structurelle identifiée
+
+#### 🔴 Critique
+
+- **Bug RLS 42501 récurrent sur INSERT** : touche `clients`, `policies`, `family_members`, `documents`. Workaround via 3 edge functions (`create-client`, `save-policy`, `bypass-insert`). **Cause racine non identifiée** : "mismatch SQL CLI vs PostgREST runtime" selon le commentaire de `create-client/index.ts`. **À investiguer en priorité par le dev** — c'est une dette qui empêche l'optimisation des flows et ralentit l'UX.
+- **Type-gen Supabase out-of-sync** : `commission_statement_lines`, `get_signature_request_by_token`, `mark_signature_request_viewed` ne sont pas dans les types auto-générés → casts `as any` éparpillés. Régénérer via `supabase gen types typescript --linked > src/integrations/supabase/types.ts`.
+
+#### 🟡 Modéré
+
+- **Tables doublonnes** :
+  - `audit_log` vs `audit_logs` (à vérifier)
+  - `king_audit_log` vs `king_audit_logs` (doublon **confirmé** — voir Module 17)
+  - **Consolider en migration** avec préservation des données existantes.
+- **`contracts` table legacy** : tout le code utilise `policies`, mais la table `contracts` existe. `save-policy` parle de `module = "contracts"` qui est l'identifiant du module dans `platform_modules`. **À auditer + nettoyer**.
+- **`clients_safe` vue** : présente dans le schéma, usage actuel inconnu. Si plus utilisée → drop.
+- **EmailHistory legacy** : `EmailHistory.tsx` lit `scheduled_emails`, `EmailDeliveryHistory.tsx` lit `tenant_email_log`. **Consolider** en un seul composant lisant la table unifiée.
+- **`frame-ancestors` CSP** : délivré via `<meta>` donc ignoré par les browsers. À déplacer en header HTTP Vercel (`vercel.json` headers).
+- **KingWizard.tsx 1158 LOC monolithique** : candidate à découpage en sous-composants.
+
+#### 🟢 Mineur
+
+- **Pas de Sentry** : pas de tracking erreurs frontend en prod. Recommandé.
+- **Pas de tests automatisés** : Vitest + Playwright recommandés (cf. §10.5).
+- **`statement_timeout = 30s`** : peut couper des exports légitimes (gros tenants). À monitorer.
+- **Pas de retry policy** sur les bounces Resend.
+- **Pas de query cancellation** dans `CRMRapports.tsx` quand l'user change de rapport.
+- **Pas de portal affilié** dédié — affiliés voient stats via export/email.
+- **Hardcoded Stripe price ID** dans `add-user-seat` (fallback). À déplacer en `tenant_app_settings`.
+- **`king-impersonate-tenant`** : à auditer pour expiration auto + visibilité côté tenant ("KING a accédé à votre compte").
+
+### 11.3 Quick wins suggérés au dev
+
+1. **Régénérer les types Supabase** (~5 min) → supprime les `as any`.
+2. **Investiguer le bug RLS 42501** (~1-2 jours) → permettrait de supprimer 3 edge functions de bypass et de revenir à des INSERTs front directs.
+3. **Consolider les tables audit doublonnes** (~2-3h avec migration de données).
+4. **Déplacer `frame-ancestors` en header Vercel** (~15 min).
+5. **Ajouter Sentry** (~1h setup + config).
+6. **Mettre en place Husky + ESLint pre-commit** (~30 min).
+7. **Cleanup `contracts` legacy table** (audit + drop si pas utilisée, ~1h).
 
 ---
 
