@@ -919,22 +919,562 @@ Vue **comptable** côté cabinet : décomptes payés aux collaborateurs, comptes
 
 ---
 
-### 6.7 → 6.18 Modules restants
+### 6.7 Module 7 — CRM Smartflow / Scan IA / Propositions
 
-> 📋 **À détailler en passe 3-4** :
->
-> 7. CRM Smartflow / Scan IA / Propositions
-> 8. CRM Signatures (mandat + imported + dispatch)
-> 9. CRM Publicité (Emailing transactionnel + campagnes)
-> 10. CRM Suivis (Tasks, Reminders, Birthdays)
-> 11. CRM Rapports
-> 12. CRM Collaborateurs & Abonnement (Stripe seats)
-> 13. CRM LytaTools
-> 14. LPP Search
-> 15. Comparateur (en préparation)
-> 16. Espace Client (portal)
-> 17. KING (admin plateforme cross-tenant)
-> 18. Affiliés
+#### 6.7.1 Rôle métier
+
+Module IA qui **automatise la saisie** de documents reçus par les courtiers :
+- **Scan d'un PDF/photo** (police existante, pièce d'identité, ancien décompte…)
+- **OCR + classification IA** (gpt-5 / Anthropic) en 1 des ~10 catégories métier
+- **Extraction de champs structurés** (numéro de police, dates, montants, compagnie, produit)
+- **Validation manuelle** par le broker dans `ScanValidationDialog`
+- **Création automatique** du client / police / commission / family member liés
+
+Sous-module **Propositions** : devis commerciaux générés à partir d'un dossier client (avant signature de mandat).
+
+#### 6.7.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMPropositions.tsx` | Page principale Smartflow (onglets Scans / Batches) |
+| `src/components/crm/ia-scan/` | Sous-dossier : `ScanBatchUpload`, `ScanBatchReview`, `ScanValidationDialog` |
+| `src/hooks/usePendingScans.tsx` | Scans en attente de validation |
+| `src/hooks/useScanBatches.tsx` | Lots de scans (traitement bulk) |
+| `src/hooks/usePendingProducts.tsx` | Produits détectés mais pas encore dans le catalogue → file d'attente KING |
+
+#### 6.7.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `scan-document` | Scan unitaire : OCR (Mistral OCR ou équivalent) + classification + extraction champs |
+| `classify-batch-documents` | Traitement en lot avec quotas (`reserveTenantQuota` / `releaseTenantQuota`) |
+| `scan-commission-statement` | Cas particulier : décomptes compagnies (voir Module 4) |
+| `_shared/ai.ts` | Helpers communs IA (`fetchAiChatCompletions`, `getAiModel`, `buildAiError`, `isAiTimeoutError`) |
+
+#### 6.7.4 Catégories de classification
+
+D'après `classify-batch-documents/DOC_CLASSIFICATIONS` :
+- `identity_doc` : pièce d'identité
+- `old_policy` : police actuelle (à résilier)
+- *(liste complète à compléter par lecture du fichier)*
+
+Selon la catégorie, des **enrichissements automatiques** s'appliquent :
+- Lemania → couvre VIE (3e pilier) ET LPP (2e pilier) selon le contenu réel du doc (fix commit `8853c94`)
+- Match VIE/LPP avec compagnies via fuzzy matching
+
+#### 6.7.5 Business rules clés
+
+- **Quotas par tenant** : chaque scan IA décrémente le quota `scans_per_month` du plan. Si dépassement → bloque ou facture overage selon `apply-monthly-overage`.
+- **Création client auto** : après validation, si le client n'existe pas → INSERT via `bypass-insert` (workaround RLS).
+- **Pending products** : si l'IA détecte un produit qui n'est pas dans le catalogue → envoyé en file d'attente KING pour validation par Habib.
+
+#### 6.7.6 Gotchas
+
+- **Bug RLS auquel Smartflow est confronté** : tous les INSERT de `family_members` et `documents` issus du scan passent par `bypass-insert`, sinon même 42501 que création client manuelle.
+- **gpt-5 coûteux** : 50-200 lignes par décompte × N décomptes/mois × N tenants. Surveiller la facturation OpenAI / Anthropic.
+- **OCR sur images de mauvaise qualité** : taux d'erreur élevé sur photos prises avec smartphone mal éclairé. Pas de retry user-friendly.
+
+---
+
+### 6.8 Module 8 — CRM Signatures (mandat + imported + dispatch)
+
+#### 6.8.1 Rôle métier
+
+**Le module sur lequel on a le plus travaillé en juin 2026.** Permet au courtier d'envoyer un document pour signature électronique à distance à un client.
+
+**Deux flows distincts** :
+1. **Mandat de gestion** : doc juridique généré depuis un template React (`MandatTemplate`), avec champs dynamiques (cabinet, client, branche). Zone de signature historiquement en bas du paragraphe d'engagement.
+2. **Document importé** : PDF arbitraire uploadé par le broker (procuration, lettre résiliation, etc.). Le **signataire** drague la zone de signature où il veut (depuis juin 2026).
+
+**Post-signature mandat** : dispatch automatique aux compagnies via `MandatDispatchPanel` (bouton manuel).
+
+#### 6.8.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMSignatures.tsx` | Page liste des demandes (en cours / signées / refusées) |
+| `src/pages/Signer.tsx` | **Page publique de signature** (URL `/signer/:token`, pas d'auth, vérif par token UUID) |
+| `src/components/signatures/PendingSignaturesPanel.tsx` | Panneau dans la fiche client listant signatures en cours/passées |
+| `src/components/signatures/MandatTemplate.tsx` | Template React du mandat (HTML rendu en PDF via html2canvas + pdf-lib) |
+| `src/components/signatures/MandatDispatchPanel.tsx` | Bouton manuel "Envoyer aux compagnies" sous un mandat signé |
+| `src/components/signatures/ImportDocumentForSignatureDialog.tsx` | Dialog broker pour uploader un PDF à signer |
+| `src/components/signatures/PdfZonePicker.tsx` | Canvas pdfjs-dist multi-page + drag rectangle de zone signature |
+| `src/hooks/useMandatDispatch.tsx` | Logic dispatch |
+| `src/hooks/useClientMandatStatus.tsx` | Statut mandat par client |
+
+#### 6.8.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `send-signature-invite` | Envoie email au signataire avec lien `https://<tenant>.lyta.ch/signer/:token` |
+| `proxy-signature-pdf` | **Proxy le PDF original** depuis Storage avec CORS `*` (contournement Storage CORS pour sous-domaines tenants) |
+| `get-signature-pdf-url` | Génère un signed URL temporaire pour le PDF |
+| `complete-signature` | Appelée après signature côté client : merge PDF + signature, store, marque la request `signed` |
+| `dispatch-mandat-to-companies` | Envoie le PDF signé à chaque compagnie en email (Resend) + log dans `mandat_dispatch_log` + `tenant_email_log` |
+| `request-signature-link-renewal` | Régénère un token si le lien a expiré (24h) |
+
+#### 6.8.4 Tables clés
+
+- `signature_requests` : colonnes critiques
+  - `access_token uuid unique` — token public dans l'URL
+  - `document_kind` (`mandat_gestion`, `imported`, `autre`)
+  - `status` (`draft`, `sent`, `viewed`, `signed`, `cancelled`, `refused`)
+  - `signature_zone jsonb` — coords normalisées 0-1 (page, x, y, width, height) — ajouté juin 2026
+  - `preview_file_key` / `signed_file_key` — keys Storage
+  - `expires_at` — timestamp expiration (par défaut +24h)
+  - `payload jsonb` — données extras (label, description, originalFileName, etc.)
+- `mandat_dispatch_log` : log par compagnie
+
+#### 6.8.5 Business rules clés
+
+- **Token public** : la sécurité du flow repose uniquement sur `access_token` (UUID non-devinable). Le proxy-signature-pdf le vérifie avant de servir le PDF.
+- **Expiration** : 24h après création. Renouvelable via `request-signature-link-renewal`.
+- **Zone de signature signataire-side** : depuis juin 2026, c'est le **signataire** qui drague la zone via `PdfZonePicker` (canvas pdfjs-dist). Avant, le broker le faisait — inversion documentée et déployée.
+- **Document kind = `mandat_gestion`** : rendu HTML (`MandatTemplate`) puis converti en PDF côté client au moment de la signature finale (html2canvas + pdf-lib).
+- **Document kind = `imported`** : PDF déjà en Storage, le client le voit via `proxy-signature-pdf` dans `PdfZonePicker`.
+- **Dispatch** : manuel par bouton, **pas automatique**. Chaque compagnie de la police du client reçoit un email avec le PDF signé en PJ (sauf si pas d'email mandat configuré). Tracé dans `tenant_email_log` (kind = `mandat_dispatch`).
+
+#### 6.8.6 Gotchas
+
+- **CORS pdfjs** : pdfjs-dist fetch le PDF en cross-origin → Storage refuse les sous-domaines tenants → `proxy-signature-pdf` contourne en CORS `*` (sécurité = token).
+- **CSP worker pdfjs** : nécessite `worker-src 'self' blob:` dans le CSP de `index.html`.
+- **Worker bundlé local** : `import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url"` — plus de dépendance CDN.
+- **Risque juridique mandat avec zone draguable** : Habib a choisi explicitement la zone draguable pour le mandat (juin 2026) malgré l'avertissement sur le risque de contestation (consentement non manifeste si signature pas sous le paragraphe d'engagement). À documenter dans le PV de mission du dev.
+- **Type-gen Supabase** : `get_signature_request_by_token` et `mark_signature_request_viewed` ne sont pas dans les types auto-générés → cast `as any` ponctuel dans `Signer.tsx`. **À régénérer**.
+
+---
+
+### 6.9 Module 9 — CRM Publicité (Emailing)
+
+#### 6.9.1 Rôle métier
+
+**Centre de communication sortante** du tenant :
+- Emails **transactionnels** (invitations signature, confirmations mandat, notifications)
+- Emails de **campagne** (newsletter, anniversaires)
+- **Historique unifié** de tous les emails envoyés (vue par filtre kind, status, destinataire)
+- Templates personnalisables par tenant
+
+Le nom "Publicité" est **trompeur** — c'est en réalité le module **Communications**. Renommage évoqué.
+
+#### 6.9.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMPublicite.tsx` | Page principale (116 LOC — wrapper avec onglets) |
+| `src/components/crm/publicite/EmailDeliveryHistory.tsx` | Liste paginée de `tenant_email_log` avec filtres kind + status |
+| `src/components/crm/emails/EmailHistory.tsx` | Historique des `scheduled_emails` (campagnes planifiées) — **legacy partiel** |
+| `src/hooks/useCrmEmails.tsx` | Helpers envoi email custom (formulaire "envoyer email à un client") |
+| `src/hooks/useEmailAutomation.tsx` | Config automations (anniversaires, échéances polices, etc.) |
+
+#### 6.9.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `send-crm-email` | Envoi email custom depuis CRM (formulaire libre) |
+| `send-client-notification-email` | Notif client (transactionnel) |
+| `send-birthday-emails` | Cron quotidien : envoie un email à chaque client dont c'est l'anniversaire |
+| `send-renewal-reminders` | Cron : alerte client + broker quand une police arrive à échéance |
+| `send-follow-up-reminders` | Cron : rappels de suivis (tâches non terminées) |
+| `send-test-tenant-emails` | Outil debug KING : envoie un email test pour valider la config Resend du tenant |
+| `process-scheduled-emails` | Worker cron : process les `scheduled_emails` due |
+
+#### 6.9.4 Tables clés
+
+- **`tenant_email_log`** (source de vérité historique) — kinds : `signature_invite`, `mandat_signed`, `mandat_dispatch`, `account_created`, `campaign`, `quick_email`, `crm_email`, `lpp_search`, `transactional`
+- `scheduled_emails` (campagnes planifiées — legacy partiel)
+- `email_templates` (templates customisables)
+- `tenant_email_automation` (config triggers)
+
+#### 6.9.5 Business rules clés
+
+- **Resend** = provider unique (`RESEND_API_KEY`). Identité expéditeur par tenant (`sender_name` + `reply_to` configurés dans `tenant_app_settings`).
+- **Tous les emails** loggués dans `tenant_email_log` avec `resend_message_id` pour cross-référence avec les logs Resend.
+- **Domaine custom** : si le tenant a configuré un domaine custom (ex: `noreply@advisy.ch`), l'envoi se fait depuis ce domaine via DNS Resend.
+
+#### 6.9.6 Gotchas
+
+- **Deux composants historique** parallèles (`EmailHistory.tsx` lit `scheduled_emails`, `EmailDeliveryHistory.tsx` lit `tenant_email_log`). Le second est la **vraie source de vérité**. Le premier doit être déprécié ou consolidé.
+- **Bounces / rejets Resend** : status `bounced` est tracé mais pas de **retry policy automatique**. À implémenter.
+
+---
+
+### 6.10 Module 10 — CRM Suivis (Tasks/Reminders)
+
+#### 6.10.1 Rôle métier
+
+Système de **tâches métier** liées à un client : suivi d'une activation de contrat, gestion d'une annulation, traitement d'un sinistre, retour de décompte, résiliation… Plus large qu'un simple TODO : chaque suivi est typé et lié à un workflow.
+
+#### 6.10.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMSuivis.tsx` | Page principale (306 LOC) — liste, filtres, kanban ? |
+| `src/hooks/useSuivis.tsx` | Query + CRUD + `recordAuditLog` sur changements |
+
+#### 6.10.3 Types et statuts
+
+```typescript
+SuiviType = "activation" | "annulation" | "retour" | "resiliation" | "sinistre" | "autre"
+SuiviStatus = "ouvert" | "en_cours" | "ferme"
+```
+
+#### 6.10.4 Business rules clés
+
+- **Assigned agent** : chaque suivi est assigné à un collaborateur (`assigned_agent_id`). Scope-aware visibility (agent voit ses propres suivis).
+- **Audit logué** : chaque modification déclenche un `recordAuditLog` dans `audit_logs`.
+
+#### 6.10.5 Gotchas
+
+- Module relativement simple, peu de pièges. **Possible amélioration** : kanban drag-drop, notifications push quand un suivi change de status.
+
+---
+
+### 6.11 Module 11 — CRM Rapports
+
+#### 6.11.1 Rôle métier
+
+**Dashboard analytique** du cabinet : KPIs, production, commissions, top clients, top agents, evolution mensuelle, comparaisons N/N-1. Avec génération de rapports custom exportables (PDF/XLSX).
+
+#### 6.11.2 Surface code
+
+| Fichier | Rôle | Volume |
+|---|---|---|
+| `src/pages/crm/CRMRapports.tsx` | Page principale (multi-rapports configurables) | 1075 LOC |
+| `src/pages/crm/CRMDashboard.tsx` | Dashboard d'accueil CRM (KPIs synthétiques) | — |
+
+#### 6.11.3 Tech
+
+- **Recharts** pour les graphes (BarChart, LineChart, PieChart)
+- **xlsx** pour exports Excel
+- **html2canvas + pdf-lib** pour exports PDF (à confirmer)
+
+#### 6.11.4 Business rules clés
+
+- **Scope-aware KPIs** : un agent voit ses propres chiffres, un manager voit ceux de son équipe, un admin voit le cabinet entier.
+- **Comparaison N/N-1** : calculs en SQL via window functions (à vérifier).
+- **Performance** : sur gros volumes, les queries d'agrégation peuvent être lourdes → cache React Query important.
+
+#### 6.11.5 Gotchas
+
+- **Pas de query cancellation** côté React : si l'user change de rapport pendant qu'une lourde requête tourne, la première continue à consommer. À surveiller.
+
+---
+
+### 6.12 Module 12 — CRM Collaborateurs & Abonnement
+
+#### 6.12.1 Rôle métier
+
+Gestion de l'**équipe du cabinet** + abonnement Stripe :
+- CRUD collaborateurs (Admin uniquement)
+- Assignation rôle/scope/branche
+- Permissions granulaires par collaborateur (override du rôle)
+- Photo de profil
+- Adresse pro / horaires
+- **Seats Stripe** : ajout/retrait de seats facturé automatiquement
+- Vue abonnement courant (plan, prochaine facture, factures passées)
+
+#### 6.12.2 Surface code
+
+| Fichier | Rôle | Volume |
+|---|---|---|
+| `src/pages/crm/CRMCollaborateurs.tsx` | Page liste + édition | 347 LOC |
+| `src/pages/crm/CRMAbonnement.tsx` | Page abonnement + facturation | 467 LOC |
+| `src/components/crm/CollaborateurForm.tsx` | Form création/édition collab |
+| `src/components/crm/CollaboratorPermissionsDialog.tsx` | Dialog permissions granulaires |
+| `src/components/crm/CollaboratorPhotoUpload.tsx` | Upload photo |
+| `src/hooks/useCollaborateurs.tsx` | Query collab |
+| `src/hooks/useCollaboratorPermissions.tsx` | Permissions par collab |
+| `src/hooks/useTenantSeats.tsx` | Quota seats |
+
+#### 6.12.3 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `add-user-seat` | Stripe : ajoute un seat à l'abonnement courant + crée le collab |
+| `create-collaborator` | Création collab + invitation email |
+| `create-checkout-session` | Stripe Checkout pour nouveau plan / upgrade |
+| `get-checkout-session-info` | Récupère info session Stripe (post-paiement) |
+| `list-tenant-invoices` | Liste factures Stripe du tenant |
+| `cancel-tenant-subscription` | Annulation abonnement |
+| `sync-tenant-stripe` | Resync data Stripe ↔ Supabase |
+| `apply-monthly-overage` | Cron mensuel : facture les overages (seats supplémentaires, scans IA sup, etc.) |
+| `stripe-webhook` | Webhook Stripe (`invoice.paid`, `subscription.updated`, etc.) |
+| `sync-external-billing` | Sync facturation externe (apps tierces connectées) |
+
+#### 6.12.4 Business rules clés (critique)
+
+- **Règle facturation fondamentale** : `extra_users` = collaborateurs CRM uniquement. **Les clients du portail espace-client sont illimités et GRATUITS** (cf. `lyta_pricing_users.md` mémoire projet).
+- **Stripe price IDs** : hardcodé en fallback dans `add-user-seat/index.ts` (`FALLBACK_USER_PRICE_ID = "price_1SmZtZF7ZITS358Au3FHsdBA"`). Idéalement à déplacer en `tenant_app_settings`.
+- **Proration** : ajout de seat en cours de mois → prorata automatique Stripe.
+
+#### 6.12.5 Gotchas
+
+- **Webhook signature verification** : `stripe-webhook` doit vérifier la signature avec `STRIPE_WEBHOOK_SECRET` — à auditer.
+- **Synchronisation Stripe ↔ Supabase** : pas toujours real-time, peut décaler de quelques secondes après un webhook. UI affiche un loader.
+
+---
+
+### 6.13 Module 13 — CRM LytaTools
+
+#### 6.13.1 Rôle métier
+
+**Module pilote** d'apps tierces connectées au tenant. Restreint à **Advisy uniquement** ("Pilot feature restricted to Advisy tenant until validation" — commentaire dans le code).
+
+Permet d'enregistrer des **External Apps** (intégrations vers outils externes type Zapier, calculateur de prime, API tierce…) et de les piloter depuis LYTA.
+
+#### 6.13.2 Surface code
+
+| Fichier | Rôle |
+|---|---|
+| `src/pages/crm/CRMLytaTools.tsx` (414 LOC) | Page principale |
+| `src/hooks/useLytaTools.tsx` | CRUD apps connectées |
+| Table : `external_apps`, `user_app_connections` | DB |
+
+#### 6.13.3 Business rules clés
+
+- **Gating tenant** : la page redirige si le tenant n'est pas Advisy.
+- **Connexion OAuth-like** : flow à confirmer dans le code détaillé.
+
+#### 6.13.4 Gotchas
+
+- Feature **pilote** : pas prête pour la prod publique. **À garder comme telle ou consolider** selon usage Advisy.
+
+---
+
+### 6.14 Module 14 — LPP Search
+
+#### 6.14.1 Rôle métier
+
+**Recherche LPP (2e pilier suisse)** pour un client : envoi de demandes officielles aux deux institutions centralisatrices pour retrouver les avoirs de prévoyance professionnelle d'une personne.
+
+Workflow métier important quand un client change d'employeur ou cherche à consolider ses avoirs (libre passage).
+
+#### 6.14.2 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `send-lpp-search-requests` | Envoie automatiquement **2 emails** : (1) Centrale du 2e pilier / Sicherheitsfonds BVG, (2) Fondation Institution Supplétive LPP. PJ : pièce d'identité + procuration. |
+
+#### 6.14.3 Tables
+
+- `lpp_search_requests` : log des demandes envoyées + statuts retours
+
+#### 6.14.4 Business rules clés
+
+- **2 emails séparés** sont nécessaires (les deux institutions ne se parlent pas).
+- **Pièces jointes obligatoires** : pièce d'identité + procuration (mandat de recherche) signée par le client.
+- **Identité expéditeur** : email envoyé avec l'identité du tenant (`sender` + `reply_to` du cabinet) — fix juin 2026 (`46e32fe`).
+
+#### 6.14.5 Gotchas
+
+- **Délai de réponse** : les institutions répondent par courrier postal ou email sous 4-8 semaines. Pas de webhook → suivi manuel.
+
+---
+
+### 6.15 Module 15 — Comparateur d'assurances
+
+#### 6.15.1 Statut
+
+⚠️ **Le comparateur d'assurances n'est PAS dans le repo LYTA.** Il vit dans un projet séparé **Optimis** (cf. mémoire projet `le_comparateur_optimis.md`, `optimis_distribution_canaux.md`).
+
+**Relation :** Optimis = comparateur Lovable + dashboard de distribution (leads → cabinets distribués). Il **alimente LYTA en leads** via deux canaux :
+1. LYTA API (pour les locataires de LYTA)
+2. Google Sheets (méthode actuelle pour distribués externes)
+
+**Pour le dev** : si la mission inclut le comparateur, il faut accéder à un autre repo (`~/Projects/Optimis/`).
+
+---
+
+### 6.16 Module 16 — Espace Client (Portal)
+
+#### 6.16.1 Rôle métier
+
+Portail destiné aux **clients finaux du cabinet**. Accès lecture (+ quelques écritures limitées) à leur dossier :
+- Vue de leurs polices d'assurance
+- Vue de leurs sinistres
+- Vue de leurs documents (téléchargement)
+- Messages avec leur conseiller
+- Notifications push
+- Signature de documents (via `/signer/:token`)
+- Programme de parrainage (`ClientReferrals`)
+
+URL : `<tenant>.lyta.ch/client/*`.
+
+#### 6.16.2 Surface code
+
+| Fichier | LOC |
+|---|---|
+| `src/pages/client/ClientDashboard.tsx` | 462 |
+| `src/pages/client/ClientLayout.tsx` | 482 |
+| `src/pages/client/ClientDocuments.tsx` | 538 |
+| `src/pages/client/ClientContracts.tsx` | 436 |
+| `src/pages/client/ClientClaims.tsx` | 452 |
+| `src/pages/client/ClientMessages.tsx` | 440 |
+| `src/pages/client/ClientReferrals.tsx` | 352 |
+| `src/pages/client/ClientProfile.tsx` | 236 |
+| `src/pages/client/ClientNotifications.tsx` | 126 |
+| **Total** | **3524** |
+
+| Composant client | Rôle |
+|---|---|
+| `src/components/client/ClaimForm.tsx` | Déclaration sinistre |
+| `src/components/client/ClientNotificationBell.tsx` | Bell notifications |
+| `src/components/client/MobileBottomNav.tsx` | Nav mobile (UX dédiée smartphone) |
+
+#### 6.16.3 Authentification client final
+
+**Découvert lors de l'audit** :
+- `ClientLayout.tsx:88` contient un commentaire : *"Check if user has a client record (needed for client portal)"*
+- → Le client utilise le **même `supabase.auth`** que les collaborateurs (table `auth.users`)
+- → La **distinction** se fait via une **jointure** `auth.users.id` ↔ `clients.user_id` lors du chargement du layout
+- → Si `clients.user_id = current auth.uid()` existe → accès portal. Sinon → redirection.
+
+**Conséquence** : un même compte Supabase peut être à la fois collaborateur d'un cabinet ET client d'un autre cabinet (cas hypothétique d'un agent qui est aussi client d'un confrère).
+
+#### 6.16.4 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `send-client-message` | Envoi message dans le fil de discussion broker↔client |
+| `send-client-notification-email` | Notification email au client (nouveau doc disponible, etc.) |
+| `submit-referral` | Soumission d'un nouveau filleul par le client |
+
+#### 6.16.5 Business rules clés
+
+- **Lecture seule** sur les polices, sinistres, commissions. Le client ne peut pas modifier ses contrats.
+- **Documents** : peut uploader (pour transmettre au broker) et télécharger (consulter ses pièces).
+- **Sinistres** : peut **déclarer** un sinistre via `ClaimForm`.
+- **Notifications** : `client_portal_upload` = source des notifs envoyées au broker quand le client upload un doc (`source: "client_portal_upload"` dans `ClientDocuments.tsx:162`).
+
+#### 6.16.6 Gotchas
+
+- **RLS clients vs auth** : nécessite des policies spécifiques sur `policies`, `documents`, `claims` qui autorisent `client.user_id = auth.uid()` en plus du chemin collaborateur. À auditer en détail (Doc 2 confidentiel).
+- **Pas de MFA SMS** pour les clients finaux à date (à confirmer).
+
+---
+
+### 6.17 Module 17 — KING (admin plateforme)
+
+#### 6.17.1 Rôle métier
+
+**L'espace administrateur global** de la plateforme LYTA, réservé à Habib (Optimislink). C'est le **module le plus volumineux** : 10 171 LOC en pages KING + 16 composants spécifiques.
+
+Fonctions :
+- **Tenants** : liste, création, activation, suspension, suppression, impersonate
+- **Onboarding wizard** : flow guidé de création tenant (KingWizard.tsx, 1158 LOC)
+- **Users** : recherche cross-tenant, gestion comptes
+- **Plans & quotas** : configuration des plans SaaS, modules par plan, quotas par plan
+- **Catalogue** : compagnies + produits + branches (catalogue cross-tenant)
+- **Affiliés** : programme d'affiliation
+- **Apps externes** : intégrations
+- **Stripe stats** : MRR, churn, expansion
+- **Coûts** : monitoring des coûts (Supabase, Resend, OpenAI…)
+- **Monitoring** : live feed des actions sur la plateforme
+- **Notifications** : inbox KING (nouvelles inscriptions, alertes, support tickets)
+- **Sécurité** : config sécurité plateforme (IP allowlist, MFA forcée…)
+- **Support** : tickets de support des tenants
+- **Settings** : config globale plateforme
+- **Compliance report** : rapport de conformité (GDPR, nLPD)
+- **Tenant import** : import bulk de tenants existants (migration depuis autre CRM)
+
+#### 6.17.2 Surface code (extraits)
+
+| Fichier | LOC |
+|---|---|
+| `src/pages/king/KingWizard.tsx` | 1158 |
+| `src/pages/king/KingTenants.tsx` | 637 |
+| `src/pages/king/KingAffiliates.tsx` | 656 |
+| `src/pages/king/TenantOnboarding.tsx` | 553 |
+| `src/pages/king/KingAffiliateDetail.tsx` | 515 |
+| `src/pages/king/KingUsers.tsx` | 366 |
+| (autres pages KING) | ~6286 cumulés |
+
+| Composants KING | Rôle |
+|---|---|
+| `AffiliateInvoiceTab` | Factures affiliés |
+| `CompanyCatalogManager` / `ProductCatalogManager` | Gestion catalogue cross-tenant |
+| `KingLiveFeedCard` | Feed temps réel des events plateforme |
+| `KingNotificationsInbox` | Inbox notifs Habib |
+| `KingProductsByBranchCard` | Vue produits par branche |
+| `OnboardingNotifications` | Notifs liées onboarding |
+| `PendingProductsManager` | Produits détectés par Smartflow en attente de validation |
+| `PendingSignupsPanel` | Signups Stripe en attente de provisioning |
+| `SwissPostalCodesManager` | Gestion CP suisses (lookup OpenPLZ) |
+| `TenantConsumptionLimits` / `TenantConsumptionRow` | Quotas et conso |
+| `TenantDataImport` / `TenantDocumentImport` | Imports massifs |
+| `TenantInvoicesPanel` | Factures Stripe par tenant |
+| `TenantLogoUpload` | Upload logo tenant |
+
+#### 6.17.3 Edge Functions KING-only
+
+| Function | Rôle |
+|---|---|
+| `activate-tenant` | Active un tenant en attente |
+| `delete-tenant` | Suppression complète (RGPD) |
+| `delete-user-account` | Suppression user |
+| `reset-tenant-data` | Reset data tenant (test/migration) |
+| `king-impersonate-tenant` | **Impersonate** un tenant (auth temporaire) — **à auditer avec attention pour traçabilité** |
+| `king-stripe-stats` | Agrégats Stripe |
+| `export-tenant-data` | Export RGPD/portabilité données tenant |
+| `create-tenant-admin` | Création admin tenant (KING) |
+| `verify-partner-email` | Validation email partenaire |
+| `check-slug-availability` | Vérif disponibilité slug avant création |
+
+#### 6.17.4 Business rules clés
+
+- **Auth KING** : `requireAuth()` puis vérification rôle KING dans `_shared/auth.ts`. Toutes les fonctions KING-only check ça.
+- **Audit cross-tenant** : chaque action KING loggée dans `king_audit_logs` (et `king_audit_log` — **doublon à consolider**).
+- **Impersonate** : crée une session temporaire pour Habib dans le contexte d'un tenant. **Critique** : doit être tracé dans audit ET visible côté tenant ("KING a accédé à votre compte le X").
+
+#### 6.17.5 Gotchas
+
+- **`king_audit_log` vs `king_audit_logs`** : doublon réel — **à consolider en une seule table**. Migration de données nécessaire.
+- **KingWizard.tsx 1158 LOC** : monolithique, dur à maintenir. Candidat à découpage en sous-composants.
+- **Impersonate sans expiration auto** ? À auditer dans `king-impersonate-tenant`.
+
+---
+
+### 6.18 Module 18 — Affiliés
+
+#### 6.18.1 Rôle métier
+
+Programme d'**affiliation LYTA** : apporteurs externes qui amènent des cabinets sur la plateforme et touchent une commission récurrente (% de l'abonnement Stripe sur N mois).
+
+#### 6.18.2 Surface code
+
+| Fichier | Rôle | LOC |
+|---|---|---|
+| `src/pages/king/KingAffiliates.tsx` | Liste affiliés (admin KING) | 656 |
+| `src/pages/king/KingAffiliateDetail.tsx` | Détail + factures affilié | 515 |
+| `src/components/king/AffiliateInvoiceTab.tsx` | Onglet factures |
+| `src/hooks/useAffiliates.tsx` | Query affiliés |
+
+#### 6.18.3 Tables clés
+
+- `affiliates` : profil affilié (nom, prénom, email, IBAN, statut)
+- `affiliate_commissions` : commissions calculées sur chaque facture Stripe d'un tenant amené
+- `partners` : partenaires commerciaux (peuvent être affiliés ou non)
+
+#### 6.18.4 Edge Functions liées
+
+| Function | Rôle |
+|---|---|
+| `submit-referral` | Création d'un filleul (depuis Espace Client) |
+| `receive-tenant-request` | Réception d'une demande tenant (depuis form public) |
+
+#### 6.18.5 Business rules clés
+
+- **Tracking** : un cabinet créé avec `referral_code` est attribué à l'affilié pour les commissions.
+- **Commissions affiliés** : déclenchées sur webhooks Stripe `invoice.paid` (à confirmer).
+- **Paiement affiliés** : via QR-facture suisse générée mensuellement.
+
+#### 6.18.6 Gotchas
+
+- **Pas de portal affilié** dédié à date — les affiliés voient leurs stats via un export ou un email. Peut être amélioré.
+
+---
+
+> ✅ **Modules 1-18 documentés.** Tous les modules métier de LYTA ont maintenant une fiche de référence. Les sections 7-13 du document maître (Edge Functions catalogue, Auth détail, Déploiement, Conventions, Dette technique) sont à étoffer en passes suivantes.
 
 ---
 
