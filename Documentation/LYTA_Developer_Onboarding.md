@@ -48,7 +48,7 @@ Ce document est **confidentiel** et destiné exclusivement au développeur signa
 10. [Conventions code](#10-conventions-code)
 11. [Dette technique & bugs UX connus](#11-dette-technique--bugs-ux-connus)
 12. [Roadmap](#12-roadmap)
-13. [Annexes](#13-annexes)
+13. [Annexes — incluant §13.4 Docs existantes et §13.5 Détails opérationnels concrets](#13-annexes)
 
 ---
 
@@ -1938,7 +1938,193 @@ tenant-onboarding, verify-partner-email, verify-sms-code
 | **Seat** | Place de collaborateur (unité de facturation) |
 | **Slug** | Identifiant URL d'un tenant (ex: `advisy`, `jcgconsulting`) |
 
-### 13.4 Variables d'environnement requises
+### 13.4 Documents existants dans le repo (à lire en complément)
+
+Le repo contient déjà plusieurs documents qu'il faut consulter en parallèle de celui-ci :
+
+| Fichier | Rôle | Statut |
+|---|---|---|
+| `README.md` (racine) | Démarrage local, env vars Vite, déploiement Vercel | ✅ Court mais à jour |
+| `Documentation/RECAP_5-18_MAI_2026.md` | Récap exhaustif de 14 jours d'activité (154 commits, ~30 features) | ✅ **Source primaire** pour comprendre l'historique récent |
+| `Documentation/TESTS_A_REALISER.md` | Checklist de tests manuels validés/non-validés | ✅ Utilisable comme base d'une suite automatisée |
+| `Documentation/legal/CGU.md` | Conditions Générales d'Utilisation | ⚠️ **Contient des `[À COMPLÉTER]`** (raison sociale, IDE, adresse) |
+| `Documentation/legal/POLITIQUE_CONFIDENTIALITE.md` | Politique RGPD/nLPD | ⚠️ **Idem `[À COMPLÉTER]`** + références art. 5 nLPD et UE 2016/679 |
+| `Documentation/legal/MENTIONS_LEGALES.md` | Mentions légales | ⚠️ **Idem `[À COMPLÉTER]`** |
+
+#### 🔴 Alerte légale (à corriger AVANT mise en ligne publique)
+
+Les **3 documents légaux contiennent des placeholders `[À COMPLÉTER]`** pour : raison sociale exacte, adresse postale, numéro IDE CHE-, registre du commerce du canton, numéro TVA, capital social, téléphone. **Tant que ces docs ne sont pas finalisés, ils ne peuvent pas être affichés tels quels sur la plateforme** — la publication d'un service en ligne en Suisse impose des mentions légales conformes (art. 322 CO + OFCOM). Habib doit les remplir avec les coordonnées exactes d'Optimislink Sàrl avant la prochaine vague d'inscription externe.
+
+### 13.5 Détails opérationnels concrets (extraits du code + RECAP)
+
+Cette section consolide les éléments **opérationnels précis** qui vivent dans le code et qui peuvent manquer au dev débutant son audit. Tout est sourcé du RECAP du 5-18 mai 2026 ou de lecture directe du code.
+
+#### Quotas par plan (Smartflow / SMS / Email auto par mois)
+
+| Plan | Smartflow scans | SMS | Email |
+|---|---|---|---|
+| **Start** | 0 | 0 | 0 |
+| **Pro** | 0 | 200 | 2000 |
+| **Prime** | 400 | 400 | 10000 |
+| **Founder** | 400 | 400 | 10000 |
+
+- Override possible par tenant : ex. **Advisy a son quota Smartflow bumpé à 500/mois** (manuellement)
+- `auto_overage_enabled` (boolean sur `tenants`) : si `true`, les dépassements sont auto-facturés en invoice items Stripe via le cron `apply-monthly-overage`
+- Widget tenant `TenantQuotaWidget` : 3 jauges Smartflow / SMS / Email
+- Alertes 80% / 100% / 150% : email tenant + notif KING
+
+#### Crons (6 jobs automatisés)
+
+| Cron | Fréquence | RPC test immédiat | Filtre |
+|---|---|---|---|
+| 🎂 Anniversaires | quotidien 07:00 Europe/Zurich | `SELECT public.trigger_birthday_emails()` | clients status='actif' |
+| 📋 Renouvellements échéance polices | quotidien 07:30 | `SELECT public.trigger_renewal_reminders()` | client actif + police active |
+| 🔔 Follow-up prospects dormants | quotidien 08:00 | `SELECT public.trigger_follow_up_reminders()` | status='prospect' seulement |
+| 🔄 Retry onboarding | horaire | — | tenants en `pending_setup` |
+| ⏱ Auto-activate trial expiré | horaire | — | tenants en `trialing` arrivés à échéance |
+| 💸 Apply monthly overage | mensuel | — | tenants avec `auto_overage_enabled=true` |
+
+**Setup Vault Supabase requis** pour les crons (sinon ils tournent silencieusement sans rien faire) :
+```sql
+SELECT vault.create_secret('https://shxbcszukoegvvejcpsn.supabase.co', 'PROJECT_URL');
+SELECT vault.create_secret('<service_role_key>', 'SERVICE_ROLE_KEY');
+```
+
+#### Toggles d'emails auto (5 toggles dans `tenant_email_automation`)
+
+Configurables par tenant dans CRM → Paramètres → Emails :
+
+1. `enable_welcome_email` — Bienvenue espace client
+2. `enable_contract_deposit_email` — Confirmation après dépôt contrat
+3. `enable_contract_signed_email` — Contrat signé
+4. `enable_mandat_signed_email` — Mandat de gestion signé
+5. `enable_account_created_email` — Compte client créé
+
+Plus 3 toggles spécifiques crons :
+- `enable_birthday_email`
+- `enable_renewal_reminder` (+ `renewal_reminder_days_before`)
+- `enable_follow_up_reminder` (+ `follow_up_reminder_days`)
+
+#### Templates emails testables (8 templates branded)
+
+KING-only : bouton "Tester emails" dans `KingTenantDetail` → envoie d'un seul clic les 8 templates branded à une boîte cible :
+
+1. `welcome` — bienvenue espace client
+2. `account_created` — compte client créé
+3. `contract_signed` — contrat signé
+4. `mandat_signed` — mandat signé
+5. `relation_client` — relation client transmise
+6. `offre_speciale` — offre commerciale
+7. `password_reset` — lien réinitialisation
+8. `finalize_signup` — filet post-paiement Stripe
+
+#### Page `/deposer-contrat` — 5 tabs
+
+Page **publique** (sans auth) avec radio-tabs :
+
+| Tab | Branche | Détail |
+|---|---|---|
+| **SANA** | Maladie de base + complémentaire | Form structuré |
+| **VITA** | Vie / 3e pilier | Form structuré |
+| **MEDIO** | Indemnités journalières | Form structuré |
+| **BUSINESS** | Risques pro | Form structuré |
+| 🐷 **LPP** (ambre) | 2e pilier — recherche / libre passage / rapatriement | Smartflow scan en haut + 7 sections dynamiques selon checkbox |
+
+LPP particularités :
+- 3 checkboxes (au moins 1 requise) : recherche d'avoirs / création libre passage / rapatriement LPP
+- N° AVS validé format `756.XXXX.XXXX.XX`
+- Sections "Anciens employeurs" / "Libre passage" / "Caisse pension actuelle" apparaissent dynamiquement
+- Upload obligatoire : pièce d'identité + facture QR + contrat + procuration
+- Submit → `policies` créé avec `product_type='lpp'` + email cabinet
+
+#### Signature anchor (zone fixe historique)
+
+**Avant juin 2026** : la zone de signature pour les docs imported avait une grille **3×3** par page (haut-gauche, haut-centre, …, bas-droite). Le broker choisissait dans le formulaire d'envoi quelle cellule + quelle page.
+
+**Depuis juin 2026** : remplacé par `PdfZonePicker` (drag rectangle libre par le signataire). Le code 3×3 reste comme **fallback** dans `Signer.tsx → generateSignedPdfBase64` : si `signerZone` est null ET `requestZone` est null, on retombe sur l'anchor 3×3.
+
+Ordre de priorité : `signerZone > requestZone > anchor 3×3`.
+
+#### Swiss postal autocomplete — 3 fallbacks
+
+1. **OpenPLZ** (`openplz.org`) — primary
+2. **Zippopotam** (`api.zippopotam.us`) — fallback 1
+3. **swisstopo SearchServer** (`api3.geo.admin.ch`) — fallback 2 (adresses de rue, source officielle swisstopo)
+
+Tous proxifiés via edge functions (`swiss-postal-code-lookup`, `swiss-address-lookup`) pour éviter les soucis CSP/CORS côté client.
+
+#### Smartflow — 14 types de documents reconnus
+
+Liste dans `classify-batch-documents/DOC_CLASSIFICATIONS` :
+
+- `identity_doc` — pièce d'identité (passeport, carte ID, permis)
+- `old_policy` — ancienne police (à résilier/remplacer)
+- `policy` — police active
+- `mandat` — mandat de gestion
+- `fiche_salaire` — fiche de paie
+- `attestation_avoirs` — attestation d'avoirs
+- `decompte_commission` — décompte de commission
+- `facture_qr` — facture QR suisse
+- `procuration` — procuration
+- *(et 5 autres — à confirmer en lisant le code)*
+
+Particularités :
+- **Lemania** : couvre VIE (3e pilier) ET LPP (2e pilier) — distinguer selon le contenu réel du doc (fix `8853c94`)
+- **Anti-doublons** : par `(company, category)` SAUF 3e pilier (split autorisé entre plusieurs polices)
+- **Branches taxonomy** : LAMal + LCA = **branche combinée**, legacy 'multirisque' dropé
+- **Catalog-aware prompt** : matching produits via **fuzzy NFD + trigram** (similarité texte)
+- **Lazy creation** : rien n'est écrit en DB tant que le broker n'a pas validé dans `ScanValidationDialog`
+- **Family flow** : N clients + N contrats routés par personne assurée (LAMal + LCA même personne = 1 contrat canonical)
+
+#### Self-signup — flow détaillé (issu du RECAP)
+
+```
+1. Marketing site lyta.ch (Lovable) : visiteur clique "Commencer mon essai 7 jours"
+2. Stripe Payment Link → paiement
+3. Webhook Stripe → asynchrone (constructEventAsync pour Deno crypto compat)
+4. Email 1 "Active ton cabinet LYTA" (filet sécu)
+5. Redirect /finalize?session_id=cs_xxx
+6. Form /finalize 4 sections :
+   - Entreprise : nom, slug (vérif live via check-slug-availability), logo (PNG/JPEG/WebP/SVG max 2MB)
+   - Couleurs : primary + secondary (color picker hex)
+   - Contact : admin (prénom/nom/email), email back-office (pour reply-to)
+   - Options : collaborateurs CRM supplémentaires (label précise "clients finaux illimités gratuits")
+7. Submit → provision-self-signup-tenant
+8. Provision : tenant (pending_setup) → admin user (auth.users) → tenant-onboarding step="full"
+   → Cloudflare DNS CNAME `<slug>.lyta.ch → cname.vercel-dns.com`
+   → Vercel domain ajouté au projet (API token)
+   → Resend audience créée
+9. Notifs King en cascade :
+   - "🆕 Nouveau paiement self-signup"
+   - "🎉 Tenant créé"
+   - "✅ DNS configuré"
+10. Email 2 welcome + magic link → user clique → /reset-password → /connexion
+11. SMS 2FA OTP envoyé via Twilio (enable_2fa_login=true PAR DÉFAUT au self-signup)
+12. Tenant actif en <5 min en cas idéal, sinon Habib reçoit alertes et peut "Re-run onboarding"
+```
+
+**Bug critique historique évité** (à ne pas refaire) : *"mandat-signed wipe admin password"* — un trigger DB sur signature mandat a reset le password admin. Fix appliqué mai 2026. Audit recommandé sur tous les triggers DB qui touchent `auth.users`.
+
+#### Détails techniques sensibles
+
+- **Phone column** : stocké en **top-level** sur `auth.users.phone` (pas dans `user_metadata`) pour que Twilio OTP fonctionne via Supabase Auth natif.
+- **`statement_timeout`** : 8s historiquement, monté à 30s pour le rôle `authenticated` (`ALTER ROLE authenticated SET statement_timeout = '30s'`).
+- **Tests sandbox** : Stripe en `test mode` (clé `sk_test_...`), Twilio en test mode, Resend en test mode pour ne pas spammer.
+- **LPP institutions test** : env vars `LPP_CENTRALE_EMAIL` et `LPP_SUPPLETIVE_EMAIL` overridables côté Supabase Dashboard pour pointer vers une boîte test au lieu des vraies institutions (`info@sfbvg.ch` + `kontakt@chaeis.net`).
+- **send-sms isolé du auth wrapper** : la fonction `send-sms` est isolée du middleware d'auth principal pour éviter la perte de session pendant l'envoi.
+- **`constructEventAsync`** : utilisé dans `stripe-webhook` au lieu de `constructEvent` synchrone — compat Deno crypto.
+- **Sidebar restructure** : 14 → 8 entrées top-level depuis mai 2026 (Onboarding et Paramètres regroupés en sous-menus).
+
+#### Métriques d'activité (sur la fenêtre 5-18 mai 2026)
+
+- 154 commits sur 14 jours = ~11 commits/jour
+- +25 000 lignes ajoutées / ~3 000 supprimées
+- 30+ edge functions créées ou modifiées
+- 20+ migrations DB
+- 6 phases KING Platform livrées
+- 0 régression non-fixée à la sortie
+
+### 13.6 Variables d'environnement requises
 
 Voir le **Doc 2 confidentiel** pour les **valeurs**. Variables attendues :
 
