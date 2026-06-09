@@ -1,5 +1,23 @@
 // NOTE: Signature locale via canvas. Cible future: intégration e-sign provider (Yousign/DocuSign)
+//
+// PRO vs PRIVÉ — bifurcation
+// --------------------------
+// Depuis juin 2026, ce composant gère DEUX flows distincts :
+//
+//   • client.is_company === false  → flow particulier (code historique
+//     de ce fichier — 5 branches d'assurance privées, identité personne
+//     physique, etc.)
+//
+//   • client.is_company === true   → flow entreprise (10 branches pro
+//     LAA/LAAC/LPP/etc., bloc raison sociale + IDE + RC + représentant
+//     légal). Délégué à MandatBusinessForm pour ne pas dupliquer 600
+//     lignes de mise en page.
+//
+// La bifurcation est faite au tout premier render du composant ci-dessous,
+// AVANT tout state ou effet — comme ça MandatBusinessForm a son propre
+// lifecycle propre et le code privé reste 100% intact.
 import { useState, useRef } from "react";
+import MandatBusinessForm from "./MandatBusinessForm";
 import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
@@ -59,7 +77,21 @@ const insuranceCompanies = [
   "Autre",
 ];
 
-export default function MandatGestionForm({ client, onSaved }: MandatGestionFormProps) {
+// Wrapper public — dispatch propre PRO vs PRIVÉ. On ne peut pas mettre le
+// `if (client.is_company)` AU MILIEU du composant MandatGestionFormPrivate
+// (Rules of Hooks : les hooks doivent être appelés au top dans le même
+// ordre à chaque render — un early return entre eux planterait si le
+// client passait de is_company=false à is_company=true en cours de vie).
+// Ce wrapper résout ça : chaque variante a son propre composant React
+// avec son propre lifecycle.
+export default function MandatGestionForm(props: MandatGestionFormProps) {
+  if (props.client.is_company) {
+    return <MandatBusinessForm client={props.client} onSaved={props.onSaved} />;
+  }
+  return <MandatGestionFormPrivate {...props} />;
+}
+
+function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
   const { t, i18n } = useTranslation();
   const { tenant } = useTenant();
   const [insurances, setInsurances] = useState<InsuranceInfo>({
