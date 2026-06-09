@@ -1,12 +1,30 @@
-# LYTA — Présentation produit & catalogue des fonctionnalités
+<div class="cover-page">
 
-> **Version** 1.0 — 8 juin 2026
-> **Audience** Toute personne qui découvre LYTA : nouveau collaborateur, prospect cabinet, partenaire, investisseur, équipe commerciale
-> **Lecture** ~25-30 min en parcours complet, ou directement le module qui vous intéresse via la table des matières
+# LYTA
 
----
+## Présentation produit & catalogue des fonctionnalités
 
-## ⚡ LYTA en 60 secondes
+<div class="cover-meta">
+
+**Version 1.0**
+
+8 juin 2026
+
+Édité par **Optimislink Sàrl**
+
+</div>
+
+<div class="cover-audience">
+
+Document destiné à toute personne qui découvre LYTA — nouveau collaborateur, prospect cabinet, partenaire, équipe commerciale.
+Lecture en parcours complet : 25 à 30 minutes.
+Lecture ciblée par module : voir le sommaire.
+
+</div>
+
+</div>
+
+## LYTA en 60 secondes
 
 LYTA est un **logiciel SaaS suisse** conçu **par et pour les cabinets de courtage en assurance**. Il regroupe dans une seule plateforme web tout ce qu'un courtier indépendant ou un cabinet utilise au quotidien :
 
@@ -26,7 +44,7 @@ Le tout en **multi-tenant** : chaque cabinet a son propre sous-domaine (ex: `adv
 
 ---
 
-## 🎯 À qui c'est destiné
+## À qui c'est destiné
 
 | Profil | Usage |
 |---|---|
@@ -39,7 +57,7 @@ Le tout en **multi-tenant** : chaque cabinet a son propre sous-domaine (ex: `adv
 
 ---
 
-## 🧰 Avec quoi LYTA fonctionne — Stack & intégrations
+## Avec quoi LYTA fonctionne — Stack & intégrations
 
 ### Plateforme
 
@@ -68,7 +86,9 @@ Le tout en **multi-tenant** : chaque cabinet a son propre sous-domaine (ex: `adv
 
 ---
 
-## 📚 Table des matières des modules
+<div class="page-break"></div>
+
+## Sommaire des modules
 
 1. [Inscription & onboarding](#1-inscription--onboarding)
 2. [Adresses / Clients](#2-adresses--clients)
@@ -1177,31 +1197,31 @@ Sur **chaque rôle**, possibilité d'**override** finement :
 
 ### Court terme (Q3 2026)
 
-- ✅ **Signature à distance avec zone draguée** (livré juin 2026)
-- 🔄 Refonte complète UI/UX (priorité #4 roadmap)
-- 🔄 Suivi visuel du mandat sur chaque ligne compagnie (côté CRM Compagnies)
-- 🔄 Stripe Customer Portal complet (gestion CB + factures self-service)
-- 🔄 LPP Phase 2 — Pingen postal automatique (envoi courrier physique)
+- **Signature à distance avec zone draguée** — *livré juin 2026*
+- Refonte complète UI/UX (priorité #4 roadmap)
+- Suivi visuel du mandat sur chaque ligne compagnie (côté CRM Compagnies)
+- Stripe Customer Portal complet (gestion CB + factures self-service)
+- LPP Phase 2 — Pingen postal automatique (envoi courrier physique)
 
 ### Moyen terme
 
-- 📋 **Comparateur d'assurances** intégré (alimenté par le projet Optimis séparé)
-- 📋 **API publique** pour partenaires (lecture leads, lecture portefeuille)
-- 📋 **App mobile native** publiée sur App Store + Google Play
-- 📋 **OCR automatique** des courriers retour des compagnies
-- 📋 **Workflow builder visuel** (créer ses propres automatisations)
+- **Comparateur d'assurances** intégré (alimenté par le projet Optimis séparé)
+- **API publique** pour partenaires (lecture leads, lecture portefeuille)
+- **App mobile native** publiée sur App Store + Google Play
+- **OCR automatique** des courriers retour des compagnies
+- **Workflow builder visuel** (créer ses propres automatisations)
 
 ### Long terme
 
-- 📋 **Multi-pays** : extension Allemagne, France, Belgique
-- 📋 **SOC 2 Type II** (audit sécurité externe)
-- 📋 **Marketplace** d'apps tierces (intégrations natives)
+- **Multi-pays** : extension Allemagne, France, Belgique
+- **SOC 2 Type II** (audit sécurité externe)
+- **Marketplace** d'apps tierces (intégrations natives)
 
 > Voir aussi le document interne `Documentation/Roadmap_LYTA_Officielle.md` (priorisation Habib) pour le détail.
 
 ---
 
-## 🤝 Pour en savoir plus
+## Pour en savoir plus
 
 - **Site marketing** : https://lyta.ch
 - **App** : https://app.lyta.ch
