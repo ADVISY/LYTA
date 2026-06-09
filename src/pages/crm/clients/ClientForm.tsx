@@ -63,6 +63,18 @@ const clientSchema = z.object({
   iban: z.string().max(34).optional().nullable(),
   bank_name: z.string().max(200).optional().nullable(),
   gender: z.enum(["homme", "femme", "enfant"]).optional().nullable(),
+
+  // ─── Champs entreprise (clients pro) ─────────────────────────────
+  // Visibles + persistés uniquement si is_company === true. Servent à
+  // pré-remplir automatiquement le mandat de gestion pro (sinon le broker
+  // les ressaisit à chaque mandat). Migration DB : 20260608120000.
+  ide: z.string().max(20).optional().nullable(),                       // CHE-XXX.XXX.XXX
+  rc_canton: z.string().max(2).optional().nullable(),                  // VD, GE, ZH…
+  rc_number: z.string().max(50).optional().nullable(),                 // CH-550.1.234.567-8
+  legal_rep_first_name: z.string().max(100).optional().nullable(),
+  legal_rep_last_name: z.string().max(100).optional().nullable(),
+  legal_rep_function: z.string().max(100).optional().nullable(),       // Administrateur, Directeur, Gérant…
+  signature_power: z.enum(["individual", "collective_2"]).optional().nullable(),
 }).refine(
   // Société = raison sociale obligatoire
   (data) =>
@@ -129,6 +141,14 @@ export default function ClientForm() {
       iban: null,
       bank_name: null,
       gender: null,
+      // Champs entreprise (vides par défaut, remplis si client pro)
+      ide: null,
+      rc_canton: null,
+      rc_number: null,
+      legal_rep_first_name: null,
+      legal_rep_last_name: null,
+      legal_rep_function: null,
+      signature_power: "individual",
     },
   });
 
@@ -191,6 +211,14 @@ export default function ClientForm() {
         iban: data.iban,
         bank_name: data.bank_name,
         gender: (data as Record<string, unknown>).gender as ClientFormData['gender'] || null,
+        // Champs entreprise — pré-remplis si déjà saisis sur ce client
+        ide: (data as Record<string, unknown>).ide as string | null || null,
+        rc_canton: (data as Record<string, unknown>).rc_canton as string | null || null,
+        rc_number: (data as Record<string, unknown>).rc_number as string | null || null,
+        legal_rep_first_name: (data as Record<string, unknown>).legal_rep_first_name as string | null || null,
+        legal_rep_last_name: (data as Record<string, unknown>).legal_rep_last_name as string | null || null,
+        legal_rep_function: (data as Record<string, unknown>).legal_rep_function as string | null || null,
+        signature_power: ((data as Record<string, unknown>).signature_power as ClientFormData['signature_power']) || "individual",
       });
       setTagsInput(data.tags?.join(", ") || "");
     }
@@ -232,6 +260,16 @@ export default function ClientForm() {
       civil_status: (data.civil_status as string) === "none" ? null : (data.civil_status || null),
       permit_type: (data.permit_type as string) === "none" ? null : (data.permit_type || null),
       gender: (data.gender as string) === "none" ? null : (data.gender || null),
+      // Champs entreprise — persistés uniquement si is_company=true.
+      // Pour un particulier on force null pour ne pas garder de résidus
+      // de saisie si l'user a basculé pro→privé.
+      ide: data.is_company ? (data.ide || null) : null,
+      rc_canton: data.is_company ? (data.rc_canton || null) : null,
+      rc_number: data.is_company ? (data.rc_number || null) : null,
+      legal_rep_first_name: data.is_company ? (data.legal_rep_first_name || null) : null,
+      legal_rep_last_name: data.is_company ? (data.legal_rep_last_name || null) : null,
+      legal_rep_function: data.is_company ? (data.legal_rep_function || null) : null,
+      signature_power: data.is_company ? (data.signature_power || "individual") : null,
     };
 
     if (id) {
@@ -387,6 +425,176 @@ export default function ClientForm() {
                       </FormItem>
                     )}
                   />
+                )}
+
+                {/* ─── Bloc Informations entreprise (juin 2026) ────────────────
+                    Visible uniquement si is_company=true. Pré-remplit
+                    automatiquement le mandat de gestion pro sans ressaisie. */}
+                {form.watch("type_adresse") === "client" && form.watch("is_company") && (
+                  <div className="mt-2 mb-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold">Informations entreprise</span>
+                      <span className="text-xs text-muted-foreground">— utilisé pour le mandat de gestion pro</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="ide"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>N° IDE</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="CHE-XXX.XXX.XXX"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rc_canton"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Canton du Registre du commerce</FormLabel>
+                            <Select
+                              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                              value={field.value || "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="—" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">— Non renseigné —</SelectItem>
+                                {["AG","AI","AR","BE","BL","BS","FR","GE","GL","GR","JU","LU","NE","NW","OW","SG","SH","SO","SZ","TG","TI","UR","VD","VS","ZG","ZH"].map((ct) => (
+                                  <SelectItem key={ct} value={ct}>{ct}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rc_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>N° d'inscription au RC</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="Ex : CH-550.1.234.567-8"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="signature_power"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Pouvoir de signature</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || "individual"}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="individual">Individuel (1 signataire)</SelectItem>
+                                <SelectItem value="collective_2">Collectif à deux (2 signataires)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="pt-3 border-t border-primary/20">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Représentant légal (signataire pour l'entreprise)
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="legal_rep_first_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Prénom</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value || ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="legal_rep_last_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nom</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value || ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="legal_rep_function"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fonction</FormLabel>
+                              <Select
+                                onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                                value={field.value || "none"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">— Non renseigné —</SelectItem>
+                                  <SelectItem value="Administrateur unique">Administrateur unique</SelectItem>
+                                  <SelectItem value="Administrateur président">Administrateur président</SelectItem>
+                                  <SelectItem value="Administrateur">Administrateur</SelectItem>
+                                  <SelectItem value="Directeur général">Directeur général</SelectItem>
+                                  <SelectItem value="Directeur">Directeur</SelectItem>
+                                  <SelectItem value="Gérant">Gérant</SelectItem>
+                                  <SelectItem value="Gérant unique">Gérant unique</SelectItem>
+                                  <SelectItem value="Président">Président</SelectItem>
+                                  <SelectItem value="Associé gérant">Associé gérant</SelectItem>
+                                  <SelectItem value="Fondé de pouvoir">Fondé de pouvoir</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {form.watch("type_adresse") === "client" && form.watch("is_company") && (
