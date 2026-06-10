@@ -55,8 +55,8 @@ Tu réponds direct : support@lyta.ch
 
 Pas intéressé ? Un mot suffit. Je n'insiste pas.
 
-Habib Agharbi
-Fondateur · Optimislink Sàrl · Édite LYTA
+LYTA
+Édité par Optimislink Sàrl
 support@lyta.ch · lyta.ch
 
 ---
