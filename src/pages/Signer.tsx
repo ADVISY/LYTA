@@ -27,6 +27,21 @@ interface SignatureZone {
   height: number;
 }
 
+// Tous les flows qui s'appuient sur un PDF déjà stocké dans Storage
+// (au lieu d'un rendu HTML <MandatTemplate>) : documents importés, autres
+// PDFs libres, ET mandat de gestion envoyé en SIGNATURE À DISTANCE (cas
+// nouveau juin 2026 — le broker pré-génère le PDF puis envoie un lien
+// au client, exactement comme pour un imported).
+//
+// Le test "preview_file_key truthy" suffit à distinguer mandat-distance
+// (preview_file_key rempli) vs mandat-présentiel historique (null —
+// le PDF est rendu HTML à la volée côté signer).
+const usesStoredPdfFlow = (kind: string, previewFileKey: string | null | undefined): boolean => {
+  if (kind === "imported" || kind === "autre") return true;
+  if (kind === "mandat_gestion" && !!previewFileKey) return true;
+  return false;
+};
+
 interface SignatureRequestRow {
   id: string;
   tenant_id: string;
@@ -194,7 +209,7 @@ export default function Signer() {
     if (screen.kind === "ready" || screen.kind === "submitting") {
       const r = screen.request;
       // For imported docs, prefer the broker-provided label
-      if (r.document_kind === "imported" || r.document_kind === "autre") {
+      if (usesStoredPdfFlow(r.document_kind, r.preview_file_key)) {
         const l = (r.payload as { label?: string })?.label;
         if (l) return l;
       }
@@ -207,7 +222,7 @@ export default function Signer() {
   useEffect(() => {
     if (screen.kind !== "ready") return;
     const r = screen.request;
-    if (r.document_kind !== "imported" && r.document_kind !== "autre") return;
+    if (!usesStoredPdfFlow(r.document_kind, r.preview_file_key)) return;
     if (!r.preview_file_key || importedPdfUrl) return;
 
     let cancelled = false;
@@ -263,7 +278,10 @@ export default function Signer() {
       throw new Error("État invalide");
     }
     const r = screen.request;
-    const isImported = r.document_kind === "imported" || r.document_kind === "autre";
+    // Variable conservée pour le reste de la fonction. "isImported" est un nom
+    // historique — il couvre maintenant aussi les mandats de gestion envoyés
+    // en signature à distance (qui ont un PDF déjà stocké dans Storage).
+    const isImported = usesStoredPdfFlow(r.document_kind, r.preview_file_key);
 
     const opt = {
       margin: [8, 10, 8, 10] as [number, number, number, number],
@@ -713,8 +731,18 @@ export default function Signer() {
           </CardContent>
         </Card>
 
-        {/* Document preview */}
-        {request.document_kind === "mandat_gestion" ? (
+        {/* Document preview
+            ─────────────────
+            Trois cas distincts :
+            1. Mandat de gestion en mode présentiel historique (pas de
+               preview_file_key) → rendu HTML <MandatTemplate>. Le PDF
+               final est généré à la volée côté signataire.
+            2. Mandat de gestion en mode signature à distance (juin 2026 —
+               preview_file_key rempli car le broker a pré-généré le PDF)
+               → tombe dans le pipeline usesStoredPdfFlow ci-dessous,
+               exactement comme un imported.
+            3. Document importé / autre PDF → pipeline PDF Storage. */}
+        {request.document_kind === "mandat_gestion" && !request.preview_file_key ? (
           <Card>
             <CardHeader>
               <CardTitle>Aperçu du document</CardTitle>
@@ -723,7 +751,7 @@ export default function Signer() {
               <MandatTemplate ref={documentRef} {...templateData} />
             </CardContent>
           </Card>
-        ) : request.document_kind === "imported" || request.document_kind === "autre" ? (
+        ) : usesStoredPdfFlow(request.document_kind, request.preview_file_key) ? (
           // Pas de bloc preview séparé : le PdfZonePicker ci-dessous affiche
           // déjà le document en entier + permet de scroller les pages + de
           // dessiner directement la zone de signature dessus. Garder uniquement
@@ -779,7 +807,7 @@ export default function Signer() {
 
         {/* Hidden attestation page for imported documents — used to generate the signed PDF.
              Positioned off-screen so it does not flash to the user. */}
-        {(request.document_kind === "imported" || request.document_kind === "autre") && (
+        {usesStoredPdfFlow(request.document_kind, request.preview_file_key) && (
           <div style={{ position: "fixed", left: "-99999px", top: 0, width: "210mm", visibility: "hidden", pointerEvents: "none" }} aria-hidden>
             <div
               ref={attestationRef}
@@ -850,7 +878,7 @@ export default function Signer() {
             Affiché uniquement pour les docs imported / autre — mandat de
             gestion a son propre template avec slots prédéfinis. */}
         {!refusalMode && importedPdfUrl &&
-         (request.document_kind === "imported" || request.document_kind === "autre") && (
+         usesStoredPdfFlow(request.document_kind, request.preview_file_key) && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Place ta signature</CardTitle>
@@ -872,7 +900,7 @@ export default function Signer() {
         {/* Fallback : picker 3×3 historique gardé pour rétrocompatibilité,
             désactivé par défaut. Aucun affichage. */}
         {false && !refusalMode &&
-         (request.document_kind === "imported" || request.document_kind === "autre") && (
+         usesStoredPdfFlow(request.document_kind, request.preview_file_key) && (
           <Card>
             <CardHeader>
               <CardTitle>Position de votre signature</CardTitle>

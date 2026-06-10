@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileDown, Printer, FileCheck, Save, Loader2 } from "lucide-react";
+import { FileDown, Printer, FileCheck, Save, Loader2, Send } from "lucide-react";
 import { format } from "date-fns";
 import { fr, de, it, enUS } from "date-fns/locale";
 import { Client } from "@/hooks/useClients";
@@ -108,6 +108,7 @@ function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
   const [signatureAdvisy, setSignatureAdvisy] = useState<string | null>(null);
   const [signatureClient, setSignatureClient] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingRemote, setIsSendingRemote] = useState(false);
   const mandatRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -429,6 +430,118 @@ function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
     }
   };
 
+  // ── Envoi pour signature à distance (juin 2026) ──────────────
+  // Génère le PDF avec la signature broker incluse mais SANS la
+  // signature client (le client la dessinera via le lien email
+  // + PdfZonePicker + drag). complete-signature merge à la fin.
+  const isRemoteReady = !!client.email && !!signatureAdvisy && lieu.trim().length > 0;
+
+  const handleSendForRemoteSignature = async () => {
+    if (!isRemoteReady) {
+      toast({
+        title: "Prérequis manquants",
+        description: "L'email du client, ta signature cabinet et le lieu sont obligatoires pour l'envoi à distance.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user?.id || !tenantId) {
+      toast({ title: "Session invalide", variant: "destructive" });
+      return;
+    }
+    if (!mandatRef.current) {
+      setShowPreview(true);
+      setTimeout(handleSendForRemoteSignature, 300);
+      return;
+    }
+
+    setIsSendingRemote(true);
+    try {
+      const pdfBlob = await generatePDFBlob();
+      if (!pdfBlob) throw new Error("Génération PDF échouée");
+
+      const fileName = `Mandat_Gestion_${getClientName().replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd_HHmmss")}.pdf`;
+      const fileKey = `${user.id}/mandats/${client.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(fileKey, pdfBlob, { contentType: "application/pdf", upsert: false });
+      if (uploadError) throw uploadError;
+
+      // Même structure de payload que le save présentiel — le dispatch
+      // côté serveur (dispatch-mandat-to-companies) lit payload.insurances
+      // pour trouver les compagnies destinataires, peu importe si le
+      // mandat a été signé en présentiel ou à distance.
+      const payloadForDispatch = {
+        insurances,
+        clientKind: "individual" as const,
+        lieu,
+        clientFirstName: client.first_name ?? null,
+        clientLastName: client.last_name ?? null,
+        clientName: getClientName(),
+        clientAddress: client.address ?? null,
+        clientPostalCode: client.zip_code ?? null,
+        clientCity: client.city ?? null,
+        clientBirthDate: client.birthdate ?? null,
+        clientEmail: client.email ?? null,
+        cabinetName: companyName,
+        brokerEmail: companyEmail || null,
+        inPerson: false,
+      };
+
+      const accessToken =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? (crypto as Crypto).randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const nowIso = new Date().toISOString();
+      // Lien valable 7 jours — un mandat est un acte engageant, on
+      // laisse au client le temps de prendre sa décision.
+      const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+
+      const { data: srRow, error: srErr } = await (supabase as any)
+        .from("signature_requests")
+        .insert({
+          tenant_id: tenantId,
+          client_id: client.id,
+          created_by: user.id,
+          document_kind: "mandat_gestion",
+          payload: payloadForDispatch,
+          preview_file_key: fileKey,  // ← Clé du flow distance — Signer.tsx détecte
+          client_full_name: getClientName(),
+          status: "sent",
+          access_token: accessToken,
+          expires_at: expiresAt,
+          invited_at: nowIso,
+        })
+        .select("id")
+        .single();
+
+      if (srErr || !srRow) {
+        throw srErr || new Error("Création de la demande de signature échouée");
+      }
+
+      await invokeSupabaseFunction("send-signature-invite", {
+        body: { signatureRequestId: srRow.id, appOrigin: window.location.origin },
+      });
+
+      toast({
+        title: "Mandat envoyé pour signature à distance ✓",
+        description: `${client.email} a reçu un lien sécurisé valable 7 jours. Tu seras notifié dès la signature.`,
+      });
+
+      onSaved?.();
+    } catch (e: any) {
+      console.error("[MandatGestionFormPrivate] remote send failed", e);
+      toast({
+        title: "Envoi à distance échoué",
+        description: e?.message || "Voir la console (F12) pour le détail.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingRemote(false);
+    }
+  };
+
   const handlePrint = () => {
     if (!mandatRef.current) return;
     const printWindow = window.open('', '_blank');
@@ -661,9 +774,9 @@ function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
               <Printer className="h-4 w-4" />
               {t('mandatForm.print')}
             </Button>
-            <Button 
-              onClick={handleSaveMandat} 
-              disabled={isSaving || !signatureAdvisy || !signatureClient}
+            <Button
+              onClick={handleSaveMandat}
+              disabled={isSaving || isSendingRemote || !signatureAdvisy || !signatureClient}
               className="gap-2 bg-green-600 hover:bg-green-700"
             >
               {isSaving ? (
@@ -673,10 +786,26 @@ function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
               )}
               {isSaving ? t('common.saving') : t('mandatForm.saveMandat')}
             </Button>
+
+            {/* Envoi à distance — le client signera lui-même via lien email */}
+            <Button
+              onClick={handleSendForRemoteSignature}
+              disabled={isSendingRemote || isSaving || !isRemoteReady}
+              variant="outline"
+              className="gap-2 border-primary text-primary hover:bg-primary/10"
+            >
+              {isSendingRemote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {isSendingRemote ? "Envoi en cours…" : "Envoyer pour signature à distance"}
+            </Button>
           </div>
           {(!signatureAdvisy || !signatureClient) && (
             <p className="text-sm text-muted-foreground">
-              {t('mandatForm.signaturesRequiredDesc')}
+              <strong>Présentiel</strong> : {t('mandatForm.signaturesRequiredDesc')}
+            </p>
+          )}
+          {!isRemoteReady && (
+            <p className="text-sm text-muted-foreground">
+              <strong>Signature à distance</strong> : email du client {!client.email && <span className="text-destructive">(manquant — édite la fiche client)</span>}, ta signature cabinet et le lieu sont requis. Le client signera lui-même via le lien reçu par email (valable 7 jours).
             </p>
           )}
         </CardContent>
