@@ -122,3 +122,11 @@ verify_jwt = false
 
 [functions.verify-sms-code]
 verify_jwt = false
+
+# --- Address autocomplete proxies (public — postal & address data is public) ---
+
+[functions.french-postal-code-lookup]
+verify_jwt = false
+
+[functions.french-address-lookup]
+verify_jwt = false

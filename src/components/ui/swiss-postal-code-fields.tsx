@@ -1,19 +1,30 @@
 /**
- * Swiss postal code + city auto-completion via OpenPLZ public API.
+ * Postal code + city auto-completion — Swiss and French support.
+ *
+ * Historical note (juin 2026) : ce composant ne supportait QUE la Suisse.
+ * Le nom est resté "SwissPostalCodeFields" pour ne pas casser tous les
+ * imports existants (ClientForm, QRInvoiceForm…) mais il gère maintenant
+ * AUSSI les clients français — switch automatique selon le champ `country`.
  *
  * Behavior:
- *  - User types a Swiss PLZ (4 digits) → 300 ms debounce → fetch OpenPLZ
- *  - 1 match  → city auto-filled silently
- *  - N matches → small dropdown lets the user pick (e.g. PLZ 1009 = Pully OR Paudex)
- *  - 0 match  → silent, the user can still type the city manually
- *  - Country ≠ Suisse / Switzerland / CH → lookup disabled, fields behave like plain inputs
+ *  - Country = Suisse → lookup PLZ 4 chiffres via OpenPLZ (proxy
+ *    swiss-postal-code-lookup edge function)
+ *  - Country = France → lookup CP 5 chiffres via Base Adresse Nationale
+ *    geo.api.gouv.fr (proxy french-postal-code-lookup edge function)
+ *  - Country = autre (Allemagne, Italie, etc.) → lookup désactivé, les
+ *    champs se comportent comme des inputs plain. À étendre plus tard
+ *    si besoin (DE = openplz.org/api/de, IT = …)
+ *  - 1 match  → ville auto-remplie silencieusement
+ *  - N matches → petit dropdown laisse l'utilisateur choisir (ex CP 75001
+ *    = plusieurs arrondissements de Paris)
+ *  - 0 match  → silent, l'utilisateur peut toujours taper à la main
  *  - API down → silent fail, fields work like plain inputs
  *
  * The component is uncontrolled regarding its own state; it just emits
  * onPostalCodeChange / onCityChange so it plugs into react-hook-form,
  * formik, or plain useState the same way.
  *
- * No API key required. OpenPLZ is a public German/Swiss/Austrian PLZ service.
+ * No API key required for either Switzerland (OpenPLZ) or France (BAN).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -53,10 +64,28 @@ export interface SwissPostalCodeFieldsProps {
   cityClassName?: string;
 }
 
+// Format unifié — couvre les retours suisse (canton) ET français (département)
+// via le champ générique `subdivision`. Le composant ne se soucie plus de
+// savoir s'il s'agit d'un canton ou d'un département : il affiche juste
+// le shortName dans le dropdown et le remonte au parent via onLocalityResolved.
+interface Locality {
+  postalCode: string;
+  name: string;
+  subdivision?: { code?: string | null; name?: string | null; shortName?: string | null };
+}
+
+// Réponse brute de l'edge function swiss-postal-code-lookup
 interface OpenPLZLocality {
   postalCode: string;
   name: string;
   canton?: { key?: string; name?: string; shortName?: string };
+}
+
+// Réponse brute de l'edge function french-postal-code-lookup
+interface FrenchLocalityRaw {
+  postalCode: string;
+  name: string;
+  department: { code: string | null };
 }
 
 const SWISS_COUNTRY_VALUES = new Set([
@@ -70,12 +99,56 @@ const SWISS_COUNTRY_VALUES = new Set([
   "svizra",
 ]);
 
-function isSwissCountry(country?: string): boolean {
-  if (!country) return true;
-  return SWISS_COUNTRY_VALUES.has(country.trim().toLowerCase());
+const FRENCH_COUNTRY_VALUES = new Set([
+  "fr",
+  "fra",
+  "france",
+  "frankreich",
+  "francia",
+]);
+
+// Exporté pour que swiss-address-input.tsx (et tout autre composant
+// d'autocomplete pays-dépendant) puisse réutiliser la même détection.
+export type CountryMode = "swiss" | "french" | "none";
+
+export function detectCountryMode(country?: string): CountryMode {
+  if (!country) return "swiss"; // default = Suisse (legacy behaviour)
+  const c = country.trim().toLowerCase();
+  if (SWISS_COUNTRY_VALUES.has(c)) return "swiss";
+  if (FRENCH_COUNTRY_VALUES.has(c)) return "french";
+  return "none";
 }
 
 const SWISS_PLZ_REGEX = /^\d{4}$/;
+const FRENCH_CP_REGEX = /^\d{5}$/;
+
+// Centralise les paramètres techniques propres à chaque pays — facile
+// d'ajouter Allemagne/Italie plus tard sans toucher au reste du code.
+const COUNTRY_CONFIG: Record<
+  "swiss" | "french",
+  {
+    regex: RegExp;
+    maxLength: number;
+    edgeFunction: string;
+    placeholder: string;
+    cityPlaceholder: string;
+  }
+> = {
+  swiss: {
+    regex: SWISS_PLZ_REGEX,
+    maxLength: 4,
+    edgeFunction: "swiss-postal-code-lookup",
+    placeholder: "1003",
+    cityPlaceholder: "Lausanne",
+  },
+  french: {
+    regex: FRENCH_CP_REGEX,
+    maxLength: 5,
+    edgeFunction: "french-postal-code-lookup",
+    placeholder: "75001",
+    cityPlaceholder: "Paris",
+  },
+};
 
 export function SwissPostalCodeFields({
   postalCode,
@@ -86,8 +159,8 @@ export function SwissPostalCodeFields({
   onLocalityResolved,
   postalCodeLabel,
   cityLabel,
-  postalCodePlaceholder = "1003",
-  cityPlaceholder = "Lausanne",
+  postalCodePlaceholder,
+  cityPlaceholder,
   postalCodeId,
   cityId,
   postalCodeName,
@@ -96,7 +169,19 @@ export function SwissPostalCodeFields({
   postalCodeClassName,
   cityClassName,
 }: SwissPostalCodeFieldsProps) {
-  const [suggestions, setSuggestions] = useState<OpenPLZLocality[]>([]);
+  // Détecte le mode pays. Si "none" (pays non géré), le lookup est désactivé
+  // et les champs deviennent de simples inputs texte.
+  const mode = detectCountryMode(country);
+  const lookupEnabled = mode !== "none";
+  const config = mode !== "none" ? COUNTRY_CONFIG[mode] : null;
+
+  // Placeholders pays-spécifiques (override si la prop est fournie).
+  const effectivePostalCodePlaceholder =
+    postalCodePlaceholder ?? config?.placeholder ?? "Code postal";
+  const effectiveCityPlaceholder =
+    cityPlaceholder ?? config?.cityPlaceholder ?? "Ville";
+
+  const [suggestions, setSuggestions] = useState<Locality[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   // Visible status badge so we don't rely on F12 console for diagnosis.
@@ -109,8 +194,6 @@ export function SwissPostalCodeFields({
   // Track the PLZ we last auto-filled for, so we don't re-overwrite a city
   // the user has manually edited.
   const lastAutoFilledPLZ = useRef<string | null>(null);
-
-  const lookupEnabled = isSwissCountry(country);
 
   // Callback refs — kept up-to-date on every render but never appear in
   // useEffect deps. This is the fix for the "PLZ never resolves" bug:
@@ -129,12 +212,20 @@ export function SwissPostalCodeFields({
     cityRef.current = city;
   });
 
-  const handlePick = useCallback((loc: OpenPLZLocality) => {
+  const handlePick = useCallback((loc: Locality) => {
     onCityChangeRef.current(loc.name);
     lastAutoFilledPLZ.current = loc.postalCode;
+    // On remonte le code de subdivision (canton suisse OU département
+    // français) sous le même nom `canton` pour ne pas casser les parents
+    // qui consomment déjà cette interface. Si on veut un jour différencier
+    // canton et département en DB, on étendra l'interface.
     onLocalityResolvedRef.current?.({
       city: loc.name,
-      canton: loc.canton?.shortName ?? loc.canton?.key ?? loc.canton?.name,
+      canton:
+        loc.subdivision?.shortName ??
+        loc.subdivision?.code ??
+        loc.subdivision?.name ??
+        undefined,
     });
     setSuggestions([]);
     setShowSuggestions(false);
@@ -143,13 +234,14 @@ export function SwissPostalCodeFields({
   useEffect(() => {
     if (typeof console !== "undefined") {
       // eslint-disable-next-line no-console
-      console.log("[SwissPostalCodeFields v3] effect tick", {
+      console.log("[PostalCodeFields v4] effect tick", {
         postalCode,
         country,
+        mode,
         lookupEnabled,
       });
     }
-    if (!lookupEnabled) {
+    if (!lookupEnabled || !config) {
       setSuggestions([]);
       setShowSuggestions(false);
       setLoading(false);
@@ -158,12 +250,15 @@ export function SwissPostalCodeFields({
     }
 
     const trimmed = postalCode.trim();
-    if (!SWISS_PLZ_REGEX.test(trimmed)) {
+    if (!config.regex.test(trimmed)) {
       setSuggestions([]);
       setShowSuggestions(false);
       setLoading(false);
-      if (trimmed.length > 0 && trimmed.length < 4) {
-        setStatusBadge({ kind: "idle", text: `Tape les ${4 - trimmed.length} chiffres restants…` });
+      if (trimmed.length > 0 && trimmed.length < config.maxLength) {
+        setStatusBadge({
+          kind: "idle",
+          text: `Tape les ${config.maxLength - trimmed.length} chiffres restants…`,
+        });
       } else {
         setStatusBadge({ kind: "idle", text: "" });
       }
@@ -176,21 +271,13 @@ export function SwissPostalCodeFields({
 
     const timer = window.setTimeout(async () => {
       try {
-        // Call our Supabase Edge Function proxy instead of openplz.org
-        // directly. Reasons:
-        //   - Some tenant networks fail to resolve openplz.org (DNS),
-        //     and the request never even gets a CSP / CORS check
-        //   - Our CSP already whitelists *.supabase.co, no extra config
-        //   - Edge Function caches & swallows upstream failures so the
-        //     UI never sees a hard error
-        // Bump the `v` param when the upstream cascade changes so the
-        // browser doesn't keep serving stale empty results from previous
-        // versions. Empty results are also no-cached server-side, so
-        // future negatives won't stick anyway.
-        const url = `${supabaseConfig.url}/functions/v1/swiss-postal-code-lookup?postalCode=${encodeURIComponent(trimmed)}&v=4`;
+        // Call our Supabase Edge Function proxy. Le choix de la fonction
+        // (swiss-postal-code-lookup vs french-postal-code-lookup) est fait
+        // automatiquement via `config.edgeFunction`. Voir COUNTRY_CONFIG.
+        const url = `${supabaseConfig.url}/functions/v1/${config.edgeFunction}?postalCode=${encodeURIComponent(trimmed)}&v=4`;
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
-          console.log("[SwissPostalCodeFields] fetching", url);
+          console.log("[PostalCodeFields] fetching", url);
         }
         const res = await fetch(url, {
           headers: {
@@ -201,7 +288,7 @@ export function SwissPostalCodeFields({
         });
         if (typeof console !== "undefined") {
           // eslint-disable-next-line no-console
-          console.log("[SwissPostalCodeFields] response", res.status, res.statusText);
+          console.log("[PostalCodeFields] response", res.status, res.statusText);
         }
         if (!res.ok) {
           if (!cancelled) {
@@ -211,7 +298,35 @@ export function SwissPostalCodeFields({
           return;
         }
         const raw = (await res.json()) as unknown;
-        const data: OpenPLZLocality[] = Array.isArray(raw) ? (raw as OpenPLZLocality[]) : [];
+        // Normalise le format de chaque réponse vers Locality (suisse
+        // utilise `canton`, française utilise `department`).
+        const data: Locality[] = Array.isArray(raw)
+          ? (raw as Array<OpenPLZLocality | FrenchLocalityRaw>).map((row): Locality => {
+              if ("canton" in row && row.canton) {
+                return {
+                  postalCode: row.postalCode,
+                  name: row.name,
+                  subdivision: {
+                    code: row.canton.key ?? null,
+                    name: row.canton.name ?? null,
+                    shortName: row.canton.shortName ?? null,
+                  },
+                };
+              }
+              if ("department" in row && row.department) {
+                return {
+                  postalCode: row.postalCode,
+                  name: row.name,
+                  subdivision: {
+                    code: row.department.code,
+                    name: null,
+                    shortName: row.department.code,
+                  },
+                };
+              }
+              return { postalCode: row.postalCode, name: row.name };
+            })
+          : [];
         if (cancelled) return;
 
         if (data.length === 0) {
@@ -236,7 +351,10 @@ export function SwissPostalCodeFields({
             onLocalityResolvedRef.current?.({
               city: only.name,
               canton:
-                only.canton?.shortName ?? only.canton?.key ?? only.canton?.name,
+                only.subdivision?.shortName ??
+                only.subdivision?.code ??
+                only.subdivision?.name ??
+                undefined,
             });
             setSuggestions([]);
             setShowSuggestions(false);
@@ -312,9 +430,9 @@ export function SwissPostalCodeFields({
           }
           onPostalCodeChange(next);
         }}
-        placeholder={postalCodePlaceholder}
+        placeholder={effectivePostalCodePlaceholder}
         inputMode={lookupEnabled ? "numeric" : undefined}
-        maxLength={lookupEnabled ? 4 : undefined}
+        maxLength={config?.maxLength}
         disabled={disabled}
         className={postalCodeClassName}
         autoComplete="postal-code"
@@ -349,7 +467,7 @@ export function SwissPostalCodeFields({
           // Delay so a click on a suggestion has time to register
           window.setTimeout(() => setShowSuggestions(false), 150);
         }}
-        placeholder={cityPlaceholder}
+        placeholder={effectiveCityPlaceholder}
         disabled={disabled}
         className={cityClassName}
         autoComplete="address-level2"
@@ -357,8 +475,12 @@ export function SwissPostalCodeFields({
       {showSuggestions && suggestions.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md max-h-56 overflow-y-auto">
           {suggestions.map((s, i) => {
-            const cantonLabel =
-              s.canton?.shortName ?? s.canton?.key ?? s.canton?.name ?? "";
+            // En suisse c'est un canton (ex "VD"), en France un département (ex "75")
+            const subdivisionLabel =
+              s.subdivision?.shortName ??
+              s.subdivision?.code ??
+              s.subdivision?.name ??
+              "";
             return (
               <button
                 key={`${s.postalCode}-${s.name}-${i}`}
@@ -368,8 +490,8 @@ export function SwissPostalCodeFields({
                 className="block w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
               >
                 <span className="font-medium">{s.name}</span>
-                {cantonLabel && (
-                  <span className="text-muted-foreground"> · {cantonLabel}</span>
+                {subdivisionLabel && (
+                  <span className="text-muted-foreground"> · {subdivisionLabel}</span>
                 )}
               </button>
             );

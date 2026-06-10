@@ -858,6 +858,7 @@ export default function ClientForm() {
                         <SwissAddressInput
                           value={field.value || ""}
                           onChange={field.onChange}
+                          country={form.watch("country") || ""}
                           onAddressResolved={(r) => {
                             if (r.postalCode) {
                               form.setValue("zip_code", r.postalCode, { shouldDirty: true, shouldTouch: true });
@@ -865,7 +866,11 @@ export default function ClientForm() {
                             if (r.city) {
                               form.setValue("city", r.city, { shouldDirty: true, shouldTouch: true });
                             }
-                            // Force country to Suisse since we only validate against CH data
+                            // Si le pays n'est pas encore renseigné, on
+                            // initialise à Suisse par défaut (cas du nouveau
+                            // client créé from scratch). Si le pays est déjà
+                            // renseigné (France, Belgique, etc.), on respecte
+                            // le choix du broker.
                             const currentCountry = (form.getValues("country") || "").toString().trim();
                             if (!currentCountry) {
                               form.setValue("country", "Suisse", { shouldDirty: true });
