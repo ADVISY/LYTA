@@ -2,7 +2,7 @@
 
 > **Pour qui** : Habib Agharbi, pour la campagne lancement LYTA juin 2026
 > **Volume** : 88 contacts courtiers B2B suisses (emails seuls, pas de prénom/nom)
-> **Sender** : `support@lyta.ch` (display name : "Habib Agharbi — LYTA")
+> **Sender** : `support@lyta.ch` (display name : "LYTA")
 > **Subject** : `Et si ton CRM datait des années 2000 ?`
 > **Effort estimé** : 45 min de setup + 5 min d'envoi
 > **Coût** : 0 € (gratuit jusqu'à 3 000 emails/mois sur Resend Free)
@@ -107,7 +107,7 @@ grep -iE "@gmail|@hotmail|@yahoo|@outlook|@bluewin|@infomaniak" ton-csv.csv
 1. Resend dashboard → **Broadcasts** → **New Broadcast**
 2. **From** :
    - Address : `support@lyta.ch`
-   - Name : `Habib Agharbi — LYTA`
+   - Name : `LYTA`
 3. **Reply-To** : `support@lyta.ch` (les réponses arrivent dans cette boîte)
 4. **Subject** : `Et si ton CRM datait des années 2000 ?`
    (alternatives dans `cold_email_copy.md` si A/B test)

@@ -2,7 +2,7 @@
 
 > **Version** finale (v9) — 10 juin 2026
 > **Audience** 88 courtiers / cabinets pros suisses (emails seuls, pas de prénom/nom)
-> **Sender** `support@lyta.ch` (display name : "Habib Agharbi — LYTA")
+> **Sender** `support@lyta.ch` (display name : "LYTA")
 > **Outil d'envoi** Resend Broadcasts (https://resend.com/broadcasts)
 > **Positionnement** Problème → solution (pas vente directe, pas démo, pas café)
 
