@@ -37,7 +37,12 @@ docs/
 *.md
 !README.md
 !CLAUDE.md
-!Documentation/**.md
+# Re-inclusion récursive des MD dans Documentation/, y compris sous-dossiers
+# (legal/, etc.). Le glob `Documentation/**.md` seul ne matchait QUE les MD
+# directement dans Documentation/ (bug confirmé via git check-ignore -v en
+# juin 2026 sur Documentation/legal/MENTIONS_LEGALES.md → ignoré silencieusement).
+!Documentation/*.md
+!Documentation/**/*.md
 audit-details/
 
 .vercel
