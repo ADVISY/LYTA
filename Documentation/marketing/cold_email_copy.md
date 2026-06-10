@@ -1,103 +1,68 @@
 # LYTA — Cold email copy (campagne lancement juin 2026)
 
-> **Version** 1.0 — 10 juin 2026
-> **Audience** 88 courtiers / cabinets pros suisses avec emails nominatifs
-> **Sender** `hello@lyta.ch` (display name : "Habib Agharbi — LYTA")
-> **Objet** Lancement LYTA — démonstration produit + LP avec vidéo
+> **Version** finale (v9) — 10 juin 2026
+> **Audience** 88 courtiers / cabinets pros suisses (emails seuls, pas de prénom/nom)
+> **Sender** `support@lyta.ch` (display name : "Habib Agharbi — LYTA")
 > **Outil d'envoi** Resend Broadcasts (https://resend.com/broadcasts)
+> **Positionnement** Problème → solution (pas vente directe, pas démo, pas café)
 
 ---
 
-## 🎯 Subject lines — 3 variantes pour A/B test
-
-Pour 88 contacts, je recommande de **tester 2-3 subjects sur 30 contacts chacun**, garder le meilleur pour le reste.
-
-### Variante A — Humaine, signée
+## 🎯 Subject final
 
 ```
-Habib d'Optimislink — un outil pensé pour ton cabinet
+Et si ton CRM datait des années 2000 ?
 ```
 
-**Pourquoi ça marche** : prénom expéditeur + "ton cabinet" = personnel. Pas de clickbait. Donne envie d'ouvrir par curiosité.
+Question directe qui parle à la majorité des cabinets suisses (encore sur Outlook + Excel ou logiciels legacy). Ouvre par curiosité défensive ("Mais non… enfin si peut-être").
 
-**Inconvénient** : si Habib n'est pas connu de la cible, "Habib d'Optimislink" peut être ignoré.
+### Alternatives validées pour A/B test si tu veux tester
+
+| # | Subject | Vibe |
+|---|---|---|
+| **A** | Et si ton CRM datait des années 2000 ? | Direct, recommandé (utilisé en preview) |
+| **B** | Ton CRM te fait perdre 2h par jour ? | Promesse chiffrée |
+| **C** | Il est temps de changer de CRM | Affirmatif, urgence |
+| **D** | LYTA — le CRM courtage qui ne rame pas | Met le produit + bénéfice |
 
 ---
 
-### Variante B — Value proposition directe
+## 📝 Body — texte plain (fallback si HTML bloqué)
+
+Resend envoie automatiquement une version texte du HTML. Pour les rares clients qui forcent le mode plain :
 
 ```
-LYTA — 2h/jour gagnées sur les mandats et le dispatch
-```
+Bonjour,
 
-**Pourquoi ça marche** : promesse chiffrée concrète. Le courtier sait en 2 secondes ce qu'il gagne à ouvrir.
+LYTA, c'est un CRM suisse pensé pour le courtage en assurance. Pas une
+usine à gaz. Pas un outil qui te demande 3 clics pour ouvrir une fiche
+client.
 
-**Inconvénient** : "2h/jour" peut sembler exagéré ou trop marketing.
+Mandats signés à distance, dispatch automatique aux compagnies, scan IA
+des polices et décomptes, espace client à ton image, calcul des
+commissions et rétrocessions, espace conformité nLPD. Tout dans la même
+interface, conçue en 2026, pour 2026.
 
----
+15 minutes suffisent pour que je te montre tout. Visio ou un vrai café
+si tu es près de Collombey, Lausanne ou Genève. Tu regardes, tu me dis
+ce qui marche, ce qui cloche, ce qui manque. Ça m'aide à construire le
+bon outil.
 
-### Variante C — Curiosité + social proof
+Découvrir LYTA : https://lyta.ch/lancement
+(90 secondes sur le site, formulaire en bas, je te rappelle.)
 
-```
-{{first_name}}, comment des cabinets suisses gagnent 2h/jour
-```
+Tu réponds direct : support@lyta.ch
 
-**Pourquoi ça marche** : personnalisation prénom + social proof ("d'autres l'utilisent") + bénéfice chiffré. Triple combo.
-
-**Inconvénient** : si la perso `{{first_name}}` ne se résout pas (CSV incomplet), apparaît littéralement "{{first_name}}, …" — désastreux. À tester avant envoi.
-
----
-
-### Ma recommandation pour 88 contacts
-
-- **Test A/B/C sur 30 contacts chacun (90 total ≈ tes 88)** : split aléatoire
-- Ou si tu préfères pas tester, **va sur la Variante A** (la plus safe et humaine pour un cold)
-
----
-
-## 📝 Body — texte plein (fallback si HTML bloqué)
-
-**Resend Broadcasts** envoie automatiquement une version texte alternative à partir du HTML. Mais pour les clients qui forcent le mode texte (très rare aujourd'hui), voici la version plain :
-
-```
-Bonjour {{first_name}},
-
-Je suis Habib, fondateur de LYTA — la nouvelle plateforme CRM pensée pour
-les cabinets de courtage suisses.
-
-On a construit LYTA en partant d'un constat simple : entre la rédaction du
-mandat de gestion, le scan des polices, le dispatch aux compagnies, les
-commissions à calculer et l'espace client à animer, un courtier passe 2 à 3
-heures par jour sur de l'administratif.
-
-LYTA automatise tout ça : mandat signé à distance en 5 minutes, dispatch
-automatique aux compagnies, IA qui lit les polices et décomptes, espace
-client branding cabinet, calcul des commissions et rétrocessions,
-conformité nLPD.
-
-{{first_name}}, j'ai préparé une vidéo de présentation de 4 minutes où je
-te montre concrètement comment ça marche chez les cabinets qui l'utilisent.
-
-→ Voir la démo : https://lyta.ch/lancement
-
-Si ça ne t'intéresse pas du tout, réponds-moi juste « non merci » et je ne
-reviens pas vers toi.
-
-Si tu veux qu'on en parle 15 minutes au téléphone, mon numéro est
-+41 78 212 23 60.
-
-Au plaisir d'échanger,
+Pas intéressé ? Un mot suffit. Je n'insiste pas.
 
 Habib Agharbi
-Fondateur, Optimislink Sàrl — Éditeur LYTA
-hello@lyta.ch · lyta.ch
+Fondateur · Optimislink Sàrl · Édite LYTA
+support@lyta.ch · lyta.ch
 
 ---
 
-Vous recevez ce message car votre cabinet de courtage est référencé
-publiquement comme acteur suisse de l'assurance. Vos coordonnées sont
-utilisées uniquement pour ce message et ne seront pas partagées avec un
-tiers.
+Vous recevez ce message car votre cabinet est référencé publiquement
+comme acteur suisse de l'assurance.
 
 Se désabonner : {{RESEND_UNSUBSCRIBE_URL}}
 
@@ -107,34 +72,64 @@ IDE CHE-229.220.256 · RC Valais CH-621.4.012.418-8
 
 ---
 
-## 🔧 Variables Resend Broadcasts à mapper depuis le CSV
+## 🎨 Design final (palette validée v9)
 
-Quand tu uploades le CSV des 88 contacts dans Resend Audiences, les colonnes
-doivent être exactement nommées :
+```
+JAUNE LYTA      #FEB000        Hook bandeau, bouton CTA, badges, accents
+Jaune éclat     #FFD54F        Top du dégradé hook + CTA
+Jaune cuivré    #F59E0B        Bottom du dégradé hook
+Marine foncé    #0F172A        Header bandeau, contrastes, liens, hook texte
+Marine clair    #1E293B        Dégradés marine
+Blanc / gris    #FFFFFF / #f8fafc    Body
+```
 
-| Colonne CSV | Variable Resend | Utilisation |
-|---|---|---|
-| `email` | `{{email}}` | Destinataire (obligatoire) |
-| `first_name` | `{{first_name}}` | Personnalisation prénom |
-| `last_name` | `{{last_name}}` | (optionnel) |
-| `company` | `{{company}}` | Nom du cabinet (optionnel, pas utilisé dans la v1 du template) |
+**Structure visuelle** (de haut en bas) :
+1. Bandeau **MARINE** (header avec logo + badge jaune "Édition lancement")
+2. Bandeau **JAUNE** (hook accroche problème → solution + badge marine "Il est temps de passer à LYTA")
+3. Body blanc (4 paragraphes secs)
+4. **Bouton JAUNE** géant (texte marine, ombre lumineuse)
+5. Séparateur "OU"
+6. CTA secondaire (mailto support@lyta.ch)
+7. Signature avec filet marine + liens marine
 
-`{{RESEND_UNSUBSCRIBE_URL}}` est généré automatiquement par Resend, ne pas le
-mettre dans le CSV.
+---
+
+## 📊 Variables Resend Broadcasts
+
+```
+{{RESEND_UNSUBSCRIBE_URL}}    auto-généré par Resend
+```
+
+C'est tout. **Aucune autre variable** (pas de prénom, pas de nom de cabinet — le CSV des 88 contacts est limité aux emails).
+
+---
+
+## 📁 CSV à uploader dans Resend Audiences
+
+Format minimaliste :
+
+```csv
+email
+contact@cabinet-1.ch
+info@cabinet-2.ch
+direction@cabinet-3.ch
+...
+(88 lignes total)
+```
+
+**Une seule colonne**, encodage UTF-8, pas de ligne vide en fin de fichier.
 
 ---
 
 ## ⚠️ Avant d'envoyer — checklist
 
 - [ ] Domaine `lyta.ch` configuré dans Resend (SPF + DKIM + DMARC vérifiés en vert)
-- [ ] Logo PNG accessible sur `https://app.lyta.ch/marketing/lyta-logo-512.png`
-       (ou alternative texte activée dans le template HTML — voir commentaire dedans)
+- [ ] Logo PNG accessible sur `https://app.lyta.ch/marketing/lyta-logo-512.png` — sur fond marine, prévoir une version **blanche ou jaune** du logo
 - [ ] LP `https://lyta.ch/lancement` en ligne avec vidéo + formulaire
-- [ ] CSV des 88 contacts nettoyé (1 email par ligne, prénom rempli partout)
+- [ ] CSV des 88 contacts nettoyé (1 email par ligne, UTF-8, pas de Gmail/Hotmail perso)
 - [ ] Test envoyé à toi-même + 1-2 collègues avant le mass send
-- [ ] Subject testé sur 30 contacts d'abord si A/B
 - [ ] Heure d'envoi : **mardi ou jeudi entre 9h30 et 11h30** (Suisse, taux d'ouverture max)
-- [ ] **Pas de vendredi après-midi ni weekend** (Suisse + courtiers en RDV)
+- [ ] **Pas de vendredi après-midi ni weekend**
 
 ---
 
@@ -154,18 +149,17 @@ Pour une **première campagne cold B2B suisse** avec template de qualité et lis
 
 Sur 88 contacts, ça veut dire :
 - **22-35 ouvertures**
-- **3-13 clics sur la démo**
+- **3-13 clics sur la LP**
 - **4-10 réponses** (positives ou négatives)
-
-Si tu obtiens **5-8 RDV qualifiés** sur cette première vague, c'est un succès.
+- **5-8 RDV qualifiés** si succès
 
 ---
 
 ## 🎬 Et après ?
 
-- **Relance J+5** : aux non-ouvreurs uniquement (Resend Broadcasts permet ce ciblage). Subject différent ("J'ai oublié de te montrer ce détail…"), copy raccourci.
-- **Relance J+10** : aux ouvreurs sans clic. Question directe : "Tu as eu le temps de voir la vidéo ?"
-- **Pas plus de 3 emails au total** par contact. Au-delà = grilling LCD.
+- **Relance J+5** : aux non-ouvreurs uniquement (Resend Broadcasts permet ce ciblage). Subject différent ("J'ai oublié de te montrer quelque chose…"), copy raccourci.
+- **Relance J+10** : aux ouvreurs sans clic. Question directe : "Tu as eu le temps de jeter un œil ?"
+- **Maximum 3 emails au total** par contact. Au-delà = LCD art. 3 al. 1 lit. o (harcèlement).
 
 Si la campagne marche bien, on industrialise (module Cold Outreach dans le CRM,
-audience persistante, scoring, etc.).
+audience persistante, scoring, A/B test, etc.).

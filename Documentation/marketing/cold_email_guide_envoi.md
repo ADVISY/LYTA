@@ -1,9 +1,12 @@
 # LYTA — Guide d'envoi cold email via Resend Broadcasts
 
 > **Pour qui** : Habib Agharbi, pour la campagne lancement LYTA juin 2026
-> **Volume** : 88 contacts courtiers B2B suisses
+> **Volume** : 88 contacts courtiers B2B suisses (emails seuls, pas de prénom/nom)
+> **Sender** : `support@lyta.ch` (display name : "Habib Agharbi — LYTA")
+> **Subject** : `Et si ton CRM datait des années 2000 ?`
 > **Effort estimé** : 45 min de setup + 5 min d'envoi
 > **Coût** : 0 € (gratuit jusqu'à 3 000 emails/mois sur Resend Free)
+> **Version template** : v9 (palette jaune LYTA + marine, validée 10 juin 2026)
 
 ---
 
@@ -72,24 +75,22 @@ emails transactionnels LYTA (signature invite, mandat dispatch, etc.).
 
 1. Resend dashboard → **Audiences** → **New Audience**
 2. Nom : `Cold outreach - Lancement LYTA juin 2026`
-3. **Upload CSV** au format suivant :
+3. **Upload CSV** au format minimaliste suivant (1 seule colonne) :
 
 ```csv
-email,first_name,last_name,company
-jean.dupont@cabinet-courtage.ch,Jean,Dupont,Cabinet Dupont Sàrl
-marie.martin@assurances-leman.ch,Marie,Martin,Assurances Léman
+email
+contact@cabinet-1.ch
+info@cabinet-2.ch
+direction@cabinet-3.ch
 ... (88 lignes au total)
 ```
 
 **Règles CSV importantes** :
-- Encodage **UTF-8** (pas Windows-1252) — sinon les é/à/ç partent en charabia
-- 1 contact par ligne, pas de doublon (Resend détecte mais nettoie d'abord
+- Encodage **UTF-8** (pas Windows-1252)
+- 1 email par ligne, pas de doublon (Resend détecte mais nettoie d'abord
   ton fichier pour éviter d'envoyer 2× au même)
-- **first_name obligatoire** (utilisé dans le subject et le body). Si tu ne
-  l'as pas pour un contact → mets "Bonjour" tout court à la place du prénom
-  dans le CSV
-- Pas de virgule dans les noms de cabinets (sinon casse la CSV) — remplace
-  par tiret ou supprime
+- Pas de prénom/nom à fournir : le template n'utilise pas de personnalisation
+  (« Bonjour, » tout court, pas « Bonjour Jean, »)
 
 **Audit avant import** :
 ```bash
@@ -105,17 +106,20 @@ grep -iE "@gmail|@hotmail|@yahoo|@outlook|@bluewin|@infomaniak" ton-csv.csv
 
 1. Resend dashboard → **Broadcasts** → **New Broadcast**
 2. **From** :
-   - Address : `hello@lyta.ch`
+   - Address : `support@lyta.ch`
    - Name : `Habib Agharbi — LYTA`
-3. **Reply-To** : `habib@lyta.ch` ou `hello@lyta.ch` (les réponses arrivent ici)
-4. **Subject** : choisir parmi les 3 variantes dans `cold_email_copy.md` —
-   recommandation : Variante A "Habib d'Optimislink — un outil pensé pour ton cabinet"
+3. **Reply-To** : `support@lyta.ch` (les réponses arrivent dans cette boîte)
+4. **Subject** : `Et si ton CRM datait des années 2000 ?`
+   (alternatives dans `cold_email_copy.md` si A/B test)
 5. **Audience** : sélectionner l'audience créée à l'étape 3
 6. **Content** :
    - Cliquer "Code editor" / "HTML editor"
    - Copier-coller le contenu de `cold_email_template.html`
-   - Vérifier que les `{{first_name}}` apparaissent bien dans la preview
-   - Vérifier que le lien CTA pointe vers la bonne URL LP
+   - Vérifier que le lien CTA pointe vers la bonne URL LP (`https://lyta.ch/lancement` ou ton URL de page de lancement)
+   - Vérifier que le `src` du logo pointe vers ton PNG hébergé sur Vercel
+     (`https://app.lyta.ch/marketing/lyta-logo-512.png`) — **important** :
+     sur fond marine, prévoir une version **blanche ou jaune** du logo
+     (pas la version coloré sur fond clair)
 
 ---
 
@@ -129,9 +133,10 @@ grep -iE "@gmail|@hotmail|@yahoo|@outlook|@bluewin|@infomaniak" ton-csv.csv
    - Ton email Outlook si tu en as un (test client corporate)
    - habib@lyta.ch (test client custom domain)
 3. Vérifier :
-   - ✅ Logo s'affiche (sinon → revoir étape 1)
-   - ✅ `{{first_name}}` est remplacé par ton prénom
-   - ✅ Le bouton CTA est cliquable et ouvre la bonne LP
+   - ✅ Logo s'affiche sur le bandeau marine (sinon → revoir étape 1)
+   - ✅ Le bandeau marine + le carton jaune avec le hook accrochent visuellement
+   - ✅ Le bouton **JAUNE "Découvrir LYTA →"** est cliquable et ouvre la bonne LP
+   - ✅ Le lien `support@lyta.ch` ouvre bien un nouveau mail
    - ✅ Le lien désabonnement marche (cliquer puis revenir)
    - ✅ Le rendu mobile est OK (vérifier sur ton smartphone)
 
@@ -173,7 +178,7 @@ Tu vois en temps réel :
 | **Unsubscribed** | Si > 3 → ton ciblage est mauvais (les gens ne sont pas la bonne cible) |
 
 **Important** : Resend ne suit pas automatiquement les réponses. Tu dois
-checker ta boîte `hello@lyta.ch` (ou Reply-To) plusieurs fois par jour.
+checker ta boîte `support@lyta.ch` plusieurs fois par jour.
 
 ---
 
@@ -240,7 +245,7 @@ intéressants (cabinets avec ≥ 3 collaborateurs, déjà sur LinkedIn LYTA, etc
 - [ ] Tests envoyés à 2-3 adresses → tout OK
 - [ ] LP `lyta.ch/lancement` testée (vidéo joue, formulaire marche)
 - [ ] Heure d'envoi : mardi/jeudi 9h30-11h30
-- [ ] Boîte `hello@lyta.ch` accessible pour traiter les réponses dans les 24h
+- [ ] Boîte `support@lyta.ch` accessible pour traiter les réponses dans les 24h
 
 ---
 
