@@ -55,7 +55,8 @@
       .mobile-h1 { font-size: 20px !important; line-height: 1.25 !important; }
       .mobile-eyebrow { font-size: 10px !important; letter-spacing: 0.18em !important; }
       .mobile-body { font-size: 14.5px !important; line-height: 1.6 !important; }
-      .mobile-logo img { max-width: 110px !important; height: auto !important; }
+      /* Mobile : 120x40 = ratio 3:1 strict, pas de déformation */
+      .mobile-logo img { width: 120px !important; height: 40px !important; max-width: 120px !important; }
       .mobile-badge { font-size: 9px !important; padding: 5px 10px !important; }
       .mobile-cta-table { width: 100% !important; }
       .mobile-cta-btn {
@@ -96,10 +97,14 @@
                       hébergée sur Vercel via public/marketing/lyta-logo-email.png.
                       Couleurs jaunes officielles, transparence OK sur fond marine.
                     -->
+                    <!-- Dimensions explicites pour ne PAS être déformé par Outlook
+                         (qui ignore height:auto). PNG source 4500x1500 = ratio 3:1
+                         strict. 150x50 = même ratio, taille raisonnable header. -->
                     <img src="https://app.lyta.ch/marketing/lyta-logo-email.png"
                          alt="LYTA"
-                         width="140"
-                         style="display:block; max-width:140px; height:auto; border:0;" />
+                         width="150"
+                         height="50"
+                         style="display:block; width:150px; height:50px; max-width:150px; border:0;" />
 
                     <!-- Fallback texte si pas de PNG dispo :
                     <div style="font-family:Georgia,'Times New Roman',serif; font-size:32px; font-weight:700; letter-spacing:0.15em; color:#FEB000;">
