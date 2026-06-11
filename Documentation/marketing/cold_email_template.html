@@ -7,7 +7,9 @@
   Style    : carton d'invitation café (zones colorées + tags + double CTA)
 
   Variables Resend utilisées :
-    {{RESEND_UNSUBSCRIBE_URL}}  — lien désabo auto-généré par Resend
+    {{{RESEND_UNSUBSCRIBE_URL}}}  — lien désabo auto-généré par Resend
+    (triple accolades = HTML raw sans escape, format Resend officiel
+     pour éviter le warning "malformed URL" dans le validateur Broadcast)
 
   Pas de personnalisation prénom (CSV des 88 n'a que des emails).
 
@@ -40,6 +42,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>LYTA · Un café ?</title>
+  <!--
+    Media query mobile — Gmail iOS/Android + Apple Mail + Outlook 365
+    mobile la respectent. Outlook desktop l'ignore (mais on est en mobile,
+    pas concerné). Réduit padding latéraux, taille du logo, taille des
+    typos, et passe le bouton CTA en pleine largeur pour faciliter le tap.
+  -->
+  <style type="text/css">
+    @media only screen and (max-width: 600px) {
+      .mobile-pad-side { padding-left: 20px !important; padding-right: 20px !important; }
+      .mobile-pad-y { padding-top: 22px !important; padding-bottom: 22px !important; }
+      .mobile-h1 { font-size: 20px !important; line-height: 1.25 !important; }
+      .mobile-eyebrow { font-size: 10px !important; letter-spacing: 0.18em !important; }
+      .mobile-body { font-size: 14.5px !important; line-height: 1.6 !important; }
+      .mobile-logo img { max-width: 78px !important; height: auto !important; }
+      .mobile-badge { font-size: 9px !important; padding: 5px 10px !important; }
+      .mobile-cta-table { width: 100% !important; }
+      .mobile-cta-btn {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 16px 12px !important;
+        font-size: 15px !important;
+      }
+      .mobile-badge-cta { font-size: 11px !important; padding: 9px 14px !important; letter-spacing: 0.06em !important; }
+      .mobile-stack-right { text-align: left !important; padding-top: 10px !important; }
+      .mobile-hide-spacer { display: none !important; }
+    }
+  </style>
 </head>
 <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif; color:#0f172a; line-height:1.55;">
 
@@ -57,10 +87,10 @@
 
           <!-- ─── Header bandeau MARINE avec logo + tag ──────────── -->
           <tr>
-            <td style="background-color:#0F172A; background-image:linear-gradient(135deg, #1E293B 0%, #0F172A 50%, #020617 100%); padding:30px 40px 26px 40px;">
+            <td class="mobile-pad-side mobile-pad-y" style="background-color:#0F172A; background-image:linear-gradient(135deg, #1E293B 0%, #0F172A 50%, #020617 100%); padding:30px 40px 26px 40px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td align="left" valign="middle">
+                  <td class="mobile-logo" align="left" valign="middle">
                     <!--
                       LOGO : remplace `src` par https://app.lyta.ch/marketing/lyta-logo-512.png
                       (sur fond marine, prendre la version blanche ou jaune du logo).
@@ -76,8 +106,8 @@
                     </div>
                     -->
                   </td>
-                  <td align="right" valign="middle">
-                    <span style="display:inline-block; background-color:#FEB000; color:#0F172A; font-size:10px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; padding:7px 14px; border-radius:999px;">
+                  <td class="mobile-stack-right" align="right" valign="middle">
+                    <span class="mobile-badge" style="display:inline-block; background-color:#FEB000; color:#0F172A; font-size:10px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; padding:7px 14px; border-radius:999px;">
                       Édition&nbsp;lancement
                     </span>
                   </td>
@@ -88,21 +118,21 @@
 
           <!-- ─── Hook problème → solution (JAUNE LYTA + marine) ─ -->
           <tr>
-            <td style="background-color:#FEB000; background-image:linear-gradient(135deg, #FFD54F 0%, #FEB000 50%, #F59E0B 100%); padding:36px 40px;">
+            <td class="mobile-pad-side mobile-pad-y" style="background-color:#FEB000; background-image:linear-gradient(135deg, #FFD54F 0%, #FEB000 50%, #F59E0B 100%); padding:36px 40px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td>
-                    <div style="font-size:11px; font-weight:800; letter-spacing:0.22em; text-transform:uppercase; color:#0F172A; margin-bottom:14px; opacity:0.75;">
+                    <div class="mobile-eyebrow" style="font-size:11px; font-weight:800; letter-spacing:0.22em; text-transform:uppercase; color:#0F172A; margin-bottom:14px; opacity:0.75;">
                       Et&nbsp;si&nbsp;ton&nbsp;CRM…
                     </div>
 
-                    <div style="font-size:24px; font-weight:800; color:#0F172A; line-height:1.3; margin-bottom:20px; letter-spacing:-0.01em;">
+                    <div class="mobile-h1" style="font-size:24px; font-weight:800; color:#0F172A; line-height:1.3; margin-bottom:20px; letter-spacing:-0.01em;">
                       …était trop compliqué,<br />
                       datait des années 2000,<br />
-                      ou te faisait perdre <span style="background-color:#0F172A; color:#FEB000; padding:2px 10px; border-radius:5px; font-weight:900;">2h par jour</span> ?
+                      ou te faisait perdre <span style="background-color:#0F172A; color:#FEB000; padding:2px 10px; border-radius:5px; font-weight:900; white-space:nowrap;">2h&nbsp;par&nbsp;jour</span> ?
                     </div>
 
-                    <div style="display:inline-block; background-color:#0F172A; background-image:linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color:#FEB000; font-size:13px; font-weight:800; letter-spacing:0.08em; padding:11px 20px; border-radius:8px; box-shadow:0 4px 12px rgba(15,23,42,0.35);">
+                    <div class="mobile-badge-cta" style="display:inline-block; background-color:#0F172A; background-image:linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color:#FEB000; font-size:13px; font-weight:800; letter-spacing:0.08em; padding:11px 20px; border-radius:8px; box-shadow:0 4px 12px rgba(15,23,42,0.35);">
                       ⚡&nbsp;&nbsp;IL&nbsp;EST&nbsp;TEMPS&nbsp;DE&nbsp;PASSER&nbsp;À&nbsp;LYTA
                     </div>
                   </td>
@@ -113,7 +143,7 @@
 
           <!-- ─── Body ──────────────────────────────────────────── -->
           <tr>
-            <td style="padding:32px 40px 8px 40px; font-size:15px; line-height:1.65; color:#1e293b;">
+            <td class="mobile-pad-side mobile-body" style="padding:32px 40px 8px 40px; font-size:15px; line-height:1.65; color:#1e293b;">
 
               <p style="margin:0 0 18px 0;">
                 Bonjour,
@@ -135,13 +165,13 @@
 
           <!-- ─── CTA primary (JAUNE LYTA + texte marine) ─────── -->
           <tr>
-            <td style="padding:8px 40px 16px 40px;" align="center">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <td class="mobile-pad-side" style="padding:8px 40px 16px 40px;" align="center">
+              <table class="mobile-cta-table" role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="background-color:#FEB000; background-image:linear-gradient(135deg, #FFD54F 0%, #FEB000 100%); border-radius:12px; box-shadow:0 4px 14px rgba(254,176,0,0.4);">
                     <!-- REMPLACE href par ton URL LP -->
-                    <a href="https://lyta.ch/lancement"
-                       style="display:inline-block; padding:18px 40px; font-size:16px; font-weight:800; color:#0F172A; text-decoration:none; border-radius:12px; letter-spacing:0.03em;">
+                    <a class="mobile-cta-btn" href="https://lyta.ch/lancement"
+                       style="display:inline-block; padding:18px 40px; font-size:16px; font-weight:800; color:#0F172A; text-decoration:none; border-radius:12px; letter-spacing:0.03em; text-align:center;">
                       Découvrir LYTA&nbsp;&nbsp;&rarr;
                     </a>
                   </td>
@@ -155,7 +185,7 @@
 
           <!-- ─── Séparateur "OU" ────────────────────────────── -->
           <tr>
-            <td style="padding:8px 40px;" align="center">
+            <td class="mobile-pad-side" style="padding:8px 40px;" align="center">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="border-bottom:1px solid #e2e8f0; height:1px; width:40%;"></td>
@@ -170,7 +200,7 @@
 
           <!-- ─── CTA secondary ─────────────────────────────── -->
           <tr>
-            <td style="padding:16px 40px 24px 40px; font-size:14px; line-height:1.6; color:#475569;" align="center">
+            <td class="mobile-pad-side" style="padding:16px 40px 24px 40px; font-size:14px; line-height:1.6; color:#475569;" align="center">
               <p style="margin:0 0 6px 0;">
                 Tu réponds direct :
               </p>
@@ -182,14 +212,14 @@
 
           <!-- ─── Soft close ─────────────────────────────────── -->
           <tr>
-            <td style="padding:8px 40px 24px 40px; font-size:13px; line-height:1.6; color:#64748b; font-style:italic;" align="center">
+            <td class="mobile-pad-side" style="padding:8px 40px 24px 40px; font-size:13px; line-height:1.6; color:#64748b; font-style:italic;" align="center">
               Pas intéressé ? Un mot suffit. Je n'insiste pas.
             </td>
           </tr>
 
           <!-- ─── Signature minimaliste (marque uniquement) ───── -->
           <tr>
-            <td style="background-color:#f8fafc; background-image:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding:24px 40px; border-top:3px solid #0F172A;">
+            <td class="mobile-pad-side" style="background-color:#f8fafc; background-image:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding:24px 40px; border-top:3px solid #0F172A;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td valign="top">
@@ -210,14 +240,14 @@
 
           <!-- ─── Footer légal + opt-out ─────────────────────── -->
           <tr>
-            <td style="padding:16px 40px 24px 40px; font-size:11px; line-height:1.5; color:#94a3b8;" align="center">
+            <td class="mobile-pad-side" style="padding:16px 40px 24px 40px; font-size:11px; line-height:1.5; color:#94a3b8;" align="center">
 
               <p style="margin:0 0 8px 0;">
                 Vous recevez ce message car votre cabinet est référencé publiquement comme acteur suisse de l'assurance.
               </p>
 
               <p style="margin:0 0 12px 0;">
-                <a href="{{RESEND_UNSUBSCRIBE_URL}}" style="color:#0F172A; text-decoration:underline;">Se désabonner en un clic</a>
+                <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#0F172A; text-decoration:underline;">Se désabonner en un clic</a>
               </p>
 
               <p style="margin:0; font-size:10px; color:#cbd5e1;">
