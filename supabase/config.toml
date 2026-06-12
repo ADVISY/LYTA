@@ -3,7 +3,16 @@ project_id = "shxbcszukoegvvejcpsn"
 [auth]
 enabled = true
 site_url = "https://app.lyta.ch"
-jwt_expiry = 3600
+# jwt_expiry passé de 3600s (1h) à 1800s (30 min) en juin 2026 pour
+# durcir la sécurité MFA SMS. Le risque qu'on adresse : entre signIn
+# password réussi et code SMS verifié, le JWT est techniquement valide.
+# Avant : fenêtre d'attaque max 1h si MFA challenge non complété.
+# Maintenant : 30 min. Pour aller plus loin (5 min recommandé en doc
+# sécurité), il faudrait shorter la session du smsClient spécifiquement
+# côté code (useAuth.tsx) plutôt que le JWT global qui force tous les
+# users à refresher 2× plus souvent. Le refresh est transparent (SDK
+# supabase-js le fait tout seul), aucun impact UX visible.
+jwt_expiry = 1800
 additional_redirect_urls = ["https://lyta-xi.vercel.app/**", "https://app.lyta.ch/**", "https://*.lyta.ch/**"]
 
 [auth.email]
