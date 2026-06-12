@@ -79,48 +79,22 @@ BEGIN
 END $$;
 
 
--- ─── Vérif whitelist : les 6 fonctions doivent rester exécutables ─
--- Sanity check : si une whitelist function a perdu son EXECUTE pour anon
--- (par effet de bord d'une migration précédente), on la regrant.
+-- ─── Vérif whitelist : les fonctions doivent rester exécutables ─
+-- Signatures réelles validées le 12 juin 2026 via SQL :
+--   get_tenant_branding_by_slug(p_slug text)
+--   get_public_tenant_branding(p_slug text)
+--   get_signature_request_by_token(p_token uuid)   ← uuid pas text
+--   mark_signature_request_viewed(p_token uuid)    ← uuid pas text
+--   get_assigned_advisor_public()                   ← pas d'args
+--   check_slug_availability                         ← n'existe pas en DB,
+--                                                     skip silencieux
 GRANT EXECUTE ON FUNCTION public.get_tenant_branding_by_slug(text) TO anon;
-GRANT EXECUTE ON FUNCTION public.get_signature_request_by_token(text) TO anon;
-GRANT EXECUTE ON FUNCTION public.mark_signature_request_viewed(text) TO anon;
-
--- get_public_tenant_branding, get_assigned_advisor_public, check_slug_availability
--- — on GRANT seulement si elles existent (certaines sont peut-être
--- définies avec une signature légèrement différente).
-DO $$
-BEGIN
-  PERFORM 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
-  WHERE n.nspname = 'public' AND p.proname = 'get_public_tenant_branding' LIMIT 1;
-  IF FOUND THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION public.get_public_tenant_branding(text) TO anon';
-  END IF;
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'get_public_tenant_branding grant skipped: %', SQLERRM;
-END $$;
-
-DO $$
-BEGIN
-  PERFORM 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
-  WHERE n.nspname = 'public' AND p.proname = 'get_assigned_advisor_public' LIMIT 1;
-  IF FOUND THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION public.get_assigned_advisor_public(uuid) TO anon';
-  END IF;
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'get_assigned_advisor_public grant skipped: %', SQLERRM;
-END $$;
-
-DO $$
-BEGIN
-  PERFORM 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
-  WHERE n.nspname = 'public' AND p.proname = 'check_slug_availability' LIMIT 1;
-  IF FOUND THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION public.check_slug_availability(text) TO anon';
-  END IF;
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'check_slug_availability grant skipped: %', SQLERRM;
-END $$;
+GRANT EXECUTE ON FUNCTION public.get_public_tenant_branding(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_signature_request_by_token(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.mark_signature_request_viewed(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_assigned_advisor_public() TO anon;
+-- check_slug_availability : pas dans pg_proc → skip (cf. edge fn dédiée
+-- check-slug-availability qui gère ça côté server-side).
 
 
 -- ─── Notification KING ───────────────────────────────────────────
