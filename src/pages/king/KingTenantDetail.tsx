@@ -405,24 +405,51 @@ export default function KingTenantDetail() {
           <Button
             variant="outline"
             onClick={async () => {
-              if (!confirm("Générer un lien d'impersonation pour ce tenant ? (à ouvrir en fenêtre privée)")) return;
+              // Durcissement juin 2026 (audit Phase 1 #8) :
+              // raison obligatoire min 10 chars + check session fraîche
+              // côté edge fn + notification au tenant impersoné.
+              const reason = window.prompt(
+                "Raison de l'impersonation (obligatoire, min 10 caractères) :\n\n" +
+                "Le tenant recevra une notification avec cette raison. " +
+                "Reste précis et professionnel.\n\n" +
+                "Ex : 'Debug sync Stripe demandé par le tenant'",
+              );
+              if (reason === null) return; // Annulation
+              if (reason.trim().length < 10) {
+                toast({
+                  title: "Raison trop courte",
+                  description: "Minimum 10 caractères pour traçabilité nLPD.",
+                  variant: "destructive",
+                });
+                return;
+              }
               try {
                 const { data, error } = await supabase.functions.invoke('king-impersonate-tenant', {
-                  body: { tenant_id: tenantId },
+                  body: { tenant_id: tenantId, reason: reason.trim() },
                 });
                 if (error) throw error;
                 // Copie l'URL dans le presse-papier
                 await navigator.clipboard.writeText(data.impersonate_url);
                 toast({
                   title: 'Lien d\'impersonation copié',
-                  description: `Connexion auto comme ${data.target_email}. Ouvre en fenêtre privée. Loggé dans audit.`,
+                  description: `Connexion auto comme ${data.target_email}. Ouvre en fenêtre privée. Tenant notifié + loggé dans audit.`,
                 });
               } catch (e: any) {
-                toast({ title: 'Erreur impersonation', description: e?.message || String(e), variant: 'destructive' });
+                // Erreur "session trop ancienne" → message explicite
+                const msg = e?.message || String(e);
+                if (msg.toLowerCase().includes("session trop ancienne") || msg.toLowerCase().includes("requires_relogin")) {
+                  toast({
+                    title: "Reconnexion requise",
+                    description: "Ta session KING date de plus de 15 min. Déconnecte-toi puis reconnecte-toi avant d'impersoner.",
+                    variant: "destructive",
+                  });
+                } else {
+                  toast({ title: 'Erreur impersonation', description: msg, variant: 'destructive' });
+                }
               }
             }}
             className="text-amber-700 border-amber-300 hover:bg-amber-50"
-            title="Génère un magic link pour te connecter comme un user admin du tenant (loggé dans audit)"
+            title="Génère un magic link pour te connecter comme un user admin du tenant. Raison obligatoire. Session < 15 min requise. Tenant notifié."
           >
             <KeyRound className="h-4 w-4 mr-2" />
             Impersonate
