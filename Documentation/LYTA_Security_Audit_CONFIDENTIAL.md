@@ -1,9 +1,82 @@
 # LYTA — Security Audit (CONFIDENTIEL)
 
-> **Version** 1.0 — 8 juin 2026
+> **Version** 1.1 — 12 juin 2026 (mise à jour majeure post-actions Phase 1)
 > **Classification** 🔒 **CONFIDENTIEL — NDA renforcé requis**
 > **Audience** Développeur externe missionné pour audit sécurité LYTA + Habib Agharbi
 > **Document associé (public)** `LYTA_Developer_Onboarding.md`
+
+---
+
+## 🔄 Mise à jour du 12 juin 2026 — Phase 1 audit + Advisor
+
+Session de durcissement intensive (~5h) appliquée le 12 juin 2026.
+Tableau de bord rapide AVANT de lire le détail des sections suivantes :
+
+### Réduction des warnings Supabase Security Advisor
+
+```
+12 juin 2026 matin   :  284 warnings (dont 2 CRITICAL)
+12 juin 2026 soir    : ~139 warnings (0 CRITICAL)
+                       ───────
+                       -145 (-51 %)
+```
+
+### Vulnérabilités V1-V9 du présent doc — statut actualisé
+
+| Vuln | Statut | Action 12 juin |
+|---|---|---|
+| **V1** Bug RLS 42501 cause inconnue | 🔴 **Toujours actif** | Workaround inchangé via `create-client` / `bypass-insert` / `save-policy` edge fns. Reste P0 pour le dev externe. |
+| **V2** `frame-ancestors` CSP ignoré | ✅ **FIXÉ** | `vercel.json` enrichi avec 6 headers HTTP sécu : `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, HSTS 2 ans, Permissions-Policy, X-Content-Type-Options nosniff, Referrer-Policy. Commit `b2020ec`. |
+| **V3** `king-impersonate-tenant` sans 2FA fresh | ✅ **FIXÉ** | Refonte complète : reason obligatoire (min 10 char), check session ≤ 15 min, notification au tenant (INSERT dans `notifications` pour chaque admin). Commit `546ad27`. |
+| **V4** Reset password redirect URL wildcard | 🟡 Pas traité | Toujours ouvert. À investiguer en lien avec audit `tenant-onboarding`. |
+| **V5** Storage path traversal | ✅ **AUDITÉ — Pas exploitable** | Policy RLS Storage utilise `(storage.foldername(name))[1] = auth.uid()::text` → premier segment du path = user_id, impossible de pivoter via `../`. L'EXISTS sur `documents`/`document_scans` scope par `tenant_id`. OK. |
+| **V6** Logs edge functions exposent stack traces | 🟡 Pas traité | À auditer ligne par ligne en phase 2. |
+| **V7** Pas de retry policy bounces Resend | 🟡 Pas traité | Reste à faire en Phase 3 (observabilité). |
+| **V8** `commission_statement_lines` non typé | 🟡 Pas traité | Régénération des types Supabase à faire (1 commande). |
+| **V9** `clients_safe` view orpheline | 🟡 Pas traité | À investiguer. |
+
+### Nouvelles vulnérabilités découvertes ET fixées le 12 juin
+
+| ID | Niveau | Description | Statut |
+|---|---|---|---|
+| **V10** | 🔴 CRITICAL | Table `clients_backup_jcg_pro_20260525` (709 rows, colonne `iban`) sans RLS, exposée via API | ✅ **FIXÉ** — REVOKE ALL + ENABLE RLS, migration `20260612180000` |
+| **V11** | 🔴 CRITICAL | `send-sms` edge function : ReferenceError `user.id` jamais défini + bypass auth (Bearer falsifié accepté) → spam SMS Twilio possible | ✅ **FIXÉ** — Refonte auth, throw AuthError si token invalide, redéployée. Commit `655e831`. |
+| **V12** | 🟠 HIGH | 4 crons cassés depuis 25 jours (`SERVICE_ROLE_KEY manquante dans vault`) → birthday, renewal, follow-up, retry tenant-onboarding désactivés | ✅ **FIXÉ** — GRANT vault à `postgres` (pg_cron). Migration `20260612141500`. |
+| **V13** | 🟠 HIGH | 13 fonctions SECURITY DEFINER sans `search_path` figé (trojan horse Postgres) | ✅ **FIXÉ** — `ALTER FUNCTION ... SET search_path = public, pg_catalog` sur les 13. Migration `20260612200000`. |
+| **V14** | 🟠 HIGH | RLS policy `System can insert audit logs` sur `document_scan_audit` avec `WITH CHECK = true` → pollution audit possible | ✅ **FIXÉ** — Policy droppée. Audit log écrit uniquement via service_role. |
+| **V15** | 🟠 HIGH | Bucket Storage `tenant-logos` policy SELECT trop large → énumération de tous les tenants via API list() | ✅ **FIXÉ** — Policy `Anyone can view tenant logos` droppée. Bucket reste public pour URLs directes mais listing bloqué. |
+| **V16** | 🟡 MEDIUM | 128 fonctions SECURITY DEFINER exécutables par `anon` (= user non connecté) | ✅ **FIXÉ pour 127** — REVOKE EXECUTE FROM anon sur 127 fns, whitelist de 5 fns publiques (branding tenant, signature token). Migration `20260612220000`. |
+| **V17** | 🟡 MEDIUM | MFA SMS — fenêtre d'attaque 1h sur JWT entre signIn et SMS verify | ✅ **FIXÉ** — `jwt_expiry` 3600s → 1800s (config.toml + Dashboard Auth). |
+| **V18** | 🟢 LOW | `Leaked Password Protection` Supabase Auth désactivé | ✅ **FIXÉ** — Toggle ON dans Dashboard Auth → check HaveIBeenPwned au signup natif (en plus du check applicatif déjà présent dans `useAuth.tsx`). |
+
+### Phase 1 audit interne — récap actions
+
+| # | Action | Statut | Commit |
+|---|---|---|---|
+| 1 | Vault `SERVICE_ROLE_KEY` + `PROJECT_URL` configurés pour pg_cron | ✅ | `b04fe56` |
+| 2 | 6 headers HTTP sécurité Vercel | ✅ | `b2020ec` |
+| 3 | `jwt_expiry` 1h → 30 min | ✅ | `b2020ec` + Dashboard |
+| 4 | Audit historique git → 0 secret leaké confirmé | ✅ | (audit-only) |
+| 5 | Audit RLS portal client — `policies` + `documents` + `claims` OK | ✅ | (audit-only) |
+| 6 | Audit 36 edge fn `requireAuth` (+ bug critique `send-sms` fixé) | ✅ | `655e831` |
+| 7 | Storage path traversal — pas exploitable | ✅ | (audit-only) |
+| 8 | `king-impersonate-tenant` durci (reason + session + notif tenant) | ✅ | `546ad27` |
+
+### Restant pour atteindre "audit parfait"
+
+| Restant | Effort | Priorité |
+|---|---|---|
+| **V1 RLS 42501** root cause | 1-2 jours dev senior Postgres | P0 |
+| Audit `tenant-onboarding` slug pour V4 | 4h | P1 |
+| `clients_safe` view orpheline (V9) | 1h | P2 |
+| Régénérer types Supabase (V8) | 5 min | P2 |
+| 128 `authenticated SECURITY DEFINER` warns | 2-3 h audit ciblé | P2 (volontaires majoritairement) |
+| Logs edge fn audit stack traces (V6) | 4h | P2 |
+| Retry policy Resend bounces (V7) | 2h | P3 |
+| Setup Sentry + tests Playwright | 5-7 jours | P3 (Phase 2 observabilité) |
+| Pen test externe | 5-10 k CHF/an | P3 (annuel) |
+
+---
 
 ---
 
