@@ -25,7 +25,7 @@ Tableau de bord rapide AVANT de lire le détail des sections suivantes :
 
 | Vuln | Statut | Action 12 juin |
 |---|---|---|
-| **V1** Bug RLS 42501 cause inconnue | 🔴 **Toujours actif** | Workaround inchangé via `create-client` / `bypass-insert` / `save-policy` edge fns. Reste P0 pour le dev externe. |
+| **V1** Bug RLS 42501 cause inconnue | 🟡 **Root cause identifiée, fix candidat prêt** | Cf. §7.1 V1 — analyse approfondie 12 juin. Migration diagnostic `20260612230000` + fix candidat `20260612231000` créés (non pushés). H2 = `user_is_member_of_tenant()` ne reconnaissait pas `user_tenant_roles`. À tester sur DB puis valider en retirant les workarounds. |
 | **V2** `frame-ancestors` CSP ignoré | ✅ **FIXÉ** | `vercel.json` enrichi avec 6 headers HTTP sécu : `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, HSTS 2 ans, Permissions-Policy, X-Content-Type-Options nosniff, Referrer-Policy. Commit `b2020ec`. |
 | **V3** `king-impersonate-tenant` sans 2FA fresh | ✅ **FIXÉ** | Refonte complète : reason obligatoire (min 10 char), check session ≤ 15 min, notification au tenant (INSERT dans `notifications` pour chaque admin). Commit `546ad27`. |
 | **V4** Reset password redirect URL wildcard | 🟡 Pas traité | Toujours ouvert. À investiguer en lien avec audit `tenant-onboarding`. |
@@ -492,13 +492,46 @@ WHERE p.prosecdef = true AND n.nspname = 'public';
 
 ### 7.1 🔴 Confirmées critiques
 
-#### V1 — Bug RLS 42501 cause inconnue
+#### V1 — Bug RLS 42501 — root cause identifiée le 12 juin 2026
 
 **Description** : INSERT sur `clients`, `policies`, `family_members`, `documents` plante en 42501 en runtime PostgREST alors que les conditions WITH CHECK semblent satisfaites en test SQL.
 
 **Impact actuel** : workaround via 3 edge functions service_role. Marche mais **on insère via service_role = on bypass complètement les RLS**. Si une edge function de bypass a un bug d'auth → INSERT possible sur n'importe quel tenant.
 
-**Recommandation** : investigation root cause prioritaire. Hypothèses à explorer : `current_setting('request.jwt.claims', true)` qui retourne NULL dans le contexte PostgREST runtime mais pas en CLI ; ou un mismatch de search_path.
+**Hypothèses analysées le 12 juin 2026** :
+
+- ❌ **H0 (audit historique)** : `current_setting('request.jwt.claims', true)` retourne NULL en PostgREST runtime. **Rejetée** : si c'était le cas, `auth.uid()` retournerait NULL et le user ne passerait pas `TO authenticated` ; or SELECT marche. Donc le JWT est bien transmis.
+
+- 🟡 **H1 (probable)** : `.insert([...]).select("*").single()` force l'évaluation de la policy SELECT sur la row insérée pour le RETURNING. Si la SELECT policy plante → Postgres ROLLBACK l'INSERT et reporte 42501 comme violation INSERT. La policy SELECT actuelle (`Scoped clients view with index`, migration `20260603200000`) repose sur `get_user_tenant_id()` qui est mono-tenant (`LIMIT 1`) et ne lit que `user_tenant_assignments`. Un user multi-tenant ou ratttaché via `user_tenant_roles` est rejeté au RETURNING.
+
+- ✅ **H2 (confirmée par lecture code)** : `user_is_member_of_tenant(user_id, tenant_id)` (helper de la policy INSERT v3 `v3_simple_create_clients`) ne reconnaît QUE `user_tenant_assignments`. Pour un user rattaché via `user_tenant_roles` (rôles dynamiques tenant, ex: agent assigné à un tenant via tenant_roles) **sans** ligne dans `user_tenant_assignments`, la policy INSERT échoue directement. **Pas besoin d'aller jusqu'au RETURNING.**
+
+**Mécanisme exact (H2)** :
+1. Front fait `.insert([...])` direct sur `public.clients`
+2. Postgres évalue WITH CHECK : `user_is_member_of_tenant(auth.uid(), tenant_id)`
+3. Helper check `EXISTS (SELECT 1 FROM user_tenant_assignments WHERE …)` → false (user n'est lié que via UTR)
+4. WITH CHECK fail → 42501
+
+**Fix candidat (migration `20260612231000_fix_clients_rls_42501_candidate.sql`)** :
+- Refactor `user_is_member_of_tenant()` pour reconnaître UTA + UTR + admin global + king (4 modes)
+- Ajout d'une policy SELECT "RETURNING-safe" pour couvrir aussi H1 par défense en profondeur
+- SECURITY DEFINER + STABLE + search_path figé (anti-trojan)
+- Rollback trivial : ré-appliquer `20260527200000`
+
+**Migration diagnostic préalable (`20260612230000_diagnose_clients_rls_42501.sql`)** :
+- Non destructive, dump dans `king_notifications` :
+  - Toutes les policies INSERT/SELECT actuelles sur `clients`
+  - Définitions des helpers critiques
+  - Stats UTA vs UTR vs **users UTR sans UTA** (= victimes de H2)
+- À pusher AVANT le fix candidat pour valider H2 sur prod.
+
+**Plan validation V1 (à exécuter)** :
+1. `supabase db push` de la migration diagnostic → lire le notification king (`utr_users_without_uta`)
+2. Si `utr_users_without_uta > 0` → H2 confirmée
+3. `supabase db push` de la migration fix candidat
+4. Tester INSERT direct depuis front (retirer temporairement le fallback create-client dans `useClients.tsx`)
+5. Si OK : marquer V1 ✅ et retirer les 3 edge functions workarounds dans une migration séparée (ou les garder verrouillées en double-check sécu)
+6. Si KO : run le diagnostic à nouveau + creuser H1
 
 #### V2 — `frame-ancestors` CSP ignoré
 
