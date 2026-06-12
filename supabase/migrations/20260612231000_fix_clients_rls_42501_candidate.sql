@@ -1,15 +1,31 @@
 -- ============================================================================
 -- FIX CANDIDAT V1 — RLS 42501 sur clients (NE PAS PUSH SANS TEST)
 -- ============================================================================
--- ⚠️  CETTE MIGRATION EST UN CANDIDAT. NE PAS L'APPLIQUER EN PROD SANS
--- avoir d'abord lancé la migration diagnostic `20260612230000_diagnose_*`
--- et confirmé l'hypothèse H2 (présence de users UTR sans UTA correspondant)
--- via inspection des king_notifications.
+-- ⚠️  CETTE MIGRATION EST UN CANDIDAT. À pousser AVEC test front juste après.
 --
--- Objectif : élargir `user_is_member_of_tenant()` pour reconnaître les
--- 4 modes d'appartenance présents en DB (UTA, UTR, rôle global admin,
--- king) et ainsi débloquer l'INSERT direct sur `clients`, `policies`,
--- `family_members`, `documents` sans passer par les edge functions.
+-- Root cause confirmée par dump CSV pg_policies (12 juin 2026) :
+--
+--   = H1 (RETURNING-time SELECT fail), PAS H2.
+--
+-- Les 5 policies INSERT PERMISSIVE actuelles couvrent déjà UTR via la
+-- policy "Direct tenant members can create clients" — donc le WITH CHECK
+-- de l'INSERT passe pour un user UTR ou admin tenant.
+--
+-- Le 42501 vient du `.insert([...]).select("*").single()` du front :
+-- Postgres évalue la policy SELECT "Scoped clients view with index" sur
+-- la nouvelle row, qui exige `assigned_agent_id = my_collab_id` ou
+-- `has_global_scope_v2()`. Un Admin Cabinet qui crée un client SANS
+-- s'auto-assigner ne match aucune branche → SELECT fail → INSERT rollback
+-- avec 42501 attribué à tort à l'INSERT.
+--
+-- Fix : ajouter une policy SELECT PERMISSIVE "RETURNING-safe tenant
+-- member view" qui autorise lecture si user est membre tenant (UTA OR
+-- UTR OR admin global OR king). Combinée en OR avec la policy scoped,
+-- aucune régression de filtrage (le scope par rôle reste appliqué côté
+-- front via filters explicites — cf. commentaire migration 20260603190000).
+--
+-- Bonus utile : refactor `user_is_member_of_tenant()` pour couvrir aussi
+-- UTR (cohérence avec les autres helpers).
 --
 -- Stratégie sécurité (PRINCIPE FONDAMENTAL) :
 --   1. SECURITY DEFINER + search_path figé (anti-trojan)

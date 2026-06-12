@@ -502,21 +502,48 @@ WHERE p.prosecdef = true AND n.nspname = 'public';
 
 - ❌ **H0 (audit historique)** : `current_setting('request.jwt.claims', true)` retourne NULL en PostgREST runtime. **Rejetée** : si c'était le cas, `auth.uid()` retournerait NULL et le user ne passerait pas `TO authenticated` ; or SELECT marche. Donc le JWT est bien transmis.
 
-- 🟡 **H1 (probable)** : `.insert([...]).select("*").single()` force l'évaluation de la policy SELECT sur la row insérée pour le RETURNING. Si la SELECT policy plante → Postgres ROLLBACK l'INSERT et reporte 42501 comme violation INSERT. La policy SELECT actuelle (`Scoped clients view with index`, migration `20260603200000`) repose sur `get_user_tenant_id()` qui est mono-tenant (`LIMIT 1`) et ne lit que `user_tenant_assignments`. Un user multi-tenant ou ratttaché via `user_tenant_roles` est rejeté au RETURNING.
+- ❌ **H2 (initialement suspectée)** : `user_is_member_of_tenant()` ignore UTR. **Invalidée par dump CSV de pg_policies du 12 juin 2026** : il y a 5 policies INSERT PERMISSIVE actives, et **`"Direct tenant members can create clients"`** contient déjà une clause inline `EXISTS (SELECT FROM user_tenant_roles JOIN tenant_roles…)`. Les policies PERMISSIVE étant combinées en OR, il suffit que celle-ci passe pour autoriser l'INSERT. Donc le WITH CHECK de l'INSERT n'est PAS le problème pour les users UTR.
 
-- ✅ **H2 (confirmée par lecture code)** : `user_is_member_of_tenant(user_id, tenant_id)` (helper de la policy INSERT v3 `v3_simple_create_clients`) ne reconnaît QUE `user_tenant_assignments`. Pour un user rattaché via `user_tenant_roles` (rôles dynamiques tenant, ex: agent assigné à un tenant via tenant_roles) **sans** ligne dans `user_tenant_assignments`, la policy INSERT échoue directement. **Pas besoin d'aller jusqu'au RETURNING.**
+- ✅ **H1 (CONFIRMÉE — root cause)** : `.insert([...]).select("*").single()` du front force l'évaluation de la policy SELECT sur la row fraîchement insérée pour le RETURNING. Postgres rollback la transaction et reporte 42501 comme violation INSERT alors que c'est le RETURNING qui plante.
 
-**Mécanisme exact (H2)** :
-1. Front fait `.insert([...])` direct sur `public.clients`
-2. Postgres évalue WITH CHECK : `user_is_member_of_tenant(auth.uid(), tenant_id)`
-3. Helper check `EXISTS (SELECT 1 FROM user_tenant_assignments WHERE …)` → false (user n'est lié que via UTR)
-4. WITH CHECK fail → 42501
+**Mécanisme exact (H1)** — analyse du dump CSV `Supabase Snippet RLS Policy Breakdown for clients.csv` :
 
-**Fix candidat (migration `20260612231000_fix_clients_rls_42501_candidate.sql`)** :
-- Refactor `user_is_member_of_tenant()` pour reconnaître UTA + UTR + admin global + king (4 modes)
-- Ajout d'une policy SELECT "RETURNING-safe" pour couvrir aussi H1 par défense en profondeur
-- SECURITY DEFINER + STABLE + search_path figé (anti-trojan)
-- Rollback trivial : ré-appliquer `20260527200000`
+Policies SELECT actives sur `clients` :
+- `Kings have full access` (USING `is_king()`) → bypass king
+- `Block unauthenticated access` (USING `false`) → cosmétique, sans effet en OR PERMISSIVE
+- `Scoped clients view with index` (la seule qui scope vraiment) :
+  ```sql
+  USING (
+    is_king()
+    OR (user_id IS NOT NULL AND user_id = auth.uid())
+    OR (tenant_id = get_user_tenant_id() AND has_global_scope_v2())
+    OR id = my_collab_id_v2()
+    OR (assigned_agent_id IS NOT NULL AND assigned_agent_id = my_collab_id_v2())
+    OR (manager_id IS NOT NULL AND manager_id = my_collab_id_v2() AND has_team_scope_v2())
+    OR (has_team_scope_v2() AND _client_is_in_team(...))
+  )
+  ```
+
+Pour un Admin Cabinet (ex Matthieu JCG) qui crée un nouveau client :
+| Branche | Résultat sur la row insérée |
+|---|---|
+| `is_king()` | `false` |
+| `user_id = auth.uid()` | `false` (fiche client ≠ fiche du user) |
+| `tenant_id = get_user_tenant_id() AND has_global_scope_v2()` | dépend de `has_global_scope_v2()` qui peut renvoyer false si le rôle de l'user n'a pas la perm `clients.view` en scope global |
+| `id = my_collab_id_v2()` | `false` (UUID frais) |
+| `assigned_agent_id = my_collab_id_v2()` | `false` (l'Admin ne s'auto-assigne pas) |
+| `manager_id = my_collab_id_v2()` | `false` |
+| `_client_is_in_team(...)` | `false` (nouvelle row) |
+
+→ **AUCUNE BRANCHE NE MATCH** → SELECT fail au RETURNING → Postgres rollback → 42501 reporté comme violation INSERT.
+
+**Pourquoi les tests SQL manuels avaient l'air OK** : ils testaient `INSERT INTO clients …` sans `RETURNING *`, qui passe effectivement le WITH CHECK. C'est uniquement le combo INSERT + RETURNING (le seul utilisé par le SDK Supabase JS) qui plante.
+
+**Fix (migration `20260612231000_fix_clients_rls_42501_candidate.sql`)** :
+- **Cœur du fix** : ajout d'une policy SELECT PERMISSIVE `"RETURNING-safe tenant member view"` qui autorise SELECT si `user_is_member_of_tenant(auth.uid(), tenant_id)`. Combinée en OR avec `Scoped clients view with index`, elle ouvre le RETURNING aux Admin Cabinet et tous les rôles sans casser la défense en profondeur (le filtrage par rôle reste actif côté front comme déjà accepté par Habib dans le commentaire de `20260603190000`).
+- **Bonus cohérence** : refactor `user_is_member_of_tenant()` pour aussi reconnaître UTR + admin global + king (4 modes), cohérent avec les autres helpers.
+- SECURITY DEFINER + STABLE + search_path figé (anti-trojan).
+- Rollback trivial : `DROP POLICY "RETURNING-safe tenant member view" ON public.clients` + ré-appliquer la version d'avant de `user_is_member_of_tenant()` (migration `20260527200000`).
 
 **Migration diagnostic préalable (`20260612230000_diagnose_clients_rls_42501.sql`)** :
 - Non destructive, dump dans `king_notifications` :
