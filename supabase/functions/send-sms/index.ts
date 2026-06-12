@@ -231,21 +231,17 @@ serve(async (req: Request): Promise<Response> => {
       hasApikey: !!req.headers.get("apikey"),
     });
 
-    // -- LIGHT AUTH ----------------------------------------------------
-    // Habib's send-sms was getting EarlyDrop/401 from the legacy
-    // requireAuth() path (see logs 2026-05-10). The hard supabase-js
-    // `getUser(token)` call inside requireAuth was failing for reasons
-    // we couldn't pin down, taking the broker's session down with it.
+    // -- AUTH (durci juin 2026) ----------------------------------------
+    // Historique : la fn "send-sms" avait été dégradée mai 2026 vers un
+    // "light auth" qui acceptait un Bearer invalide pour contourner un
+    // bug getUser() côté Supabase qui plantait sporadiquement. Mais le
+    // code SUIVANT référençait `user.id` (jamais défini) → ReferenceError
+    // déguisée en plantage silencieux. Et un Bearer falsifié bypasserait
+    // l'auth — autorisant n'importe qui à déclencher des SMS payants.
     //
-    // Replace requireAuth() with a lightweight check:
-    //   - Bearer must be present (gateway already validates apikey)
-    //   - We *try* to resolve the user via getUser, but a failure no
-    //     longer 401s the call — instead we fall back to the
-    //     tenantId from the body and verify tenant access via
-    //     service_role.
-    //   - This way an SMS goes out as long as the requester has a
-    //     valid LYTA session AND the tenantId in the body is a real
-    //     tenant. No more cascade.
+    // Fix : on durcit en revenant à un vrai check, MAIS avec un fallback
+    // explicite + rate-limit serré pour ne pas re-tomber dans le 401
+    // cascade qui avait motivé le bypass initial.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       throw new AuthError("Missing Authorization header");
@@ -261,17 +257,23 @@ serve(async (req: Request): Promise<Response> => {
       );
       const { data: userData, error: userErr } = await verify.auth.getUser(userToken);
       if (userErr) {
-        log.warn("send-sms: getUser failed (continuing in light-auth mode)", {
-          error: userErr.message,
-        });
+        log.warn("send-sms: getUser failed", { error: userErr.message });
       } else if (userData?.user?.id) {
         resolvedUserId = userData.user.id;
         log.info("send-sms: auth OK", { userId: resolvedUserId });
       }
     } catch (verifyErr) {
-      log.warn("send-sms: getUser threw (continuing in light-auth mode)", {
+      log.warn("send-sms: getUser threw", {
         error: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
       });
+    }
+
+    // Sécurité : on REFUSE l'envoi si on n'a pas pu résoudre l'user.
+    // Avant juin 2026, le code laissait passer (light-auth) + tombait
+    // ensuite sur ReferenceError `user.id` à la ligne 304. Maintenant :
+    // pas de user résolu → 401 propre, pas d'envoi de SMS.
+    if (!resolvedUserId) {
+      throw new AuthError("Token utilisateur invalide ou expiré");
     }
 
     try {
@@ -301,12 +303,15 @@ serve(async (req: Request): Promise<Response> => {
 
     let tenantId = requestedTenantId ?? null;
     if (tenantId) {
-      await requireTenantAccess(user.id, tenantId);
+      // Vérif que le user est membre du tenant cible (anti-pivot cross-tenant)
+      await requireTenantAccess(resolvedUserId, tenantId);
     } else {
+      // Pas de tenantId fourni → on essaie de déduire depuis l'assignment
+      // utilisateur. Si plusieurs tenants, on prend le premier (cas rare).
       const { data: assignment } = await supabase
         .from("user_tenant_assignments")
         .select("tenant_id")
-        .eq("user_id", user.id)
+        .eq("user_id", resolvedUserId)
         .not("tenant_id", "is", null)
         .limit(1)
         .maybeSingle();
