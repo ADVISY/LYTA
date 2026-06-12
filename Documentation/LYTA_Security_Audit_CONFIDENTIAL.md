@@ -25,7 +25,7 @@ Tableau de bord rapide AVANT de lire le détail des sections suivantes :
 
 | Vuln | Statut | Action 12 juin |
 |---|---|---|
-| **V1** Bug RLS 42501 cause inconnue | 🟡 **Root cause identifiée, fix candidat prêt** | Cf. §7.1 V1 — analyse approfondie 12 juin. Migration diagnostic `20260612230000` + fix candidat `20260612231000` créés (non pushés). H2 = `user_is_member_of_tenant()` ne reconnaissait pas `user_tenant_roles`. À tester sur DB puis valider en retirant les workarounds. |
+| **V1** Bug RLS 42501 — analyse révisée 2× | 🟡 **Root cause = bug provisioning rôles (probable)** | Cf. §7.1 V1. H2 invalidée par dump CSV pg_policies. H1 confirmée (RETURNING fail). Cause profonde probable : Admin Cabinet sans tenant_role+perm clients.view en scope global → has_global_scope_v2()=false → branche 3 fail. Migration diagnostic ciblée `20260612232000_diagnose_v1_scopes.sql` à pousser pour valider. Fix candidat précédent ANNULÉ (cassait le scope par rôle). |
 | **V2** `frame-ancestors` CSP ignoré | ✅ **FIXÉ** | `vercel.json` enrichi avec 6 headers HTTP sécu : `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, HSTS 2 ans, Permissions-Policy, X-Content-Type-Options nosniff, Referrer-Policy. Commit `b2020ec`. |
 | **V3** `king-impersonate-tenant` sans 2FA fresh | ✅ **FIXÉ** | Refonte complète : reason obligatoire (min 10 char), check session ≤ 15 min, notification au tenant (INSERT dans `notifications` pour chaque admin). Commit `546ad27`. |
 | **V4** Reset password redirect URL wildcard | 🟡 Pas traité | Toujours ouvert. À investiguer en lien avec audit `tenant-onboarding`. |
@@ -539,11 +539,31 @@ Pour un Admin Cabinet (ex Matthieu JCG) qui crée un nouveau client :
 
 **Pourquoi les tests SQL manuels avaient l'air OK** : ils testaient `INSERT INTO clients …` sans `RETURNING *`, qui passe effectivement le WITH CHECK. C'est uniquement le combo INSERT + RETURNING (le seul utilisé par le SDK Supabase JS) qui plante.
 
-**Fix (migration `20260612231000_fix_clients_rls_42501_candidate.sql`)** :
-- **Cœur du fix** : ajout d'une policy SELECT PERMISSIVE `"RETURNING-safe tenant member view"` qui autorise SELECT si `user_is_member_of_tenant(auth.uid(), tenant_id)`. Combinée en OR avec `Scoped clients view with index`, elle ouvre le RETURNING aux Admin Cabinet et tous les rôles sans casser la défense en profondeur (le filtrage par rôle reste actif côté front comme déjà accepté par Habib dans le commentaire de `20260603190000`).
-- **Bonus cohérence** : refactor `user_is_member_of_tenant()` pour aussi reconnaître UTR + admin global + king (4 modes), cohérent avec les autres helpers.
-- SECURITY DEFINER + STABLE + search_path figé (anti-trojan).
-- Rollback trivial : `DROP POLICY "RETURNING-safe tenant member view" ON public.clients` + ré-appliquer la version d'avant de `user_is_member_of_tenant()` (migration `20260527200000`).
+**Fix initial proposé — ANNULÉ après revue Habib** :
+Une migration `20260612231000_fix_clients_rls_42501_candidate.sql` ajoutait une policy SELECT PERMISSIVE qui ouvrait la lecture à tout membre tenant. **Régression sécurité non acceptable** : ça annulait le scope par rôle (Agent → ses clients, Manager → son équipe). La migration est désormais no-op et marquée annulée dans le code.
+
+**Hypothèse approfondie 12 juin 2026 (post revue Habib)** :
+
+La policy `Scoped clients view with index` actuelle est *correcte conceptuellement*. Le 42501 vient probablement d'un **bug de provisioning des rôles** : les Admin Cabinet créés via `tenant-onboarding` n'ont peut-être pas systématiquement un `tenant_role` avec :
+- `dashboard_scope = 'global'`
+- `tenant_role_permissions { module='clients', action='view', allowed=true }`
+
+→ `has_global_scope_v2()` retourne `false` pour eux → branche 3 ne passe pas → tombent dans branche 4 (personal) qui exige `assigned_agent_id = lui` → faux pour une nouvelle row → RETURNING fail → 42501.
+
+**Migration diagnostic ciblée (`20260612232000_diagnose_v1_scopes.sql`)** :
+Liste tous les membres UTA des tenants actifs et calcule `user_has_global_client_scope()` pour chacun. Dump dans `king_notifications` les users qui sortent `false` = victimes du 42501.
+
+**Fix candidat selon résultat du diag** :
+- **Fix A (préférable)** : élargir `user_has_global_client_scope()` pour reconnaître automatiquement un flag `uta.is_tenant_admin = true`. Migration cible : ALTER FUNCTION + backfill UTA.is_tenant_admin = true pour le créateur du tenant.
+- **Fix B (alternatif)** : corriger `tenant-onboarding` pour qu'il provisionne systématiquement un `tenant_role` Admin Cabinet avec scope global + toutes perms à `allowed=true`. Migration de backfill pour les tenants existants.
+
+**Plan validation V1 (corrigé)** :
+1. `supabase db push` de `20260612232000_diagnose_v1_scopes.sql` → lire `king_notifications.metadata.orphan_users_detail`
+2. Si `orphan_users_count > 0` → root cause confirmée
+3. Choisir Fix A ou Fix B selon volume + ce que Habib préfère
+4. Pusher le fix dédié
+5. Tester INSERT direct depuis front
+6. Si OK → marquer V1 ✅ et retirer les 3 edge fns workarounds
 
 **Migration diagnostic préalable (`20260612230000_diagnose_clients_rls_42501.sql`)** :
 - Non destructive, dump dans `king_notifications` :
