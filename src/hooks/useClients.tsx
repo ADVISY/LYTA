@@ -513,19 +513,38 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       // └─────────────────────────────────────────────────────────────┘
       const payload: any = { ...clientData, tenant_id: tenantId };
 
-      // Auto-assign si scope non-global ET pas d'assigned_agent_id explicite
-      const needsAutoAssign =
-        myScope !== "global"
-        && myCollabId
-        && (payload.assigned_agent_id == null || payload.assigned_agent_id === "");
+      // ─── Auto-assign selon le rôle du créateur ───────────────────
+      // Règle métier (validée Habib 12 juin 2026) :
+      //   • Admin Cabinet (scope=global) : aucun auto-assign. La fiche
+      //     reste libre, à attribuer ensuite à un agent par l'Admin.
+      //     RLS : passe via branche 3 (has_global_scope_v2).
+      //   • Manager (scope=team) : auto-assign manager_id = lui-même
+      //     (cohérent : il supervise cette fiche en attendant qu'un
+      //     agent soit attribué). PAS d'assigned_agent_id (un Manager
+      //     n'est pas un agent commercial).
+      //     RLS : passe via branche 5 (manager_id = my_collab_id).
+      //   • Agent (scope=personal) : auto-assign assigned_agent_id =
+      //     lui-même (l'agent qui crée la fiche en est responsable).
+      //     RLS : passe via branche 4 (assigned_agent_id = my_collab_id).
+      //
+      // Un champ explicitement renseigné par l'user dans le formulaire
+      // n'est jamais écrasé (assigned_agent_id ou manager_id du payload
+      // sont respectés s'ils sont non-null).
+      const isEmpty = (v: unknown) => v == null || v === "";
 
-      if (needsAutoAssign) {
+      if (myScope === "personal" && myCollabId && isEmpty(payload.assigned_agent_id)) {
         payload.assigned_agent_id = myCollabId;
-        console.info("[createClient] auto-assign", {
-          scope: myScope,
+        console.info("[createClient] auto-assign (Agent → assigned_agent_id)", {
+          collab_id: myCollabId,
+        });
+      } else if (myScope === "team" && myCollabId && isEmpty(payload.manager_id)) {
+        payload.manager_id = myCollabId;
+        console.info("[createClient] auto-assign (Manager → manager_id)", {
           collab_id: myCollabId,
         });
       }
+      // myScope === "global" : pas d'auto-assign, on respecte le choix
+      // de l'Admin (assigned_agent_id reste vide ou ce qu'il a saisi).
 
       // ─── Étape 1 : INSERT direct PostgREST (voie nominale) ────────
       console.info("[createClient] trying direct INSERT", {
