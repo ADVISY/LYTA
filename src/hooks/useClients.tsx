@@ -491,21 +491,76 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       }
 
       // ┌─────────────────────────────────────────────────────────────┐
-      // │  Route principale : edge function create-client.              │
-      // │  Pourquoi : INSERT direct via supabase.from('clients') a        │
-      // │  remonté un 403 / code 42501 sur PLUSIEURS tenants (Advisy,   │
-      // │  JCG). Mismatch SQL CLI vs PostgREST runtime : impossible    │
-      // │  de cibler la cause exacte des policies RLS. La fonction    │
-      // │  contourne tout ça via service_role en backend, après        │
-      // │  vérif explicite que le caller est bien membre du tenant.   │
+      // │  Fix V1 (12 juin 2026) — INSERT direct PostgREST en premier │
+      // │  avec auto-assign assigned_agent_id pour les non-global.    │
+      // │                                                              │
+      // │  Diagnostic V1 (cf. migrations 20260612232000-235500) :     │
+      // │  - Admin Cabinet : 10/10 ont scope global → branche 3 de    │
+      // │    la policy SELECT passe → RETURNING OK.                    │
+      // │  - Agent/Manager : tombent en branche 4 (personal) qui      │
+      // │    exige assigned_agent_id = my_collab_id_v2(). Si la fiche │
+      // │    est créée sans s'auto-assigner → null → RETURNING fail   │
+      // │    → 42501 reporté à tort sur INSERT.                       │
+      // │                                                              │
+      // │  Fix métier-cohérent : un Agent/Manager qui CRÉE une fiche  │
+      // │  en est responsable par défaut → on auto-assigne au moment  │
+      // │  de la création s'il n'a pas mis d'assignation explicite.   │
+      // │  Pour un Admin Cabinet, pas d'auto-assign (il a scope global│
+      // │  et veut souvent attribuer la fiche à un agent ensuite).    │
+      // │                                                              │
+      // │  Fallback edge function `create-client` conservé en sécurité│
+      // │  pour les cas exotiques (multi-tenant, rôle non détecté…).  │
       // └─────────────────────────────────────────────────────────────┘
-      const payload = { ...clientData, tenant_id: tenantId };
+      const payload: any = { ...clientData, tenant_id: tenantId };
 
-      console.info("[createClient] calling edge function create-client", {
+      // Auto-assign si scope non-global ET pas d'assigned_agent_id explicite
+      const needsAutoAssign =
+        myScope !== "global"
+        && myCollabId
+        && (payload.assigned_agent_id == null || payload.assigned_agent_id === "");
+
+      if (needsAutoAssign) {
+        payload.assigned_agent_id = myCollabId;
+        console.info("[createClient] auto-assign", {
+          scope: myScope,
+          collab_id: myCollabId,
+        });
+      }
+
+      // ─── Étape 1 : INSERT direct PostgREST (voie nominale) ────────
+      console.info("[createClient] trying direct INSERT", {
         tenant_id: payload.tenant_id,
-        type_adresse: payload.type_adresse,
-        status: payload.status,
-        is_company: payload.is_company,
+        scope: myScope,
+        has_assigned_agent: !!payload.assigned_agent_id,
+      });
+
+      const { data: directData, error: directError } = await supabase
+        .from("clients")
+        .insert([payload])
+        .select("*")
+        .single();
+
+      if (!directError && directData) {
+        console.info("[createClient] ✅ direct INSERT succeeded", {
+          client_id: directData.id,
+        });
+        toast({
+          title: "Client créé",
+          description: "Le client a été créé avec succès",
+        });
+        void queryClient.invalidateQueries({ queryKey: baseQueryKey });
+        return { data: directData, error: null };
+      }
+
+      // ─── Étape 2 : Fallback edge function (filet de sécurité) ──────
+      const isRls =
+        (directError as any)?.code === "42501"
+        || /row-level security/i.test(directError?.message ?? "");
+
+      console.warn("[createClient] direct INSERT failed, falling back to edge fn", {
+        code: (directError as any)?.code,
+        is_rls: isRls,
+        message: directError?.message,
       });
 
       const result = await invokeSupabaseFunction<{ success: boolean; id: string; data: any }>(
@@ -519,12 +574,9 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
 
       toast({
         title: "Client créé",
-        description: "Le client a été créé avec succès",
+        description: "Le client a été créé (via fallback sécurisé)",
       });
-
       void queryClient.invalidateQueries({ queryKey: baseQueryKey });
-      // La row reconstituée par l'edge function contient l'UUID généré
-      // côté serveur — suffisant pour navigate(`/crm/clients/${id}`).
       return { data: result.data, error: null };
     } catch (caughtError: any) {
       console.error("[createClient] failed", {
