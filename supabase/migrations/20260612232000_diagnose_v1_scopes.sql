@@ -88,7 +88,7 @@ BEGIN
     FROM candidates c
     JOIN public.tenants t ON t.id = c.tenant_id
     LEFT JOIN auth.users u ON u.id = c.user_id
-    WHERE t.is_active = true
+    WHERE t.status = 'active'
   )
   SELECT
     jsonb_agg(jsonb_build_object(
@@ -115,7 +115,7 @@ BEGIN
   SELECT COUNT(*) INTO v_total_active_admins
   FROM public.user_tenant_assignments uta
   JOIN public.tenants t ON t.id = uta.tenant_id
-  WHERE t.is_active = true;
+  WHERE t.status = 'active';
 
   -- Dump dans king_notifications
   INSERT INTO public.king_notifications (title, message, kind, priority, metadata)
