@@ -122,8 +122,43 @@ export function SwissAddressInput({
   const [hits, setHits] = useState<AddressHit[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  /** The label of the most recently picked suggestion. Drives the ✓ badge. */
-  const [validatedLabel, setValidatedLabel] = useState<string | null>(null);
+  /**
+   * The label of the most recently picked suggestion. Drives the ✓ badge.
+   *
+   * Fix juin 2026 : auparavant initialisé à `null` → bug UX où l'ouverture
+   * d'une fiche client existante re-déclenchait une recherche autocomplete
+   * sur l'adresse déjà stockée en DB ("on doit constamment revalider").
+   *
+   * Correction : on track la valeur initiale dans une ref. Si la prop
+   * `value` (depuis le parent) change et n'a pas encore été reconnue par
+   * le composant comme édition user (via onChange interne), on présume
+   * qu'elle est validée. Cas couverts :
+   *   1. Mount initial avec une adresse en DB → ✓ affiché direct
+   *   2. Parent qui charge une autre fiche (value change brusquement) → ✓
+   *   3. User modifie le champ via onChange → reset à null (via handleChange)
+   *      et NE déclenche PAS la présomption (lastExternalValueRef est mis
+   *      à jour AVANT que la value remonte par la prop).
+   */
+  const [validatedLabel, setValidatedLabel] = useState<string | null>(
+    () => (value && value.trim().length > 0 ? value.trim() : null)
+  );
+  const lastExternalValueRef = useRef<string>(value);
+
+  useEffect(() => {
+    // value a changé. Est-ce une édition user (onChange interne) ou un
+    // changement extérieur (parent reset/init) ?
+    // Si lastExternalValueRef !== value et qu'on ne l'a pas marqué comme
+    // édition user → c'est un changement extérieur → on présume validé.
+    if (value !== lastExternalValueRef.current) {
+      lastExternalValueRef.current = value;
+      if (value && value.trim().length > 0) {
+        setValidatedLabel(value.trim());
+      } else {
+        setValidatedLabel(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   // Stabilise the resolved callback so the lookup effect doesn't re-fire
   // every render of the parent form.
@@ -235,6 +270,9 @@ export function SwissAddressInput({
         visible = (hit.label || "").replace(/[,;]?\s*\d{4}\s+\S.*$/u, "").trim();
         if (!visible) visible = hit.label || "";
       }
+      // Marque cette valeur comme "édition user en cours" — empêche le
+      // useEffect [value] de la considérer comme un changement extérieur.
+      lastExternalValueRef.current = visible;
       onChange(visible);
       setValidatedLabel(visible);
       onResolvedRef.current?.({
@@ -266,6 +304,11 @@ export function SwissAddressInput({
             if (validatedLabel && next !== validatedLabel) {
               setValidatedLabel(null);
             }
+            // Marque cette nouvelle value comme "édition user en cours" avant
+            // qu'elle redescende via la prop — empêche le useEffect [value] de
+            // la considérer comme un changement extérieur et de la re-marquer
+            // comme "validée" par erreur.
+            lastExternalValueRef.current = next;
             onChange(next);
           }}
           onFocus={() => {
