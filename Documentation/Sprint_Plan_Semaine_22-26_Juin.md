@@ -148,7 +148,29 @@ async function downloadAllDocuments(clientId: string, opts: { onlyVisible: boole
 ## 3. 📱 Mobile Responsive v2
 
 ### Objectif
-Rendre LYTA utilisable sur iPhone. Aujourd'hui les **tableaux de listes sont illisibles** (scroll horizontal, colonnes coupées).
+Rendre LYTA utilisable sur iPhone. Audit visuel du 15 juin 2026 sur
+iPhone (17 screenshots dans `~/Desktop/Projects/LYTA/lyta mobile/`)
+confirme 3 problèmes critiques :
+  1. **Tableaux de listes illisibles** sur 5 pages (Clients, Collaborateurs,
+     Commissions, Paramètres > Utilisateurs, Suivis)
+  2. **Boutons d'action coupés à droite** (Dashboard, Fiche client,
+     Commissions, Paramètres > Profil → "Changer le mot de pass…")
+  3. **Topbar prend ~25% de l'écran** (logo trop gros + barre supérieure
+     globe+ inutilisée)
+
+### Pages à fixer (par priorité depuis audit screenshots)
+| Page | Problème principal observé | Sévérité |
+|---|---|---|
+| **ClientsList** | Tableau coupé partout, noms tronqués gauche/droite | 🔴 P0 |
+| **Paramètres > Utilisateurs** | Tableau coupé, rôles "Admi…" | 🔴 P0 |
+| **Collaborateurs** liste | Tableau coupé, emails OK mais cols suivantes coupées | 🔴 P0 |
+| **Commissions** liste | Tableau Montant coupé à droite + boutons d'action coupés | 🔴 P0 |
+| **Fiche client > Suivis** | Cards KPI coupées + tableau coupé | 🔴 P0 |
+| **Dashboard** | Bandeau "Vos clients vous attendent !" coupé + filtres graph | 🟠 P1 |
+| **Fiche client header** | Bouton "Créer espac…" coupé | 🟠 P1 |
+| **Topbar globale** | Logo trop gros + barre inutile au-dessus | 🟠 P1 |
+| **Paramètres > Profil** | Bouton "Changer le mot de pass…" coupé | 🟠 P1 |
+| **Portail client** | À auditer (non couvert dans les 17 screenshots) | 🟡 P2 |
 
 ### Solution
 Nouveau composant générique `<ResponsiveDataTable>` :
