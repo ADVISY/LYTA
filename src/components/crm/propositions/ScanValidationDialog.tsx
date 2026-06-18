@@ -2248,22 +2248,22 @@ export default function ScanValidationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[95vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="p-6 pb-4 flex-shrink-0">
+      <DialogContent className="w-[95vw] max-w-3xl md:max-w-5xl max-h-[95vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="p-4 md:p-6 pb-3 md:pb-4 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-primary/10">
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
-            Validation du dossier IA Scan
+            <span className="truncate">Validation du dossier IA Scan</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             {scan.dossier_summary || 'Vérifiez les données extraites et choisissez ce que vous souhaitez créer'}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scrollable content area */}
-        <ScrollArea className="flex-1 px-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 180px)' }}>
-          <div className="space-y-4 pb-4">
+        {/* Scrollable content area — min-w-0 sur les enfants empêche le débordement horizontal */}
+        <ScrollArea className="flex-1 px-4 md:px-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 180px)' }}>
+          <div className="space-y-4 pb-4 min-w-0">
             {/* Documents detected */}
             {scan.documents_detected && scan.documents_detected.length > 0 && (
               <div className="flex flex-wrap gap-2">
