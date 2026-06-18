@@ -2471,9 +2471,9 @@ export default function ScanValidationDialog({
                           </div>
                           <div className="space-y-1.5">
                             {products.map((product, pi) => (
-                              <div key={`old-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <span className="font-medium truncate">{product.product_name}</span>
+                              <div key={`old-${ci}-${pi}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                                  <span className="font-medium truncate max-w-full">{product.product_name}</span>
                                   <ProductBranchEditor
                                     branchId={product.resolved_branch_id}
                                     branchCode={product.resolved_branch_code || product.branch_code}
@@ -2485,14 +2485,14 @@ export default function ScanValidationDialog({
                                     lowConfidence={!product.resolved_branch_id && !product.branch_code}
                                   />
                                 </div>
-                                <div className="flex items-center gap-3 text-muted-foreground flex-shrink-0">
+                                <div className="flex items-center gap-3 text-muted-foreground sm:flex-shrink-0 flex-wrap">
                                   {product.premium_monthly && (
-                                    <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                    <span className="text-orange-600 dark:text-orange-400 font-medium whitespace-nowrap">
                                       CHF {product.premium_monthly.toFixed(2)}/mois
                                     </span>
                                   )}
                                   {product.franchise && (
-                                    <span>Franchise: CHF {product.franchise}</span>
+                                    <span className="whitespace-nowrap">Franchise: CHF {product.franchise}</span>
                                   )}
                                 </div>
                               </div>
@@ -2537,9 +2537,9 @@ export default function ScanValidationDialog({
                           </div>
                           <div className="space-y-1.5">
                             {products.map((product, pi) => (
-                              <div key={`new-${ci}-${pi}`} className="flex items-center justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <span className="font-medium truncate">{product.product_name}</span>
+                              <div key={`new-${ci}-${pi}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs bg-background/50 rounded p-1.5 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                                  <span className="font-medium truncate max-w-full">{product.product_name}</span>
                                   <ProductBranchEditor
                                     branchId={product.resolved_branch_id}
                                     branchCode={product.resolved_branch_code || product.branch_code}
@@ -2550,14 +2550,14 @@ export default function ScanValidationDialog({
                                     lowConfidence={!product.resolved_branch_id && !product.branch_code}
                                   />
                                 </div>
-                                <div className="flex items-center gap-3 text-muted-foreground flex-shrink-0">
+                                <div className="flex items-center gap-3 text-muted-foreground sm:flex-shrink-0 flex-wrap">
                                   {product.premium_monthly && (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
                                       CHF {product.premium_monthly.toFixed(2)}/mois
                                     </span>
                                   )}
                                   {product.franchise && (
-                                    <span>Franchise: CHF {product.franchise}</span>
+                                    <span className="whitespace-nowrap">Franchise: CHF {product.franchise}</span>
                                   )}
                                 </div>
                               </div>
