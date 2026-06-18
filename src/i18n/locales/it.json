@@ -394,6 +394,7 @@
     "filterByAgent": "Agente",
     "allProducts": "Tutti i prodotti",
     "allAgents": "Tutti gli agenti",
+    "pendingScans": "Scansioni in attesa",
     "lca": "LCA (Salute)",
     "vie": "VIE (Previdenza)",
     "contracts": "contratti",
@@ -921,7 +922,12 @@
     "accepted": "Accettate",
     "rejected": "Rifiutate",
     "moduleInConstruction": "Modulo in costruzione",
-    "comingSoonDesc": "La creazione e il monitoraggio delle proposte commerciali saranno presto disponibili"
+    "comingSoonDesc": "La creazione e il monitoraggio delle proposte commerciali saranno presto disponibili",
+    "validateScansSubtitle": "Convalida i dossier scansionati e crea i clienti"
+  },
+  "signatures": {
+    "pendingSignaturesTitle": "Firme in attesa",
+    "noPendingSignatures": "Nessuna richiesta di firma in attesa."
   },
   "subscription": {
     "title": "Abbonamento",

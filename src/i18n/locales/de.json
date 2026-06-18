@@ -931,7 +931,12 @@
     "pendingScans": "Gescannte Dossiers in Wartestellung",
     "individualScans": "Einzelne Scans",
     "batchScans": "Dossier-Scans",
-    "pendingValidation": "Scan(s) zur Validierung ausstehend"
+    "pendingValidation": "Scan(s) zur Validierung ausstehend",
+    "validateScansSubtitle": "Validieren Sie gescannte Dossiers und erstellen Sie Kunden"
+  },
+  "signatures": {
+    "pendingSignaturesTitle": "Ausstehende Signaturen",
+    "noPendingSignatures": "Keine ausstehenden Signaturanfragen."
   },
   "subscription": {
     "title": "Abonnement",

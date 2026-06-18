@@ -394,6 +394,7 @@
     "filterByAgent": "Agent",
     "allProducts": "All products",
     "allAgents": "All agents",
+    "pendingScans": "Pending scans",
     "lca": "LCA (Health)",
     "vie": "VIE (Life)",
     "contracts": "contracts",
@@ -927,7 +928,12 @@
     "accepted": "Accepted",
     "rejected": "Rejected",
     "moduleInConstruction": "Module under construction",
-    "comingSoonDesc": "Commercial proposition creation and tracking will be available soon"
+    "comingSoonDesc": "Commercial proposition creation and tracking will be available soon",
+    "validateScansSubtitle": "Validate scanned documents and create clients"
+  },
+  "signatures": {
+    "pendingSignaturesTitle": "Pending signatures",
+    "noPendingSignatures": "No pending signature requests."
   },
   "subscription": {
     "title": "Subscription",
