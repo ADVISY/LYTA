@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter, Building2, Heart, Activity, Car, Home as HomeIcon, Scale, Shield, PiggyBank, Loader2 } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Users, FileCheck, FileText, Download, Trash2, Upload, Eye, ClipboardList, Clock, CheckCircle2, AlertCircle, MoreHorizontal, XCircle, RotateCcw, Calendar, DollarSign, ChevronDown, ChevronRight, UserCircle, Percent, FileSignature, Mail, UserPlus, RefreshCw, Send, Pencil, Filter, Building2, Heart, Activity, Car, Home as HomeIcon, Scale, Shield, PiggyBank, Loader2, TrendingUp } from "lucide-react";
+import { NewOpportunityDialog } from "@/components/crm/pipeline/NewOpportunityDialog";
 import { useTenantDocumentTypes } from "@/hooks/useTenantLookups";
 import {
   AlertDialog,
@@ -164,6 +165,7 @@ export default function ClientDetail() {
   const [suiviFormOpen, setSuiviFormOpen] = useState(false);
   const [editSuiviOpen, setEditSuiviOpen] = useState(false);
   const [editSuivi, setEditSuivi] = useState<Suivi | null>(null);
+  const [newOppOpen, setNewOppOpen] = useState(false);
   const [deleteSuiviConfirmOpen, setDeleteSuiviConfirmOpen] = useState(false);
   const [suiviToDelete, setSuiviToDelete] = useState<string | null>(null);
   const [expandedCommissions, setExpandedCommissions] = useState<Record<string, boolean>>({});
@@ -573,12 +575,31 @@ export default function ClientDetail() {
             clientName={getClientName()}
             disabled={!client.email}
           />
+          <Button
+            variant="outline"
+            onClick={() => setNewOppOpen(true)}
+            className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white border-0 hover:opacity-90"
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Nouvelle opportunité
+          </Button>
           <Button onClick={() => navigate(`/crm/clients/${id}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
             {t('common.edit')}
           </Button>
         </div>
       </div>
+
+      {/* Modale Nouvelle Opportunité */}
+      <NewOpportunityDialog
+        open={newOppOpen}
+        onOpenChange={setNewOppOpen}
+        clientId={id ?? ""}
+        clientName={getClientName()}
+        onCreated={() => {
+          // Optionnel : refetch suivis si l'onglet "suivis" est actif
+        }}
+      />
 
       {/* Dialog pour créer un compte client */}
       <Dialog open={clientAccountDialogOpen} onOpenChange={setClientAccountDialogOpen}>
