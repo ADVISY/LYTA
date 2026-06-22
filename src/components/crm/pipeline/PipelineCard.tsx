@@ -4,9 +4,23 @@
  * Affiche : nom client/prospect, produit espéré, compagnie, agent assigné,
  * date pertinente (RDV ou dernière action), priorité visuelle.
  *
- * Click → ouvre la fiche client en gardant l'opp en contexte.
+ * Interactions :
+ *   - Click → ouvre la modale détail
+ *   - Drag → glisse vers une autre colonne pour changer de stage
+ *   - Menu ⋮ → actions contextuelles selon le stage actuel
+ *     (Modifier RDV, Saisir commission, Marquer perdue…)
  */
-import { Calendar, User, Building2, MoreVertical, X } from "lucide-react";
+import { useState } from "react";
+import {
+  Calendar,
+  User,
+  Building2,
+  MoreVertical,
+  X,
+  Edit3,
+  DollarSign,
+  FileSignature,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -14,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
@@ -27,6 +42,7 @@ interface PipelineCardProps {
   onOpen?: (opp: Suivi) => void;
   onMoveStage?: (opp: Suivi, newStage: PipelineStage) => void;
   onMarkLost?: (opp: Suivi) => void;
+  onEditRdv?: (opp: Suivi) => void;
   availableStages?: PipelineStage[];
 }
 
@@ -63,8 +79,11 @@ export function PipelineCard({
   onOpen,
   onMoveStage,
   onMarkLost,
+  onEditRdv,
   availableStages = [],
 }: PipelineCardProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
   const clientName = formatClientName(opp);
   const agentName = opp.agent
     ? `${opp.agent.first_name ?? ""} ${opp.agent.last_name ?? ""}`.trim() || opp.agent.email
@@ -73,11 +92,25 @@ export function PipelineCard({
   const date = opp.reminder_date || opp.updated_at;
   const dateLabel = formatRelativeDate(date);
 
+  // HTML5 drag & drop : on stocke l'ID de l'opp dans dataTransfer
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/x-pipeline-card", opp.id);
+    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+  };
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       className={cn(
-        "group relative bg-card rounded-lg shadow-sm hover:shadow-md transition-shadow",
-        "p-3 cursor-pointer select-none",
+        "group relative bg-card rounded-lg shadow-sm hover:shadow-md transition-all",
+        "p-3 cursor-grab active:cursor-grabbing select-none",
+        isDragging && "opacity-40 scale-95",
         PRIORITY_INDICATOR[opp.priority ?? "normal"]
       )}
       onClick={() => onOpen?.(opp)}
@@ -99,22 +132,69 @@ export function PipelineCard({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            {availableStages.length > 0 && (
-              <>
-                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                  Déplacer vers
-                </div>
-                {availableStages.map((stage) => (
-                  <DropdownMenuItem
-                    key={stage}
-                    onClick={() => onMoveStage?.(opp, stage)}
-                  >
-                    {PIPELINE_STAGE_LABELS[stage] ?? stage}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-              </>
+            <DropdownMenuLabel className="text-xs">
+              Modifier · {PIPELINE_STAGE_LABELS[opp.pipeline_stage as PipelineStage] ?? "Opportunité"}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {/* Actions contextuelles selon le stage actuel */}
+            {opp.pipeline_stage === "prospect" && onEditRdv && (
+              <DropdownMenuItem onClick={() => onEditRdv(opp)}>
+                <Calendar className="h-3.5 w-3.5 mr-2" />
+                Fixer un rendez-vous
+              </DropdownMenuItem>
             )}
+
+            {opp.pipeline_stage === "rdv_fixe" && onEditRdv && (
+              <DropdownMenuItem onClick={() => onEditRdv(opp)}>
+                <Edit3 className="h-3.5 w-3.5 mr-2" />
+                Modifier le RDV
+              </DropdownMenuItem>
+            )}
+
+            {opp.pipeline_stage === "rdv_passe" && (
+              <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+                <Edit3 className="h-3.5 w-3.5 mr-2" />
+                Ajouter notes du RDV
+              </DropdownMenuItem>
+            )}
+
+            {opp.pipeline_stage === "signe" && (
+              <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+                <FileSignature className="h-3.5 w-3.5 mr-2" />
+                Voir checklist backoffice
+              </DropdownMenuItem>
+            )}
+
+            {opp.pipeline_stage === "attente_contrat" && (
+              <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+                <Edit3 className="h-3.5 w-3.5 mr-2" />
+                Modifier compagnie
+              </DropdownMenuItem>
+            )}
+
+            {opp.pipeline_stage === "contrat_recu" && (
+              <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+                <FileSignature className="h-3.5 w-3.5 mr-2" />
+                Lier au contrat
+              </DropdownMenuItem>
+            )}
+
+            {opp.pipeline_stage === "contrat_police" && (
+              <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+                <DollarSign className="h-3.5 w-3.5 mr-2" />
+                Saisir commission
+              </DropdownMenuItem>
+            )}
+
+            {/* Action universelle : modifier les infos */}
+            <DropdownMenuItem onClick={() => onOpen?.(opp)}>
+              <Edit3 className="h-3.5 w-3.5 mr-2" />
+              Voir détails complets
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
               onClick={() => onMarkLost?.(opp)}

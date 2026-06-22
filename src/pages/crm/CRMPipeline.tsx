@@ -175,6 +175,7 @@ export default function CRMPipeline() {
             onOpenOpportunity={handleOpenOpportunity}
             onMoveStage={handleMoveStage}
             onMarkLost={(opp) => setLostOpp(opp)}
+            onEditRdv={(opp) => setRdvOpp(opp)}
           />
         </CardContent>
       </Card>

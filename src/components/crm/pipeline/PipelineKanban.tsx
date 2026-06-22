@@ -7,6 +7,7 @@
  * MVP : pas de drag&drop, juste affichage groupé + menu "Déplacer vers".
  * Drag&drop avec dnd-kit prévu en V2.
  */
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { PipelineCard } from "./PipelineCard";
 import {
@@ -25,6 +26,7 @@ interface PipelineKanbanProps {
   onOpenOpportunity?: (opp: Suivi) => void;
   onMoveStage?: (opp: Suivi, newStage: PipelineStage) => void;
   onMarkLost?: (opp: Suivi) => void;
+  onEditRdv?: (opp: Suivi) => void;
   className?: string;
 }
 
@@ -33,9 +35,19 @@ export function PipelineKanban({
   onOpenOpportunity,
   onMoveStage,
   onMarkLost,
+  onEditRdv,
   className,
 }: PipelineKanbanProps) {
   const { stages, totalCount, loading } = usePipeline(filters);
+
+  // Map global id → opp pour résoudre le drag&drop facilement
+  const allOpps = Object.values(stages).flat() as Suivi[];
+  const handleDrop = (oppId: string, targetStage: PipelineStage) => {
+    const opp = allOpps.find((o) => o.id === oppId);
+    if (!opp) return;
+    if (opp.pipeline_stage === targetStage) return; // no-op si même colonne
+    onMoveStage?.(opp, targetStage);
+  };
 
   if (loading) {
     return (
@@ -69,6 +81,8 @@ export function PipelineKanban({
             onOpen={onOpenOpportunity}
             onMoveStage={onMoveStage}
             onMarkLost={onMarkLost}
+            onEditRdv={onEditRdv}
+            onDrop={(oppId) => handleDrop(oppId, stage)}
           />
         ))}
       </div>
@@ -86,6 +100,8 @@ interface KanbanColumnProps {
   onOpen?: (opp: Suivi) => void;
   onMoveStage?: (opp: Suivi, newStage: PipelineStage) => void;
   onMarkLost?: (opp: Suivi) => void;
+  onEditRdv?: (opp: Suivi) => void;
+  onDrop?: (oppId: string) => void;
 }
 
 function KanbanColumn({
@@ -94,12 +110,29 @@ function KanbanColumn({
   onOpen,
   onMoveStage,
   onMarkLost,
+  onEditRdv,
+  onDrop,
 }: KanbanColumnProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
   const label = PIPELINE_STAGE_LABELS[stage];
   const colorClass = PIPELINE_STAGE_COLORS[stage];
 
-  // Liste des stages possibles vers lesquels on peut déplacer
-  const availableStages = PIPELINE_STAGES.filter((s) => s !== stage);
+  // Drop zone : la colonne accepte le drop d'une PipelineCard
+  const handleDragOver = (e: React.DragEvent) => {
+    // Vérifie qu'on drague bien une pipeline card (pas autre chose)
+    if (e.dataTransfer.types.includes("application/x-pipeline-card")) {
+      e.preventDefault(); // ← nécessaire pour autoriser le drop
+      e.dataTransfer.dropEffect = "move";
+      if (!isDragOver) setIsDragOver(true);
+    }
+  };
+  const handleDragLeave = () => setIsDragOver(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const oppId = e.dataTransfer.getData("application/x-pipeline-card");
+    if (oppId) onDrop?.(oppId);
+  };
 
   return (
     <div className="flex flex-col w-64 flex-shrink-0">
@@ -118,16 +151,21 @@ function KanbanColumn({
         </div>
       </div>
 
-      {/* Body colonne */}
+      {/* Body colonne (zone de drop) */}
       <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         className={cn(
-          "flex-1 rounded-b-lg border-l border-r border-b min-h-[500px] p-2 space-y-2",
-          "bg-muted/30"
+          "flex-1 rounded-b-lg border-l border-r border-b min-h-[500px] p-2 space-y-2 transition-colors",
+          isDragOver
+            ? "bg-primary/10 border-primary border-dashed"
+            : "bg-muted/30"
         )}
       >
         {opportunities.length === 0 ? (
           <div className="text-xs text-muted-foreground/60 text-center py-8">
-            Aucune carte
+            {isDragOver ? "Relâche pour déplacer ici" : "Aucune carte"}
           </div>
         ) : (
           opportunities.map((opp) => (
@@ -137,7 +175,7 @@ function KanbanColumn({
               onOpen={onOpen}
               onMoveStage={onMoveStage}
               onMarkLost={onMarkLost}
-              availableStages={availableStages}
+              onEditRdv={onEditRdv}
             />
           ))
         )}
