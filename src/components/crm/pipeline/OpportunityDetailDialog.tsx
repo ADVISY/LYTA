@@ -52,6 +52,7 @@ interface OpportunityDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onMoveStage?: (opp: Suivi, newStage: PipelineStage) => void;
   onMarkLost?: (opp: Suivi) => void;
+  onEditRdv?: (opp: Suivi) => void;
 }
 
 function formatClientName(suivi: Suivi): string {
@@ -123,6 +124,7 @@ export function OpportunityDetailDialog({
   onOpenChange,
   onMoveStage,
   onMarkLost,
+  onEditRdv,
 }: OpportunityDetailDialogProps) {
   const navigate = useNavigate();
 
@@ -243,25 +245,44 @@ export function OpportunityDetailDialog({
                 </div>
               </div>
 
-              {gcalUrl && (
-                <Button
-                  asChild
-                  size="sm"
-                  className="w-full mt-3"
-                  variant="default"
-                >
-                  <a
-                    href={gcalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <div className="flex gap-2 mt-3">
+                {onEditRdv && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => onEditRdv(opportunity)}
                   >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Ajouter à Google Agenda
-                    <ExternalLink className="h-3 w-3 ml-2" />
-                  </a>
-                </Button>
-              )}
+                    Modifier le RDV
+                  </Button>
+                )}
+                {gcalUrl && (
+                  <Button asChild size="sm" className="flex-1">
+                    <a
+                      href={gcalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Calendar className="h-4 w-4 mr-1" />
+                      Google Agenda
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
+          )}
+
+          {/* Si stage n'est pas encore RDV → bouton "Fixer un RDV" */}
+          {!hasRdv && onEditRdv && stage !== "perdu" && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => onEditRdv(opportunity)}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Fixer un rendez-vous
+            </Button>
           )}
 
           {/* Bloc Agent */}

@@ -33,6 +33,7 @@ import {
 import { TrendingUp, RefreshCw } from "lucide-react";
 import { PipelineKanban } from "@/components/crm/pipeline/PipelineKanban";
 import { OpportunityDetailDialog } from "@/components/crm/pipeline/OpportunityDetailDialog";
+import { SetRdvDialog } from "@/components/crm/pipeline/SetRdvDialog";
 import {
   usePipeline,
   type Suivi,
@@ -56,6 +57,9 @@ export default function CRMPipeline() {
   // Modale "Détail opportunité"
   const [detailOpp, setDetailOpp] = useState<Suivi | null>(null);
 
+  // Modale "Fixer/modifier RDV"
+  const [rdvOpp, setRdvOpp] = useState<Suivi | null>(null);
+
   // Modale "Marquer perdu"
   const [lostOpp, setLostOpp] = useState<Suivi | null>(null);
   const [lossReason, setLossReason] = useState<string>("pas_de_réponse");
@@ -67,6 +71,14 @@ export default function CRMPipeline() {
   };
 
   const handleMoveStage = async (opp: Suivi, newStage: PipelineStage) => {
+    // Cas spécial : passage à "RDV fixé" → ouvre la modale date/heure
+    // (au lieu d'un simple update du stage sans détails)
+    if (newStage === "rdv_fixe") {
+      setRdvOpp(opp);
+      return;
+    }
+
+    // Cas standard : update direct du stage
     try {
       const { error } = await supabase
         .from("suivis")
@@ -173,10 +185,22 @@ export default function CRMPipeline() {
         open={!!detailOpp}
         onOpenChange={(open) => !open && setDetailOpp(null)}
         onMoveStage={handleMoveStage}
+        onEditRdv={(opp) => {
+          setDetailOpp(null);
+          setRdvOpp(opp);
+        }}
         onMarkLost={(opp) => {
           setDetailOpp(null);
           setLostOpp(opp);
         }}
+      />
+
+      {/* Modale fixer/modifier RDV */}
+      <SetRdvDialog
+        opportunity={rdvOpp}
+        open={!!rdvOpp}
+        onOpenChange={(open) => !open && setRdvOpp(null)}
+        onUpdated={() => refetch()}
       />
 
       {/* Modale "Marquer perdu" */}
