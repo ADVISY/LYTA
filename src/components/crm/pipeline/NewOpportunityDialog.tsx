@@ -181,6 +181,30 @@ export function NewOpportunityDialog({
         .filter(Boolean)
         .join("\n");
 
+      // ─── Résolution de l'agent à assigner ────────────────────────
+      // Le client peut avoir un assigned_agent_id (référence vers un
+      // client de type 'collaborateur'). On résout vers son user_id
+      // pour que la FK profiles fonctionne sur suivis.assigned_agent_id.
+      let resolvedAgentUserId: string | null = null;
+      try {
+        const { data: clientRow } = await supabase
+          .from("clients")
+          .select("assigned_agent_id")
+          .eq("id", clientId)
+          .maybeSingle();
+
+        if (clientRow?.assigned_agent_id) {
+          const { data: agentClient } = await supabase
+            .from("clients")
+            .select("user_id")
+            .eq("id", clientRow.assigned_agent_id)
+            .maybeSingle();
+          resolvedAgentUserId = agentClient?.user_id ?? null;
+        }
+      } catch {
+        // En cas d'erreur, on laisse null → "Non assigné" affiché
+      }
+
       const { error } = await supabase.from("suivis").insert([
         {
           tenant_id: tenantId,
@@ -195,6 +219,7 @@ export function NewOpportunityDialog({
           reminder_date: reminderIso,
           priority: "normal",
           source: "manual",
+          assigned_agent_id: resolvedAgentUserId,
         },
       ]);
 
