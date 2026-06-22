@@ -16,7 +16,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { Suivi, PipelineStage } from "@/hooks/useSuivis";
+import {
+  PIPELINE_STAGE_LABELS,
+  type Suivi,
+  type PipelineStage,
+} from "@/hooks/useSuivis";
 
 interface PipelineCardProps {
   opportunity: Suivi;
@@ -105,7 +109,7 @@ export function PipelineCard({
                     key={stage}
                     onClick={() => onMoveStage?.(opp, stage)}
                   >
-                    {stage}
+                    {PIPELINE_STAGE_LABELS[stage] ?? stage}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
