@@ -26,6 +26,7 @@ const CRMClients = lazy(() => import("./pages/crm/clients/ClientsList"));
 const ClientForm = lazy(() => import("./pages/crm/clients/ClientForm"));
 const ClientDetail = lazy(() => import("./pages/crm/clients/ClientDetail"));
 const CRMSuivis = lazy(() => import("./pages/crm/CRMSuivis"));
+const CRMPipeline = lazy(() => import("./pages/crm/CRMPipeline"));
 const CRMPropositions = lazy(() => import("./pages/crm/CRMPropositions"));
 const CRMContracts = lazy(() => import("./pages/crm/CRMContracts"));
 const CRMCommissions = lazy(() => import("./pages/crm/CRMCommissions"));
@@ -149,6 +150,7 @@ const App = () => (
                 <Route path="clients/:id" element={<ClientDetail />} />
                 <Route path="clients/:id/edit" element={<ClientForm />} />
                 <Route path="suivis" element={<CRMSuivis />} />
+                <Route path="pipeline" element={<CRMPipeline />} />
                 <Route path="propositions" element={<CRMPropositions />} />
                 <Route path="contrats" element={<CRMContracts />} />
                 <Route path="commissions" element={<CRMCommissions />} />

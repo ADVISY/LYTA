@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Users,
+  TrendingUp,
   FileText,
   FileCheck,
   DollarSign,
@@ -61,6 +62,7 @@ interface MenuItem {
 const getMenuItems = (t: (key: string) => string, canManageAdminSettings: boolean): MenuItem[] => [
   { to: "/crm", icon: LayoutDashboard, label: t('nav.drive'), end: true, color: "from-blue-500 to-indigo-500" },
   { to: "/crm/clients", icon: Users, label: t('nav.clients'), color: "from-emerald-500 to-teal-500", requiredModule: "clients" },
+  { to: "/crm/pipeline", icon: TrendingUp, label: "Pipeline", color: "from-violet-500 to-indigo-500" },
   { to: "/crm/contrats", icon: FileCheck, label: t('nav.contracts'), color: "from-violet-500 to-purple-500", requiredModule: "contracts" },
   { to: "/crm/commissions", icon: DollarSign, label: t('nav.payout'), color: "from-green-500 to-emerald-500", requiredModule: "commissions" },
   { to: "/crm/compta", icon: FileText, label: t('nav.finance'), color: "from-amber-500 to-orange-500", requiredModule: "statements" },
