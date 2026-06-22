@@ -38,15 +38,19 @@ export type PipelineStage =
   | "commission_recue"
   | "perdu";
 
+// Colonnes affichées dans le Kanban (6 au lieu des 9 stages DB).
+// Simplification UX du 22 juin 2026 :
+//   - 'attente_contrat' est fusionné dans 'signe' (= colonne "Signé · En attente")
+//   - 'commission_recue' n'a pas sa propre colonne (= action depuis 'contrat_police')
+// Les 9 valeurs restent en DB (CHECK constraint) pour ne pas casser les opps
+// existantes et préserver la traçabilité fine.
 export const PIPELINE_STAGES: PipelineStage[] = [
   "prospect",
   "rdv_fixe",
   "rdv_passe",
-  "signe",
-  "attente_contrat",
+  "signe",            // ← regroupe aussi attente_contrat à l'affichage
   "contrat_recu",
-  "contrat_police",
-  "commission_recue",
+  "contrat_police",   // ← la saisie commission archive directement depuis cette colonne
 ];
 
 // Labels FR par défaut (le composant peut utiliser i18n par-dessus)
@@ -54,8 +58,8 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   prospect: "Prospect",
   rdv_fixe: "RDV fixé",
   rdv_passe: "RDV passé",
-  signe: "Signé",
-  attente_contrat: "Attente contrat",
+  signe: "Signé · En attente",
+  attente_contrat: "Signé · En attente",  // même label visuel
   contrat_recu: "Contrat reçu",
   contrat_police: "Contrat policé",
   commission_recue: "Commission reçue",
@@ -562,7 +566,13 @@ export function usePipeline(filters: PipelineFilters = {}): PipelineResult {
       { perdu: [] as Suivi[] } as Record<PipelineStage, Suivi[]>
     );
     for (const item of items) {
-      const stage = (item.pipeline_stage as PipelineStage) || "prospect";
+      let stage = (item.pipeline_stage as PipelineStage) || "prospect";
+      // Simplification UI : 'attente_contrat' s'affiche dans la colonne 'signe'
+      if (stage === "attente_contrat") stage = "signe";
+      // 'commission_recue' : pas de colonne dédiée, on filtre comme 'contrat_police'
+      // (les opps en commission_recue qui ne sont pas encore archivées restent
+      // visibles dans 'contrat_police' jusqu'à archivage manuel)
+      if (stage === "commission_recue") stage = "contrat_police";
       empty[stage] = [...(empty[stage] ?? []), item];
     }
     return empty;

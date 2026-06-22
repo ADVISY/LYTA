@@ -125,6 +125,7 @@ export const PIPELINE_ACTION_TEMPLATES: Record<PipelineStage, PipelineActionTemp
     },
   ],
 
+  // Colonne fusionnée "Signé · En attente" : templates signature + suivi compagnie
   signe: [
     {
       id: "request_supporting_docs",
@@ -153,9 +154,6 @@ export const PIPELINE_ACTION_TEMPLATES: Record<PipelineStage, PipelineActionTemp
       taskDescription: "Brief backoffice : produit, options, conditions spécifiques.",
       priority: "high",
     },
-  ],
-
-  attente_contrat: [
     {
       id: "follow_up_company",
       label: "Relance compagnie",
@@ -172,6 +170,20 @@ export const PIPELINE_ACTION_TEMPLATES: Record<PipelineStage, PipelineActionTemp
       icon: Mail,
       taskTitle: "Informer le client du statut",
       taskDescription: "En attente de la compagnie, délai estimé.",
+    },
+  ],
+
+  // Garde les templates 'attente_contrat' au cas où une opp y serait
+  // mappée par erreur — mais en pratique on regroupe dans 'signe'.
+  attente_contrat: [
+    {
+      id: "follow_up_company_legacy",
+      label: "Relance compagnie",
+      kind: "email",
+      icon: AlertTriangle,
+      taskTitle: "Relancer {{expected_company}} pour le contrat",
+      taskDescription: "Délai dépassé, demander point sur la souscription.",
+      priority: "high",
     },
   ],
 
