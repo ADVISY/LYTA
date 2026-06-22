@@ -111,6 +111,14 @@ export interface Suivi {
     first_name: string | null;
     last_name: string | null;
     company_name: string | null;
+    // Étendu pour enrichir les events Google Calendar (location + détails)
+    email?: string | null;
+    phone?: string | null;
+    mobile?: string | null;
+    address?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    country?: string | null;
   };
   agent?: {
     first_name: string | null;
@@ -243,7 +251,7 @@ export function useSuivis(clientId?: string) {
         .from("suivis")
         .select(`
           *,
-          client:clients(first_name, last_name, company_name),
+          client:clients(first_name, last_name, company_name, email, phone, mobile, address, postal_code, city, country),
           agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email)
         `)
         .order("created_at", { ascending: false });
@@ -528,7 +536,7 @@ export function usePipeline(filters: PipelineFilters = {}): PipelineResult {
       let query: any = base
         .select(`
           *,
-          client:clients(first_name, last_name, company_name),
+          client:clients(first_name, last_name, company_name, email, phone, mobile, address, postal_code, city, country),
           agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email)
         `)
         .eq("tenant_id", tenantId!)
@@ -583,7 +591,7 @@ export function useArchivedPipeline(filters: PipelineFilters = {}) {
       let query: any = base
         .select(`
           *,
-          client:clients(first_name, last_name, company_name),
+          client:clients(first_name, last_name, company_name, email, phone, mobile, address, postal_code, city, country),
           agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email)
         `)
         .eq("tenant_id", tenantId!)

@@ -44,6 +44,7 @@ import {
   type Suivi,
   type PipelineStage,
 } from "@/hooks/useSuivis";
+import { buildGoogleCalendarUrl } from "@/lib/google-calendar";
 import { cn } from "@/lib/utils";
 
 interface OpportunityDetailDialogProps {
@@ -100,23 +101,8 @@ function formatRelative(iso: string | null | undefined): string {
   return `Il y a ${Math.abs(diffDays)} jours`;
 }
 
-function buildGoogleCalendarUrl(opp: Suivi): string | null {
-  if (!opp.reminder_date) return null;
-  const title = opp.title || "Rendez-vous LYTA";
-  const description = opp.description || "Opportunité LYTA";
-  const start = new Date(opp.reminder_date);
-  // Durée par défaut 30 min (on ne stocke pas la durée actuellement, à étendre)
-  const end = new Date(start.getTime() + 30 * 60 * 1000);
-  const fmt = (d: Date): string =>
-    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: title,
-    details: description,
-    dates: `${fmt(start)}/${fmt(end)}`,
-  });
-  return `https://calendar.google.com/calendar/u/0/r/eventedit?${params.toString()}`;
-}
+// buildGoogleCalendarUrl est importé depuis @/lib/google-calendar et enrichit
+// l'event avec l'adresse client (location/Maps) + téléphone + email.
 
 export function OpportunityDetailDialog({
   opportunity,
@@ -137,7 +123,9 @@ export function OpportunityDetailDialog({
   const stageColor = PIPELINE_STAGE_COLORS[stage];
 
   const hasRdv = stage === "rdv_fixe" && opportunity.reminder_date;
-  const gcalUrl = hasRdv ? buildGoogleCalendarUrl(opportunity) : null;
+  const gcalUrl = hasRdv
+    ? buildGoogleCalendarUrl(opportunity, opportunity.client, 30)
+    : null;
 
   const handleGoToClient = () => {
     onOpenChange(false);

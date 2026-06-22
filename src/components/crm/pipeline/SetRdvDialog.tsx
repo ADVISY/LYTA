@@ -40,31 +40,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { Suivi } from "@/hooks/useSuivis";
+import { buildGoogleCalendarUrl } from "@/lib/google-calendar";
 
 interface SetRdvDialogProps {
   opportunity: Suivi | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated?: () => void;
-}
-
-function buildGoogleCalendarUrl(
-  title: string,
-  description: string,
-  startISO: string,
-  durationMin: number,
-): string {
-  const start = new Date(startISO);
-  const end = new Date(start.getTime() + durationMin * 60 * 1000);
-  const fmt = (d: Date): string =>
-    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: title,
-    details: description,
-    dates: `${fmt(start)}/${fmt(end)}`,
-  });
-  return `https://calendar.google.com/calendar/u/0/r/eventedit?${params.toString()}`;
 }
 
 export function SetRdvDialog({
@@ -144,13 +126,11 @@ export function SetRdvDialog({
         })} à ${rdvTime}`,
       });
 
-      // Construit l'URL Google Calendar
-      const title = opportunity.title || "Rendez-vous LYTA";
-      const description = opportunity.description || "Opportunité LYTA";
+      // Construit l'URL Google Calendar avec infos client enrichies
+      // (adresse → location/Maps, téléphone/email → détails)
       const gcalUrl = buildGoogleCalendarUrl(
-        title,
-        description,
-        reminderIso,
+        { ...opportunity, reminder_date: reminderIso },
+        opportunity.client,
         parseInt(rdvDuration, 10) || 30,
       );
       setCreatedGoogleUrl(gcalUrl);

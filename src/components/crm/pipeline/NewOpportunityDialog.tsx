@@ -42,6 +42,7 @@ import {
   PIPELINE_STAGE_LABELS,
   type PipelineStage,
 } from "@/hooks/useSuivis";
+import { buildGoogleCalendarUrl } from "@/lib/google-calendar";
 
 const PRODUCTS = [
   "LAMal",
@@ -127,25 +128,8 @@ export function NewOpportunityDialog({
     onOpenChange(false);
   };
 
-  const buildGoogleCalendarUrl = (
-    title: string,
-    description: string,
-    startISO: string,
-    durationMin: number,
-  ): string => {
-    const start = new Date(startISO);
-    const end = new Date(start.getTime() + durationMin * 60 * 1000);
-    // Format : YYYYMMDDTHHMMSSZ
-    const fmt = (d: Date): string =>
-      d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-    const params = new URLSearchParams({
-      action: "TEMPLATE",
-      text: title,
-      details: description,
-      dates: `${fmt(start)}/${fmt(end)}`,
-    });
-    return `https://calendar.google.com/calendar/u/0/r/eventedit?${params.toString()}`;
-  };
+  // buildGoogleCalendarUrl est importé depuis @/lib/google-calendar et
+  // enrichit l'event avec l'adresse client (location/Maps) + téléphone + email
 
   const handleSubmit = async () => {
     if (!tenantId) {
@@ -221,13 +205,20 @@ export function NewOpportunityDialog({
         description: `${title} — stage : ${PIPELINE_STAGE_LABELS[stage]}`,
       });
 
-      // Si RDV : prépare le lien Google Calendar à afficher
+      // Si RDV : prépare le lien Google Calendar enrichi (adresse + tel + email)
       if (isRdvStage && reminderIso) {
+        // Fetch les infos client pour enrichir l'event Google Calendar
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("first_name, last_name, company_name, email, phone, mobile, address, postal_code, city, country")
+          .eq("id", clientId)
+          .maybeSingle();
+
         const gcalUrl = buildGoogleCalendarUrl(
-          title,
-          description,
-          reminderIso,
+          { title, description, expected_product: product, expected_company: company, reminder_date: reminderIso },
+          clientData,
           parseInt(rdvDuration, 10) || 30,
+          notes,
         );
         setCreatedGoogleUrl(gcalUrl);
         // On ne ferme pas la modale : l'user voit le bouton "Ajouter à Google Agenda"
