@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { TrendingUp, RefreshCw } from "lucide-react";
 import { PipelineKanban } from "@/components/crm/pipeline/PipelineKanban";
+import { OpportunityDetailDialog } from "@/components/crm/pipeline/OpportunityDetailDialog";
 import {
   usePipeline,
   type Suivi,
@@ -52,15 +53,17 @@ export default function CRMPipeline() {
   const { toast } = useToast();
   const { totalCount, refetch } = usePipeline();
 
+  // Modale "Détail opportunité"
+  const [detailOpp, setDetailOpp] = useState<Suivi | null>(null);
+
   // Modale "Marquer perdu"
   const [lostOpp, setLostOpp] = useState<Suivi | null>(null);
   const [lossReason, setLossReason] = useState<string>("pas_de_réponse");
   const [lossNote, setLossNote] = useState<string>("");
 
   const handleOpenOpportunity = (opp: Suivi) => {
-    if (opp.client_id) {
-      navigate(`/crm/clients/${opp.client_id}`);
-    }
+    // Click sur une card → ouvre la modale de détails (pas de navigation)
+    setDetailOpp(opp);
   };
 
   const handleMoveStage = async (opp: Suivi, newStage: PipelineStage) => {
@@ -163,6 +166,18 @@ export default function CRMPipeline() {
           />
         </CardContent>
       </Card>
+
+      {/* Modale détail opportunité (click sur card) */}
+      <OpportunityDetailDialog
+        opportunity={detailOpp}
+        open={!!detailOpp}
+        onOpenChange={(open) => !open && setDetailOpp(null)}
+        onMoveStage={handleMoveStage}
+        onMarkLost={(opp) => {
+          setDetailOpp(null);
+          setLostOpp(opp);
+        }}
+      />
 
       {/* Modale "Marquer perdu" */}
       <AlertDialog open={!!lostOpp} onOpenChange={(open) => !open && setLostOpp(null)}>
