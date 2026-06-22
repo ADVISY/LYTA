@@ -30,9 +30,10 @@ export const useNotifications = () => {
 
   const fetchNotifications = async () => {
     if (!user) return;
-    
+
     try {
-      let query = supabase
+      // ─── Source 1 : table notifications (legacy) ─────────────────
+      let oldQuery = supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
@@ -40,27 +41,66 @@ export const useNotifications = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      // Filter by tenant if available
       if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
+        oldQuery = oldQuery.eq('tenant_id', tenantId);
       }
 
-      const { data, error } = await query;
+      const oldFetch = oldQuery;
+
+      // ─── Source 2 : suivis kind='notification' (modèle unifié) ───
+      const inboxBase: any = supabase.from('suivis');
+      const inboxFetchPromise = tenantId
+        ? inboxBase
+            .select('id, title, description, status, completed_at, created_at, kind, related_kind, related_id, action_url, priority')
+            .eq('tenant_id', tenantId)
+            .eq('kind', 'notification')
+            .or(`assigned_agent_id.eq.${user.id},assigned_agent_id.is.null`)
+            .in('status', ['ouvert', 'open'])
+            .order('created_at', { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [], error: null });
+
+      const [oldRes, inboxRes] = await Promise.all([oldFetch, inboxFetchPromise]);
+
+      const oldRows: Notification[] = (oldRes.data ?? []) as any;
+
+      // Map les suivis vers la même forme que Notification (compatibilité UI)
+      const inboxRows: Notification[] = ((inboxRes.data ?? []) as any[]).map(
+        (row): Notification => ({
+          id: row.id,
+          user_id: user.id,
+          kind: row.priority === 'urgent' || row.priority === 'high' ? 'warning' : 'info',
+          title: row.title,
+          message: row.description ?? null,
+          payload: {
+            action_url: row.action_url ?? undefined,
+            related_kind: row.related_kind ?? undefined,
+            related_id: row.related_id ?? undefined,
+            from_suivis: true, // marker pour markAsRead
+          },
+          read_at: row.status === 'done' || row.completed_at ? row.completed_at : null,
+          created_at: row.created_at,
+          tenant_id: tenantId ?? null,
+        })
+      );
+
+      // Merge + tri par date desc
+      const merged = [...oldRows, ...inboxRows].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       if (import.meta.env.DEV) {
         console.log('[useNotifications CRM] fetch', {
           userId: user.id,
           tenantId,
-          rowsReturned: data?.length ?? 0,
-          kinds: (data ?? []).map(n => n.kind),
-          error: error?.message,
+          old: oldRows.length,
+          inbox: inboxRows.length,
+          total: merged.length,
         });
       }
 
-      if (error) throw error;
-
-      setNotifications(data || []);
-      setUnreadCount((data || []).filter(n => !n.read_at).length);
+      setNotifications(merged);
+      setUnreadCount(merged.filter(n => !n.read_at).length);
     } catch (error) {
       console.error('Error fetching CRM notifications:', error);
     } finally {
@@ -70,12 +110,25 @@ export const useNotifications = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase
-        .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('id', notificationId);
-      
-      setNotifications(prev => 
+      // Détecte si c'est une notif suivis ou legacy
+      const target = notifications.find(n => n.id === notificationId);
+      const isFromSuivis = !!target?.payload?.from_suivis;
+
+      if (isFromSuivis) {
+        // Marque comme done dans suivis
+        await supabase
+          .from('suivis')
+          .update({ status: 'done', completed_at: new Date().toISOString() })
+          .eq('id', notificationId);
+      } else {
+        // Vieille table notifications
+        await supabase
+          .from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .eq('id', notificationId);
+      }
+
+      setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read_at: new Date().toISOString() } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -86,9 +139,10 @@ export const useNotifications = () => {
 
   const markAllAsRead = async () => {
     if (!user) return;
-    
+
     try {
-      let query = supabase
+      // Marque les 2 sources en parallèle
+      let oldQuery = supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('user_id', user.id)
@@ -96,12 +150,24 @@ export const useNotifications = () => {
         .is('read_at', null);
 
       if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
+        oldQuery = oldQuery.eq('tenant_id', tenantId);
       }
 
-      await query;
-      
-      setNotifications(prev => 
+      // IDs des notifs suivis non lues qu'on a en mémoire
+      const suivisIds = notifications
+        .filter(n => n.payload?.from_suivis && !n.read_at)
+        .map(n => n.id);
+
+      const inboxBase: any = supabase.from('suivis');
+      const inboxUpdate = suivisIds.length > 0
+        ? inboxBase
+            .update({ status: 'done', completed_at: new Date().toISOString() })
+            .in('id', suivisIds)
+        : Promise.resolve({ error: null });
+
+      await Promise.all([oldQuery, inboxUpdate]);
+
+      setNotifications(prev =>
         prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
       );
       setUnreadCount(0);

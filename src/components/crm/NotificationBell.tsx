@@ -135,9 +135,9 @@ export const NotificationBell = () => {
                       )}
                       <p className="text-xs text-muted-foreground/70 mt-1.5 flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(notification.created_at), { 
+                        {formatDistanceToNow(new Date(notification.created_at), {
                           addSuffix: true,
-                          locale: getDateLocale() 
+                          locale: getDateLocale()
                         })}
                       </p>
                     </div>
@@ -150,6 +150,18 @@ export const NotificationBell = () => {
             </div>
           )}
         </ScrollArea>
+
+        {/* Footer : lien vers la page Suivis complète */}
+        <div className="border-t bg-muted/30 p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center text-xs"
+            onClick={() => navigate("/crm/suivis")}
+          >
+            Voir toutes mes tâches et rappels →
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
