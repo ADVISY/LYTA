@@ -1,8 +1,31 @@
 # Sprint LYTA — Semaine du 22 au 26 juin 2026
 
 > **Préparé** le 15 juin 2026 pour démarrage le 22 juin (lundi)
+> **Mis à jour** le 22 juin 2026 — ajout session sécu phase 2 vendredi
 > **Hypothèse de travail** : 1-2 signatures cabinets cette semaine (L'Agence25 + autres)
 > **Si pas de signature** : on garde le sprint mais on baisse l'ambition (1 module au lieu de 4)
+
+---
+
+## ⚠️ Session sécurité phase 2 — Vendredi 26 juin (2-3h)
+
+Fin du sprint = nettoyer les warnings Supabase Advisor remontés à 261
+(vs 139 le 12 juin). Cible : redescendre à ~50 (le reste = SECURITY
+DEFINER authenticated volontaires).
+
+### Items à traiter
+- ☐ Search_path figé sur les nouvelles fonctions (V1 diag, suivis triggers)
+- ☐ V8 Régénérer types Supabase (5 min)
+- ☐ V9 Audit vue `clients_safe` orpheline (drop ou documenter)
+- ☐ Audit ciblé des 128 SECURITY DEFINER authenticated (catégoriser
+  volontaires vs à durcir)
+- ☐ Mise à jour `LYTA_Security_Audit_CONFIDENTIAL.md` (v1.2)
+- ☐ Régénération PDF
+
+### Items reportés (sprint suivant ou Q3)
+- V4 Reset password redirect URL audit tenant-onboarding (4h)
+- V6 Logs edge fn stack traces audit (4h)
+- Pen test externe avant signature 5+ tenants
 
 ---
 
