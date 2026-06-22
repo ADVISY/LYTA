@@ -8,8 +8,9 @@
  * Drag&drop avec dnd-kit prévu en V2.
  */
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, MoreHorizontal } from "lucide-react";
 import { PipelineCard } from "./PipelineCard";
+import { ColumnActionsMenu } from "./ColumnActionsMenu";
 import {
   usePipeline,
   PIPELINE_STAGES,
@@ -143,11 +144,16 @@ function KanbanColumn({
           colorClass
         )}
       >
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">{label}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm flex-1 truncate">{label}</h3>
           <span className="text-xs bg-white/60 px-2 py-0.5 rounded-full font-medium">
             {opportunities.length}
           </span>
+          {/* Menu "..." de la colonne — actions/templates pour ce stade */}
+          <ColumnActionsMenu
+            stage={stage}
+            opportunities={opportunities}
+          />
         </div>
       </div>
 
