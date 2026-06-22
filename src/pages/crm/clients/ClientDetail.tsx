@@ -541,7 +541,7 @@ export default function ClientDetail() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Bouton créer compte client - uniquement si pas de user_id, type client, et module client_portal actif */}
           {hasClientPortal && !permissionsLoading && canManageClientPortal && client.type_adresse === 'client' && !client.user_id && client.email && (
             <Button 
