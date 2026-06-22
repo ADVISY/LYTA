@@ -129,6 +129,14 @@ export interface Suivi {
     last_name: string | null;
     email: string;
   };
+  // Opp pipeline parente (si cette suivi est une sous-tâche d'opportunité)
+  parent_opp?: {
+    id: string;
+    title: string;
+    expected_product: string | null;
+    expected_company: string | null;
+    pipeline_stage: string | null;
+  } | null;
 }
 
 export interface CreateSuiviData {
@@ -251,13 +259,21 @@ export function useSuivis(clientId?: string) {
   } = usePaginatedQuery<Suivi>({
     queryKey: ['suivis', clientId ?? 'all'],
     buildQuery: (client) => {
-      const q = client
-        .from("suivis")
+      // Cast en `any` pour éviter "Type instantiation excessively deep"
+      // causé par le SELECT avec joints multiples (client, agent, parent_opp).
+      const base: any = client.from("suivis");
+      const q = base
         .select(`
           *,
           client:clients(first_name, last_name, company_name, email, phone, mobile, address, postal_code, city, country),
-          agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email)
+          agent:profiles!suivis_assigned_agent_id_fkey(first_name, last_name, email),
+          parent_opp:suivis!suivis_parent_suivi_id_fkey(
+            id, title, expected_product, expected_company, pipeline_stage
+          )
         `)
+        // Par défaut on n'affiche pas les pipeline_card dans la liste Suivis
+        // (elles ont leur propre vue Pipeline). On affiche tâches + rappels.
+        .neq("kind", "pipeline_card")
         .order("created_at", { ascending: false });
       return clientId ? q.eq("client_id", clientId) : q;
     },

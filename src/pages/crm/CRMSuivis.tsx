@@ -222,6 +222,18 @@ export default function CRMSuivis() {
                           {suivi.description}
                         </p>
                       )}
+                      {/* Badge si la tâche est liée à une opportunité Pipeline */}
+                      {suivi.parent_opp && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto mt-1 text-xs text-violet-600 hover:text-violet-700"
+                          onClick={() => navigate(`/crm/pipeline`)}
+                        >
+                          🎯 {suivi.parent_opp.expected_product || "Opp"}
+                          {suivi.parent_opp.expected_company && ` · ${suivi.parent_opp.expected_company}`}
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button

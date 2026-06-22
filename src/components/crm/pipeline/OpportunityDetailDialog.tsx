@@ -17,6 +17,9 @@
  *   - Marquer perdue
  */
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,6 +41,9 @@ import {
   ExternalLink,
   X,
   ArrowRight,
+  ListChecks,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import {
   PIPELINE_STAGE_LABELS,
@@ -113,6 +120,52 @@ export function OpportunityDetailDialog({
   onEditRdv,
 }: OpportunityDetailDialogProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch les sous-tâches liées à cette opportunité (parent_suivi_id = opp.id)
+  const oppId = opportunity?.id;
+  const { data: subTasks = [], refetch: refetchSubTasks } = useQuery({
+    queryKey: ["opp_subtasks", oppId],
+    enabled: !!oppId && open,
+    queryFn: async () => {
+      if (!oppId) return [];
+      const base: any = supabase.from("suivis");
+      const { data, error } = await base
+        .select("id, title, description, status, priority, kind, created_at, completed_at")
+        .eq("parent_suivi_id", oppId)
+        .neq("kind", "pipeline_card")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const handleToggleTaskDone = async (
+    taskId: string,
+    currentStatus: string,
+  ) => {
+    const isDone = currentStatus === "done" || currentStatus === "ferme";
+    const newStatus = isDone ? "ouvert" : "done";
+    const completedAt = newStatus === "done" ? new Date().toISOString() : null;
+
+    try {
+      const { error } = await supabase
+        .from("suivis")
+        .update({ status: newStatus, completed_at: completedAt })
+        .eq("id", taskId);
+      if (error) throw error;
+      refetchSubTasks();
+      // Invalide aussi les autres queries (page Suivis, etc.)
+      queryClient.invalidateQueries({ queryKey: ["suivis"] });
+    } catch (err: any) {
+      toast({
+        title: "Erreur",
+        description: err.message || "Impossible de mettre à jour la tâche",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!opportunity) return null;
 
@@ -293,6 +346,74 @@ export function OpportunityDetailDialog({
               </h4>
               <p className="text-sm whitespace-pre-wrap break-words">
                 {opportunity.description}
+              </p>
+            </div>
+          )}
+
+          {/* Sous-tâches liées à l'opportunité */}
+          {subTasks.length > 0 && (
+            <div className="rounded-lg border bg-card p-3">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <ListChecks className="h-3.5 w-3.5" />
+                Tâches liées ({subTasks.length})
+              </h4>
+              <div className="space-y-1.5">
+                {subTasks.map((task: any) => {
+                  const isDone = task.status === "done" || task.status === "ferme";
+                  return (
+                    <div
+                      key={task.id}
+                      className={cn(
+                        "flex items-start gap-2 rounded-md p-2 hover:bg-muted/50 transition-colors",
+                        isDone && "opacity-60"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTaskDone(task.id, task.status)}
+                        className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform"
+                        aria-label={isDone ? "Marquer comme non fait" : "Marquer comme fait"}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={cn(
+                            "text-sm font-medium leading-tight",
+                            isDone && "line-through text-muted-foreground"
+                          )}
+                        >
+                          {task.title}
+                        </p>
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                        {task.priority && task.priority !== "normal" && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] mt-1 py-0 px-1.5 h-4",
+                              task.priority === "urgent" && "bg-red-100 text-red-700 border-red-300",
+                              task.priority === "high" && "bg-orange-100 text-orange-700 border-orange-300"
+                            )}
+                          >
+                            {task.priority}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                Astuce : utilise le menu "..." de la colonne pour ajouter d'autres
+                tâches par template.
               </p>
             </div>
           )}
