@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import i18n from '@/i18n';
 import { AssignTaskFromNotificationDialog } from './AssignTaskFromNotificationDialog';
+import { SwipeableNotificationRow } from './SwipeableNotificationRow';
 
 const getDateLocale = () => {
   const lang = i18n.language;
@@ -151,8 +152,12 @@ export const NotificationBell = () => {
           ) : (
             <div className="divide-y">
               {notifications.map((notification) => (
-                <div
+                <SwipeableNotificationRow
                   key={notification.id}
+                  onSwipeRight={() => setAssignTaskNotif(notification)}
+                  onSwipeLeft={() => handleDeleteNotification(notification)}
+                >
+                <div
                   className={cn(
                     "relative group hover:bg-muted/50 transition-colors",
                     !notification.read_at && "bg-primary/5"
@@ -227,6 +232,7 @@ export const NotificationBell = () => {
                     </DropdownMenu>
                   </div>
                 </div>
+                </SwipeableNotificationRow>
               ))}
             </div>
           )}
