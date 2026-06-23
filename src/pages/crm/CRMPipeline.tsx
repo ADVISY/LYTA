@@ -9,8 +9,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrendingUp, RefreshCw } from "lucide-react";
+import { TrendingUp, RefreshCw, User, Users } from "lucide-react";
 import { PipelineKanban } from "@/components/crm/pipeline/PipelineKanban";
 import { OpportunityDetailDialog } from "@/components/crm/pipeline/OpportunityDetailDialog";
 import { SetRdvDialog } from "@/components/crm/pipeline/SetRdvDialog";
@@ -52,7 +54,14 @@ const LOSS_REASONS = [
 export default function CRMPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { totalCount, refetch } = usePipeline();
+  const { user } = useAuth();
+
+  // Filtre "Mes opportunités" vs "Toutes" — par défaut "mine"
+  const [agentFilter, setAgentFilter] = useState<"mine" | "all">("mine");
+
+  const { totalCount, refetch } = usePipeline(
+    agentFilter === "mine" && user?.id ? { agentId: user.id } : {}
+  );
 
   // Modale "Détail opportunité"
   const [detailOpp, setDetailOpp] = useState<Suivi | null>(null);
@@ -162,16 +171,46 @@ export default function CRMPipeline() {
           </div>
         </div>
 
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Toggle "Mes opportunités" / "Toutes" */}
+          <ToggleGroup
+            type="single"
+            value={agentFilter}
+            onValueChange={(v) => {
+              if (v === "mine" || v === "all") setAgentFilter(v);
+            }}
+            className="bg-muted/50 rounded-lg p-1"
+          >
+            <ToggleGroupItem
+              value="mine"
+              size="sm"
+              className="data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs"
+            >
+              <User className="h-3.5 w-3.5 mr-1.5" />
+              Mes opps
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="all"
+              size="sm"
+              className="data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs"
+            >
+              <Users className="h-3.5 w-3.5 mr-1.5" />
+              Toutes
+            </ToggleGroupItem>
+          </ToggleGroup>
+
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Vue Kanban */}
       <Card className="border-0 shadow-lg bg-card/80 backdrop-blur">
         <CardContent className="p-4">
           <PipelineKanban
+            filters={agentFilter === "mine" && user?.id ? { agentId: user.id } : undefined}
             onOpenOpportunity={handleOpenOpportunity}
             onMoveStage={handleMoveStage}
             onMarkLost={(opp) => setLostOpp(opp)}
