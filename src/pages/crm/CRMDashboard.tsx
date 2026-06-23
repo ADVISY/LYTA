@@ -27,6 +27,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInter
 import { fr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { DashboardInboxWidget } from "@/components/crm/DashboardInboxWidget";
 import {
   BarChart,
   Bar,
@@ -85,7 +86,7 @@ export default function CRMDashboard() {
   const { commissions, loading: commissionsLoading, fetchCommissions } = useCommissions();
   const { loading: performanceLoading, companyTotals, myPerformance, myTeam, individualPerformance, teamPerformance } = usePerformance();
   const { fetchAllParts, fetchPartsForAgent } = useCommissionParts();
-  const { notifications, unreadCount, markAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, fetchNotifications } = useNotifications();
   const { scans: pendingScans } = usePendingScans();
   const pendingScanCount = pendingScans.filter(s => s.status === 'completed' || s.status === 'processing').length;
 
@@ -1270,71 +1271,12 @@ export default function CRMDashboard() {
               )}
             </div>
 
-            {/* Right Column - Notifications */}
+            {/* Right Column - Inbox (Notifications + Tâches) */}
             <div className="space-y-6">
-              {/* Recent Notifications */}
-              <Card className="border shadow-sm bg-card">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-blue-500" />
-                      <CardTitle className="text-sm font-semibold">{t('notifications.title')}</CardTitle>
-                    </div>
-                    {unreadCount > 0 && (
-                      <Badge variant="destructive" className="text-xs">
-                        {unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {recentNotifications.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      {t('notifications.noNotifications')}
-                    </p>
-                  ) : (
-                    <ScrollArea className="h-[300px]">
-                      <div className="space-y-2">
-                        {recentNotifications.map(notif => (
-                          <div 
-                            key={notif.id}
-                            className={cn(
-                              "flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                              notif.read_at ? "bg-muted/30" : "bg-blue-50 dark:bg-blue-950/20",
-                              "hover:bg-muted/50"
-                            )}
-                            onClick={() => !notif.read_at && markAsRead(notif.id)}
-                          >
-                            <div className="mt-0.5">
-                              {getNotificationIcon(notif.kind)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={cn(
-                                "text-sm truncate",
-                                !notif.read_at && "font-medium"
-                              )}>
-                                {notif.title}
-                              </p>
-                              {notif.message && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {notif.message}
-                                </p>
-                              )}
-                              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: fr })}
-                              </p>
-                            </div>
-                            {!notif.read_at && (
-                              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Widget Inbox : onglets Notifications + Mes tâches */}
+              <DashboardInboxWidget
+                getNotificationIcon={getNotificationIcon}
+              />
 
               {/* Quick Stats (Team view for managers) */}
               {dashboardScope === 'team' && myTeam && (
