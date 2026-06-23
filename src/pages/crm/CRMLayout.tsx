@@ -44,6 +44,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/crm/NotificationBell";
 import { LanguageSelector } from "@/components/ui/language-selector";
 import { WelcomeMessage } from "@/components/crm/WelcomeMessage";
 import { UserAvatar } from "@/components/crm/UserAvatar";
@@ -362,8 +363,9 @@ export default function CRMLayout() {
                     <p className="text-xs text-muted-foreground capitalize">{role}</p>
                   </div>
                 </div>
-                {/* Language and Theme toggles */}
+                {/* Notifications + Language + Theme */}
                 <div className="flex items-center justify-center gap-1 mb-3">
+                  <NotificationBell />
                   <LanguageSelector />
                   <ThemeToggle />
                 </div>
@@ -393,6 +395,7 @@ export default function CRMLayout() {
             </div>
           )}
           <div className="flex items-center gap-1">
+            <NotificationBell />
             <LanguageSelector />
             <ThemeToggle />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
