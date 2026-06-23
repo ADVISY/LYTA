@@ -11,12 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Settings, User, Building2, Package, Percent, Moon, Sun, 
+import {
+  Settings, User, Building2, Package, Percent, Moon, Sun,
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
   Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
-  CreditCard, Briefcase, MapPin, RefreshCw, FolderOpen
+  CreditCard, Briefcase, MapPin, RefreshCw, FolderOpen, Puzzle, ArrowRight
 } from "lucide-react";
+import { useLytaToolsEnabled } from "@/hooks/useLytaTools";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -185,7 +187,9 @@ export default function CRMParametres() {
   const tenantSeats = useTenantSeats();
   const { role } = useUserRole();
   const { can, isAdmin: hasTenantAdminRole, isLoading: permissionsLoading } = usePermissions();
-  
+  const { enabled: lytaToolsEnabled } = useLytaToolsEnabled();
+  const navigate = useNavigate();
+
   // Check URL params for tab selection (e.g., ?tab=abonnement)
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab');
@@ -986,6 +990,12 @@ export default function CRMParametres() {
                   <span className="hidden sm:inline">{t('emails.title')}</span>
                 </TabsTrigger>
               </>
+            )}
+            {lytaToolsEnabled && (
+              <TabsTrigger value="lyta-tools" className="gap-2 whitespace-nowrap">
+                <Puzzle className="h-4 w-4" />
+                <span className="hidden sm:inline">LYTA Tools</span>
+              </TabsTrigger>
             )}
             <TabsTrigger value="support" className="gap-2 whitespace-nowrap">
               <AlertCircle className="h-4 w-4" />
@@ -2182,6 +2192,44 @@ export default function CRMParametres() {
         <TabsContent value="emails" className="space-y-6 mt-6">
           <EmailAutomationSettings />
         </TabsContent>
+        )}
+
+        {/* LYTA TOOLS */}
+        {lytaToolsEnabled && (
+          <TabsContent value="lyta-tools" className="space-y-6 mt-6">
+            <Card className="border-cyan-200 dark:border-cyan-800 bg-gradient-to-br from-cyan-50/50 to-teal-50/50 dark:from-cyan-950/20 dark:to-teal-950/20">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 text-white">
+                      <Puzzle className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">LYTA Tools</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Outils avancés : import, export, intégrations, automatisations
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => navigate("/crm/tools")}
+                    className="gap-2 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600"
+                  >
+                    Ouvrir LYTA Tools
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Accède à l'ensemble des outils LYTA Tools depuis cette section.
+                  Tu y trouveras les imports en masse, les exports, les intégrations
+                  externes et les outils d'automatisation réservés aux cabinets
+                  pilotes.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
         )}
 
         {/* SUPPORT */}

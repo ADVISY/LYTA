@@ -94,26 +94,12 @@ export default function CRMLayout() {
   const navigate = useNavigate();
   const canManageAdminSettings = role === "admin" || hasTenantAdminRole || can("settings", "update");
   
-  // Get all menu items + conditionally add LYTA Tools (Pilot: Advisy only)
+  // Get all menu items. LYTA Tools déplacé dans Paramètres pour alléger le menu.
+  // (l'accès direct via /crm/tools reste fonctionnel — c'est juste l'entrée nav
+  // qui est retirée, le contenu reste accessible via Paramètres > LYTA Tools)
   const allMenuItems = useMemo(() => {
-    const items = getMenuItems(t, canManageAdminSettings);
-    if (lytaToolsEnabled) {
-      // Insert LYTA Tools before settings (second to last)
-      const settingsIndex = items.findIndex(i => i.to === '/crm/parametres');
-      const toolsItem: MenuItem = {
-        to: '/crm/tools',
-        icon: Puzzle,
-        label: 'LYTA Tools',
-        color: 'from-cyan-500 to-teal-500',
-      };
-      if (settingsIndex >= 0) {
-        items.splice(settingsIndex, 0, toolsItem);
-      } else {
-        items.push(toolsItem);
-      }
-    }
-    return items;
-  }, [t, lytaToolsEnabled, canManageAdminSettings]);
+    return getMenuItems(t, canManageAdminSettings);
+  }, [t, canManageAdminSettings]);
 
   // Check if we should show welcome message (on first load after login)
   useEffect(() => {
