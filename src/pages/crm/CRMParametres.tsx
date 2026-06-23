@@ -15,7 +15,8 @@ import {
   Settings, User, Building2, Package, Percent, Moon, Sun,
   Palette, Save, Pencil, Trash2, Plus, Shield, Eye, EyeOff, Check,
   Users, UserCheck, AlertCircle, Loader2, KeyRound, Mail, Lock,
-  CreditCard, Briefcase, MapPin, RefreshCw, FolderOpen, Puzzle, ArrowRight
+  CreditCard, Briefcase, MapPin, RefreshCw, FolderOpen, Puzzle, ArrowRight,
+  UserCog, BarChart3,
 } from "lucide-react";
 import { useLytaToolsEnabled } from "@/hooks/useLytaTools";
 import { useNavigate } from "react-router-dom";
@@ -991,6 +992,19 @@ export default function CRMParametres() {
                 </TabsTrigger>
               </>
             )}
+            {/* Modules déplacés du menu principal pour alléger la nav */}
+            <TabsTrigger value="compagnies" className="gap-2 whitespace-nowrap">
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Compagnies</span>
+            </TabsTrigger>
+            <TabsTrigger value="collaborateurs" className="gap-2 whitespace-nowrap">
+              <UserCog className="h-4 w-4" />
+              <span className="hidden sm:inline">Collaborateurs</span>
+            </TabsTrigger>
+            <TabsTrigger value="rapports" className="gap-2 whitespace-nowrap">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Rapports</span>
+            </TabsTrigger>
             {lytaToolsEnabled && (
               <TabsTrigger value="lyta-tools" className="gap-2 whitespace-nowrap">
                 <Puzzle className="h-4 w-4" />
@@ -2193,6 +2207,90 @@ export default function CRMParametres() {
           <EmailAutomationSettings />
         </TabsContent>
         )}
+
+        {/* COMPAGNIES */}
+        <TabsContent value="compagnies" className="space-y-6 mt-6">
+          <Card className="border-red-200 dark:border-red-800 bg-gradient-to-br from-red-50/50 to-orange-50/50 dark:from-red-950/20 dark:to-orange-950/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 text-white">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Compagnies partenaires</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Catalogue des compagnies d'assurance avec lesquelles vous travaillez
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate("/crm/compagnies")}
+                  className="gap-2 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+                >
+                  Ouvrir
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        </TabsContent>
+
+        {/* COLLABORATEURS */}
+        <TabsContent value="collaborateurs" className="space-y-6 mt-6">
+          <Card className="border-pink-200 dark:border-pink-800 bg-gradient-to-br from-pink-50/50 to-rose-50/50 dark:from-pink-950/20 dark:to-rose-950/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 text-white">
+                    <UserCog className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Collaborateurs du cabinet</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Gérez votre équipe : agents, managers, backoffice, compta
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate("/crm/collaborateurs")}
+                  className="gap-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
+                >
+                  Ouvrir
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        </TabsContent>
+
+        {/* RAPPORTS */}
+        <TabsContent value="rapports" className="space-y-6 mt-6">
+          <Card className="border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-violet-50/50 dark:from-indigo-950/20 dark:to-violet-950/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
+                    <BarChart3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Rapports & Analytics</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Analyses avancées, exports comptables, KPI sur mesure
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate("/crm/rapports")}
+                  className="gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600"
+                >
+                  Ouvrir
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        </TabsContent>
 
         {/* LYTA TOOLS */}
         {lytaToolsEnabled && (
