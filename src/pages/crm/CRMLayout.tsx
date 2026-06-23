@@ -35,7 +35,6 @@ import {
   Puzzle,
   User,
   FileSignature,
-  Briefcase,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -65,9 +64,9 @@ const getMenuItems = (t: (key: string) => string, canManageAdminSettings: boolea
   { to: "/crm", icon: LayoutDashboard, label: t('nav.drive'), end: true, color: "from-blue-500 to-indigo-500" },
   { to: "/crm/clients", icon: Users, label: t('nav.clients'), color: "from-emerald-500 to-teal-500", requiredModule: "clients" },
   { to: "/crm/pipeline", icon: TrendingUp, label: "Pipeline", color: "from-violet-500 to-indigo-500" },
-  // 'Portefeuille' regroupe Contrats + Commissions + Compta (page hub /crm/portefeuille)
-  // Les routes individuelles restent fonctionnelles via accès direct depuis la page hub.
-  { to: "/crm/portefeuille", icon: Briefcase, label: "Portefeuille", color: "from-violet-500 to-purple-500", requiredModule: "contracts" },
+  { to: "/crm/contrats", icon: FileCheck, label: t('nav.contracts'), color: "from-violet-500 to-purple-500", requiredModule: "contracts" },
+  { to: "/crm/commissions", icon: DollarSign, label: t('nav.payout'), color: "from-green-500 to-emerald-500", requiredModule: "commissions" },
+  { to: "/crm/compta", icon: FileText, label: t('nav.finance'), color: "from-amber-500 to-orange-500", requiredModule: "statements" },
   { to: "/crm/publicite", icon: Mail, label: t('nav.advertising'), color: "from-cyan-500 to-blue-500", requiredModule: "emailing" },
   // Compagnies / Collaborateurs / Rapports déplacés dans Paramètres pour alléger le menu
   canManageAdminSettings
