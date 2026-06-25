@@ -17,6 +17,8 @@ export type Document = {
   doc_kind?: string | null;
   created_by?: string | null;
   created_at: string;
+  // Migration 20260625160000 : dossier libre par client. NULL = "racine".
+  folder_id?: string | null;
 };
 
 export function useDocuments() {

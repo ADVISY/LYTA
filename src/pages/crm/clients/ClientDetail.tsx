@@ -42,6 +42,14 @@ import { BranchChip } from "@/components/crm/BranchSelector";
 import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import SuiviForm from "@/components/crm/SuiviForm";
 import DocumentUpload, { docKindOptions } from "@/components/crm/DocumentUpload";
+import { ClientScanIADialog } from "@/components/crm/ia-scan";
+import { Sparkles } from "lucide-react";
+import { DocumentPreviewDialog, type DocumentPreviewDoc } from "@/components/crm/DocumentPreviewDialog";
+import { RenameDocumentDialog } from "@/components/crm/RenameDocumentDialog";
+import { DuplicateDocumentDialog } from "@/components/crm/DuplicateDocumentDialog";
+import { ClientFolderTiles, ROOT_FOLDER_ID } from "@/components/crm/ClientFolderTiles";
+import { MoveDocumentToFolderDialog } from "@/components/crm/MoveDocumentToFolderDialog";
+import { FolderInput } from "lucide-react";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import MandatGestionForm from "@/components/crm/MandatGestionForm";
 import PendingSignaturesPanel from "@/components/signatures/PendingSignaturesPanel";
@@ -161,6 +169,19 @@ export default function ClientDetail() {
   const [docDateTo, setDocDateTo] = useState<string>("");
   const [editTypeDocId, setEditTypeDocId] = useState<string | null>(null);
   const [editTypeDocKind, setEditTypeDocKind] = useState<string>("autre");
+  // Scan IA in-fiche : ouvre <ClientScanIADialog> qui chaîne upload → classif IA → import
+  const [scanIAOpen, setScanIAOpen] = useState(false);
+  // Preview inline d'un document (modal iframe/img au lieu d'ouvrir un nouvel onglet)
+  const [previewDoc, setPreviewDoc] = useState<DocumentPreviewDoc | null>(null);
+  // Renommer : on stocke l'id + le nom courant pour pré-remplir l'input
+  const [renameDocId, setRenameDocId] = useState<string | null>(null);
+  const [renameDocName, setRenameDocName] = useState<string>("");
+  // Dupliquer : on stocke tout le doc pour la copie storage + insert
+  const [duplicateDoc, setDuplicateDoc] = useState<Document | null>(null);
+  // Dossier actif dans la barre de tiles. null = "Tous", ROOT_FOLDER_ID = racine, UUID = dossier
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  // Doc à déplacer vers un dossier (état = le doc cible ou null)
+  const [moveDoc, setMoveDoc] = useState<Document | null>(null);
   const { rows: dynamicDocTypes } = useTenantDocumentTypes();
   const [suiviFormOpen, setSuiviFormOpen] = useState(false);
   const [editSuiviOpen, setEditSuiviOpen] = useState(false);
@@ -1223,6 +1244,20 @@ export default function ClientDetail() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Documents ({clientDocuments.length})</CardTitle>
+                  {/* Bouton Scan IA : ouvre <ClientScanIADialog> qui chaîne upload →
+                      classification IA (edge fn classify-batch-documents) →
+                      validateBatchAndImportDocuments(batchId, clientId) qui crée
+                      directement les rows `documents` liés à ce client. */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScanIAOpen(true)}
+                    className="gap-2 border-primary/40 text-primary hover:bg-primary/5"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Scanner avec IA
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Upload Section */}
@@ -1237,6 +1272,27 @@ export default function ClientDetail() {
                       showList={false}
                     />
                   </div>
+
+                  {/* Barre des dossiers (tiles cliquables) — filtre la liste docs ci-dessous */}
+                  {client && (
+                    <ClientFolderTiles
+                      clientId={client.id}
+                      activeFolderId={activeFolderId}
+                      onActiveChange={setActiveFolderId}
+                      counts={(() => {
+                        const byFolder: Record<string, number> = {};
+                        let root = 0;
+                        for (const d of clientDocuments) {
+                          if (d.folder_id) {
+                            byFolder[d.folder_id] = (byFolder[d.folder_id] ?? 0) + 1;
+                          } else {
+                            root += 1;
+                          }
+                        }
+                        return { all: clientDocuments.length, root, byFolder };
+                      })()}
+                    />
+                  )}
 
                   {/* Filters */}
                   {clientDocuments.length > 0 && (
@@ -1305,6 +1361,12 @@ export default function ClientDetail() {
                     </div>
                   ) : (() => {
                     const filtered = clientDocuments.filter((doc) => {
+                      // Filtre dossier actif (tile cliquée)
+                      if (activeFolderId === ROOT_FOLDER_ID) {
+                        if (doc.folder_id) return false;
+                      } else if (activeFolderId !== null) {
+                        if (doc.folder_id !== activeFolderId) return false;
+                      }
                       if (docTypeFilter !== "all" && (doc.doc_kind || "autre") !== docTypeFilter) return false;
                       if (docDateFrom && new Date(doc.created_at) < new Date(docDateFrom)) return false;
                       if (docDateTo) {
@@ -1363,7 +1425,21 @@ export default function ClientDetail() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDocumentView(doc.file_key)}
+                                    title="Déplacer vers un dossier"
+                                    onClick={() => setMoveDoc(doc)}
+                                  >
+                                    <FolderInput className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Aperçu"
+                                    onClick={() => setPreviewDoc({
+                                      id: doc.id,
+                                      file_key: doc.file_key,
+                                      file_name: doc.file_name,
+                                      mime_type: doc.mime_type,
+                                    })}
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
@@ -1430,6 +1506,76 @@ export default function ClientDetail() {
                   </Dialog>
                 </CardContent>
               </Card>
+
+              {/* Dialog Scan IA in-fiche : pré-lié au clientId courant */}
+              {client && (
+                <ClientScanIADialog
+                  open={scanIAOpen}
+                  onOpenChange={setScanIAOpen}
+                  clientId={client.id}
+                  clientLabel={getClientName()}
+                  onImportDone={() => {
+                    void loadDocuments();
+                  }}
+                />
+              )}
+
+              {/* Preview inline : modal PDF/image + boutons Renommer / Dupliquer / Télécharger.
+                  Quand l'utilisateur clique Renommer ou Dupliquer dans la modale preview,
+                  on ferme le preview et on ouvre la modale d'action correspondante. */}
+              <DocumentPreviewDialog
+                open={!!previewDoc}
+                onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}
+                doc={previewDoc}
+                onRename={(d) => {
+                  setRenameDocId(d.id);
+                  setRenameDocName(d.file_name);
+                  setPreviewDoc(null);
+                }}
+                onDuplicate={(d) => {
+                  // On retrouve le doc complet (avec doc_kind, tenant_id...) dans clientDocuments
+                  const full = clientDocuments.find((cd) => cd.id === d.id) || null;
+                  setDuplicateDoc(full);
+                  setPreviewDoc(null);
+                }}
+              />
+
+              {/* Renommer : met à jour file_name dans `documents` (storage inchangé) */}
+              <RenameDocumentDialog
+                open={!!renameDocId}
+                onOpenChange={(open) => { if (!open) setRenameDocId(null); }}
+                documentId={renameDocId}
+                currentName={renameDocName}
+                onRenamed={() => { void loadDocuments(); }}
+              />
+
+              {/* Déplacer vers dossier : met à jour documents.folder_id */}
+              {client && (
+                <MoveDocumentToFolderDialog
+                  open={!!moveDoc}
+                  onOpenChange={(o) => { if (!o) setMoveDoc(null); }}
+                  clientId={client.id}
+                  documentId={moveDoc?.id ?? null}
+                  currentFolderId={moveDoc?.folder_id ?? null}
+                  onMoved={() => { void loadDocuments(); }}
+                />
+              )}
+
+              {/* Dupliquer : copie storage + insert row documents pour un autre client */}
+              {client && (
+                <DuplicateDocumentDialog
+                  open={!!duplicateDoc}
+                  onOpenChange={(open) => { if (!open) setDuplicateDoc(null); }}
+                  document={duplicateDoc}
+                  tenantId={client.tenant_id ?? null}
+                  sourceClientId={client.id}
+                  onDuplicated={() => {
+                    // Recharge la liste du client courant (au cas où on copie vers
+                    // un autre client puis on revient — pas critique mais bon réflexe)
+                    void loadDocuments();
+                  }}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="suivis">
