@@ -28,6 +28,7 @@ import { fr } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { DashboardInboxWidget } from "@/components/crm/DashboardInboxWidget";
+import { WelcomeDialog } from "@/components/crm/WelcomeDialog";
 import {
   BarChart,
   Bar,
@@ -791,6 +792,9 @@ export default function CRMDashboard() {
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
+      {/* Modale d'accueil — s'affiche 1x par session (récap du jour) */}
+      <WelcomeDialog />
+
       {/* Header with Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
