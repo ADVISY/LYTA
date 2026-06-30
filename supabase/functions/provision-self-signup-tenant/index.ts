@@ -122,6 +122,22 @@ serve(async (req) => {
         status: 400, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
+    // Téléphone OBLIGATOIRE : utilisé pour SMS 2FA au login admin/king. Sans ça,
+    // l'admin ne peut JAMAIS se connecter. Cas sarcom (juin 2026) qui a forcé
+    // ce fix. Le front /finalize valide déjà mais on re-check ici en défense
+    // en profondeur. Format E.164 large : commence par + ou 00, 7-15 chiffres.
+    if (!phone) {
+      return new Response(JSON.stringify({
+        error: "admin_phone_required",
+        message: "Téléphone admin requis pour la double authentification SMS.",
+      }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+    if (!/^(\+|00)\d{7,15}$/.test(phone)) {
+      return new Response(JSON.stringify({
+        error: "admin_phone_invalid_format",
+        message: "Téléphone admin invalide. Format attendu : +41791234567 (E.164).",
+      }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+    }
 
     const slug = sluggify(slugRaw || tenantName);
     if (!isValidSlug(slug)) {

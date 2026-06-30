@@ -177,6 +177,20 @@ export default function FinaliserInscription() {
       setSubmitError("Email back-office invalide.");
       return;
     }
+    // Téléphone OBLIGATOIRE — utilisé par le SMS 2FA au login admin/king.
+    // Sans téléphone, l'admin ne peut JAMAIS se connecter (boucle morte).
+    // Cas réel : sarcom (juin 2026) → bloqué au login après self-signup.
+    // Format accepté : commence par + ou 00, suivi de 7-15 chiffres (E.164 large).
+    // Espaces et tirets autorisés à la saisie, on les retire pour le check.
+    const phoneStripped = phone.replace(/[\s\-().]/g, "");
+    if (!phoneStripped) {
+      setSubmitError("Téléphone du contact principal requis (utilisé pour le SMS de validation à chaque connexion).");
+      return;
+    }
+    if (!/^(\+|00)\d{7,15}$/.test(phoneStripped)) {
+      setSubmitError("Numéro de téléphone invalide. Format attendu : +41 79 123 45 67 (commence par + et l'indicatif pays).");
+      return;
+    }
     if (!/^[a-z][a-z0-9-]{2,39}$/.test(computedSlug)) {
       setSubmitError("Sous-domaine invalide. 3-40 caractères, commence par une lettre, lettres/chiffres/tirets uniquement.");
       return;
@@ -197,7 +211,9 @@ export default function FinaliserInscription() {
           slug: computedSlug,
           admin_first_name: firstName.trim(),
           admin_last_name: lastName.trim(),
-          admin_phone: phone.trim() || undefined,
+          // Normalise : retire espaces / tirets / parenthèses avant envoi.
+          // Le backend re-vérifie aussi mais on envoie déjà du clean.
+          admin_phone: phone.replace(/[\s\-().]/g, ""),
           admin_email: adminEmail.trim() || undefined,
           backoffice_email: backofficeEmail.trim() || undefined,
           language,
@@ -436,8 +452,18 @@ export default function FinaliserInscription() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="phone">Téléphone</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+41 79 ..." />
+              <Label htmlFor="phone">Téléphone *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+41 79 123 45 67"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Vous recevrez un SMS de validation à chaque connexion (2FA).
+              </p>
             </div>
             <div>
               <Label htmlFor="language">Langue</Label>
