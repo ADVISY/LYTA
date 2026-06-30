@@ -2,6 +2,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import "./i18n"; // Initialize i18n
+import { initSentry } from "./lib/sentry";
+
+// Init Sentry AVANT le render — pour capturer les erreurs au mount.
+// No-op si VITE_SENTRY_DSN n'est pas défini (donc rien en dev par défaut).
+initSentry();
 
 // Security: block access via builder preview domains — only custom domains and dev allowed
 const hostname = window.location.hostname;

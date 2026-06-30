@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import i18n from "@/i18n";
+import * as Sentry from "@sentry/react";
 
 interface Props {
   children: ReactNode;
@@ -33,6 +34,16 @@ class ErrorBoundary extends Component<Props, State> {
       error,
       errorInfo
     );
+
+    // Reporte à Sentry avec le contexte du "space" (CRM/King/Client) pour
+    // filtrer par module dans le dashboard Sentry. No-op si DSN absent.
+    Sentry.withScope((scope) => {
+      if (this.props.space) scope.setTag("space", this.props.space);
+      scope.setContext("react", {
+        componentStack: errorInfo.componentStack,
+      });
+      Sentry.captureException(error);
+    });
 
     this.props.onError?.(error, errorInfo);
   }

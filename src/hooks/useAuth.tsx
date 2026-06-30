@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { supabaseConfig } from "@/integrations/supabase/config";
 import { useNavigate } from "react-router-dom";
+import { setSentryUser } from "@/lib/sentry";
 import {
   clearSessionEnforcerState,
   writeSessionEnforcerState,
@@ -226,12 +227,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
+      // Identifie l'utilisateur dans Sentry (id seul — pas d'email/PII)
+      setSentryUser(nextSession?.user?.id ?? null);
     });
 
     supabase.auth.getSession().then(({ data: { session: nextSession } }) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       setLoading(false);
+      setSentryUser(nextSession?.user?.id ?? null);
     });
 
     return () => subscription.unsubscribe();
