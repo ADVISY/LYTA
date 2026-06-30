@@ -18,6 +18,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { TenantGate } from "./components/TenantGate";
 import { SessionEnforcer } from "./components/SessionEnforcer";
+import { MFAEnforcer } from "./components/MFAEnforcer";
+const SetupMFA = lazy(() => import("./pages/SetupMFA"));
 
 // CRM (lazy loaded)
 const CRMLayout = lazy(() => import("./pages/crm/CRMLayout"));
@@ -141,9 +143,22 @@ const App = () => (
               {/* Post-paiement Stripe : page publique de finalisation du tenant */}
               <Route path="/finalize" element={<FinaliserInscription />} />
               <Route path="/access" element={<FinaliserInscription />} />
-              
-              {/* CRM Routes */}
-              <Route path="/crm" element={<ProtectedRoute><ErrorBoundary space="CRM"><CRMLayout /></ErrorBoundary></ProtectedRoute>}>
+
+              {/* Setup MFA — accessible à tout user connecté, requise pour
+                  les admins/king après leur grace period (cf. MFAEnforcer) */}
+              <Route
+                path="/setup-mfa"
+                element={
+                  <ProtectedRoute>
+                    <ErrorBoundary space="MFA">
+                      <SetupMFA />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* CRM Routes — wrap MFAEnforcer pour banner/blocage admin/king */}
+              <Route path="/crm" element={<ProtectedRoute><ErrorBoundary space="CRM"><MFAEnforcer><CRMLayout /></MFAEnforcer></ErrorBoundary></ProtectedRoute>}>
                 <Route index element={<CRMDashboard />} />
                 <Route path="clients" element={<CRMClients />} />
                 <Route path="clients/nouveau" element={<ClientForm />} />
@@ -166,7 +181,7 @@ const App = () => (
               </Route>
               
               {/* KING Platform Routes */}
-              <Route path="/king" element={<ProtectedRoute><ErrorBoundary space="King"><KingLayout /></ErrorBoundary></ProtectedRoute>}>
+              <Route path="/king" element={<ProtectedRoute><ErrorBoundary space="King"><MFAEnforcer><KingLayout /></MFAEnforcer></ErrorBoundary></ProtectedRoute>}>
                 <Route index element={<KingDashboard />} />
                 <Route path="tenants" element={<KingTenants />} />
                 <Route path="tenants/:tenantId" element={<KingTenantDetail />} />
