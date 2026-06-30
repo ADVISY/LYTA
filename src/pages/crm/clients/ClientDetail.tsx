@@ -51,6 +51,7 @@ import { ClientFolderTiles, ROOT_FOLDER_ID } from "@/components/crm/ClientFolder
 import { MoveDocumentToFolderDialog } from "@/components/crm/MoveDocumentToFolderDialog";
 import { FolderInput } from "lucide-react";
 import { getClientDisplayName } from "@/lib/clientName";
+import { detectLifePillarFromName, LIFE_PILLAR_BADGES, lifePillarBadgeClasses } from "@/lib/lifePillar";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import MandatGestionForm from "@/components/crm/MandatGestionForm";
 import PendingSignaturesPanel from "@/components/signatures/PendingSignaturesPanel";
@@ -1188,6 +1189,12 @@ export default function ClientDetail() {
                                     <div className="space-y-1.5">
                                       {productsDataList.map((prod: any, idx: number) => {
                                         const isLppProd = prod?.avoirTotal != null || /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(prod?.name || '');
+                                        // Badge pilier 3A/3B/Vie classique :
+                                        //   1. pillarType saisi explicitement via selector contrat
+                                        //   2. Fallback détection auto depuis le nom du produit
+                                        const pillarType: string | null =
+                                          (prod?.pillarType as string | null) || detectLifePillarFromName(prod?.name) || null;
+                                        const pillarBadge = pillarType ? LIFE_PILLAR_BADGES[pillarType as keyof typeof LIFE_PILLAR_BADGES] : null;
                                         return (
                                           <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded text-xs">
                                             <div className="flex-1 min-w-0 truncate">
@@ -1195,6 +1202,15 @@ export default function ClientDetail() {
                                               {isLppProd && (
                                                 <Badge variant="outline" className="ml-2 text-[10px] bg-amber-50 text-amber-700 border-amber-300">
                                                   LPP
+                                                </Badge>
+                                              )}
+                                              {pillarBadge && (
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`ml-2 text-[10px] ${lifePillarBadgeClasses(pillarType as keyof typeof LIFE_PILLAR_BADGES)}`}
+                                                  title={pillarBadge.description}
+                                                >
+                                                  {pillarBadge.label}
                                                 </Badge>
                                               )}
                                             </div>
