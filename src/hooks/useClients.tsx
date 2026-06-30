@@ -247,24 +247,30 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   //   - OR id = mon_collab_id              → utilise pk
   // Postgres applique le filter AVANT la RLS check → instantané (46 ms vs 28s).
   // ──────────────────────────────────────────────────────────────────────
-  const [myScope, setMyScope] = useState<"global" | "team" | "personal" | null>(null);
-  const [myCollabId, setMyCollabId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!tenantId || !user?.id) {
-      setMyScope(null);
-      setMyCollabId(null);
-      return;
-    }
-    let aborted = false;
-    (async () => {
+  // ────────────────────────────────────────────────────────────────────────
+  // PERF (juin 2026, JCG 928+ contacts) :
+  // Avant on faisait ça dans un useEffect avec useState → exécuté en serial à
+  // chaque mount du hook, 2 round-trips (user_tenant_roles + RPC), zéro
+  // mémorisation entre navigations. Sur JCG ça ajoutait ~400-1500ms à chaque
+  // /crm/clients alors que les données ne changent quasiment jamais.
+  // Avec useQuery + staleTime 5 min : 1re résolution + cache, les
+  // navigations suivantes utilisent le cache instantanément → la query
+  // principale des clients démarre sans attendre.
+  // ────────────────────────────────────────────────────────────────────────
+  const { data: scopeData } = useQuery({
+    queryKey: ["my_scope_v1", user?.id ?? "", tenantId ?? ""],
+    enabled: !!tenantId && !!user?.id,
+    staleTime: 5 * 60_000, // 5 min — un user change rarement de rôle pendant sa session
+    gcTime: 30 * 60_000,   // garde 30 min après unmount, retour rapide à la liste
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<{ scope: "global" | "team" | "personal"; collabId: string | null }> => {
       try {
-        // 1) Récupère le dashboard_scope agrégé (highest privilege wins)
+        // 1) Dashboard_scope agrégé (highest privilege wins)
         const { data: roleRows } = await supabase
           .from("user_tenant_roles")
           .select("tenant_roles(dashboard_scope, is_active)")
-          .eq("user_id", user.id)
-          .eq("tenant_id", tenantId);
+          .eq("user_id", user!.id)
+          .eq("tenant_id", tenantId!);
 
         const scopes = (roleRows ?? [])
           .map((r: any) => r.tenant_roles)
@@ -275,27 +281,22 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
         if (scopes.includes("global")) scope = "global";
         else if (scopes.includes("team")) scope = "team";
 
-        // 2) Récupère le collab_id via RPC (déjà SECURITY DEFINER en DB)
+        // 2) collab_id seulement si on n'est pas global (sinon inutile au filter)
         let collabId: string | null = null;
         if (scope !== "global") {
           const { data: collabIdData } = await supabase.rpc("my_collab_id_v2");
           collabId = (collabIdData as string | null) ?? null;
         }
-
-        if (!aborted) {
-          setMyScope(scope);
-          setMyCollabId(collabId);
-        }
+        return { scope, collabId };
       } catch (err) {
-        if (!aborted) {
-          console.warn("[useClients] failed to resolve scope/collab_id", err);
-          setMyScope("global"); // fallback safe : pas de filter ajouté
-          setMyCollabId(null);
-        }
+        console.warn("[useClients] failed to resolve scope/collab_id", err);
+        // Fallback safe : pas de filter ajouté côté front, RLS reste seule
+        return { scope: "global", collabId: null };
       }
-    })();
-    return () => { aborted = true; };
-  }, [tenantId, user?.id]);
+    },
+  });
+  const myScope = scopeData?.scope ?? null;
+  const myCollabId = scopeData?.collabId ?? null;
 
   const cityFilter = (filters?.city ?? "").trim();
   const cantonFilter = (filters?.canton ?? "").trim();
