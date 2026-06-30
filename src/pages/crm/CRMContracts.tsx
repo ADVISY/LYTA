@@ -359,6 +359,13 @@ export default function CRMContracts() {
                           <div className="space-y-1.5">
                             {productsDataList.map((prod: any, idx: number) => {
                               const isLppProd = prod?.avoirTotal != null || /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(prod?.name || '');
+                              // Badge pilier 3A / 3B / Vie classique pour les produits de la branche Vie/Prévoyance
+                              const pillarLabel: Record<string, string> = {
+                                pilier_3a: '3ᵉ pilier A',
+                                pilier_3b: '3ᵉ pilier B',
+                                vie_classique: 'Vie classique',
+                              };
+                              const pillar = prod?.pillarType && pillarLabel[prod.pillarType];
                               return (
                                 <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded text-xs">
                                   <div className="flex-1 min-w-0 truncate">
@@ -366,6 +373,11 @@ export default function CRMContracts() {
                                     {isLppProd && (
                                       <Badge variant="outline" className="ml-2 text-[10px] bg-amber-50 text-amber-700 border-amber-300">
                                         LPP
+                                      </Badge>
+                                    )}
+                                    {pillar && (
+                                      <Badge variant="outline" className="ml-2 text-[10px] bg-violet-50 text-violet-700 border-violet-300">
+                                        {pillar}
                                       </Badge>
                                     )}
                                   </div>

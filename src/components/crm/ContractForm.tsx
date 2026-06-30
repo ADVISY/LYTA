@@ -67,6 +67,10 @@ type SelectedProduct = {
    *  La commission (3% par défaut, configurée dans Partenaires) est
    *  calculée sur ce montant. */
   avoirTotal?: string;
+  /** Pour les produits Vie/Prévoyance : type de pilier (3a/3b/classique).
+   *  Stocké dans products_data.pillarType au submit (JSONB sur la policy),
+   *  pas de migration DB. Distinction fiscale + juridique CH majeure. */
+  pillarType?: string | null;
 };
 
 type UploadedDoc = { file_key: string; file_name: string; doc_kind: string; mime_type: string; size_bytes: number };
@@ -524,6 +528,8 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             branchCode: liveBranchCode,
             // LPP : restore avoir_total si présent (champ ajouté pour LPP libre passage)
             avoirTotal: prod.avoirTotal != null ? String(prod.avoirTotal) : undefined,
+            // Vie : restore pillarType si présent (3a/3b/classique)
+            pillarType: typeof prod.pillarType === 'string' ? prod.pillarType : null,
           };
         }));
         
@@ -1030,6 +1036,11 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           // LPP : montant d'avoirs (capital) — base de calcul commission
           // qui s'applique selon le taux du partenaire (typiquement 3%).
           avoirTotal,
+          // Type de pilier pour les produits Vie/Prévoyance ('pilier_3a',
+          // 'pilier_3b', 'vie_classique'). NULL pour les produits non-vie.
+          // Crucial pour la fiscalité (3a déductible, 3b non) et le
+          // traitement successoral.
+          pillarType: product.pillarType ?? null,
         };
       });
 
@@ -1681,6 +1692,37 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                             className="h-8 text-sm bg-white"
                                           />
                                         </div>
+                                      </div>
+                                      {/* Type de pilier — distinction fiscale + juridique majeure en CH :
+                                          · 3a (lié) : déductible fiscalement, max ~7'056 CHF/an, blocage 60 ans,
+                                            conditions strictes de retrait (immo, indépendant, expatrié).
+                                          · 3b (libre) : pas de déduction fiscale directe, retrait libre,
+                                            traitement successoral différent.
+                                          On stocke dans products_data.pillarType sur la policy — pas de
+                                          migration DB nécessaire (JSONB polymorphe). */}
+                                      <div className="mt-3">
+                                        <Label className="text-xs">Type de pilier</Label>
+                                        <Select
+                                          value={product.pillarType || ""}
+                                          onValueChange={(val) =>
+                                            updateSelectedProduct(product.id, { pillarType: val || null })
+                                          }
+                                        >
+                                          <SelectTrigger className="h-8 text-sm bg-white">
+                                            <SelectValue placeholder="Sélectionner…" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="pilier_3a">
+                                              3ᵉ pilier A (lié, fiscalement déductible)
+                                            </SelectItem>
+                                            <SelectItem value="pilier_3b">
+                                              3ᵉ pilier B (libre, pas de déduction)
+                                            </SelectItem>
+                                            <SelectItem value="vie_classique">
+                                              Vie classique (risque, mixte, rente)
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
                                       </div>
                                       {product.premium && product.durationYears && (
                                         <p className="mt-2 text-xs text-muted-foreground">
