@@ -50,6 +50,7 @@ import { DuplicateDocumentDialog } from "@/components/crm/DuplicateDocumentDialo
 import { ClientFolderTiles, ROOT_FOLDER_ID } from "@/components/crm/ClientFolderTiles";
 import { MoveDocumentToFolderDialog } from "@/components/crm/MoveDocumentToFolderDialog";
 import { FolderInput } from "lucide-react";
+import { getClientDisplayName } from "@/lib/clientName";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
 import MandatGestionForm from "@/components/crm/MandatGestionForm";
 import PendingSignaturesPanel from "@/components/signatures/PendingSignaturesPanel";
@@ -472,14 +473,11 @@ export default function ClientDetail() {
     return docKindOptions.find(o => o.value === kind)?.label || kind;
   };
 
-  const getClientName = () => {
-    if (!client) return "";
-    if (client.company_name) return client.company_name;
-    if (client.first_name || client.last_name) {
-      return `${client.first_name || ""} ${client.last_name || ""}`.trim();
-    }
-    return "Sans nom";
-  };
+  // Délégué à lib/clientName : pour une PERSONNE PHYSIQUE (is_company=false),
+  // on ignore company_name (qui est souvent l'employeur, pas l'identité du
+  // client). Sinon on tombait dans le bug SarCom où tous les courtiers
+  // indépendants s'affichaient sous le nom de leur cabinet.
+  const getClientName = () => getClientDisplayName(client, "");
 
   const getTypeLabel = () => {
     if (!client?.type_adresse) return "";

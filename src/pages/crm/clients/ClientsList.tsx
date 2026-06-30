@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
 import { usePendingScanCount } from "@/hooks/usePendingScans";
+import { getClientDisplayName } from "@/lib/clientName";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -194,10 +195,11 @@ export default function ClientsList() {
   };
 
   const getClientName = (client: any) => {
-    if (client.company_name) return client.company_name;
-    if (client.first_name || client.last_name) {
-      return `${client.first_name || ""} ${client.last_name || ""}`.trim();
-    }
+    // Délégué à lib/clientName : pour personne physique (is_company≠true),
+    // on n'affiche PAS company_name (souvent rempli avec l'employeur).
+    const display = getClientDisplayName(client, "");
+    if (display) return display;
+    // Fallback profile (legacy) si le client a un profile auth lié
     return client.profile?.first_name && client.profile?.last_name
       ? `${client.profile.first_name} ${client.profile.last_name}`
       : t('common.noName');
