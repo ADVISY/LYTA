@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { usePolicies } from "@/hooks/usePolicies";
 import { usePermissions } from "@/hooks/usePermissions";
+import { detectLifePillarFromName } from "@/lib/lifePillar";
 import { InsuranceCompanyLogo } from "@/components/crm/InsuranceCompanyLogo";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -240,6 +241,7 @@ export default function CRMContracts() {
                 const status = statusConfig[policy.status] || statusConfig.pending;
                 const isExpanded = expandedPolicyId === policy.id;
                 const productsDataList = Array.isArray((policy as any).products_data) ? (policy as any).products_data : [];
+                // (Import detectLifePillarFromName ajouté en haut du fichier pour les badges 3A/3B)
 
                 return (
                   <div
@@ -359,13 +361,17 @@ export default function CRMContracts() {
                           <div className="space-y-1.5">
                             {productsDataList.map((prod: any, idx: number) => {
                               const isLppProd = prod?.avoirTotal != null || /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(prod?.name || '');
-                              // Badge pilier 3A / 3B / Vie classique pour les produits de la branche Vie/Prévoyance
+                              // Badge pilier 3A / 3B / Vie classique. Priorité :
+                              //   1. pillarType stocké explicitement (saisi via selector)
+                              //   2. Détection auto sur le nom (fallback pour les anciens contrats)
+                              const pillarType: string | null =
+                                (prod?.pillarType as string | null) || detectLifePillarFromName(prod?.name) || null;
                               const pillarLabel: Record<string, string> = {
                                 pilier_3a: '3ᵉ pilier A',
                                 pilier_3b: '3ᵉ pilier B',
                                 vie_classique: 'Vie classique',
                               };
-                              const pillar = prod?.pillarType && pillarLabel[prod.pillarType];
+                              const pillar = pillarType && pillarLabel[pillarType];
                               return (
                                 <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/30 rounded text-xs">
                                   <div className="flex-1 min-w-0 truncate">

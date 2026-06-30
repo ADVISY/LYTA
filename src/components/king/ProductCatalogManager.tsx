@@ -13,6 +13,7 @@ import { useProductCatalog, ProductMainCategory, InsuranceProductExtended, BRANC
 import { useInsuranceCompanies } from "@/hooks/useInsuranceCompanies";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { useUserRole } from "@/hooks/useUserRole";
+import { detectLifePillarFromName, LIFE_PILLAR_BADGES, lifePillarBadgeClasses } from "@/lib/lifePillar";
 import {
   Package,
   Plus,
@@ -357,7 +358,26 @@ export default function ProductCatalogManager() {
                     <TableRow key={product.id} className={isPending ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{product.name}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium">{product.name}</p>
+                            {/* Badge auto pilier 3A/3B/Vie classique détecté depuis le nom.
+                                Cf. lib/lifePillar.ts — regex sur tokens "3a", "3b", "vie",
+                                "rente", etc. Couvre les nomenclatures usuelles des compagnies CH. */}
+                            {(() => {
+                              const pillar = detectLifePillarFromName(product.name);
+                              if (!pillar) return null;
+                              const info = LIFE_PILLAR_BADGES[pillar];
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] ${lifePillarBadgeClasses(pillar)}`}
+                                  title={info.description}
+                                >
+                                  {info.label}
+                                </Badge>
+                              );
+                            })()}
+                          </div>
                           {product.description && (
                             <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                               {product.description}

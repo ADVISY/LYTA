@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useCelebration } from "@/hooks/useCelebration";
+import { detectLifePillarFromName } from "@/lib/lifePillar";
 import {
   Dialog,
   DialogContent,
@@ -834,7 +835,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // Remove product
         return currentList.filter((_, index) => index !== existingIndex);
       } else {
-        // Add product
+        // Add product. Pré-remplit pillarType si le nom contient "3a"/"3b"/"vie"
+        // (cf. lib/lifePillar.ts) → le courtier voit déjà le bon type au lieu
+        // de devoir le saisir. Il peut overrider via le selector si besoin.
+        const autoPillar = detectLifePillarFromName(productName);
         const newProduct: SelectedProduct = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           productId: productId,
@@ -843,6 +847,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
           premium: "",
           deductible: "",
           durationYears: "",
+          pillarType: autoPillar,
         };
         return [...currentList, newProduct];
       }
