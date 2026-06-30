@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useCelebration } from "@/hooks/useCelebration";
-import { detectLifePillarFromName } from "@/lib/lifePillar";
+import { resolveLifePillarFromProduct } from "@/lib/lifePillar";
 import {
   Dialog,
   DialogContent,
@@ -835,10 +835,12 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // Remove product
         return currentList.filter((_, index) => index !== existingIndex);
       } else {
-        // Add product. Pré-remplit pillarType si le nom contient "3a"/"3b"/"vie"
-        // (cf. lib/lifePillar.ts) → le courtier voit déjà le bon type au lieu
-        // de devoir le saisir. Il peut overrider via le selector si besoin.
-        const autoPillar = detectLifePillarFromName(productName);
+        // Add product. Pré-remplit pillarType selon la chaîne :
+        //   1. product.life_pillar taggé par admin/king dans le catalogue
+        //   2. détection auto regex sur le nom (fallback)
+        // → le courtier voit déjà le bon type au lieu de devoir le saisir.
+        // Il peut overrider via le selector si besoin (différent du défaut produit).
+        const autoPillar = resolveLifePillarFromProduct(product as any);
         const newProduct: SelectedProduct = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           productId: productId,

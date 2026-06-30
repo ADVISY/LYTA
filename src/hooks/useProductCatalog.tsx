@@ -51,6 +51,10 @@ export interface InsuranceProductExtended {
   status: string;          // 'active' | 'pending'
   tenant_id: string | null; // NULL = système / verrouillé pour les tenants
   created_at: string;
+  /** Type de pilier (3a/3b/vie_classique). NULL = non taggé, fallback détection
+   *  auto sur le nom. Pertinent pour les produits VIE. Cf. migration
+   *  20260626180000_insurance_products_life_pillar. */
+  life_pillar: 'pilier_3a' | 'pilier_3b' | 'vie_classique' | null;
   company?: {
     id: string;
     name: string;

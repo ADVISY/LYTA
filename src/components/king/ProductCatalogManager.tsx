@@ -13,7 +13,7 @@ import { useProductCatalog, ProductMainCategory, InsuranceProductExtended, BRANC
 import { useInsuranceCompanies } from "@/hooks/useInsuranceCompanies";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { useUserRole } from "@/hooks/useUserRole";
-import { detectLifePillarFromName, LIFE_PILLAR_BADGES, lifePillarBadgeClasses } from "@/lib/lifePillar";
+import { resolveLifePillarFromProduct, LIFE_PILLAR_BADGES, lifePillarBadgeClasses } from "@/lib/lifePillar";
 import {
   Package,
   Plus,
@@ -59,6 +59,9 @@ interface ProductFormData {
   subcategory: string;
   description: string;
   branch_code: BranchCode | '';
+  /** Type de pilier (3a/3b/vie_classique). Pertinent uniquement pour les
+   *  produits de la branche VIE. '' = non taggé → fallback détection auto sur le nom. */
+  life_pillar: 'pilier_3a' | 'pilier_3b' | 'vie_classique' | '';
   aliases: string[];
 }
 
@@ -70,6 +73,7 @@ const emptyForm: ProductFormData = {
   subcategory: '',
   description: '',
   branch_code: '',
+  life_pillar: '',
   aliases: [],
 };
 
@@ -141,6 +145,7 @@ export default function ProductCatalogManager() {
       subcategory: product.subcategory || '',
       description: product.description || '',
       branch_code: product.branch_code ?? '',
+      life_pillar: ((product as any).life_pillar ?? '') as ProductFormData['life_pillar'],
       aliases: [],
     });
     setDialogOpen(true);
@@ -151,6 +156,10 @@ export default function ProductCatalogManager() {
 
     setIsSubmitting(true);
     try {
+      // Cast `any` ponctuel : life_pillar n'est pas encore dans le type généré
+      // de useProductCatalog (sera ajouté au prochain refresh des types Supabase).
+      // La colonne existe en DB (migration 20260626180000) + CHECK constraint
+      // valide la valeur côté serveur.
       if (editingProduct) {
         await updateProduct(editingProduct.id, {
           name: formData.name,
@@ -160,7 +169,8 @@ export default function ProductCatalogManager() {
           subcategory: formData.subcategory || undefined,
           description: formData.description || undefined,
           branch_code: formData.branch_code || null,
-        });
+          life_pillar: formData.life_pillar || null,
+        } as any);
       } else {
         await createProduct({
           name: formData.name,
@@ -170,8 +180,9 @@ export default function ProductCatalogManager() {
           subcategory: formData.subcategory || undefined,
           description: formData.description || undefined,
           branch_code: formData.branch_code || null,
+          life_pillar: formData.life_pillar || null,
           aliases: formData.aliases,
-        });
+        } as any);
       }
       setDialogOpen(false);
     } finally {
@@ -360,18 +371,19 @@ export default function ProductCatalogManager() {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium">{product.name}</p>
-                            {/* Badge auto pilier 3A/3B/Vie classique détecté depuis le nom.
-                                Cf. lib/lifePillar.ts — regex sur tokens "3a", "3b", "vie",
-                                "rente", etc. Couvre les nomenclatures usuelles des compagnies CH. */}
+                            {/* Badge pilier 3A/3B/Vie classique.
+                                Priorité : (1) life_pillar taggé manuellement par admin/king
+                                dans le catalogue > (2) détection auto regex sur le nom. */}
                             {(() => {
-                              const pillar = detectLifePillarFromName(product.name);
+                              const pillar = resolveLifePillarFromProduct(product as any);
                               if (!pillar) return null;
                               const info = LIFE_PILLAR_BADGES[pillar];
+                              const isManual = (product as any).life_pillar === pillar;
                               return (
                                 <Badge
                                   variant="outline"
                                   className={`text-[10px] ${lifePillarBadgeClasses(pillar)}`}
-                                  title={info.description}
+                                  title={`${info.description}${isManual ? ' (taggé manuellement)' : ' (détection auto)'}`}
                                 >
                                   {info.label}
                                 </Badge>
@@ -607,6 +619,41 @@ export default function ProductCatalogManager() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Selector Pilier (3A/3B/Vie classique) — visible UNIQUEMENT pour
+                les produits de la branche VIE. Permet à l'admin/king de tagger
+                un produit dont le nom commercial ne contient pas "3a"/"3b"
+                (ex: "Swiss Life Dynamic Elements"). Le tag s'applique par
+                défaut à TOUS les contrats créés avec ce produit, et le courtier
+                peut overrider sur un contrat précis via le selector du
+                ContractForm (qui stocke dans products_data.pillarType). */}
+            {formData.main_category === 'VIE' && (
+              <div className="space-y-2">
+                <Label>Type de pilier (par défaut)</Label>
+                <Select
+                  value={formData.life_pillar || 'none'}
+                  onValueChange={(v) => setFormData(f => ({
+                    ...f,
+                    life_pillar: v === 'none' ? '' : (v as ProductFormData['life_pillar']),
+                  }))}
+                  disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Auto-détecté depuis le nom" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Auto-détecté depuis le nom</SelectItem>
+                    <SelectItem value="pilier_3a">3ᵉ pilier A (lié, déductible)</SelectItem>
+                    <SelectItem value="pilier_3b">3ᵉ pilier B (libre)</SelectItem>
+                    <SelectItem value="vie_classique">Vie classique (risque, mixte, rente)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Si tu laisses sur "auto-détecté", on devine depuis le nom du produit.
+                  Tagger explicitement utile pour les noms commerciaux (ex: "Swiss Life Dynamic Elements").
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Catégorie legacy</Label>

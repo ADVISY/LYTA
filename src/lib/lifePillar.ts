@@ -15,6 +15,30 @@
 export type LifePillarType = "pilier_3a" | "pilier_3b" | "vie_classique" | null;
 
 /**
+ * Résout le type de pilier d'un produit avec la chaîne de priorité :
+ *   1. `product.life_pillar` taggé explicitement dans le catalogue (admin/king)
+ *   2. Détection auto regex sur le nom (cf. detectLifePillarFromName)
+ *
+ * Utilisé par ProductCatalogManager, ContractForm, CRMContracts, ClientDetail
+ * pour cohérence partout. Le type stocké sur le CONTRAT
+ * (products_data.pillarType) reste prioritaire mais c'est géré au call site
+ * — ce helper ne s'occupe que du PRODUIT.
+ */
+export function resolveLifePillarFromProduct(product: {
+  life_pillar?: LifePillarType | string | null;
+  name?: string | null;
+} | null | undefined): LifePillarType {
+  if (!product) return null;
+  // 1. Tag manuel admin/king en priorité
+  const tagged = product.life_pillar;
+  if (tagged === "pilier_3a" || tagged === "pilier_3b" || tagged === "vie_classique") {
+    return tagged;
+  }
+  // 2. Fallback : regex sur le nom
+  return detectLifePillarFromName(product.name);
+}
+
+/**
  * Détecte le type de pilier à partir du nom d'un produit.
  *
  * Règles :
