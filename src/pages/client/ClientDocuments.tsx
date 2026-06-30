@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { DocumentPreviewDialog, type DocumentPreviewDoc } from "@/components/crm/DocumentPreviewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invokeSupabaseFunction } from "@/lib/edgeFunctions";
@@ -66,6 +67,8 @@ export default function ClientDocuments() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  // Preview inline (modal PDF/image) — remplace window.open du vieux handleView
+  const [previewDoc, setPreviewDoc] = useState<DocumentPreviewDoc | null>(null);
 
   // ─── Upload dialog state ─────────────────────────────────────────────
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -258,23 +261,17 @@ export default function ClientDocuments() {
     }
   };
 
-  const handleView = async (doc: any) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(doc.file_key, 3600);
-      
-      if (error) throw error;
-      
-      window.open(data.signedUrl, '_blank');
-    } catch (error) {
-      console.error('View error:', error);
-      toast({
-        title: t('common.error'),
-        description: t('clientDocuments.viewError'),
-        variant: "destructive"
-      });
-    }
+  // Preview inline (modal) au lieu d'ouvrir un nouvel onglet.
+  // L'ancien handleView faisait window.open(signedUrl) → l'user perdait
+  // le contexte de l'espace client et certains navigateurs bloquaient
+  // le popup. Maintenant on stocke le doc cible et on rend le dialog.
+  const handleView = (doc: any) => {
+    setPreviewDoc({
+      id: doc.id,
+      file_key: doc.file_key,
+      file_name: doc.file_name,
+      mime_type: doc.mime_type ?? null,
+    });
   };
 
   const formatFileSize = (bytes: number | null) => {
@@ -533,6 +530,14 @@ export default function ClientDocuments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Preview inline : modal PDF (iframe) / image (img) — remplace
+          window.open(signedUrl) qui faisait perdre le contexte espace client. */}
+      <DocumentPreviewDialog
+        open={!!previewDoc}
+        onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}
+        doc={previewDoc}
+      />
     </div>
   );
 }

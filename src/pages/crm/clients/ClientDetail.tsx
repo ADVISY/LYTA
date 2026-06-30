@@ -1396,9 +1396,22 @@ export default function ClientDetail() {
                           {filtered.map((doc) => (
                             <TableRow key={doc.id}>
                               <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-primary" />
-                                  {doc.file_name}
+                                {/* Double-clic sur le nom = renommer rapide (raccourci UX
+                                    Habib juin 2026). Simple-clic n'a pas d'effet pour
+                                    rester compatible avec sélection text classique. */}
+                                <div
+                                  className="flex items-center gap-2 cursor-text select-text"
+                                  onDoubleClick={(e) => {
+                                    e.preventDefault();
+                                    setRenameDocId(doc.id);
+                                    setRenameDocName(doc.file_name);
+                                  }}
+                                  title="Double-cliquez pour renommer"
+                                >
+                                  <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                  <span className="hover:underline decoration-dotted underline-offset-2">
+                                    {doc.file_name}
+                                  </span>
                                 </div>
                               </TableCell>
                               <TableCell>

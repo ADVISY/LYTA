@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
+import { DocumentPreviewDialog, type DocumentPreviewDoc } from "@/components/crm/DocumentPreviewDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,9 @@ export default function ClientContracts() {
   const [policyDocuments, setPolicyDocuments] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Preview inline (modal) — remplace window.open(signedUrl) qui sortait
+  // l'utilisateur de l'espace client.
+  const [previewDoc, setPreviewDoc] = useState<DocumentPreviewDoc | null>(null);
   
   const categoryLabels = getCategoryLabels(t);
   const statusConfig = getStatusConfig(t);
@@ -130,23 +134,16 @@ export default function ClientContracts() {
     }
   };
 
-  const handleViewDocument = async (doc: any) => {
-    const fileKey = doc?.file_key;
-    if (!fileKey) return;
-
-    try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(fileKey, 3600);
-
-      if (error) throw error;
-
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('View document error:', error);
-    }
+  // Preview inline (modal PDF/image) — remplace window.open(signedUrl) qui
+  // faisait perdre le contexte espace client.
+  const handleViewDocument = (doc: any) => {
+    if (!doc?.file_key) return;
+    setPreviewDoc({
+      id: doc.id ?? doc.file_key,
+      file_key: doc.file_key,
+      file_name: doc.file_name ?? "document.pdf",
+      mime_type: doc.mime_type ?? null,
+    });
   };
 
   const handleDownloadDocument = async (doc: any) => {
@@ -431,6 +428,12 @@ export default function ClientContracts() {
           })}
         </div>
       )}
+
+      <DocumentPreviewDialog
+        open={!!previewDoc}
+        onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}
+        doc={previewDoc}
+      />
     </div>
   );
 }
