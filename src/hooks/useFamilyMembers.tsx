@@ -222,9 +222,22 @@ export function useFamilyMembers(clientId?: string) {
         }
       }
 
-      const allMembers = [...mappedDirectMembers, ...reverseMembers].filter((member, index, array) => {
-        return array.findIndex((candidate) => candidate.id === member.id) === index;
-      });
+      // Dédup en 2 passes :
+      //   1. Par `id` (cas trivial, ceinture)
+      //   2. Par `linked_client_id` (rescue : avant juin 2026, FamilyMemberForm
+      //      insérait DEUX rows (direct + reverse) pour chaque nouveau membre,
+      //      → sur la fiche parent on voyait l'enfant 2x. Le fix Form évite
+      //      ça pour les NOUVEAUX, mais on a des dupes en base sur les
+      //      tenants existants. Cette 2e passe les cache (on ne supprime pas
+      //      la donnée — juste l'affichage). On garde la PREMIÈRE occurrence
+      //      qui sera le row direct (= ordre des push : mappedDirectMembers
+      //      d'abord, puis reverseMembers).
+      const allMembers = [...mappedDirectMembers, ...reverseMembers]
+        .filter((member, index, array) => array.findIndex((c) => c.id === member.id) === index)
+        .filter((member, index, array) => {
+          if (!member.linked_client_id) return true; // pas de linked → pas de risque dup
+          return array.findIndex((c) => c.linked_client_id === member.linked_client_id) === index;
+        });
       setFamilyMembers(allMembers);
     } catch (error: unknown) {
       console.error('Error fetching family members:', error);

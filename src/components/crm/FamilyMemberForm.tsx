@@ -167,6 +167,15 @@ export default function FamilyMemberForm({
         },
       });
 
+      // On insère UNE SEULE row family_members (direction parent → enfant).
+      // La bidirectionnalité (= voir le parent depuis la fiche de l'enfant)
+      // est reconstruite par `useFamilyMembers.fetchFamilyMembers` via sa
+      // query `reverseRows` (WHERE linked_client_id = targetId).
+      //
+      // Avant juin 2026 on insérait aussi la row reverse explicitement →
+      // résultat : sur la fiche parent, l'enfant apparaissait 2 fois
+      // (une fois en "direct" via R1, une fois en "reverse" via R2).
+      // Cf. https://lyta.ch tickets — Habib a reporté le doublon.
       const { error: familyError } = await createFamilyMember({
         client_id: clientId,
         linked_client_id: newClient.id,
@@ -175,47 +184,6 @@ export default function FamilyMemberForm({
 
       if (familyError) {
         console.error('Error creating family member:', familyError);
-      }
-
-      const reverseRelationType =
-        data.relation_type === 'conjoint'
-          ? 'conjoint'
-          : data.relation_type === 'enfant'
-          ? 'parent'
-          : data.relation_type === 'parent'
-          ? 'enfant'
-          : 'autre';
-
-      const { data: reverseRelation, error: reverseError } = await supabase
-        .from('family_members')
-        .insert([{
-          client_id: newClient.id,
-          linked_client_id: clientId,
-          first_name: parentClient?.first_name || '',
-          last_name: parentClient?.last_name || '',
-          birth_date: parentClient?.birthdate || null,
-          relation_type: reverseRelationType,
-          permit_type: parentClient?.permit_type || null,
-          nationality: parentClient?.nationality || null,
-        }])
-        .select('id')
-        .single();
-
-      if (reverseError) {
-        console.error('Error creating reverse family member:', reverseError);
-      } else {
-        await recordAuditLog({
-          action: "create",
-          entity: "family_member",
-          entityId: reverseRelation.id,
-          tenantId: parentClient?.tenant_id || tenantId || null,
-          metadata: {
-            source: "family_member_form",
-            client_id: newClient.id,
-            linked_client_id: clientId,
-            relation_type: reverseRelationType,
-          },
-        });
       }
 
       toast({
