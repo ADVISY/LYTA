@@ -314,6 +314,10 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
 
   const from = (page - 1) * CLIENTS_PAGE_SIZE;
   const to = from + CLIENTS_PAGE_SIZE - 1;
+  // Le scope est résolu côté DB par la RPC list_clients_for_tenant — pas
+  // besoin de l'inclure dans la queryKey (sinon on invalide le cache
+  // inutilement quand le scope query revient). myScope/myCollabId restent
+  // exposés via le hook pour les composants qui en dépendent (pipeline, etc).
   const baseQueryKey = useMemo(
     () => [
       "clients",
@@ -326,10 +330,8 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       postalCodeFilter,
       isCompanyFilter,
       assignedAgentFilter,
-      myScope ?? "",
-      myCollabId ?? "",
     ],
-    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter, myScope, myCollabId]
+    [tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]
   );
 
   const fetchClientsPage = useCallback(async () => {
@@ -337,99 +339,58 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
       return { rows: [] as Client[], count: 0 };
     }
 
-    // SELECT data + recherche côté serveur (sans la recherche serveur, la
-    // barre de recherche front ne filtrait que la page courante de 50 = JCG
-    // perdait ses 928 contacts dès la page 2).
-    let query = supabase
-      .from("clients")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false });
+    // ────────────────────────────────────────────────────────────────────
+    // PERF JCG 5000+ contacts : on appelle la RPC SECURITY DEFINER
+    // `list_clients_for_tenant` qui :
+    //   - bypass la RLS clients (3 EXISTS croisés évités par ligne)
+    //   - résout le scope (global/team/personal) en interne
+    //   - retourne { rows, count } en 1 seul round-trip
+    // Avant : 2 calls parallèles (SELECT + count RPC) + RLS row-by-row.
+    // Note : on continue à laisser le hook scope+collabId côté front pour
+    // d'autres composants qui en dépendent (pipeline, dashboard) — mais
+    // on n'a PLUS besoin de les passer ici, la RPC s'en occupe.
+    // ────────────────────────────────────────────────────────────────────
+    const rpcCall = supabase.rpc("list_clients_for_tenant", {
+      p_tenant_id: tenantId,
+      p_type_adresse: typeFilter ?? null,
+      p_search: trimmedSearch || null,
+      p_city: cityFilter || null,
+      p_canton: cantonFilter || null,
+      p_status: statusFilter || null,
+      p_postal_code: postalCodeFilter || null,
+      p_is_company: isCompanyFilter,
+      p_assigned_agent: assignedAgentFilter,
+      p_limit: CLIENTS_PAGE_SIZE,
+      p_offset: from,
+    });
 
-    if (typeFilter) {
-      query = query.eq("type_adresse", typeFilter);
-    }
-    if (statusFilter) {
-      query = query.eq("status", statusFilter);
-    }
-    if (cantonFilter) {
-      query = query.ilike("canton", cantonFilter);
-    }
-    if (cityFilter) {
-      query = query.ilike("city", `%${cityFilter}%`);
-    }
-    if (postalCodeFilter) {
-      query = query.ilike("postal_code", `${postalCodeFilter}%`);
-    }
-    if (isCompanyFilter === true) {
-      // Filtre Pro : uniquement les fiches B2B (raison sociale)
-      query = query.eq("is_company", true);
-    } else if (isCompanyFilter === false) {
-      // Filtre Privé : on inclut aussi les fiches legacy où is_company est NULL
-      // (avant l'ajout de la colonne, toutes les fiches étaient des particuliers).
-      query = query.or("is_company.eq.false,is_company.is.null");
-    }
-    if (assignedAgentFilter === "unassigned") {
-      query = query.is("assigned_agent_id", null);
-    } else if (assignedAgentFilter) {
-      query = query.eq("assigned_agent_id", assignedAgentFilter);
+    const result = await withTimeout(
+      rpcCall,
+      CLIENTS_QUERY_TIMEOUT_MS,
+      "Le chargement des adresses a expiré."
+    );
+
+    if (result.error) {
+      throw result.error;
     }
 
-    // ─── Filter scope-aware (Agent/Manager) ─────────────────────────
-    // Si le user est Agent (personal) ou Manager (team), on filtre côté
-    // query pour ne charger QUE ses fiches accessibles. Postgres utilise
-    // idx_clients_assigned_agent + pk → instantané, et la policy RLS
-    // (scopée) valide en plus chaque row pour défense en profondeur.
-    // Pour Manager (team), on simplifie en personal — la team subordinate
-    // logic est gardée par la RLS qui filtrera les rows en plus.
-    if (myCollabId && (myScope === "personal" || myScope === "team")) {
-      query = query.or(`assigned_agent_id.eq.${myCollabId},id.eq.${myCollabId}`);
-    }
+    const payload = (result.data ?? { rows: [], count: 0 }) as
+      | { rows: Client[]; count: number }
+      | null;
 
-    if (trimmedSearch) {
-      // Échappe les caractères PostgREST spéciaux (% , ()) dans la valeur user
-      const safe = trimmedSearch.replace(/[%,()]/g, " ");
-      const pattern = `%${safe}%`;
-      query = query.or(
-        `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern},company_name.ilike.${pattern},phone.ilike.${pattern}`
-      );
-    }
+    const baseRows = (payload?.rows ?? []) as Client[];
+    const totalCount = typeof payload?.count === "number" ? payload.count : 0;
 
-    const [dataResult, countResult] = await Promise.all([
-      withTimeout(
-        query.range(from, to),
-        CLIENTS_QUERY_TIMEOUT_MS,
-        "Le chargement des adresses a expiré."
-      ),
-      supabase.rpc("count_clients_for_tenant", {
-        p_tenant_id: tenantId,
-        p_type_adresse: typeFilter ?? null,
-        p_search: trimmedSearch || null,
-        p_city: cityFilter || null,
-        p_canton: cantonFilter || null,
-        p_status: statusFilter || null,
-        p_postal_code: postalCodeFilter || null,
-        p_is_company: isCompanyFilter,
-        p_assigned_agent: assignedAgentFilter,
-      }),
-    ]);
-
-    if (dataResult.error) {
-      throw dataResult.error;
-    }
-
-    const rows = await withAssignedAgents((dataResult.data ?? []) as Client[], tenantId);
-
-    // Si la RPC count échoue (très rare), on tombe sur rows.length comme fallback
-    const totalCount = (typeof countResult?.data === "number")
-      ? countResult.data
-      : (rows.length === CLIENTS_PAGE_SIZE ? from + rows.length + 1 : from + rows.length);
+    // withAssignedAgents fait 2 queries en parallèle pour résoudre
+    // assigned_agent_id → nom affichable. Sur 50 lignes c'est ~150ms,
+    // négligeable vs le gain RPC.
+    const rows = await withAssignedAgents(baseRows, tenantId);
 
     return {
       rows,
       count: totalCount,
     };
-  }, [from, tenantId, to, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter, myScope, myCollabId]);
+  }, [from, tenantId, typeFilter, trimmedSearch, cityFilter, cantonFilter, statusFilter, postalCodeFilter, isCompanyFilter, assignedAgentFilter]);
 
   const {
     data,
@@ -440,14 +401,10 @@ export function useClients(typeFilter?: string, searchTerm?: string, filters?: C
   } = useQuery({
     queryKey: [...baseQueryKey, page, CLIENTS_PAGE_SIZE],
     queryFn: fetchClientsPage,
-    // Crucial : on attend que myScope soit résolu (= les rôles tenant sont
-    // chargés). Sans ça, un Agent lance une query non-scopée qui timeout
-    // sur la policy RLS scopée (28 sec). myScope === 'global' = pas de filter
-    // côté front nécessaire (l'user voit tout) → on peut activer dès qu'on
-    // sait qu'il est global. myScope === 'personal' || 'team' nécessite
-    // aussi le collabId pour appliquer le filter.
-    enabled: !tenantLoading && !!tenantId && !!user
-            && (myScope === "global" || (myScope !== null && !!myCollabId)),
+    // La RPC list_clients_for_tenant résout le scope en interne — on n'a
+    // plus besoin d'attendre myScope/myCollabId côté front. Plus de
+    // dépendance bloquante → la query démarre dès que tenant+user sont là.
+    enabled: !tenantLoading && !!tenantId && !!user,
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
     retry: 1,
