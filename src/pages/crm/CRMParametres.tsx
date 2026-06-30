@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { checkPasswordPolicy } from "@/lib/passwordPolicy";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -612,8 +613,10 @@ export default function CRMParametres() {
       toast.error(t('settings.passwordMismatch'));
       return;
     }
-    if (passwords.new.length < 8) {
-      toast.error(t('settings.passwordTooShort'));
+    // Policy unifiée LYTA (lib/passwordPolicy). Avant : juste min 8.
+    const policyCheck = checkPasswordPolicy(passwords.new);
+    if (!policyCheck.ok) {
+      toast.error(policyCheck.errors.join(" · "));
       return;
     }
 

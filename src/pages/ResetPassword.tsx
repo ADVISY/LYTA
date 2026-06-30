@@ -8,6 +8,7 @@ import lytaLogo from "@/assets/lyta-logo-full.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseConfig } from "@/integrations/supabase/config";
 import { Loader2 } from "lucide-react";
+import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
 import { BrandLogo } from "@/components/BrandLogo";
 import { clearSessionEnforcerState } from "@/lib/sessionEnforcerStorage";
 import type { Session } from "@supabase/supabase-js";
@@ -403,10 +404,12 @@ const ResetPassword = () => {
       return;
     }
 
-    if (password.length < 6) {
+    // Policy unifiée LYTA (min 12 + classes + blocklist). Avant : min 6 seul.
+    const policyCheck = checkPasswordPolicy(password);
+    if (!policyCheck.ok) {
       toast({
-        title: "Erreur",
-        description: "Le mot de passe doit contenir au moins 6 caractères.",
+        title: "Mot de passe trop faible",
+        description: policyCheck.errors.join(" · "),
         variant: "destructive",
       });
       return;
@@ -571,6 +574,10 @@ const ResetPassword = () => {
                 placeholder="********"
                 autoComplete="new-password"
               />
+              <p className="text-xs text-muted-foreground">
+                Minimum {PASSWORD_MIN_LENGTH} caractères avec majuscule,
+                minuscule, chiffre et caractère spécial.
+              </p>
             </div>
 
             <div className="space-y-2">

@@ -98,7 +98,9 @@ const initialFormData: TenantFormData = {
   email_sender_name: "",
   enable_2fa_login: false,
   enable_2fa_contract: false,
-  password_min_length: 8,
+  // Policy LYTA unifiée : 12 caractères minimum, toutes classes requises.
+  // Avant : défaut 8 sans regex. Voir src/lib/passwordPolicy.ts.
+  password_min_length: 12,
   password_require_uppercase: true,
   password_require_number: true,
   password_require_special: true,
@@ -889,10 +891,13 @@ export default function KingWizard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="6">6 caractères</SelectItem>
-                        <SelectItem value="8">8 caractères</SelectItem>
-                        <SelectItem value="10">10 caractères</SelectItem>
-                        <SelectItem value="12">12 caractères</SelectItem>
+                        {/* Policy LYTA min absolu = 12 (lib/passwordPolicy).
+                            Options 6/8/10 retirées pour ne plus pouvoir
+                            descendre sous le seuil. */}
+                        <SelectItem value="12">12 caractères (minimum LYTA)</SelectItem>
+                        <SelectItem value="14">14 caractères</SelectItem>
+                        <SelectItem value="16">16 caractères</SelectItem>
+                        <SelectItem value="20">20 caractères</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
