@@ -250,6 +250,10 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  // N° de police émis par la compagnie (référence contrat officielle).
+  // Souvent renseigné A POSTERIORI (la compagnie envoie sa confirmation
+  // avec le n° dans les jours suivant la signature). Champ optionnel.
+  const [policyNumber, setPolicyNumber] = useState("");
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
   const [documents, setDocuments] = useState<UploadedDoc[]>([]);
@@ -453,6 +457,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     if (existingPolicy) {
       setStartDate(existingPolicy.start_date || new Date().toISOString().split('T')[0]);
       setStatus(existingPolicy.status || 'active');
+      setPolicyNumber(existingPolicy.policy_number ?? "");
       setNotes(existingPolicy.notes || '');
 
       // Set company from product
@@ -1105,7 +1110,9 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const policyData = {
         client_id: clientId,
         product_id: mainProductId,
-        policy_number: null,
+        // N° police saisi par le courtier (souvent renseigné après réception
+        // de la confirmation par la compagnie). Trim + null si vide.
+        policy_number: policyNumber.trim() || null,
         start_date: startDate,
         end_date: endDate,
         premium_monthly: totalMonthly,
@@ -1344,6 +1351,22 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
+                />
+              </div>
+
+              {/* N° de police : référence contrat émise par la compagnie.
+                  Optionnel à la création car souvent renseigné a posteriori
+                  (délai d'envoi de la confirmation par la compagnie). */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  N° de police
+                </Label>
+                <Input
+                  type="text"
+                  value={policyNumber}
+                  onChange={(e) => setPolicyNumber(e.target.value)}
+                  placeholder="Ex. 12.345.678"
+                  autoComplete="off"
                 />
               </div>
 
