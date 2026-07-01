@@ -6,6 +6,7 @@ import { usePolicies } from "@/hooks/usePolicies";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useCelebration } from "@/hooks/useCelebration";
 import { resolveLifePillarFromProduct } from "@/lib/lifePillar";
+import { isLppProductName } from "@/lib/librePassageDetect";
 import {
   Dialog,
   DialogContent,
@@ -913,7 +914,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     // "Compte de libre passage", "LPP", "2e pilier", "Prévoyance professionnelle".
     const isLppRow = (p: SelectedProduct): boolean => {
       if (p.branchCode === 'LPP') return true;
-      return !!(p.name && /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(p.name));
+      return isLppProductName(p.name);
     };
 
     const bucketOf = (p: SelectedProduct): 'health' | 'life' | 'other' => {
@@ -1046,7 +1047,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // montant d'avoirs en plus du reste (la prime mensuelle est laissée
         // à 0 par défaut puisqu'il n'y a pas de versement récurrent).
         const isLpp = product.branchCode === 'LPP'
-          || /libre[\s_-]?passage|lpp|2e?\s*pilier|prévoyance prof/i.test(product.name || '');
+          || isLppProductName(product.name);
         const avoirTotal = isLpp && product.avoirTotal ? parseFloat(product.avoirTotal) : null;
 
         return {
@@ -1244,7 +1245,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
     const isLppProduct = (p: any): boolean => {
       const branchCode = p.tenant_branch?.code || p.tenant_branch?.[0]?.code;
       if (branchCode === 'LPP') return true;
-      return !!(p.name && /libre[\s_-]?passage|\bLPP\b|2e?\s*pilier|prévoyance prof/i.test(p.name));
+      return isLppProductName(p.name);
     };
 
     const grouped: Record<string, Product[]> = {};
@@ -1825,7 +1826,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                                   // → pas de prime mensuelle mais montant d'avoirs (capital sur lequel
                                   // la commission Partenaires sera calculée, typiquement 3%).
                                   const isLpp = product.branchCode === 'LPP'
-                                    || /libre[\s_-]?passage|lpp|2e?\s*pilier|prévoyance prof/i.test(product.name || '');
+                                    || isLppProductName(product.name);
                                   return (
                                     <div key={product.id} className="p-3 bg-white rounded-lg border">
                                       <div className="flex items-center justify-between mb-2">

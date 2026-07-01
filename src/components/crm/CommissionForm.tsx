@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
+import { getClientDisplayName } from "@/lib/clientName";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -252,10 +253,11 @@ export default function CommissionForm({ open, onOpenChange, onSuccess, prefill 
     ? policies.filter(p => p.client_id === selectedClient.id)
     : [];
 
-  const getClientName = (client: Client) => {
-    if (client.company_name) return client.company_name;
-    return `${client.first_name || ''} ${client.last_name || ''}`.trim() || t('common.noName');
-  };
+  // Délégué au helper unifié (respecte is_company). Avant : company_name
+  // pris en priorité aveugle → bug SarCom (affichait l'employeur pour une
+  // personne physique).
+  const getClientName = (client: Client) =>
+    getClientDisplayName(client as any, t('common.noName'));
 
   const getAgentName = (agent: Collaborateur) => {
     return `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email || t('common.unknown');

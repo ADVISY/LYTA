@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientDisplayName } from "@/lib/clientName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -65,11 +66,11 @@ export default function CRMSuivis() {
   const suiviTypeLabels = getSuiviTypeLabels(t);
   const suiviStatusLabels = getSuiviStatusLabels(t);
 
-  const getClientName = (suivi: typeof suivis[0]) => {
-    if (!suivi.client) return "—";
-    if (suivi.client.company_name) return suivi.client.company_name;
-    return `${suivi.client.first_name || ""} ${suivi.client.last_name || ""}`.trim() || "—";
-  };
+  // Délégué au helper unifié (respecte is_company). Avant : company_name
+  // pris en priorité aveugle → bug SarCom (affichait l'employeur pour
+  // les personnes physiques).
+  const getClientName = (suivi: typeof suivis[0]) =>
+    getClientDisplayName(suivi.client as any, "—");
 
   const filteredSuivis = suivis.filter((suivi) => {
     const matchesSearch =

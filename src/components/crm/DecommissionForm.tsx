@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { getClientDisplayName } from "@/lib/clientName";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,20 +106,20 @@ export default function DecommissionForm({ open, onOpenChange, onSuccess }: Deco
     if (!searchQuery) return true;
     
     const query = searchQuery.toLowerCase();
-    const clientName = commission.policy?.client?.company_name || 
-      `${commission.policy?.client?.first_name || ''} ${commission.policy?.client?.last_name || ''}`;
+    // Utilise le helper unifié (respecte is_company) au lieu de fallback aveugle
+    // sur company_name qui affichait l'employeur pour les personnes physiques.
+    const clientName = getClientDisplayName(commission.policy?.client as any, "");
     const productName = commission.policy?.product?.name || '';
     const policyNumber = commission.policy?.policy_number || '';
-    
-    return clientName.toLowerCase().includes(query) || 
+
+    return clientName.toLowerCase().includes(query) ||
            productName.toLowerCase().includes(query) ||
            policyNumber.toLowerCase().includes(query);
   });
 
   const getClientName = (commission: Commission) => {
     if (!commission.policy?.client) return 'Client inconnu';
-    if (commission.policy.client.company_name) return commission.policy.client.company_name;
-    return `${commission.policy.client.first_name || ''} ${commission.policy.client.last_name || ''}`.trim() || 'Sans nom';
+    return getClientDisplayName(commission.policy.client as any, 'Sans nom');
   };
 
   const getAgentName = (agent: Collaborateur | undefined) => {

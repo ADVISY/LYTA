@@ -19,6 +19,7 @@
 import { useState, useRef } from "react";
 import MandatBusinessForm from "./MandatBusinessForm";
 import { useTranslation } from "react-i18next";
+import { getClientDisplayName } from "@/lib/clientName";
 import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,13 +136,17 @@ function MandatGestionFormPrivate({ client, onSaved }: MandatGestionFormProps) {
   const companyEmail = tenant?.branding?.company_email || "";
   const companyWebsite = tenant?.branding?.company_website || "";
 
-  const getClientName = () => {
-    if (client.company_name) return client.company_name;
-    return `${client.last_name || ""} ${client.first_name || ""}`.trim() || "N/A";
-  };
+  // Délégué au helper unifié (respecte is_company). Le "N/A" fallback est
+  // préservé pour la génération PDF où on veut un placeholder explicite.
+  const getClientName = () => getClientDisplayName(client as any, "N/A");
 
+  // Prénom seul — pour une société (is_company=true) on tombe sur company_name
+  // comme "prénom" par convention historique. Pour une personne physique on
+  // prend first_name.
   const getClientPrenom = () => {
-    if (client.company_name) return client.company_name;
+    if ((client as any).is_company === true && client.company_name) {
+      return client.company_name;
+    }
     return client.first_name || "N/A";
   };
 
