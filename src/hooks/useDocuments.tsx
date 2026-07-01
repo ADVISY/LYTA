@@ -19,6 +19,9 @@ export type Document = {
   created_at: string;
   // Migration 20260625160000 : dossier libre par client. NULL = "racine".
   folder_id?: string | null;
+  // Migration 20260626210000 : masquage dans l'espace client.
+  // true = visible dans le portail /espace-client, false = masqué (broker only).
+  visible_to_client?: boolean;
 };
 
 export function useDocuments() {

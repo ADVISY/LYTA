@@ -49,7 +49,7 @@ import { RenameDocumentDialog } from "@/components/crm/RenameDocumentDialog";
 import { DuplicateDocumentDialog } from "@/components/crm/DuplicateDocumentDialog";
 import { ClientFolderTiles, ROOT_FOLDER_ID } from "@/components/crm/ClientFolderTiles";
 import { MoveDocumentToFolderDialog } from "@/components/crm/MoveDocumentToFolderDialog";
-import { FolderInput } from "lucide-react";
+import { FolderInput, EyeOff, Maximize2 } from "lucide-react";
 import { getClientDisplayName } from "@/lib/clientName";
 import { detectLifePillarFromName, LIFE_PILLAR_BADGES, lifePillarBadgeClasses } from "@/lib/lifePillar";
 import ReserveAccountCard from "@/components/crm/ReserveAccountCard";
@@ -1457,6 +1457,50 @@ export default function ClientDetail() {
                                   >
                                     <FolderInput className="h-4 w-4" />
                                   </Button>
+                                  {/* Toggle visibilité dans l'espace client.
+                                      visible_to_client=false → le client ne voit
+                                      pas ce doc dans son portail (filtre RLS). */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title={
+                                      doc.visible_to_client === false
+                                        ? "Masqué du client — cliquer pour rendre visible"
+                                        : "Visible par le client — cliquer pour masquer"
+                                    }
+                                    onClick={async () => {
+                                      const next = doc.visible_to_client === false;
+                                      const { error } = await supabase
+                                        .from("documents")
+                                        .update({ visible_to_client: next })
+                                        .eq("id", doc.id);
+                                      if (error) {
+                                        toast({
+                                          title: "Erreur",
+                                          description: error.message,
+                                          variant: "destructive",
+                                        });
+                                        return;
+                                      }
+                                      toast({
+                                        title: next
+                                          ? "Document rendu visible pour le client"
+                                          : "Document masqué du client",
+                                      });
+                                      await loadDocuments();
+                                    }}
+                                    className={
+                                      doc.visible_to_client === false
+                                        ? "text-muted-foreground"
+                                        : ""
+                                    }
+                                  >
+                                    {doc.visible_to_client === false ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1468,7 +1512,7 @@ export default function ClientDetail() {
                                       mime_type: doc.mime_type,
                                     })}
                                   >
-                                    <Eye className="h-4 w-4" />
+                                    <Maximize2 className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="ghost"
