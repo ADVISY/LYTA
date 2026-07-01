@@ -254,6 +254,13 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
   // Souvent renseigné A POSTERIORI (la compagnie envoie sa confirmation
   // avec le n° dans les jours suivant la signature). Champ optionnel.
   const [policyNumber, setPolicyNumber] = useState("");
+  // Date de fin / échéance du contrat. Optionnelle.
+  //   - Auto-calculée depuis start + durée pour les contrats Vie
+  //   - Saisie manuelle pour tous les autres (auto, RC, LAMal, LCA…)
+  //   - `endDateManuallySet` indique si l'user a touché au champ →
+  //     dans ce cas on n'écrase pas avec le calcul auto Vie.
+  const [endDate, setEndDate] = useState("");
+  const [endDateManuallySet, setEndDateManuallySet] = useState(false);
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
   const [documents, setDocuments] = useState<UploadedDoc[]>([]);
@@ -458,6 +465,13 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       setStartDate(existingPolicy.start_date || new Date().toISOString().split('T')[0]);
       setStatus(existingPolicy.status || 'active');
       setPolicyNumber(existingPolicy.policy_number ?? "");
+      // Hydratation date de fin. Si valeur en base, on la charge ET on considère
+      // qu'elle a été "manuellement" fixée (pour ne pas la réécraser par le
+      // calcul auto Vie au prochain change de produit).
+      if (existingPolicy.end_date) {
+        setEndDate(existingPolicy.end_date);
+        setEndDateManuallySet(true);
+      }
       setNotes(existingPolicy.notes || '');
 
       // Set company from product
@@ -1060,15 +1074,20 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
       const totalMonthly = totals.grandTotal;
       const totalYearly = totalMonthly * 12;
       
-      // Calculate end date based on life insurance duration if applicable
-      let endDate: string | null = null;
-      const lifeProducts = selectedProducts.filter(p => p.category === 'life' && p.durationYears);
-      if (lifeProducts.length > 0) {
-        const maxDuration = Math.max(...lifeProducts.map(p => parseInt(p.durationYears) || 0));
-        if (maxDuration > 0) {
-          const start = new Date(startDate);
-          start.setFullYear(start.getFullYear() + maxDuration);
-          endDate = start.toISOString().split('T')[0];
+      // Résolution de la date de fin (priorité) :
+      //   1. Saisie MANUELLE (state endDate rempli par l'user)
+      //   2. Sinon : calcul auto depuis start + durée pour les contrats Vie
+      //   3. Sinon : null (contrat sans échéance formelle)
+      let resolvedEndDate: string | null = endDate.trim() || null;
+      if (!resolvedEndDate) {
+        const lifeProducts = selectedProducts.filter(p => p.category === 'life' && p.durationYears);
+        if (lifeProducts.length > 0) {
+          const maxDuration = Math.max(...lifeProducts.map(p => parseInt(p.durationYears) || 0));
+          if (maxDuration > 0) {
+            const start = new Date(startDate);
+            start.setFullYear(start.getFullYear() + maxDuration);
+            resolvedEndDate = start.toISOString().split('T')[0];
+          }
         }
       }
 
@@ -1114,7 +1133,7 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
         // de la confirmation par la compagnie). Trim + null si vide.
         policy_number: policyNumber.trim() || null,
         start_date: startDate,
-        end_date: endDate,
+        end_date: resolvedEndDate,
         premium_monthly: totalMonthly,
         premium_yearly: totalYearly,
         deductible: policyDeductible,
@@ -1351,6 +1370,23 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
+                />
+              </div>
+
+              {/* Date de fin / échéance. Optionnelle. Si vide, calcul auto
+                  depuis start + durée pour les contrats Vie. Sinon, saisie
+                  manuelle prime toujours (état endDateManuallySet). */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  Date de fin / échéance
+                </Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setEndDateManuallySet(!!e.target.value);
+                  }}
                 />
               </div>
 
