@@ -173,7 +173,23 @@ export default function ProductCatalogManager() {
       // La colonne existe en DB (migration 20260626180000) + CHECK constraint
       // valide la valeur côté serveur.
       if (editingProduct) {
-        await updateProduct(editingProduct.id, {
+        // Clone-on-write : si l'user non-king modifie un produit SYSTÈME
+        // (tenant_id=NULL), on clone d'abord dans son tenant puis on update
+        // le CLONE — jamais le row système partagé. Comportement invisible
+        // pour l'utilisateur : il modifie, il save, ses changements restent
+        // dans son cabinet. Les autres cabinets ne voient RIEN.
+        let targetId = editingProduct.id;
+        if (editingProduct.tenant_id === null && !isKing) {
+          const cloneId = await cloneProduct(editingProduct.id);
+          if (!cloneId) {
+            // Erreur déjà loggée par le hook — on stoppe pour ne pas écraser
+            // le système par erreur.
+            return;
+          }
+          targetId = cloneId;
+        }
+
+        await updateProduct(targetId, {
           name: formData.name,
           company_id: formData.company_id,
           category: formData.category || MAIN_CATEGORY_TO_LEGACY[formData.main_category],
@@ -534,59 +550,24 @@ export default function ProductCatalogManager() {
                 value={formData.name}
                 onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
                 placeholder="Ex: LAMal FAVORIT MEDPHARM"
-                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
+                // Champs déverrouillés même pour un produit système : le save
+                // déclenchera un clone-on-write automatique (cf. handleSubmit).
+                disabled={false}
               />
             </div>
 
+            {/* Info discrète : signale que la modif d'un produit système va
+                créer une copie privée automatique au save. UX plus fluide
+                qu'un bouton explicite : l'user modifie, click Save, c'est
+                cloné en fond. */}
             {editingProduct && editingProduct.tenant_id === null && !isKing && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm space-y-3">
-                <div className="flex items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
-                  <Lock className="h-4 w-4" /> Produit système — partagé entre tous les cabinets
-                </div>
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  Ce produit est un catalogue partagé. Tu ne peux pas le modifier directement.
-                  Clique <strong>« Personnaliser pour mon cabinet »</strong> ci-dessous pour en créer une
-                  copie privée que tu pourras adapter — les autres cabinets ne verront PAS tes modifications.
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="border-amber-400 text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-900/40"
-                  onClick={async () => {
-                    if (!editingProduct) return;
-                    setIsSubmitting(true);
-                    try {
-                      const cloneId = await cloneProduct(editingProduct.id);
-                      if (!cloneId) {
-                        // Erreur déjà loggée par le hook
-                        return;
-                      }
-                      // Recharge le clone comme produit édité (déverrouille les champs)
-                      const clone = products.find(p => p.id === cloneId);
-                      if (clone) {
-                        setEditingProduct(clone);
-                        setFormData({
-                          name: clone.name,
-                          company_id: clone.company_id,
-                          category: clone.category,
-                          main_category: clone.main_category,
-                          subcategory: clone.subcategory || '',
-                          description: clone.description || '',
-                          branch_code: clone.branch_code ?? '',
-                          life_pillar: ((clone as any).life_pillar ?? '') as ProductFormData['life_pillar'],
-                          aliases: [],
-                        });
-                      }
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }}
-                  disabled={isSubmitting}
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                  Personnaliser pour mon cabinet
-                </Button>
+              <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2">
+                <Sparkles className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>
+                  Ce produit fait partie du catalogue partagé. En enregistrant tes modifications,
+                  une <strong>copie privée sera créée pour ton cabinet</strong>. Les autres cabinets ne verront
+                  PAS tes changements.
+                </span>
               </div>
             )}
 
@@ -595,7 +576,7 @@ export default function ProductCatalogManager() {
               <Select
                 value={formData.company_id}
                 onValueChange={(v) => setFormData(f => ({ ...f, company_id: v }))}
-                disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
+                disabled={false}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner une compagnie" />
@@ -619,7 +600,7 @@ export default function ProductCatalogManager() {
                     subcategory: '',
                     branch_code: BRANCHES_FOR_MAIN[v as ProductMainCategory].includes(f.branch_code as BranchCode) ? f.branch_code : '',
                   }))}
-                  disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
+                  disabled={false}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -637,7 +618,7 @@ export default function ProductCatalogManager() {
                 <Select
                   value={formData.branch_code || 'none'}
                   onValueChange={(v) => setFormData(f => ({ ...f, branch_code: v === 'none' ? '' : (v as BranchCode) }))}
-                  disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
+                  disabled={false}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner" />
@@ -659,7 +640,7 @@ export default function ProductCatalogManager() {
               <Select
                 value={formData.subcategory || "none"}
                 onValueChange={(v) => setFormData(f => ({ ...f, subcategory: v === "none" ? "" : v }))}
-                disabled={!!editingProduct && (editingProduct.tenant_id === null && !isKing)}
+                disabled={false}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Optionnel" />
@@ -689,7 +670,9 @@ export default function ProductCatalogManager() {
                     ...f,
                     life_pillar: v === 'none' ? '' : (v as ProductFormData['life_pillar']),
                   }))}
-                  disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
+                  // Champs déverrouillés même pour un produit système : le save
+                // déclenchera un clone-on-write automatique (cf. handleSubmit).
+                disabled={false}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Auto-détecté depuis le nom" />
@@ -714,7 +697,9 @@ export default function ProductCatalogManager() {
                 value={formData.category}
                 onChange={(e) => setFormData(f => ({ ...f, category: e.target.value }))}
                 placeholder="Ex: health, life, auto..."
-                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
+                // Champs déverrouillés même pour un produit système : le save
+                // déclenchera un clone-on-write automatique (cf. handleSubmit).
+                disabled={false}
               />
             </div>
 
@@ -725,7 +710,9 @@ export default function ProductCatalogManager() {
                 onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
                 placeholder="Description optionnelle..."
                 rows={2}
-                disabled={!!editingProduct && editingProduct.tenant_id === null && !isKing}
+                // Champs déverrouillés même pour un produit système : le save
+                // déclenchera un clone-on-write automatique (cf. handleSubmit).
+                disabled={false}
               />
             </div>
 
@@ -782,13 +769,14 @@ export default function ProductCatalogManager() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              {editingProduct && editingProduct.tenant_id === null && !isKing ? 'Fermer' : 'Annuler'}
+              Annuler
             </Button>
-            {!(editingProduct && editingProduct.tenant_id === null && !isKing) && (
-              <Button onClick={handleSubmit} disabled={isSubmitting || !formData.name || !formData.company_id}>
-                {isSubmitting ? 'Enregistrement...' : (editingProduct ? 'Modifier' : 'Créer')}
-              </Button>
-            )}
+            {/* Bouton Save toujours visible — le clone-on-write s'occupera
+                automatiquement de créer une copie privée si l'user modifie
+                un produit système (cf. handleSubmit). */}
+            <Button onClick={handleSubmit} disabled={isSubmitting || !formData.name || !formData.company_id}>
+              {isSubmitting ? 'Enregistrement...' : (editingProduct ? 'Modifier' : 'Créer')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
