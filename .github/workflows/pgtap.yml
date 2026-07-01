@@ -1,0 +1,141 @@
+name: pgTAP RLS Tests
+
+# Vérifie que les policies RLS multi-tenant ne fuient pas entre cabinets.
+# Se lance à chaque PR qui touche aux migrations ou aux tests, ainsi que
+# manuellement via workflow_dispatch.
+#
+# Le test spin up un Postgres 15 + pgTAP, applique toutes les migrations
+# de supabase/migrations/ dans l'ordre, puis lance chaque *.test.sql.
+# En cas de fail, la PR est bloquée à la review.
+
+# NOTE (juin 2026) : v1 = trigger MANUEL uniquement (workflow_dispatch).
+# Raison : les migrations LYTA utilisent auth.jwt(), storage.objects,
+# vault.decrypted_secrets, extension pg_trgm etc. qui ne sont pas natifs
+# à Postgres. Ce workflow émule le strict minimum et va probablement
+# faillir sur certaines migrations. Il faut d'abord stabiliser en local
+# via `supabase test db` (qui utilise le vrai Supabase Docker), puis
+# activer le trigger auto quand la CI passe. À ré-activer :
+#   pull_request: paths: ["supabase/migrations/**", "supabase/tests/**"]
+on:
+  workflow_dispatch: {}
+
+jobs:
+  pgtap:
+    name: RLS cross-tenant isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lyta_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pgTAP + psql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          # pgTAP est packagé, on l'installe dans le container Postgres via SQL
+          PGPASSWORD=postgres psql -h localhost -U postgres -d lyta_test -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+
+      - name: Setup Supabase schema minimal
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # On crée les schémas auth / storage minimalement pour permettre
+          # aux migrations qui référencent auth.users / storage.objects de
+          # passer. Supabase les crée automatiquement en prod ; en CI il
+          # faut les émuler à minima.
+          psql -h localhost -U postgres -d lyta_test <<'EOF'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE SCHEMA IF NOT EXISTS storage;
+
+          -- Table auth.users minimale (colonnes que les migrations réfèrent)
+          CREATE TABLE IF NOT EXISTS auth.users (
+            id UUID PRIMARY KEY,
+            instance_id UUID,
+            email TEXT,
+            encrypted_password TEXT,
+            email_confirmed_at TIMESTAMPTZ,
+            phone TEXT,
+            phone_confirmed_at TIMESTAMPTZ,
+            aud TEXT,
+            role TEXT,
+            raw_user_meta_data JSONB DEFAULT '{}'::jsonb,
+            raw_app_meta_data JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+          );
+
+          -- Fonctions auth.uid() / auth.role() basées sur JWT claims (comme Supabase)
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID
+          LANGUAGE sql STABLE AS $$
+            SELECT COALESCE(
+              (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')::uuid,
+              NULL::uuid
+            )
+          $$;
+
+          CREATE OR REPLACE FUNCTION auth.role() RETURNS TEXT
+          LANGUAGE sql STABLE AS $$
+            SELECT COALESCE(
+              current_setting('request.jwt.claims', true)::jsonb ->> 'role',
+              'anon'
+            )
+          $$;
+
+          -- Rôles Supabase
+          DO $do$ BEGIN
+            CREATE ROLE authenticated NOLOGIN;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
+          DO $do$ BEGIN
+            CREATE ROLE anon NOLOGIN;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
+          DO $do$ BEGIN
+            CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
+          EOF
+
+      - name: Apply all migrations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # Applique toutes les migrations dans l'ordre chronologique (nom
+          # de fichier commence par timestamp).
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "→ $f"
+            psql -h localhost -U postgres -d lyta_test -v ON_ERROR_STOP=1 -f "$f" || {
+              echo "❌ Migration failed: $f"
+              exit 1
+            }
+          done
+
+      - name: Run pgTAP tests
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          cd supabase/tests
+          for f in *.test.sql; do
+            echo "─────────────────────────────────────────────"
+            echo "→ Running $f"
+            echo "─────────────────────────────────────────────"
+            psql -h localhost -U postgres -d lyta_test -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "pgTAP tests terminés. Voir les logs ci-dessus pour le détail des assertions."
