@@ -302,5 +302,23 @@ export function useProductCatalog(companyId?: string, filters?: ProductCatalogFi
     deleteProduct,
     addAlias,
     removeAlias,
+    /**
+     * Clone un produit système dans le tenant actif (clone-on-write).
+     * Appelle la RPC SECURITY DEFINER `clone_insurance_product_for_tenant`
+     * qui gère : vérif rôle, tenant actif, doublon (renvoie l'existant si
+     * le tenant a déjà cloné ce produit).
+     * @returns l'UUID du clone (nouveau ou existant), ou null en cas d'erreur.
+     */
+    cloneProduct: async (sourceProductId: string): Promise<string | null> => {
+      const { data, error } = await supabase.rpc("clone_insurance_product_for_tenant", {
+        p_source_product_id: sourceProductId,
+      });
+      if (error) {
+        console.error("[useProductCatalog] cloneProduct failed:", error);
+        return null;
+      }
+      await refetch();
+      return (data as string | null) ?? null;
+    },
   };
 }

@@ -28,6 +28,7 @@ import {
   Lock,
   GitBranch,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 const MAIN_CATEGORIES: { value: ProductMainCategory; label: string; color: string }[] = [
@@ -94,7 +95,7 @@ export default function ProductCatalogManager() {
   const [filterBranch, setFilterBranch] = useState<BranchCode | 'all' | 'none'>('all');
   const [filterOrigin, setFilterOrigin] = useState<'all' | 'system' | 'tenant'>('all');
 
-  const { products, loading, page, totalCount, totalPages, goToPage, createProduct, updateProduct, deleteProduct, addAlias, removeAlias } = useProductCatalog(undefined, { statusFilter: filterStatus });
+  const { products, loading, page, totalCount, totalPages, goToPage, createProduct, updateProduct, deleteProduct, addAlias, removeAlias, cloneProduct } = useProductCatalog(undefined, { statusFilter: filterStatus });
   const { companies } = useInsuranceCompanies();
 
   const [search, setSearch] = useState('');
@@ -110,8 +111,19 @@ export default function ProductCatalogManager() {
   const [aliasDialogOpen, setAliasDialogOpen] = useState(false);
   const [aliasProduct, setAliasProduct] = useState<InsuranceProductExtended | null>(null);
 
+  // Clone-on-write : IDs des produits système que ce tenant a déjà clonés.
+  // Sert à masquer le système correspondant → le tenant voit sa version perso
+  // uniquement, jamais le système en doublon. Le king voit tout comme avant.
+  const clonedParentIds = new Set(
+    products
+      .filter(p => (p as any).parent_product_id && p.tenant_id !== null)
+      .map(p => (p as any).parent_product_id as string)
+  );
+
   // Filter products
   const filteredProducts = products.filter(p => {
+    // Hide système si ce tenant a un clone dérivé (clone-on-write)
+    if (!isKing && p.tenant_id === null && clonedParentIds.has(p.id)) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterCategory !== 'all' && p.main_category !== filterCategory) return false;
     if (filterCompany !== 'all' && p.company_id !== filterCompany) return false;
@@ -527,13 +539,54 @@ export default function ProductCatalogManager() {
             </div>
 
             {editingProduct && editingProduct.tenant_id === null && !isKing && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm space-y-3">
                 <div className="flex items-center gap-2 font-medium text-amber-900 dark:text-amber-200">
-                  <Lock className="h-4 w-4" /> Produit système — lecture seule
+                  <Lock className="h-4 w-4" /> Produit système — partagé entre tous les cabinets
                 </div>
-                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
-                  Ce produit fait partie du catalogue partagé entre tous les tenants. Tu ne peux pas le modifier. Pour proposer une correction, contacte le support.
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Ce produit est un catalogue partagé. Tu ne peux pas le modifier directement.
+                  Clique <strong>« Personnaliser pour mon cabinet »</strong> ci-dessous pour en créer une
+                  copie privée que tu pourras adapter — les autres cabinets ne verront PAS tes modifications.
                 </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-400 text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                  onClick={async () => {
+                    if (!editingProduct) return;
+                    setIsSubmitting(true);
+                    try {
+                      const cloneId = await cloneProduct(editingProduct.id);
+                      if (!cloneId) {
+                        // Erreur déjà loggée par le hook
+                        return;
+                      }
+                      // Recharge le clone comme produit édité (déverrouille les champs)
+                      const clone = products.find(p => p.id === cloneId);
+                      if (clone) {
+                        setEditingProduct(clone);
+                        setFormData({
+                          name: clone.name,
+                          company_id: clone.company_id,
+                          category: clone.category,
+                          main_category: clone.main_category,
+                          subcategory: clone.subcategory || '',
+                          description: clone.description || '',
+                          branch_code: clone.branch_code ?? '',
+                          life_pillar: ((clone as any).life_pillar ?? '') as ProductFormData['life_pillar'],
+                          aliases: [],
+                        });
+                      }
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  Personnaliser pour mon cabinet
+                </Button>
               </div>
             )}
 
