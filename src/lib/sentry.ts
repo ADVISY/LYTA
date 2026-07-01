@@ -86,12 +86,18 @@ export function initSentry(): void {
     ],
     // Liste des patterns à ignorer côté SDK (avant tout traitement réseau)
     ignoreErrors: IGNORE_ERROR_PATTERNS,
-    // Domaines de notre app — on ne trace pas les requêtes externes (ex. CDNs)
+    // Domaines de notre app UNIQUEMENT — on n'ajoute PAS les headers de tracing
+    // (`baggage`, `sentry-trace`) sur les requêtes vers Supabase parce que
+    // leurs endpoints (auth, rest, functions, storage) n'ont pas
+    // `baggage` dans leur `Access-Control-Allow-Headers`. Résultat sans
+    // cette restriction : toutes les requêtes CORS Supabase cassent avec
+    // "Request header field baggage is not allowed" (bug juin 2026).
+    // Impact : on perd la vue "trace distribuée" côté Supabase, mais on
+    // garde toutes les erreurs frontend + les breadcrumbs de fetch.
     tracePropagationTargets: [
       /^https:\/\/[^/]+\.lyta\.ch/,
       /^https:\/\/lyta\.ch/,
-      /^https:\/\/[^/]+\.supabase\.co/,
-      /^\//, // requêtes relatives
+      /^\//, // requêtes relatives (route interne app)
     ],
     // Beforesend : dernier filet de sécurité PII + scrubbing
     beforeSend(event) {

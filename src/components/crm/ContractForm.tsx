@@ -508,17 +508,35 @@ export default function ContractForm({ clientId, open, onOpenChange, onSuccess, 
             }
           }
           
-          // If productId is missing, try to find it by name
+          // Si productId est absent du snapshot (contrats legacy), on tente
+          // de le retrouver par nom EXACT (case-insensitive). Avant on faisait
+          // `ilike '%name%'` (match partiel) qui pouvait tomber sur un produit
+          // COMPLÈTEMENT DIFFÉRENT contenant les mêmes mots — bug reporté
+          // Habib (juin 2026) : un contrat Prévoyance édité repassait en Santé
+          // parce que le nom matchait partiellement un produit santé, et le
+          // mainProductId au submit pointait alors vers le mauvais produit.
           let resolvedProductId = prod.productId || '';
           if (!resolvedProductId && prod.name) {
             const { data: matchedProduct } = await supabase
               .from('insurance_products')
-              .select('id')
-              .ilike('name', `%${prod.name}%`)
+              .select('id, category')
+              .ilike('name', prod.name)  // = comparaison EXACTE (case-insensitive)
               .limit(1)
               .maybeSingle();
             if (matchedProduct) {
-              resolvedProductId = matchedProduct.id;
+              // Défense en profondeur : on vérifie AUSSI que la category live
+              // matche la category snapshot avant d'accepter le match. Si
+              // divergence → on refuse le match (mieux vaut un productId
+              // vide qu'un pointeur vers un produit d'une autre branche).
+              const liveCategory = normalizeCategoryFromDB(matchedProduct.category as string | null);
+              if (liveCategory === normalizedCategory || liveCategory === 'other' || normalizedCategory === 'other') {
+                resolvedProductId = matchedProduct.id;
+              } else {
+                console.warn(
+                  '[ContractForm] Product name match rejected — category mismatch:',
+                  { name: prod.name, snapshotCategory: normalizedCategory, liveCategory }
+                );
+              }
             }
           }
 
