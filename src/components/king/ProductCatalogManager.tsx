@@ -82,7 +82,7 @@ const emptyForm: ProductFormData = {
 const BRANCHES_FOR_MAIN: Record<ProductMainCategory, BranchCode[]> = {
   VIE: ['VIE', 'LPP'],
   LCA: ['LAMAL', 'LCA', 'PGM', 'ACCIDENT'],
-  NON_VIE: ['AUTO', 'MENAGE_RC', 'JURIDIQUE', 'VOYAGE', 'ENTREPRISE'],
+  NON_VIE: ['AUTO', 'MOTO', 'MENAGE_RC', 'JURIDIQUE', 'VOYAGE', 'ENTREPRISE'],
   HYPO: ['HYPO_CREDIT'],
 };
 

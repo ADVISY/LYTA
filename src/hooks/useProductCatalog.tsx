@@ -13,18 +13,19 @@ export interface ProductAlias {
 }
 
 export type BranchCode =
-  | 'AUTO' | 'LAMAL' | 'LCA' | 'PGM' | 'ACCIDENT'
+  | 'AUTO' | 'MOTO' | 'LAMAL' | 'LCA' | 'PGM' | 'ACCIDENT'
   | 'VIE' | 'LPP' | 'HYPO_CREDIT'
   | 'MENAGE_RC' | 'JURIDIQUE' | 'VOYAGE' | 'ENTREPRISE';
 
 export const BRANCH_CODES: BranchCode[] = [
-  'AUTO','LAMAL','LCA','PGM','ACCIDENT',
+  'AUTO','MOTO','LAMAL','LCA','PGM','ACCIDENT',
   'VIE','LPP','HYPO_CREDIT',
   'MENAGE_RC','JURIDIQUE','VOYAGE','ENTREPRISE',
 ];
 
 export const BRANCH_LABELS: Record<BranchCode, string> = {
-  AUTO: 'Auto / Moto',
+  AUTO: 'Auto',
+  MOTO: 'Moto',
   LAMAL: 'LAMal',
   LCA: 'Complémentaire',
   PGM: 'Perte de gain',
