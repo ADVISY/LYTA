@@ -28,7 +28,6 @@ import {
   Lock,
   GitBranch,
   Clock,
-  Sparkles,
 } from "lucide-react";
 
 const MAIN_CATEGORIES: { value: ProductMainCategory; label: string; color: string }[] = [
@@ -556,20 +555,9 @@ export default function ProductCatalogManager() {
               />
             </div>
 
-            {/* Info discrète : signale que la modif d'un produit système va
-                créer une copie privée automatique au save. UX plus fluide
-                qu'un bouton explicite : l'user modifie, click Save, c'est
-                cloné en fond. */}
-            {editingProduct && editingProduct.tenant_id === null && !isKing && (
-              <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2">
-                <Sparkles className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                <span>
-                  Ce produit fait partie du catalogue partagé. En enregistrant tes modifications,
-                  une <strong>copie privée sera créée pour ton cabinet</strong>. Les autres cabinets ne verront
-                  PAS tes changements.
-                </span>
-              </div>
-            )}
+            {/* Clone-on-write 100 % transparent — l'user modifie et save
+                comme d'habitude, la RPC clone_insurance_product_for_tenant
+                se déclenche en fond dans handleSubmit si nécessaire. */}
 
             <div className="space-y-2">
               <Label>Compagnie *</Label>
